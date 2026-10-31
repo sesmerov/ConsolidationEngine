@@ -4,6 +4,7 @@ import type { HttpResponse } from '@angular/common/http';
 import { firstValueFrom, fromEvent, takeUntil } from 'rxjs';
 import type { BootstrapDTO, CapabilitiesDTO, DirectionChoiceDTO, DirectionsResponseDTO, JobDTO, RulesPageDTO, WorkspaceDTO, ValidationResultsPageDTO } from '@ce/contracts';
 import type { HistoryPageDTO, PreviewDTO, PreviewSelectionDTO, PreviewSummaryDTO, ProposalsPageDTO, RunSummaryDTO } from '@ce/contracts';
+import type { ApplicationDetailDTO, ApplicationRequestDTO, ComparisonPageDTO } from '@ce/contracts';
 @Injectable({ providedIn: 'root' })
 export class ApiClient {
   private readonly http = inject(HttpClient);
@@ -69,9 +70,22 @@ export class ApiClient {
     return firstValueFrom(this.http.post<PreviewSelectionDTO>(this.previewUrl(workspaceId, previewId) + '/selection', { selectedIds }, { headers: this.headers() }));
   }
   discardPreview(workspaceId: string, previewId: string, etag: string): Promise<PreviewDTO> { return firstValueFrom(this.http.delete<PreviewDTO>(this.previewUrl(workspaceId, previewId), { headers: this.headers(etag) })); }
+  apply(workspaceId: string, body: ApplicationRequestDTO, etag: string, key: string): Promise<JobDTO> {
+    return firstValueFrom(this.http.post<JobDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/applications', body, { headers: this.headers(etag).set('Idempotency-Key', key) }));
+  }
+  application(workspaceId: string, receiptId: string): Promise<ApplicationDetailDTO> {
+    return firstValueFrom(this.http.get<ApplicationDetailDTO>(this.applicationUrl(workspaceId, receiptId), { headers: this.headers() }));
+  }
+  comparison(workspaceId: string, receiptId: string, cursor?: string): Promise<ComparisonPageDTO> {
+    return firstValueFrom(this.http.get<ComparisonPageDTO>(this.applicationUrl(workspaceId, receiptId) + '/comparison', { headers: this.headers(), params: { limit: '50', ...(cursor ? { cursor } : {}) } }));
+  }
+  private applicationUrl(workspaceId: string, receiptId: string): string { return '/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/applications/' + encodeURIComponent(receiptId); }
   private previewUrl(workspaceId: string, previewId: string): string { return '/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/previews/' + encodeURIComponent(previewId); }
   exportResults(workspaceId: string, versionId: string, runId: string, etag: string, key: string): Promise<JobDTO> {
     return firstValueFrom(this.http.post<JobDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/exports', { versionId, runId, kind: 'results' }, { headers: this.headers(etag).set('Idempotency-Key', key) }));
+  }
+  exportReport(workspaceId: string, versionId: string, etag: string, key: string): Promise<JobDTO> {
+    return firstValueFrom(this.http.post<JobDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/exports', { versionId, kind: 'report' }, { headers: this.headers(etag).set('Idempotency-Key', key) }));
   }
   downloadExport(workspaceId: string, exportId: string): Promise<Blob> {
     return firstValueFrom(this.http.get('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/exports/' + encodeURIComponent(exportId), { headers: this.headers(), responseType: 'blob' }));

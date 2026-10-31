@@ -5,7 +5,7 @@ import { stageMultipart } from '../import/multipart-staging.js';
 import type { UploadLimits } from '../import/multipart-staging.js';
 import { registerJobRoute } from './jobs.js';
 export function registerImports(app: FastifyInstance, limits?: Partial<UploadLimits>): void {
-  registerJobRoute(app, { path: '/workspaces/:workspaceId/imports', kind: 'import', prepare: async (request) => {
+  registerJobRoute(app, { path: '/workspaces/:workspaceId/imports', kind: 'import', accept: () => ({ includeSnapshot: false }), prepare: async (request) => {
     const workspaceId = (request.params as { workspaceId: string }).workspaceId;
     const key = request.headers['idempotency-key'] as string;
     const recognized = app.ce.idempotency.has({ workspaceId, key, operation: 'import:/workspaces/:workspaceId/imports' });

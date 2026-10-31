@@ -13,6 +13,8 @@ import type { Binding } from '../resolver/scope.js';
 export interface RunValidationOptions {
   readonly runId: string; readonly startedAt: string; readonly cancelled?: () => boolean;
   readonly progress?: (completed: number, total: number) => void; readonly limits?: Partial<WorkLimits>; readonly now?: () => number;
+  /** When supplied, this operation-wide budget owns limits, cancellation and the deadline. */
+  readonly budget?: WorkBudget;
 }
 class ProfileError extends Error { readonly code = 'PROFILE_MISMATCH'; }
 /** Stable within a snapshot, including coverage rows with no instance or binding. */
@@ -82,7 +84,8 @@ export function runValidation(snapshot: Snapshot, options: RunValidationOptions)
       // A declared coordinate with no Facts row keeps its own source and implicit absence.
       // Preserve every source if an invalid internal snapshot contains duplicate facts; never select the first.
       return facts.length ? facts.map(fact => ({ factKey, coordinate, presence: fact.presence === 'value' ? 'value' as const : 'explicit_null' as const,
-        ...(fact.normalizedValue !== undefined ? { normalizedValue: fact.normalizedValue } : {}), ...(fact.originalText !== undefined ? { originalText: fact.originalText } : {}), sourceLocator: fact.sourceLocator }))
+        ...(fact.normalizedValue !== undefined ? { normalizedValue: fact.normalizedValue } : {}), ...(fact.originalText !== undefined ? { originalText: fact.originalText } : {}),
+        ...(fact.derivation ? { derivation: fact.derivation } : {}), sourceLocator: fact.sourceLocator }))
         : [{ factKey, coordinate, presence: 'implicit_null' as const, sourceLocator: coordinate.sourceLocator }];
     });
     const sources = uniqueSources([...variants.flatMap(item => item.sourceLocators), ...readKeys.flatMap(key => {
@@ -102,7 +105,7 @@ export function runValidation(snapshot: Snapshot, options: RunValidationOptions)
       readKeys, factReads, metadataReads, sources, diagnostics: issues });
   }
   try {
-    budget = new WorkBudget({ ...(options.limits ? { limits: options.limits } : {}), ...(options.cancelled ? { cancelled: options.cancelled } : {}), ...(options.now ? { now: options.now } : {}) });
+    budget = options.budget ?? new WorkBudget({ ...(options.limits ? { limits: options.limits } : {}), ...(options.cancelled ? { cancelled: options.cancelled } : {}), ...(options.now ? { now: options.now } : {}) });
     budget.check();
     if (content.profileId !== 'ce-dpmxl-0.9-closed-v1') throw new ProfileError('Snapshot profile does not match this engine');
     for (const cell of content.coordinates) { budget.check(); coordinateByKey.set(cell.factKey, cell); }

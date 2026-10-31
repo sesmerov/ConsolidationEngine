@@ -52,7 +52,9 @@ Todas las rutas siguientes, salvo bootstrap, requieren token. `{w}` es workspace
 | GET `/workspaces/{w}/previews/{previewId}/proposals` | Página de propuestas, dependencias, valores y bloqueos. |
 | POST `/workspaces/{w}/previews/{previewId}/selection` | `{selectedIds}` → 200 `{selectedIds,requiredIds,closureHash,complete,state}` para ready/obsolete; informa clausura, no aplica ni acepta cambios. |
 | POST `/workspaces/{w}/applications` | `{baseVersionId,previewId,selectedIds,closureHash}` → 202 Job de aplicación confirmada. |
-| POST `/workspaces/{w}/exports` | `{versionId,runId?,kind}` → 202 Job; kind=`report` o `results`. Para results, runId es obligatorio y pertenece a versionId; produce el ZIP descrito abajo. |
+| GET `/workspaces/{w}/applications/{id}` | 200 `{receipt,changeCount,beforeSummary,afterSummary}`; consulta autenticada sin If-Match. |
+| GET `/workspaces/{w}/applications/{id}/comparison` | Página `{items,total,nextCursor,receipt,beforeSummary,afterSummary,sourceFiles?}`; consulta autenticada sin If-Match. |
+| POST `/workspaces/{w}/exports` | `{versionId,runId?,kind}` → 202 Job; kind=`report` o `results`. Para results, runId es obligatorio y pertenece a versionId. Ambos formatos generan los paquetes ZIP descritos abajo. |
 | GET `/workspaces/{w}/exports/{exportId}` | 200 descarga producida, con Content-Disposition seguro; nunca una ruta del filesystem. |
 
 Directions utiliza instancias de una validación completa del snapshot actual. La configuración
@@ -104,6 +106,26 @@ La operación exige que no exista ningún Job no terminal: en caso contrario res
 `WORKSPACE_BUSY` para evitar una carrera con la aplicación. Un If-Match obsoleto produce 412
 `STALE_VERSION`; ningún rechazo altera la preview ni el snapshot.
 
+El recibo de aplicación identifica `beforeValidationRunId` para la base y `validationRunId`
+para el candidato publicado. Ambas validaciones deben estar completas. Puede reutilizarse una
+validación completa de la base exacta; si falta, el Job la calcula con el mismo presupuesto de
+trabajo/plazo que la validación posterior. La validación previa nueva solo se publica junto al
+candidato completo, validación posterior y recibo, después de comprobar versión y cancelación.
+Un resultado incompleto o fallo previo a publicar no deja una aplicación ni un run previo parcial.
+La misma publicación fija `PreviewDTO.appliedReceiptId` y state=applied junto al recibo y al
+nuevo snapshot. Al restaurar el historial, la UI abre la preview aplicada y usa ese ID para
+consultar GET application y su comparison; no se añade un listado separado de aplicaciones.
+
+GET application devuelve el recibo, changeCount y resúmenes antes/después, sin snapshots
+ni la lista completa de cambios. changeCount cuenta solo ApplyChange.changed=true y puede ser
+cero: una propuesta aceptada equivalente conserva el hecho y se audita changed=false, aunque
+siga en acceptedIds y pase a applied. Una selección no vacía puede publicar versión/recibo con
+cero parches tras revalidar. La comparación usa `limit` (1–200, por defecto 50) y cursor;
+cada item es `{key,before?,after?}` y empareja resultados por identidad semántica, no por runId
+o ID del resultado. Un resultado presente solo en un lado conserva el otro ausente. Los items
+son resultados de validación, no copias completas de los snapshots. sourceFiles opcional
+explica sus locadores sin rutas locales. Los cambios completos se conservan para la exportación.
+
 ## Exportación de resultados y cuotas
 
 `kind=results` genera una única descarga ZIP, `Content-Type: application/zip`, con dos entradas
@@ -111,27 +133,60 @@ de nombres fijos en su raíz: `results.json` y `results.xlsx`. JSON conserva val
 racionales como cadenas, estados, diagnósticos, versiones y procedencias del run solicitado;
 XLSX presenta esos resultados mediante celdas literales, sin fórmulas ni enlaces activos. No se
 truncan filas ni valores para completar el trabajo. El nombre de descarga lo genera el servidor
-y nunca procede de una ruta o nombre aportado por el usuario. `kind=report` mantiene el informe
-ce-report-1 definido en [workbook](workbook.md#exportación-y-roundtrip); este ZIP corresponde
-exclusivamente a results y no redefine el formato de report.
+y nunca procede de una ruta o nombre aportado por el usuario.
+
+`kind=report` descarga `report.zip` (`application/zip`): contiene de 1 a 20 informes ce-report-1,
+uno por SourceFile de tipo report, con nombres controlados `reports/report-001.xlsx`,
+`reports/report-002.xlsx`, etc., más `changes.json` y `changes.xlsx` literal. El manifiesto dentro
+de changes.json relaciona cada entrada con su fuente, contextIds, hash y tamaños; los recibos y
+cambios son acumulados desde la última importación hasta el snapshot solicitado. El
+[workbook](workbook.md#exportación-y-roundtrip) define su forma y reglas de procedencia.
+El catálogo no se incluye: para reimportar se usan los informes extraídos y el catálogo original
+por separado. No se sobrescriben originales ni se incorporan versiones posteriores al registro.
+Los informes ce-report-1 se escriben incrementalmente con inlineStr y ZIP DEFLATE, contabilizando
+bytes reales. No construyen una matriz completa de celdas ni usan el guard XML estimado de los
+libros de resultados/cambios. El worker mantiene `maxOldGenerationSizeMb: 256`, sin equipararlo
+a un límite de RSS o de todos los buffers.
+Importación/exportación preserva el texto ST_Xstring mediante una sola decodificación, escapes
+de literales `_xHHHH_`, CR y espacios; controles XML 1.0 no representables y surrogates sin pareja
+se rechazan. Las reglas completas de texto están en el [workbook](workbook.md#exportación-y-roundtrip).
 
 Las capacidades publican separadamente estos límites locales (1 MiB = 1.048.576 bytes):
 
 | Límite | Valor y métrica |
 | --- | --- |
 | Cada contenido de results | 64 MiB por `results.json` (bytes UTF-8) y por `results.xlsx` (bytes del XLSX). |
-| Paquete results | Tanto la suma de los dos contenidos serializados como el ZIP completo deben ser ≤100 MiB. |
-| Carga XML previa de XLSX | `limits.exportXmlWorkloadBytes = 64 MiB`: estimación conservadora antes de construir las celdas. |
+| Cada informe de report | 10 MiB por XLSX ce-report-1; entre 1 y 20 informes. |
+| Lote reimportable de report | Informes exportados + catálogo original: ≤50 MiB serializados y ≤100 MiB de bytes descomprimidos reales. |
+| Registros de cambios de report | 64 MiB por `changes.json` y por `changes.xlsx`. |
+| Cada paquete results/report | Tanto la suma de sus contenidos serializados como el ZIP completo deben ser ≤100 MiB. |
+| Carga XML previa de resultados/cambios | `limits.exportXmlWorkloadBytes = 64 MiB` por results.xlsx o changes.xlsx; no corresponde a informes ce-report-1 incrementales. |
 | Estado de sesión | 512 MiB de JSON canónico contabilizado, según el modelo. |
 | Archivos propios del workspace | 512 MiB acumulados, incluidos staging, archivos de trabajo y exports retenidos. |
 
-La estimación XML es `64 KiB + 128 × filas + 128 × celdas + 6 × bytes UTF-8 de los valores`,
+Para results.xlsx y changes.xlsx, la estimación XML es
+`64 KiB + 128 × filas + 128 × celdas + 6 × bytes UTF-8 de los valores`,
 sumando todas las filas/celdas previstas del libro, incluidas cabeceras. Es una comprobación
-previa a reservar las estructuras de celdas del escritor, separada de los límites de contenidos
+conservadora previa a generar el XLSX, separada de los límites de contenidos
 serializados y del ZIP final. Un XLSX comprimido inferior a 64 MiB puede exceder esta estimación.
 El motivo `XML_WORKLOAD_LIMIT` explica ese caso; el error público continúa siendo `EXPORT_LIMIT`:
 413 si se conoce antes de aceptar o Job failed si se detecta tras el 202. Capabilities publica
 el límite y explica esta diferencia; no se sustituyen los controles de bytes reales de salida.
+Los informes ce-report-1 conservan 10 MiB por XLSX, 50 MiB serializados y 100 MiB descomprimidos
+con el catálogo original, 64 MiB descomprimidos por entrada ZIP y las restantes cuotas de
+preflight. La exclusión del guard estimado no modifica los máximos de paquete ni de sesión.
+
+El preflight de importación conserva `SourceFile.expandedBytes`; la exportación report necesita
+ese metadato del catálogo original para verificar el lote reimportable. No supone cero si falta.
+La importación de informes usa SAX por bloques y filas Contexts → Coordinates → Facts, sin
+retener todos los RawCells de datos ni materializar otra matriz. El catálogo mantiene su lector
+raw/read-excel-file. Esta organización no cambia el contrato de carga, sus cuotas ni la publicación
+atómica; las reglas de identidad y XML desordenado están en el contrato de workbook.
+Los informes generados deben satisfacer además todas las cuotas de preflight/importación. Una
+cadena de procedencia rota o metadatos insuficientes rechaza la exportación, sin fabricar un log.
+Esos casos producen 409 `EXPORT_NOT_AVAILABLE`, con reason limitado a `MISSING_IMPORT_STATS`,
+`INVALID_REPORT_SOURCE` o `INCOMPLETE_VERSION_HISTORY`, sin rutas en el diagnóstico.
+`EXPORT_LIMIT` se reserva a límites de tamaño/carga medidos; no sustituye un fallo de procedencia.
 
 Se comprueba/reserva capacidad antes de crear buffers grandes y se cuentan los bytes reales
 durante la generación; una estimación inicial no autoriza exceder el límite. La compresión no
@@ -177,11 +232,18 @@ proyecciones explícitas, no registros completos:
 | RunSummary | id, versionId, profileId, status, startedAt, endedAt? |
 | PreviewSummary | id, baseVersionId, profileId, policyId, state, createdAt |
 
-No incluyen resultIds, AST, propuestas ni rutas. El orden es estable por fecha (startedAt en
-runs, createdAt en previews) e id. El cursor está firmado con HMAC y vinculado a la revisión de
+El filtro status admite running/completed/incomplete en runs y ready/applied/discarded/obsolete
+en previews. No incluyen resultIds, AST, propuestas ni rutas. El orden es descendente por fecha
+(startedAt en runs, createdAt en previews) y, en empate, por id descendente: primero el más reciente.
+El cursor está firmado con HMAC y vinculado a la revisión de
 la colección de resúmenes y sus filtros. Un cambio de colección/revisión invalida el cursor
 anterior (`INVALID_CURSOR`); el cliente vuelve a consultar desde la primera página.
 Preview.createdAt se captura al comenzar la simulación y se conserva al cambiar su estado.
+
+`ProposalsPageDTO.sourceFiles?: readonly SourceFile[]` procede del snapshot base de la preview
+y permite explicar displayName/hoja/celda también en consultas históricas. La página de propuestas
+preserva el orden topológico emitido por el motor, sin ordenar por UUID; los filtros conservan
+ese mismo orden relativo.
 
 La página de resultados `ValidationResultsPageDTO` añade `run` y, opcionalmente,
 `sourceFiles: SourceFile[]`. Estos archivos pertenecen al snapshot de ese run, aunque ya sea
@@ -222,7 +284,7 @@ para legibilidad; la implementación devolverá los campos del modelo, con expre
 variante, coordenadas y locadores. No serializa el AST ni rutas locales.
 
 FR-009 incluye además `factReads`, obligatorio aunque sea `[]`, para explicar cada hecho leído:
-`{factKey, coordinate, presence, normalizedValue?, originalText?, sourceLocator}`. Presence es
+`{factKey, coordinate, presence, normalizedValue?, originalText?, sourceLocator, derivation?}`. Presence es
 `value`, `explicit_null` o `implicit_null`; normalizedValue es racional con enteros en cadenas
 o booleano cuando existe valor. Coordinate conserva la clave completa, unidad, `decimals`, ejes
 y su localizador de Coordinates. El sourceLocator principal apunta a Facts para un valor/null
@@ -235,6 +297,11 @@ misma celda se usa con opciones distintas. `values` conserva los operandos/resul
 Solo se informan lecturas realmente realizadas: una precondición false no genera lecturas del
 cuerpo omitido. Los indicadores se conservan separados en metadataReads. JSON usa valores exactos,
 sin BigInt ni AST serializados. Esta trazabilidad también forma parte de la exportación results.
+
+Un hecho calculado puede llevar `derivation:{receiptId,previewId,proposalId,baseVersionId}`,
+también presente en su FactReadDTO. Conserva el sourceLocator original para ubicar la celda,
+mientras derivation identifica el cálculo que produjo el valor. La UI explica esa procedencia
+y no presenta el valor recalculado como si fuera el importe original del archivo.
 
 Error común:
 
@@ -261,7 +328,7 @@ El frontend traduce estados y mensajes al español sin recalcular valores.
 | 400 | INVALID_REQUEST, INVALID_CURSOR: petición sin efecto. |
 | 403 | INVALID_SESSION, ORIGIN_NOT_ALLOWED: no revela datos de sesión. |
 | 404 | RESOURCE_NOT_FOUND: ID desconocido, cerrado o de otra sesión. |
-| 409 | WORKSPACE_BUSY, ACTIVE_WORKSPACE_EXISTS, IDEMPOTENCY_CONFLICT, SELECTION_NOT_CLOSED, PREVIEW_NOT_APPLICABLE. |
+| 409 | WORKSPACE_BUSY, ACTIVE_WORKSPACE_EXISTS, IDEMPOTENCY_CONFLICT, SELECTION_NOT_CLOSED, PREVIEW_NOT_APPLICABLE, EXPORT_NOT_AVAILABLE. |
 | 412 | STALE_VERSION: If-Match/baseVersion/preview no concuerdan. |
 | 413 | UPLOAD_LIMIT, EXPANSION_LIMIT, EXPORT_LIMIT, SESSION_LIMIT: conservar estado anterior; no publicar archivos parciales. |
 | 415 | UNSUPPORTED_FILE_TYPE: solo XLSX admitido. |

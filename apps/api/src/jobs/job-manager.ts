@@ -3,8 +3,8 @@ import { Worker } from 'node:worker_threads';
 import { ERROR_MESSAGES, JOB_DEADLINE_MS, isTerminalJob } from '@ce/contracts';
 import type { JobDTO, JobKind, JsonValue, ResultRef } from '@ce/contracts';
 import { ApiError } from '../errors.js';
-import type { WorkspaceStore } from '../session/workspace-store.js';
-import type { StateRecord, WorkerMessage, WorkerRequest } from '../workers/protocol.js';
+import type { PublicationOutput, WorkspaceStore } from '../session/workspace-store.js';
+import type { StateRecord, WorkerMessage, WorkerOutput, WorkerRequest } from '../workers/protocol.js';
 import { receivedDiagnostic } from '../public-diagnostic.js';
 
 export type WorkerHandle = Pick<Worker, 'on' | 'terminate'>;
@@ -13,9 +13,11 @@ export interface JobManagerOptions {
   workerFactory?: WorkerFactory; workerModules?: Partial<Record<JobKind, URL>>; deadlineMs?: number; workerEntry?: URL;
 }
 export interface JobAcceptance { input?: JsonValue; initialRecords?: readonly StateRecord[]; resultRef?: ResultRef; includeSnapshot?: boolean;
+  retainedState?: JsonValue;
+  preparePublication?: (job: JobDTO, output: WorkerOutput) => { output: PublicationOutput; assertCommit?: () => void };
   onTerminal?: (job: JobDTO) => readonly StateRecord[]; finalize?: () => Promise<void> }
 export interface StartJob extends JobAcceptance { workspaceId: string; kind: JobKind; baseVersionId?: string; input: JsonValue; jobId?: string }
-interface Running extends Pick<JobAcceptance, 'onTerminal' | 'includeSnapshot' | 'finalize'> { cancellation: Int32Array; worker?: WorkerHandle; timer?: NodeJS.Timeout; expiresAt: number; stopping: boolean; stopPromise?: Promise<JobDTO> }
+interface Running extends Pick<JobAcceptance, 'onTerminal' | 'includeSnapshot' | 'finalize' | 'preparePublication'> { cancellation: Int32Array; worker?: WorkerHandle; timer?: NodeJS.Timeout; expiresAt: number; stopping: boolean; stopPromise?: Promise<JobDTO> }
 class DeadlineElapsed extends Error {}
 export class JobManager {
   private readonly running = new Map<string, Running>();
@@ -40,9 +42,9 @@ export class JobManager {
     if (this.disposed) throw new ApiError('RESOURCE_NOT_FOUND');
     const job: JobDTO = { jobId: input.jobId ?? randomUUID(), workspaceId: input.workspaceId, kind: input.kind, status: 'queued',
       ...(input.baseVersionId ? { baseVersionId: input.baseVersionId } : {}), ...(input.resultRef ? { resultRef: input.resultRef } : {}), progress: { completed: 0, total: 0, complete: false }, diagnostics: [], pollAfterMs: 1000 };
-    this.store.registerJob(job, input.initialRecords);
+    this.store.registerJob(job, input.initialRecords, input.retainedState);
     const running: Running = { cancellation: new Int32Array(new SharedArrayBuffer(4)), expiresAt: Infinity, stopping: false, ...(input.finalize ? { finalize: input.finalize } : {}),
-      ...(input.onTerminal ? { onTerminal: input.onTerminal } : {}), ...(input.includeSnapshot !== undefined ? { includeSnapshot: input.includeSnapshot } : {}) };
+      ...(input.onTerminal ? { onTerminal: input.onTerminal } : {}), ...(input.preparePublication ? { preparePublication: input.preparePublication } : {}), ...(input.includeSnapshot !== undefined ? { includeSnapshot: input.includeSnapshot } : {}) };
     this.running.set(job.jobId, running);
     queueMicrotask(() => this.begin(job, input.input, running)); return this.get(job.workspaceId, job.jobId);
   }
@@ -85,10 +87,12 @@ export class JobManager {
         this.store.assertBase(job.workspaceId, job.baseVersionId);
         if (Atomics.load(running.cancellation, 0)) return;
         if (Date.now() >= running.expiresAt) { void this.stop(job, 'timed_out'); return; }
-        this.store.publishJobResult(job, message.output, () => {
+        const publication: { output: PublicationOutput; assertCommit?: () => void } = running.preparePublication?.(job, message.output) ?? { output: message.output };
+        this.store.publishJobResult(job, publication.output, () => {
           this.store.assertBase(job.workspaceId, job.baseVersionId);
           if (Date.now() >= running.expiresAt) throw new DeadlineElapsed();
           if (Atomics.load(running.cancellation, 0)) throw new ApiError('INTERNAL_ERROR');
+          publication.assertCommit?.();
         });
         this.cleanup(job.jobId);
       } else if (message.type === 'failure') {

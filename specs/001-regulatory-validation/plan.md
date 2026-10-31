@@ -32,6 +32,14 @@ Java 11+ solo para ANTLR, generación de referencia con JDK 17 y versión exacta
 multipart 10.1.6/static 10.1.8, ANTLR 4.13.2 herramienta/runtime, read-excel-file 9.3.14,
 write-excel-file 4.1.1, yauzl 3.4.0 y sax 1.6.1. Pins y fuentes: [research R1](research.md#r1-versiones-y-organización).
 
+**Workbook Pipeline**: El catálogo usa celdas raw/read-excel-file; los informes ce-report-1
+usan preflight SAX por bloques en modo metadata y normalización por filas Contexts → Coordinates
+→ Facts. Se conservan cabeceras/sharedStrings/metadatos necesarios, sin retener todos los RawCells
+ni construir la segunda matriz de read-excel-file. El normalizador de dominio es compartido.
+Esta decisión elimina la retención masiva de celdas/direcciones que provocó OOM durante el preflight
+del caso 100.000 hechos, antes de la segunda lectura. Conserva el heap configurado del worker
+y las cuotas; detalle: [research R5](research.md#r5-xlsx-y-precisión-de-importación).
+
 **Storage**: Un workspace efímero por proceso, snapshots inmutables en memoria y temporales locales.
 Sin DB, sin recuperación entre reinicios. Exportaciones elegidas por el usuario sobreviven al cierre.
 
@@ -125,6 +133,9 @@ grammar/                  # fuentes originales existentes, inmutables
 **Structure Decision**: El motor no importa HTTP, filesystem ni Angular. API depende de motor
 y DTO; web depende de DTO, sin incluir el evaluador en el navegador. Los adaptadores XLSX viven
 en API y entregan datos normalizados al motor. El paquete compartido no almacena estado de sesión.
+La lectura incremental de informes resuelve cabeceras/identidades y fragmentos de filas sin
+depender del orden de elementos XML; duplicar una celda es inválido. Esta admisión de XML
+desordenado es explícita: no se afirma que el lector anterior admitiera esos mismos archivos.
 No se añaden Nx, colas externas ni una capa genérica de repositorios.
 
 ### Flujo de ejecución

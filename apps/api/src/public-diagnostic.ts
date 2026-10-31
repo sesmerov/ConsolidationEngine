@@ -2,6 +2,9 @@ import { ERROR_MESSAGES, ERROR_STATUS, safeDisplayName } from '@ce/contracts';
 import type { Diagnostic, ErrorCode, SourceLocator } from '@ce/contracts';
 import { ApiError } from './errors.js';
 const REASONS: Readonly<Record<string, string>> = {
+  MISSING_IMPORT_STATS: 'Faltan los tamaños originales de importación necesarios para verificar que el informe pueda volver a cargarse.',
+  INVALID_REPORT_SOURCE: 'La procedencia conservada no permite reconstruir los informes originales.',
+  INCOMPLETE_VERSION_HISTORY: 'El historial de versiones o aplicaciones está incompleto para esta exportación.',
   XML_WORKLOAD_LIMIT: 'La estimación conservadora de carga XML supera el límite de la vista Excel, aunque el ZIP final pudiera ser menor.',
   TEXT_CELL_REQUIRED: 'La celda debe ser texto de Excel. Vuelve a introducir el importe o código como texto para conservar su precisión.',
   INPUT_VALUE_LIMIT: 'El importe supera 128 dígitos significativos o 128 posiciones decimales.',

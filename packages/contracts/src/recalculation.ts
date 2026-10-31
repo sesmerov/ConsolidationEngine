@@ -1,7 +1,8 @@
 import type { Diagnostic, Rational, SourceFile, SourceLocator } from './common.js';
 import type { FactReadDTO, MetadataReadDTO, ValidationBinding } from './validation.js';
 import { rationalSchema, sourceLocatorSchema, uuidSchema } from './common.schemas.js';
-import { coordinateSchema } from './report.js';
+import { coordinateSchema, factDerivationSchema } from './report.js';
+import { diagnosticSchema } from './catalog.js';
 
 export const RECALCULATION_POLICY_ID = 'half-even-v1' as const;
 export type TargetSide = 'left' | 'right';
@@ -23,6 +24,7 @@ export interface GraphSummaryDTO {
 export interface PreviewDTO {
   readonly id: string; readonly baseVersionId: string; readonly profileId: string; readonly policyId: string;
   readonly createdAt: string;
+  readonly appliedReceiptId?: string;
   readonly state: PreviewState; readonly proposalIds: readonly string[]; readonly graphSummary: GraphSummaryDTO;
   readonly diagnostics: readonly Diagnostic[];
 }
@@ -53,21 +55,18 @@ const hashes = { type: 'array', items: hash, uniqueItems: true } as const;
 const uuids = { type: 'array', items: uuidSchema, uniqueItems: true } as const;
 const texts = { type: 'array', items: text, uniqueItems: true } as const;
 const count = { type: 'integer', minimum: 0 } as const;
-const bindingSchema = { type: 'object', additionalProperties: false, properties: {
+export const bindingSchema = { type: 'object', additionalProperties: false, properties: {
   contextId: text, contextIds: texts, tableCode: text, sheetCode: text, rowCode: text, columnCode: text,
 } } as const;
-const diagnosticSchema = { type: 'object', additionalProperties: false, required: ['code', 'message'], properties: {
-  code: text, message: text, locator: sourceLocatorSchema, fileName: text, severity: { enum: ['error', 'warning', 'info'] },
-  line: { type: 'integer', minimum: 1 }, column: count, start: count, end: count,
-} } as const;
 const diagnostics = { type: 'array', items: diagnosticSchema } as const;
-const metadataReads = { type: 'array', items: { type: 'object', additionalProperties: false, required: ['contextId', 'code', 'presence'], properties: {
+export const metadataReadsSchema = { type: 'array', items: { type: 'object', additionalProperties: false, required: ['contextId', 'code', 'presence'], properties: {
   contextId: text, code: text, presence: { enum: ['declared', 'missing'] }, value: { type: 'boolean' }, sourceLocator: sourceLocatorSchema,
 } } } as const;
-const beforeSchema = { type: 'object', additionalProperties: false, required: ['factKey', 'coordinate', 'presence', 'sourceLocator'], properties: {
+export const factReadSchema = { type: 'object', additionalProperties: false, required: ['factKey', 'coordinate', 'presence', 'sourceLocator'], properties: {
   factKey: text, coordinate: coordinateSchema, presence: { enum: ['value', 'explicit_null', 'implicit_null'] },
-  normalizedValue: { anyOf: [rationalSchema, { type: 'boolean' }] }, originalText: text, sourceLocator: sourceLocatorSchema,
-}, allOf: [{ if: { properties: { presence: { const: 'value' } } }, then: { required: ['normalizedValue', 'originalText'] }, else: { not: { anyOf: [{ required: ['normalizedValue'] }, { required: ['originalText'] }] } } }] } as const;
+  normalizedValue: { anyOf: [rationalSchema, { type: 'boolean' }] }, originalText: text, sourceLocator: sourceLocatorSchema, derivation: factDerivationSchema,
+}, allOf: [{ if: { type: 'object', properties: { presence: { const: 'value' } } }, then: { type: 'object', required: ['normalizedValue', 'originalText'] }, else: { not: { anyOf: [{ type: 'object', required: ['normalizedValue'] }, { type: 'object', required: ['originalText'] }] } } },
+  { if: { type: 'object', required: ['derivation'] }, then: { type: 'object', properties: { presence: { const: 'value' } } } }] } as const;
 export const directionChoiceSchema = { type: 'object', additionalProperties: false, required: ['instanceId', 'targetSide'], properties: {
   instanceId: hash, targetSide: { enum: ['left', 'right'] },
 } } as const;
@@ -81,28 +80,28 @@ export const directionSchema = { type: 'object', additionalProperties: false, re
 const previewStates = { enum: ['ready', 'applied', 'discarded', 'obsolete'] } as const;
 export const previewSchema = { type: 'object', additionalProperties: false,
   required: ['id', 'baseVersionId', 'profileId', 'policyId', 'createdAt', 'state', 'proposalIds', 'graphSummary', 'diagnostics'], properties: {
-    id: uuidSchema, baseVersionId: uuidSchema, profileId: text, policyId: text, createdAt: { type: 'string', format: 'date-time' }, state: previewStates, proposalIds: uuids, diagnostics,
+    id: uuidSchema, baseVersionId: uuidSchema, profileId: text, policyId: text, createdAt: { type: 'string', format: 'date-time' }, appliedReceiptId: uuidSchema, state: previewStates, proposalIds: uuids, diagnostics,
     graphSummary: { type: 'object', additionalProperties: false, required: ['nodes', 'edges', 'order', 'conflicts', 'cycles', 'blocked'], properties: {
       nodes: count, edges: count, order: hashes, blocked: count, cycles: { type: 'array', items: hashes },
       conflicts: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['targetKey', 'producerIds'], properties: { targetKey: text, producerIds: hashes } } },
     } },
-  } } as const;
+  }, allOf: [{ if: { type: 'object', properties: { state: { const: 'applied' } } }, then: { type: 'object', required: ['appliedReceiptId'] }, else: { not: { type: 'object', required: ['appliedReceiptId'] } } }] } as const;
 export const proposalSchema = { type: 'object', additionalProperties: false,
   required: ['id', 'previewId', 'directionId', 'instanceId', 'variantIds', 'binding', 'code', 'targetKey', 'readKeys', 'predecessorIds', 'metadataReads', 'sources', 'state', 'diagnostics'], properties: {
     id: uuidSchema, previewId: uuidSchema, directionId: hash, instanceId: hash, variantIds: hashes, binding: bindingSchema, code: text, targetKey: text,
-    before: beforeSchema, exactNominal: rationalSchema,
+    before: factReadSchema, exactNominal: rationalSchema,
     derivedInterval: { type: 'object', additionalProperties: false, required: ['lo', 'hi'], properties: { lo: rationalSchema, hi: rationalSchema } },
     after: { oneOf: [
       { type: 'object', additionalProperties: false, required: ['normalizedValue', 'originalText', 'decimals', 'unit'], properties: { normalizedValue: rationalSchema, originalText: text, decimals: { type: 'string', pattern: '^(?:INF|0|-?(?:[1-9]|1[0-8]))$' }, unit: text } },
       { type: 'object', additionalProperties: false, required: ['normalizedValue', 'originalText'], properties: { normalizedValue: { type: 'boolean' }, originalText: { enum: ['true', 'false'] } },
-        allOf: [{ if: { properties: { normalizedValue: { const: true } } }, then: { properties: { originalText: { const: 'true' } } }, else: { properties: { originalText: { const: 'false' } } } }] },
+        allOf: [{ if: { type: 'object', properties: { normalizedValue: { const: true } } }, then: { type: 'object', properties: { originalText: { const: 'true' } } }, else: { type: 'object', properties: { originalText: { const: 'false' } } } }] },
     ] },
-    readKeys: texts, predecessorIds: uuids, metadataReads, sources: { type: 'array', items: sourceLocatorSchema }, diagnostics,
+    readKeys: texts, predecessorIds: uuids, metadataReads: metadataReadsSchema, sources: { type: 'array', items: sourceLocatorSchema }, diagnostics,
     state: { enum: ['available', 'blocked', 'accepted', 'applied', 'discarded', 'obsolete'] },
   }, allOf: [
-    { if: { properties: { state: { enum: ['available', 'accepted', 'applied'] } } }, then: { required: ['before', 'after'] } },
-    { if: { properties: { state: { const: 'blocked' } } }, then: { not: { required: ['after'] } } },
-    { if: { required: ['after'], properties: { after: { properties: { normalizedValue: { type: 'boolean' } } } } }, then: { not: { anyOf: [{ required: ['exactNominal'] }, { required: ['derivedInterval'] }] } } },
+    { if: { type: 'object', properties: { state: { enum: ['available', 'accepted', 'applied'] } } }, then: { type: 'object', required: ['before', 'after'] } },
+    { if: { type: 'object', properties: { state: { const: 'blocked' } } }, then: { not: { type: 'object', required: ['after'] } } },
+    { if: { type: 'object', required: ['after'], properties: { after: { type: 'object', properties: { normalizedValue: { type: 'boolean' } } } } }, then: { not: { anyOf: [{ type: 'object', required: ['exactNominal'] }, { type: 'object', required: ['derivedInterval'] }] } } },
   ] } as const;
 export const previewSelectionRequestSchema = { type: 'object', additionalProperties: false, required: ['selectedIds'], properties: { selectedIds: { ...uuids, maxItems: 1_000_000 } } } as const;
 export const previewSelectionSchema = { type: 'object', additionalProperties: false, required: ['selectedIds', 'requiredIds', 'closureHash', 'complete', 'state'], properties: {

@@ -8,3 +8,4 @@ export * from './report.js';
 export * from './validation.js';
 export * from './recalculation.js';
 export * from './history.js';
+export * from './application.js';

@@ -1,9 +1,11 @@
 import type { Diagnostic, JobDTO, JsonValue, ResultRef, Snapshot, SnapshotContent } from '@ce/contracts';
+import type { ApplicationCandidate } from '@ce/engine';
 export interface StateRecord { readonly key: string; readonly value: JsonValue }
 export interface WorkerOutput {
   readonly complete: boolean; readonly snapshotContent?: SnapshotContent;
   readonly records?: readonly StateRecord[]; readonly resultRef?: ResultRef;
   readonly diagnostics?: readonly Diagnostic[];
+  readonly applicationCandidate?: ApplicationCandidate;
 }
 export interface WorkerRequest {
   readonly job: JobDTO; readonly input: JsonValue; readonly snapshot?: Snapshot;

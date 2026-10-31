@@ -1,5 +1,5 @@
 import type { Diagnostic, Rational, SourceLocator } from './common.js';
-import type { Coordinate } from './report.js';
+import type { Coordinate, FactDerivation } from './report.js';
 import type { SourceFile } from './report.js';
 import type { Severity } from './catalog.js';
 import type { DirectionChoiceDTO } from './recalculation.js';
@@ -15,7 +15,7 @@ export interface MetadataReadDTO { readonly contextId: string; readonly code: st
 /** Original snapshot input, before selection-specific default and interval options. */
 export interface FactReadDTO {
   readonly factKey: string; readonly coordinate: Coordinate; readonly presence: 'value' | 'explicit_null' | 'implicit_null';
-  readonly normalizedValue?: Rational | boolean; readonly originalText?: string; readonly sourceLocator: SourceLocator;
+  readonly normalizedValue?: Rational | boolean; readonly originalText?: string; readonly sourceLocator: SourceLocator; readonly derivation?: FactDerivation;
 }
 export interface RuleResultDTO {
   readonly id: string; readonly runId: string; readonly versionId: string; readonly profileId: string;

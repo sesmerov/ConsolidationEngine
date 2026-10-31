@@ -1,7 +1,6 @@
 import type { JsonValue, PreviewBundle, PreviewSelectionDTO } from '@ce/contracts';
-import { WorkBudget, WorkLimitError } from '@ce/engine';
+import { selectionClosureHash, WorkBudget, WorkLimitError } from '@ce/engine';
 import { ApiError } from '../errors.js';
-import { canonicalHash } from '../session/canonical-state.js';
 import type { WorkspaceStore } from '../session/workspace-store.js';
 export const previewKey = (workspaceId: string, previewId: string) => 'preview:' + workspaceId + ':' + previewId;
 export function getPreview(store: WorkspaceStore, workspaceId: string, previewId: string): PreviewBundle {
@@ -23,8 +22,15 @@ export function selectPreview(bundle: PreviewBundle, selection: readonly string[
     }
     const requiredIds = [...visited].filter(id => !selected.has(id)).sort();
     return { selectedIds, requiredIds, complete: requiredIds.length === 0, state: preview.state,
-      closureHash: canonicalHash({ previewId: preview.id, baseVersionId: preview.baseVersionId, profileId: preview.profileId, policyId: preview.policyId, selectedIds, requiredIds }) };
+      closureHash: selectionClosureHash(preview, selectedIds, requiredIds) };
   } catch (error) { if (error instanceof WorkLimitError) throw new ApiError('EXPANSION_LIMIT', { reason: error.code }); throw error; }
+}
+/** Build the history transition; the caller publishes it with receipt, runs and snapshot in one commit. */
+export function markPreviewApplied(bundle: PreviewBundle, receiptId: string, acceptedIds: readonly string[]): PreviewBundle {
+  if (bundle.preview.state !== 'ready') throw new ApiError('PREVIEW_NOT_APPLICABLE');
+  const selected = new Set(acceptedIds);
+  return { preview: { ...bundle.preview, state: 'applied', appliedReceiptId: receiptId },
+    proposals: bundle.proposals.map(proposal => ({ ...proposal, state: selected.has(proposal.id) ? 'applied' : 'obsolete' })) };
 }
 export function discardPreview(store: WorkspaceStore, workspaceId: string, previewId: string): PreviewBundle {
   store.assertAccepting(workspaceId); store.assertIdle(workspaceId); const bundle = getPreview(store, workspaceId, previewId);

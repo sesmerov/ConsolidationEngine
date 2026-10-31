@@ -1,0 +1,20 @@
+<section class="confirmation" aria-labelledby="apply-title">
+  <h3 id="apply-title">Confirmar la aplicación</h3>
+  <p>Se aplicará exclusivamente este conjunto de {{ selection()?.selectedIds?.length || 0 }} propuestas, incluidos los predecesores elegidos expresamente. Se creará una versión y se volverá a validar todo el catálogo.</p>
+  @for (row of selectedProposals(); track row.id) {
+    <article class="rule-row"><h4>{{ row.code }} · {{ target(row) }}</h4>
+      @if (row.before; as before) { <p>Antes: {{ before.presence === 'explicit_null' ? 'Nulo explícito' : before.presence === 'implicit_null' ? 'Nulo implícito' : before.originalText }}</p><p class="muted">{{ source(before.sourceLocator) }}</p>@if (before.derivation) { <p>Valor calculado en la aplicación {{ before.derivation.receiptId }}; se conserva la localización de origen.</p> } }
+      @if (row.after; as after) { <p>Después propuesto: <strong>{{ after.originalText }}</strong>@if ('unit' in after) { · {{ after.unit }} · precisión {{ after.decimals }} }</p> }
+      @if (row.exactNominal; as exact) { <p>Resultado antes del redondeo: {{ fraction(exact) }} · política {{ preview().policyId }}</p> }
+      @if (row.derivedInterval; as interval) { <p>Intervalo calculado: [{{ fraction(interval.lo) }}, {{ fraction(interval.hi) }}]</p> }
+      @if (noChange(row)) { <p>Sin cambio de valor: se conservarán el texto y el origen existentes aunque se acepte esta propuesta.</p> }
+      @if (row.predecessorIds.length) { <p>Predecesores incluidos:</p><ul>@for (id of row.predecessorIds; track id) { <li>{{ predecessor(id) }}</li> }</ul> }
+    </article>
+  }
+  @if (!canApply() && !uncertain()) { <p class="notice">Para aplicar se necesita una previsualización vigente y una selección no vacía con todos sus predecesores y detalles disponibles.</p> }
+  <label><input type="checkbox" [checked]="acknowledged()" [disabled]="!canApply()" (change)="acknowledged.set($any($event.target).checked)"/> He revisado cada propuesta y acepto aplicar el conjunto completo mostrado.</label>
+  <button (click)="apply()" [disabled]="!canApply() || !acknowledged()">Aplicar cambios seleccionados</button>
+  @if (uncertain()) { <button class="secondary" (click)="retry()" [disabled]="pending() || session.pending() || session.jobActive()">Reintentar misma aplicación</button> }
+  @if (pending()) { <p aria-live="polite">Enviando la aplicación…</p> }
+  @if (error(); as message) { <p class="error" role="alert">{{ message }}</p> }
+</section>

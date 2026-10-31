@@ -67,7 +67,8 @@ export function simulate(snapshot: Snapshot, options: SimulateOptions): PreviewB
     if (coordinate && previous.length <= 1) {
       const fact = previous[0];
       before = { factKey: coordinate.factKey, coordinate, presence: fact ? fact.presence === 'null' ? 'explicit_null' : 'value' : 'implicit_null',
-        ...(fact?.normalizedValue !== undefined ? { normalizedValue: fact.normalizedValue } : {}), ...(fact?.originalText !== undefined ? { originalText: fact.originalText } : {}), sourceLocator: fact?.sourceLocator ?? coordinate.sourceLocator };
+        ...(fact?.normalizedValue !== undefined ? { normalizedValue: fact.normalizedValue } : {}), ...(fact?.originalText !== undefined ? { originalText: fact.originalText } : {}),
+        ...(fact?.derivation ? { derivation: fact.derivation } : {}), sourceLocator: fact?.sourceLocator ?? coordinate.sourceLocator };
     }
     const readSet = new Set([...node.readKeys, direction.targetKey]);
     const sources = uniqueSources([...snapshot.content.catalog.variants.filter(variant => direction.variantIds.includes(variant.variantId)).flatMap(variant => variant.sourceLocators),

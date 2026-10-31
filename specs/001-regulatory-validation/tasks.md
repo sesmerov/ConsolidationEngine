@@ -6,7 +6,7 @@ description: "Tareas de implementación del motor local de validación y recálc
 
 **Input**: `specs/001-regulatory-validation/`: spec, plan, research, data-model, contracts y quickstart.
 **Prerequisites**: [plan.md](plan.md), [spec.md](spec.md) y constitución 1.0.0.
-**Estado**: implementación en curso. Setup, foundation y US1–US3 T001–T058 completados y verificados; las tareas restantes se cierran con evidencia en cada checkpoint.
+**Estado**: implementación en curso. Setup, foundation y US1–US4 T001–T070 completados y verificados; quedan las comprobaciones finales T071–T075, con evidencia en cada checkpoint.
 
 **Tests**: Se incluyen pruebas porque spec.md exige escenarios verificables y criterios SC-001–007,
 y la constitución exige evidencia de comportamiento. Las tareas de pruebas preparan casos de negocio
@@ -162,21 +162,21 @@ anterior intacta; reintentos no repiten cambios; exportación/reimportación con
 
 ### Tests for User Story 4
 
-- [ ] T059 [P] [US4] Preparar `tests/integration/application-atomicity.spec.ts` con clausura incompleta, cambio de base, timeout/cancelación antes y después de publicar, worker caído, cuota512MiB/20snapshots y revalidación técnica incompleta; comprobar byte/valor/versión previa sin mutaciones parciales (depende de T058).
-- [ ] T060 [P] [US4] Preparar `tests/contract/applications-exports.spec.ts` para aplicación confirmada, replay tras If-Match antiguo, misma clave/cuerpo distinto, export histórico/Content-Disposition y roundtrip de >15 dígitos/null/códigos; expected V10/V14/V16 (depende de T058).
-- [ ] T061 [P] [US4] Preparar `apps/web/src/app/recalculation/apply.component.spec.ts` y `tests/integration/revalidation-comparison.spec.ts`: aceptación explícita de todos los selectedIds, resultados antes/después con reglas que siguen fallando, obsolescencia y respuesta perdida sin segundo cambio (depende de T058).
+- [X] T059 [P] [US4] Preparar `tests/integration/application-atomicity.spec.ts` con clausura incompleta, cambio de base, timeout/cancelación antes y después de publicar, worker caído, cuota512MiB/20snapshots y revalidación técnica incompleta; comprobar byte/valor/versión previa sin mutaciones parciales (depende de T058).
+- [X] T060 [P] [US4] Preparar `tests/contract/applications-exports.spec.ts` para aplicación confirmada, replay tras If-Match antiguo, misma clave/cuerpo distinto, export histórico/Content-Disposition y roundtrip de >15 dígitos/null/códigos; expected V10/V14/V16 (depende de T058).
+- [X] T061 [P] [US4] Preparar `apps/web/src/app/recalculation/apply.component.spec.ts` y `tests/integration/revalidation-comparison.spec.ts`: aceptación explícita de todos los selectedIds, resultados antes/después con reglas que siguen fallando, obsolescencia y respuesta perdida sin segundo cambio (depende de T058).
 
 ### Implementation for User Story 4
 
-- [ ] T062 [US4] Definir `packages/contracts/src/application.ts` con ApplyReceipt/selección/resultado y estados del modelo: «Solo existe tras publicar la versión completa», Preview `ready → applied | discarded | obsolete`, Proposal `available → accepted → applied` y ramas descartada/obsoleta; accepted vive solo en candidato mientras se revalida, no como cambio publicado prematuramente (depende de T059, T060, T061).
-- [ ] T063 [US4] Implementar `packages/engine/src/recalculation/apply-candidate.ts` y `apps/api/src/workers/apply.worker.ts`: validar conjunto no vacío/cerrado/sin conflictos, copiar únicamente hechos cambiados y revalidar todas las reglas aplicables con versiones/evidencia; fallos de reglas se conservan como resultados, pero fallo técnico/cuota/timeout impide completar candidato (depende de T062, T054, T040).
-- [ ] T064 [US4] Implementar `apps/api/src/recalculation/application-service.ts` y `apps/api/src/routes/applications.ts`: comprobar base/preview/closureHash, iniciar Job y publicar en una única sección del hilo principal tras nueva comprobación de versión/cancelación/plazo/cuota; conservar original ante fallo y recuperar resultado por idempotencia sin reaplicar (depende de T063, T014, T013, T059).
-- [ ] T065 [US4] Ampliar `apps/api/src/recalculation/preview-store.ts` y `apps/api/src/session/workspace-store.ts` con historial de aplicación: «solo una preview ready de otra base pasa a obsolete; applied/discarded mantienen su estado histórico»; al aplicar subconjunto marcar elegidas applied y no elegidas obsolete, registrar cambio/versiones/momento y respetar límites sin expulsar original (depende de T064).
-- [ ] T066 [US4] Implementar `apps/api/src/export/recalculated-report.ts` y `apps/api/src/export/change-log.ts`: ce-report-1 exacto con contextos/filingIndicators/coordenadas y valores cuantizados como texto, precisión/presencia intactas, JSON de cambios/nominal/intervalos/política/fuentes/versiones y vista Excel literal; no sobrescribir originales ni presentar salida como remisión oficial (depende de T065, T042, T060).
-- [ ] T067 [US4] Ampliar `apps/api/src/routes/exports.ts` y `apps/api/src/workers/export.worker.ts` para kind=report/resultados posteriores, snapshot histórico explícito, temporales propios y descarga por exportId con nombre seguro, token/If-Match/quotas y limpieza; no admitir rutas del usuario (depende de T066, T064).
-- [ ] T068 [US4] Crear `apps/web/src/app/recalculation/apply.component.ts`, su template y `apps/web/src/app/recalculation/comparison.component.ts`: mostrar conjunto completo y confirmar expresamente, comunicar stale/timeout/fallo versus aplicado, comparar estados/severidad/valores antes-después y no prometer rollback si cancelación llega después de publicar (depende de T065, T057, T061).
-- [ ] T069 [US4] Añadir `apps/web/src/app/recalculation/exports.component.ts` y ampliar `apps/web/src/app/core/session.store.ts` para elegir exportación de versión/run, guardar informes/cambios y cerrar workspace con cancelación/limpieza explícitas, manteniendo descargas del usuario y aviso de que reinicio pierde sesión (depende de T068, T067).
-- [ ] T070 [US4] Implementar y ejecutar `tests/e2e/apply-export.spec.ts` con V06-completo/V10/V11/V14/V16, reimportación exacta del resultado, cierre y hashes originales; ejecutar T059–T061 antes de cerrar la primera versión con recálculos (depende de T069).
+- [X] T062 [US4] Definir `packages/contracts/src/application.ts` con ApplyReceipt/selección/resultado y estados del modelo: «Solo existe tras publicar la versión completa», Preview `ready → applied | discarded | obsolete`, Proposal `available → accepted → applied` y ramas descartada/obsoleta; accepted vive solo en candidato mientras se revalida, no como cambio publicado prematuramente (depende de T059, T060, T061).
+- [X] T063 [US4] Implementar `packages/engine/src/recalculation/apply-candidate.ts` y `apps/api/src/workers/apply.worker.ts`: validar conjunto no vacío/cerrado/sin conflictos, copiar únicamente hechos cambiados y revalidar todas las reglas aplicables con versiones/evidencia; fallos de reglas se conservan como resultados, pero fallo técnico/cuota/timeout impide completar candidato (depende de T062, T054, T040).
+- [X] T064 [US4] Implementar `apps/api/src/recalculation/application-service.ts` y `apps/api/src/routes/applications.ts`: comprobar base/preview/closureHash, iniciar Job y publicar en una única sección del hilo principal tras nueva comprobación de versión/cancelación/plazo/cuota; conservar original ante fallo y recuperar resultado por idempotencia sin reaplicar (depende de T063, T014, T013, T059).
+- [X] T065 [US4] Ampliar `apps/api/src/recalculation/preview-store.ts` y `apps/api/src/session/workspace-store.ts` con historial de aplicación: «solo una preview ready de otra base pasa a obsolete; applied/discarded mantienen su estado histórico»; al aplicar subconjunto marcar elegidas applied y no elegidas obsolete, registrar cambio/versiones/momento y respetar límites sin expulsar original (depende de T064).
+- [X] T066 [P] [US4] Implementar `apps/api/src/export/recalculated-report.ts` y `apps/api/src/export/change-log.ts`: ce-report-1 exacto particionado por SourceFile, con contextos/filingIndicators/coordenadas y valores cuantizados como texto, precisión/presencia intactas, JSON de cambios acumulados de la rama y vista Excel literal; conservar expandedBytes durante importación y comprobar límites de reimportación con el catálogo original; no sobrescribir originales ni presentar salida como remisión oficial (depende de T065, T042, T060).
+- [X] T067 [US4] Ampliar `apps/api/src/routes/exports.ts` y `apps/api/src/workers/export.worker.ts` para kind=report/resultados posteriores, snapshot histórico explícito, temporales propios y descarga por exportId con nombre seguro, token/If-Match/quotas y limpieza; no admitir rutas del usuario (depende de T066, T064).
+- [X] T068 [P] [US4] Crear `apps/web/src/app/recalculation/apply.component.ts`, su template y `apps/web/src/app/recalculation/comparison.component.ts`: mostrar conjunto completo y confirmar expresamente, comunicar stale/timeout/fallo versus aplicado, comparar estados/severidad/valores antes-después y no prometer rollback si cancelación llega después de publicar (depende de T065, T057, T061).
+- [X] T069 [US4] Añadir `apps/web/src/app/recalculation/exports.component.ts` y ampliar `apps/web/src/app/core/session.store.ts` para elegir exportación de versión/run, guardar informes/cambios y cerrar workspace con cancelación/limpieza explícitas, manteniendo descargas del usuario y aviso de que reinicio pierde sesión (depende de T068, T067).
+- [X] T070 [US4] Implementar y ejecutar `tests/e2e/apply-export.spec.ts` con V06-completo/V10/V11/V14/V16, reimportación exacta del resultado, cierre y hashes originales; ejecutar T059–T061 antes de cerrar la primera versión con recálculos (depende de T069).
 
 **Checkpoint**: US1–US4 integradas. Las propuestas aceptadas producen una versión nueva y una
 validación completa; la integridad original, efectos de cancelación y exportación son verificables.
@@ -228,6 +228,7 @@ comprobar el resultado final. Ninguna tarea está autorizada a afirmar un test e
 | US3 pruebas | T045 terminada | T046 dependency-graph, T047 simulation/fixture y T048 previews. |
 | US3 implementación | T050 terminada | T051 y T056 en archivos separados; tras T051, T052 y T053, con contratos comunes T049 y API de resolución ya fijados. |
 | US4 pruebas | T058 terminada | T059 application-atomicity, T060 applications-exports y T061 apply/UI comparison. |
+| US4 implementación | T065 terminada | T066 exportadores y T068 aceptación/comparación Angular en archivos separados; T067 espera T066 y T069 espera T067/T068. |
 
 ## Parallel Example: User Story 1
 
@@ -248,7 +249,7 @@ No iniciar T054 hasta disponer tanto del grafo terminado T052 como del candidato
 ## Parallel Example: User Story 4
 
 Tras T058, T059/T060/T061 preparan atomicidad, exportación y UI/comparación en archivos distintos.
-T062 espera sus contratos/casos; no paralelizar T064/T065, pues comparten publicación y ciclo de vida.
+T062 espera sus contratos/casos; no paralelizar T064/T065, pues comparten publicación y ciclo de vida. Tras T065 y con DTO/API estables, T066 y T068 pueden avanzar en paralelo; T069 espera a la integración de exportación T067 y a la aceptación UI T068. Esta distribución se precisó al fijar los contratos de US4 y no cambia sus dependencias funcionales.
 
 ## Implementation Strategy
 

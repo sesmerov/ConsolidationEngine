@@ -1,6 +1,8 @@
 import readXlsxFile from 'read-excel-file/node';
 import { ApiError } from '../errors.js';
 import type { PreflightWorkbook, RawSheet } from './xlsx-preflight.js';
+export { readSheetRows } from './xlsx-row-reader.js';
+export type { RawSheetRow } from './xlsx-row-reader.js';
 export interface WorkbookSheet extends RawSheet { readonly rows: readonly (readonly (string | boolean | Date | null)[])[] }
 export interface RawWorkbook { readonly date1904: boolean; readonly sheets: readonly WorkbookSheet[] }
 /** Only a completed, bounded preflight can authorize materialization. Raw cell metadata remains authoritative for types/dates. */

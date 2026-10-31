@@ -172,8 +172,21 @@ El nombre proporcionado por el usuario nunca se usa como ruta. Antes de leer tab
 4. Rechazar fórmulas de cualquier hoja, macros/VBA, ActiveX/OLE y relaciones externas de datos.
    Los hipervínculos informativos se conservan como texto o se ignoran, sin acceder a sus destinos.
    Ninguna relación puede leer red o filesystem. Resolver relaciones internas dentro del ZIP.
-5. Comprobar índices sharedStrings, coordenadas dispersas y dimensiones reales antes de materializar
-   tablas. La dimensión declarada en el XML no autoriza reservar memoria sin límites.
+5. Comprobar índices sharedStrings, coordenadas dispersas y dimensiones reales antes de normalizar
+   filas. La dimensión declarada en el XML no autoriza reservar memoria sin límites.
+
+Para informes ce-report-1, el preflight usa SAX por bloques y modo metadata: conserva cabeceras
+de la fila 1, sharedStrings decodificados y metadatos ZIP/hojas, sin retener todas las celdas raw
+de datos. Después lee filas en orden lógico Contexts → Coordinates → Facts con el mismo
+normalizador de dominio; no crea la matriz adicional de read-excel-file. El catálogo EBA conserva
+su ruta raw/read-excel-file para lexemas, tipos, estilos y fechas.
+
+En los informes, la identidad de celda/fila y las cabeceras prevalecen sobre el orden físico de
+los elementos XML. Se admiten filas/celdas fuera de orden; fragmentos disjuntos de una misma fila
+se reúnen y repetir la misma celda se rechaza, aunque el contenido coincida. El resultado se
+ordena por fila de origen, conservando locadores. Esta admisión es una decisión explícita de la
+ruta incremental; el lector anterior rechazaba filas desordenadas y no se presenta como equivalente
+en ese caso. No cambian las reglas de tipos, presencia, precisión, unidades ni cuotas.
 
 | Cuota | Límite |
 | --- | --- |
@@ -187,31 +200,100 @@ El nombre proporcionado por el usuario nunca se usa como ruta. Antes de leer tab
 La cuota de hechos excluye metadatos de coordenadas, cuyo máximo también es 100.000 por lote.
 Los errores estructurales rechazan todo el lote y conservan el snapshot previo. Los errores de
 reglas individuales quedan registrados y no impiden importar otras reglas válidas.
+El preflight conserva por archivo `SourceFile.expandedBytes`, suma de bytes descomprimidos reales,
+además de size y sha256. Ese dato permite verificar después las cuotas del lote reimportable;
+un valor ausente no se interpreta como cero.
 
 ## Exportación y roundtrip
 
-El informe recalculado usa ce-report-1, conserva contextos/coordenadas, incluido el mapa explícito
-filingIndicators, y escribe importes como texto. Exportar/reimportar conserva las diferencias
-entre indicador true, false y no declarado; no reconstruye el mapa a partir de los hechos.
-La versión original no se sobrescribe. `kind=results` descarga un ZIP con entradas de nombres
-fijos `results.json` (valores exactos y racionales en cadenas) y `results.xlsx` (vista literal,
-nunca fórmulas ni enlaces activos). La exportación incluye perfil, versiones, procedencias,
-redondeos y datos sintéticos identificados cuando corresponda. El formato de `kind=report`
-sigue siendo ce-report-1; no se sustituye por ese paquete de resultados. No se presenta ninguno
-como fichero oficial de remisión.
+`kind=results` descarga un ZIP con entradas fijas `results.json` (valores exactos y racionales
+en cadenas) y `results.xlsx` (vista literal). `kind=report` descarga `report.zip`, con MIME
+`application/zip` y nombres controlados: `reports/report-001.xlsx`, `reports/report-002.xlsx`,
+etc., más `changes.json` y `changes.xlsx`. Cada XLSX de reports corresponde a una SourceFile de
+tipo report del conjunto original: se mantienen entre 1 y 20 informes. El catálogo original no
+se incluye en el ZIP. Para reimportar se cargan los XLSX extraídos de reports junto al catálogo
+original por separado; changes.json/changes.xlsx no son informes de entrada.
 
-La exportación results admite hasta 64 MiB por contenido serializado; tanto la suma de contenidos
-como el ZIP completo deben ser ≤100 MiB. No se truncan resultados al alcanzar esos límites:
-se informa `EXPORT_LIMIT` antes de publicar una descarga. Además, los archivos propios de cada
-workspace tienen una cuota acumulada
-separada de 512 MiB, que incluye staging, trabajo y exports retenidos; excederla produce
-`SESSION_LIMIT`. Contabilidad, reservas y respuestas están en el
-[contrato HTTP](http-api.md#exportación-de-resultados-y-cuotas) y el
-[modelo de sesión](../data-model.md#capacidad-y-limpieza). Son límites de diseño; estos contratos
-no acreditan pruebas de exportación ejecutadas.
+Cada informe exportado sigue ce-report-1 y conserva contextIds, contextos, coordenadas, hechos,
+unidades y precisión. Conserva también los contextos sin coordenadas/hechos, identificados por
+la procedencia de Contexts (`filingIndicatorsLocator.fileId`), y su mapa filingIndicators
+explícito: true, false y no declarado siguen siendo distintos. Los importes se escriben como
+texto; no se reconstruyen indicadores a partir de los hechos. Se mantienen presencia/null y
+ceros iniciales. La versión original no se sobrescribe. Ninguna vista XLSX ejecuta fórmulas ni
+contiene enlaces activos; ningún paquete se presenta como fichero oficial de remisión.
 
-Antes de construir las celdas del XLSX también se limita su carga XML estimada a 64 MiB
-(`exportXmlWorkloadBytes`): `64 KiB + 128 × filas + 128 × celdas + 6 × bytes UTF-8 de los valores`.
-Incluye cabeceras y es independiente del tamaño comprimido/serializado: excederlo informa el
-motivo `XML_WORKLOAD_LIMIT` dentro del error público `EXPORT_LIMIT`, según la fase HTTP/Job
-descrita en el contrato. Este control previo no cambia los máximos de 64/100 MiB anteriores.
+El texto OOXML se trata como ST_Xstring tanto al importar inlineStr/str/sharedStrings como al
+exportar texto nuevo. Tras el procesamiento XML, el lector decodifica `_xHHHH_` en una sola
+pasada, nunca recursivamente. El escritor protege el guion bajo inicial de una secuencia literal
+con `_x005F_`; así, `_x005F_x0041_` se importa como el literal `_x0041_`, no como `A`.
+Codifica CR como `_x000D_` y conserva LF, tabulaciones y espacios iniciales/finales mediante
+`xml:space="preserve"`. Los controles no representables en XML 1.0 y los surrogates sin pareja
+se rechazan con diagnóstico, sin eliminarlos ni normalizar silenciosamente el contenido.
+
+Los XLSX ce-report-1 se escriben incrementalmente, con celdas `inlineStr` y entradas ZIP
+comprimidas con DEFLATE, sin construir una matriz completa de objetos de celda. Durante la
+escritura se cuentan los bytes reales serializados y descomprimidos, por archivo/entrada/lote.
+El worker conserva `maxOldGenerationSizeMb: 256`; esto limita su heap V8 configurado, no el RSS
+ni todos los buffers, que siguen sujetos a las cuotas de bytes.
+
+### Manifiesto y cambios acumulados de report
+
+changes.json contiene los campos `versionId`, `profileId`, `policyId`, `contentHash`, `synthetic`,
+`reports`, `receipts` y `changes`. reports es el manifiesto con entradas
+`{entryName,sourceFileId,contextIds,size,sha256,expandedBytes}`: el nombre controlado identifica
+el XLSX generado, sourceFileId su fuente original y los tamaños/hash corresponden al archivo
+exportado. size son bytes serializados; expandedBytes son bytes descomprimidos reales.
+receipts contiene ApplyReceipt, incluidos beforeValidationRunId y validationRunId.
+
+Cada entrada ApplyChange contiene `{receiptId,proposalId,directionId,targetKey,before,after,sources,changed}`;
+before es FactReadDTO y after es ProposalAfterDTO. Los cambios numéricos incluyen exactNominal,
+derivedInterval y policyId de cuantización obligatorio. Los booleanos omiten evidencia numérica
+y policyId de redondeo. changes.xlsx presenta el mismo registro mediante celdas literales.
+Las versiones, procedencias y datos sintéticos quedan identificados.
+
+changed es booleano obligatorio: true para cambios reales y false para una propuesta aceptada
+cuyo valor normalizado exacto ya coincide con un hecho presente de igual unidad/precisión.
+Esta última se audita y figura aplicada, pero no reescribe el hecho ni su originalText/derivation.
+Por ejemplo, un valor `12` no se convierte en `12.00` solo por el formato de preview; after en
+el registro refleja el texto `12` realmente preservado. changeCount solo cuenta changed=true.
+Una aplicación con selección no vacía y cero cambios reales conserva recibo y revalidación;
+su log incluye las entradas changed=false y no se confunde con el snapshot original sin aplicaciones.
+
+El registro es acumulado **hasta el snapshot exportado**, desde la última importación de su
+conjunto: incluye recibos/cambios aplicados en su cadena de antecesores, nunca posteriores ni
+de otro conjunto. La frontera se determina por la firma ordenada de pares (kind,id) de sources:
+importar reemplaza sources con IDs nuevos; configuración y aplicación preservan ese array/IDs.
+Los archivos exportados no se incorporan a sources. Al exportar el snapshot original, receipts
+y changes están vacíos. Una cadena rota, fuentes ausentes/duplicadas o metadatos necesarios
+incompletos rechazan la exportación; no se fabrica un historial parcial ni se supone cero para
+expandedBytes ausente.
+
+### Cuotas de salida y reimportación
+
+| Contenido | Límite |
+| --- | --- |
+| Cada XLSX dentro de reports | 10 MiB; entre 1 y 20 informes. |
+| Informes exportados + catálogo original | 50 MiB serializados y 100 MiB descomprimidos reales, usando size/expandedBytes del catálogo. |
+| results.json/results.xlsx o changes.json/changes.xlsx | 64 MiB por contenido serializado. |
+| Cada paquete results/report | Suma de contenidos y ZIP completo ≤100 MiB cada uno. |
+| Carga XML previa estimada | 64 MiB por results.xlsx o changes.xlsx; no se aplica a los informes ce-report-1 incrementales. |
+| Archivos propios de sesión | 512 MiB acumulados, incluidos staging, trabajo y exports retenidos. |
+
+Antes de publicar, cada informe generado debe cumplir también las restantes cuotas del preflight
+de entrada: entradas ZIP, hojas, sharedStrings, dimensiones, longitud de celdas, XML y datos.
+Sigue vigente el máximo de 64 MiB descomprimidos reales por entrada ZIP, además de 100 MiB por
+lote con el catálogo; el escritor incremental no elimina esos límites.
+El catálogo original se contabiliza para verificar el lote reimportable aunque no viaje en el
+paquete. Los logs de cambios cuentan para la cuota del paquete, pero no se cargan como informes.
+
+Solo para results.xlsx y changes.xlsx, el guard de carga XML previa es
+`64 KiB + 128 × filas + 128 × celdas + 6 × bytes UTF-8 de los valores`, incluidas cabeceras,
+antes de generar el XLSX. Excederlo explica `XML_WORKLOAD_LIMIT` dentro de
+`EXPORT_LIMIT`. Esta estimación no se aplica al escritor incremental de informes ce-report-1;
+en ellos gobiernan los bytes reales y las cuotas de preflight. En todos los formatos se comprueban
+también los bytes reales de salida.
+No se truncan archivos ni historiales para cumplir cuotas: el exceso de exportación produce
+EXPORT_LIMIT; el acumulado de archivos de sesión, SESSION_LIMIT. Reservas, respuestas HTTP/Job
+y limpieza están en el [contrato HTTP](http-api.md#exportación-de-resultados-y-cuotas) y el
+[modelo de sesión](../data-model.md#capacidad-y-limpieza). Estos contratos no acreditan pruebas
+de exportación o roundtrip ejecutadas.

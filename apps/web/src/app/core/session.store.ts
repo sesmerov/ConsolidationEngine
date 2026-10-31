@@ -16,7 +16,9 @@ export class SessionStore {
   readonly etag = signal<string | null>(null);
   readonly job = signal<JobDTO | null>(null);
   readonly selectedContextId = signal<string | null>(null);
+  readonly selectedExportVersionId = signal<string | null>(null);
   readonly versionId = computed(() => this.workspace()?.currentVersionId ?? null);
+  readonly exportVersionId = computed(() => { const selected = this.selectedExportVersionId(); return selected && this.workspace()?.versionIds.includes(selected) ? selected : this.versionId(); });
   readonly selectedContext = computed(() => this.workspace()?.contexts.find((context) => context.contextId === this.selectedContextId()) ?? null);
   readonly jobActive = computed(() => { const job = this.job(); return job ? !isTerminalJob(job.status) : false; });
   constructor() { inject(DestroyRef).onDestroy(() => this.stopPolling()); }
@@ -25,14 +27,14 @@ export class SessionStore {
     await this.perform(async () => {
       const bootstrap = await this.api.bootstrap(); this.api.setSessionToken(bootstrap.sessionToken); this.connected.set(true);
       if (bootstrap.activeWorkspaceId) await this.refreshWorkspace(bootstrap.activeWorkspaceId);
-      else { this.workspace.set(null); this.etag.set(null); this.job.set(null); this.selectedContextId.set(null); }
+      else { this.workspace.set(null); this.etag.set(null); this.job.set(null); this.selectedContextId.set(null); this.selectedExportVersionId.set(null); }
     });
   }
   async create(name: string): Promise<void> { await this.perform(async () => { this.acceptWorkspace(await this.api.createWorkspace(name)); }); }
   async close(): Promise<void> {
     const workspace = this.workspace(); const etag = this.etag(); if (!workspace || !etag) return;
     await this.perform(async () => {
-      await this.api.closeWorkspace(workspace.id, etag); this.stopPolling(); this.workspace.set(null); this.etag.set(null); this.job.set(null); this.selectedContextId.set(null);
+      await this.api.closeWorkspace(workspace.id, etag); this.stopPolling(); this.workspace.set(null); this.etag.set(null); this.job.set(null); this.selectedContextId.set(null); this.selectedExportVersionId.set(null);
     });
   }
   async refreshWorkspace(id = this.workspace()?.id): Promise<void> {
@@ -45,6 +47,7 @@ export class SessionStore {
   selectContext(id: string): void {
     if (this.workspace()?.contexts.some((context) => context.contextId === id)) this.selectedContextId.set(id);
   }
+  selectExportVersion(id: string): void { if (this.workspace()?.versionIds.includes(id)) this.selectedExportVersionId.set(id); }
   trackJob(job: JobDTO): void {
     this.stopPolling(); this.job.set(job);
     if (!isTerminalJob(job.status)) this.schedule(this.generation);
@@ -55,6 +58,7 @@ export class SessionStore {
   }
   private acceptWorkspace(response: HttpResponse<WorkspaceDTO>): void {
     if (!response.body || !response.headers.get('ETag')) throw new Error('Invalid workspace response');
+    if (this.workspace()?.id !== response.body.id || this.selectedExportVersionId() && !response.body.versionIds.includes(this.selectedExportVersionId()!)) this.selectedExportVersionId.set(null);
     this.workspace.set(response.body); this.etag.set(response.headers.get('ETag'));
     if (!response.body.contexts.some((context) => context.contextId === this.selectedContextId())) this.selectedContextId.set(response.body.contexts[0]?.contextId ?? null);
   }

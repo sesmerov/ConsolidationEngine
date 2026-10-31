@@ -30,23 +30,23 @@ migraciones, clases ni almacenamiento implementado. El motor recibe snapshots y 
 
 | Entidad | Campos principales | Invariantes y relaciones |
 | --- | --- | --- |
-| SourceFile | id, sha256, displayName, kind, size, importedAt | Temporal local. displayName nunca es ruta. SourceLocator apunta a archivo/hoja/fila/celda. |
+| SourceFile | id, sha256, displayName, kind, size, expandedBytes, importedAt | Temporal local. size es el tamaño serializado y expandedBytes son bytes descomprimidos reales medidos durante preflight. displayName nunca es ruta. SourceLocator apunta a archivo/hoja/fila/celda. |
 | RawRuleRecord | id, sourceLocator, originalFields, diagnostics, variantId? | Una entrada por fila importada; ninguna desaparece por ser inválida o duplicada. |
 | RuleVariant | variantId, code, framework, modules[], crossModule, tables[], expression, precondition?, active, referenceWindow, submissionFrom?, severityOriginal, severity, sourceRecords[] | variantId no incluye fila/archivo. La vigencia y los módulos distinguen variantes. Un código puede tener varias. |
 | RuleAnalysis | variantId, grammarVersion, profileId, syntaxStatus, supportStatus, AST?, diagnostics | Solo hay AST ejecutable con cero errores y construcciones soportadas. El árbol ANTLR no sale por HTTP. |
 | ReportContext | canonicalContextKey, contextId, entityId, referenceDate, submissionDate?, framework, moduleVersion, filingIndicators | Una entidad/fecha por workspace. filingIndicators es un mapa de códigos exactos a booleanos; vacío significa no declarados. Repetir contexto con mapa inconsistente rechaza el lote. Contextos declarados compatibles; referencias ambiguas son diagnóstico. |
 | Coordinate | factKey, dataType, unit, decimals, axes | Es parte del catálogo cerrado, incluso sin hecho. No admite claves repetidas. |
-| ReportedFact | factKey, presence, originalText?, normalizedValue?, sourceLocator | presence=value/null. Un null explícito tiene fila; ausencia de fila en coordenada válida es null implícito al resolver. |
+| ReportedFact | factKey, presence, originalText?, normalizedValue?, sourceLocator, derivation? | presence=value/null. Un null explícito tiene fila; ausencia de fila en coordenada válida es null implícito al resolver. derivation identifica un cálculo sin reemplazar el sourceLocator original. |
 | Workspace | id, state, currentVersionId?, versionIds[], activeJobId?, sessionId | Un workspace por proceso; el hilo principal es el único propietario mutable del puntero vigente. |
 | Snapshot | versionId, parentVersionId?, contentHash, catalogVersion, reportVersion, configVersion, profileId, contexts, coordinates, facts, directions, sources, createdAt | Inmutable. Versiona cualquier cambio de reglas, datos, contexto o direcciones. Conserva el original dentro de la sesión. |
 | RuleInstance | instanceId, variantIds[], binding, applicableContext, diagnostic? | Clave estable por contenido de regla efectivo, binding completo, clave canónica del contexto aplicable y contextos de resolución ordenados; sin alias contextId ni ordinal de importación. Una precondición actual false/indeterminada no elimina una instancia estructural con cuerpo soportado y binding finito. |
 | ValidationRun | id, versionId, profileId, status, startedAt, endedAt?, summary, resultIds[] | Los resultados pertenecen a un snapshot. Cambiar el vigente los hace históricos, no los reasigna. |
 | RuleResult | id, runId, instanceId, status, severity, preconditionResult, operands, factReads, metadataReads, locators, diagnostics | Un estado terminal por instancia; valores incluyen nominal/intervalo/unidad o presencia de null. factReads conserva entradas originales leídas; metadataReads conserva contexto/código/valor o ausencia de indicadores y su procedencia. |
-| FactRead | factKey, coordinate, presence, normalizedValue?, originalText?, sourceLocator | presence=value/explicit_null/implicit_null. Valor racional exacto o booleano, cuando existe; coordinate conserva unidad/decimals/ejes y procedencia. Es la entrada original antes de default/interval, no el operando efectivo. |
+| FactRead | factKey, coordinate, presence, normalizedValue?, originalText?, sourceLocator, derivation? | presence=value/explicit_null/implicit_null. Valor racional exacto o booleano, cuando existe; coordinate conserva unidad/decimals/ejes y procedencia. Es la entrada del snapshot antes de default/interval, con derivation si procede de un cálculo. |
 | RecalculationDirection | directionId, instanceId, targetSide, targetKey | Configurada expresamente para una igualdad; destino único number o boolean con identidad canónica. Un filingIndicator no es destino. |
-| Preview | id, baseVersionId, profileId, policyId, state, createdAt, proposalIds[], graphSummary | Solo puede aplicarse contra la base que la produjo. createdAt se captura al comenzar la simulación y permanece en todas las transiciones. Incluye resultados no disponibles y motivos. |
+| Preview | id, baseVersionId, profileId, policyId, state, createdAt, proposalIds[], graphSummary, appliedReceiptId? | Solo puede aplicarse contra la base que la produjo. createdAt se captura al comenzar la simulación y permanece en todas las transiciones. appliedReceiptId se publica atómicamente con state=applied, recibo y snapshot nuevo. Incluye resultados no disponibles y motivos. |
 | Proposal | id, previewId, directionId, targetKey, before, exactNominal (solo number), derivedInterval (solo number), after, readKeys[], predecessorIds[], state, diagnostics | Para number, after es el valor cuantizado con precisión destino; para boolean, el booleano conocido propuesto sin unidad/decimals/redondeo. Los consumidores leen exactamente el valor que se aplicaría. |
-| ApplyReceipt | id, previewId, acceptedIds[], closureHash, baseVersionId, newVersionId, validationRunId, appliedAt | Constancia funcional del cambio, no un recibo del sistema de revisión gentle-ai. Solo existe tras publicar la versión completa. |
+| ApplyReceipt | id, previewId, acceptedIds[], closureHash, baseVersionId, newVersionId, beforeValidationRunId, validationRunId, appliedAt | beforeValidationRunId identifica la validación completa de la base; validationRunId la posterior. Constancia funcional del cambio, no un recibo de revisión gentle-ai. Solo existe tras publicar la versión completa. |
 | Job | id, workspaceId, kind, baseVersionId?, status, progress, startedAt, deadline, resultRef?, diagnostics | kind=import/validate/preview/apply/export. Una tarea activa global; estado terminal no retrocede. |
 
 `ApplyReceipt` es trazabilidad de negocio. El desarrollo con recibos continúa `disabled/unmanaged`.
@@ -55,11 +55,15 @@ El historial expone proyecciones explícitas de los registros conservados en la 
 RunSummary contiene id, versionId, profileId, status, startedAt y endedAt opcional;
 PreviewSummary contiene id, baseVersionId, profileId, policyId, state y createdAt.
 No incluyen resultIds, AST, propuestas ni rutas. Las páginas contienen items, total, nextCursor
-y revision; ordenan por fecha e id y admiten filtro de estado. El cursor HMAC se vincula a la
+y revision; ordenan por fecha descendente y, en empate, id descendente. El filtro status admite
+running/completed/incomplete en runs y ready/applied/discarded/obsolete en previews. El cursor HMAC se vincula a la
 revisión de la colección de resúmenes y sus filtros, y deja de ser válido si cambia la colección.
 Estas consultas permiten recuperar el registro más reciente y navegar el historial después de
 refrescar, sin IDs persistidos en localStorage. No prolongan la sesión tras cerrar/reiniciar ni
 permiten modificar snapshots históricos. Véase el [contrato HTTP](contracts/http-api.md#formatos-comunes).
+
+La página de propuestas mantiene el orden topológico del motor, incluidos sus filtros, y puede
+incluir sourceFiles del snapshot base para explicar procedencia histórica. No ordena por UUID.
 
 `RuleResult.factReads` siempre existe, como `[]` si no hubo lecturas. FactRead.sourceLocator
 apunta a Facts para valores y null explícitos, y a Coordinates para null implícito; coordinate
@@ -68,6 +72,10 @@ traza. Los operandos efectivos se conservan aparte; leer la misma celda con opci
 no autoriza inventar un intervalo de origen común. Las lecturas del cuerpo omitido por una
 precondición false no se registran como realizadas. Los DTO representan racionales mediante
 cadenas, nunca BigInt, y permiten inspeccionar coordenadas, precisión y fuentes según FR-009.
+
+ReportedFact y FactReadDTO admiten `derivation?: {receiptId,previewId,proposalId,baseVersionId}`.
+Identifica el hecho calculado sin cambiar el sourceLocator de la celda original. La UI distingue
+esa procedencia del valor importado; las lecturas posteriores conservan el enlace al cálculo.
 
 La respuesta de consulta puede enriquecer RuleResultDTO con
 `recalculation?: {left: DirectionEligibilityDTO, right: DirectionEligibilityDTO}`; cada lado es
@@ -191,16 +199,62 @@ Esta distinción es conceptual; la forma concreta del DTO de propuestas se fijar
 La petición contiene previewId, baseVersionId y el conjunto exacto seleccionado. Se verifica
 la clausura de antecesores, unicidad de destinos, vigencia y ausencia de bloqueos. El worker
 construye un candidato con copia lógica de los hechos modificados; nunca cambia el snapshot base.
-Revalida todas las reglas aplicables y devuelve candidato, resultados y trazabilidad.
+Una propuesta aceptada no crea factPatch si el hecho base tiene presence=value y coincide
+exactamente en normalizedValue, unidad y precisión con el valor propuesto. Se conserva la
+misma referencia del hecho, originalText y derivation previa, incluso para textos numéricos
+equivalentes como `12` y `12.00`. Solo se copian los hechos con cambio real; el formato canónico
+mostrado en preview no obliga a reescribir un dato equivalente.
 
-En una única sección del hilo principal se verifica de nuevo la versión, el token de cancelación
-y el plazo, se registra el nuevo snapshot completo y se cambia currentVersionId. Una respuesta
+La propuesta sigue en acceptedIds y pasa a applied; su entrada ApplyChange lleva `changed:false`.
+Los cambios reales llevan `changed:true`; changeCount cuenta estos últimos, no las propuestas
+aceptadas. El after auditado de un no-op refleja el texto realmente conservado. Una selección
+no vacía puede publicar nueva versión y auditoría con cero parches, tras completar las mismas
+comprobaciones y revalidación; no se omite del recibo por tener changeCount=0.
+
+La validación completa anterior corresponde exactamente a la base: se reutiliza si existe o se
+calcula dentro del Job. La validación anterior nueva y la posterior comparten presupuesto de
+trabajo/plazo. Revalida todas las reglas aplicables sobre el candidato y devuelve ambos resultados
+y trazabilidad; no publica la validación anterior por separado.
+
+En una única sección del hilo principal se verifica de nuevo la versión, que la preview siga
+ready, el token de cancelación y el plazo; se publican conjuntamente el nuevo snapshot completo,
+ambos runs completos y ApplyReceipt, se fija Preview.state=applied con appliedReceiptId y se
+cambia currentVersionId. Un run anterior reutilizado mantiene su identidad.
+Una respuesta
 perdida no repite los cambios: la clave de idempotencia devuelve el mismo Job/resultado.
 Un fallo previo a la publicación deja el puntero y los valores anteriores intactos. Tras publicar,
 cancelar no revierte un cambio ya confirmado; se devuelve su estado final.
 
 Los fallos de reglas en la nueva validación se muestran y comparan con la anterior. Un error técnico
 que impide completar la revalidación, un timeout o una cuota impiden publicar la aplicación.
+
+La consulta de aplicación proyecta `{receipt,changeCount,beforeSummary,afterSummary}`, con
+changeCount igual al número de entradas ApplyChange con changed=true y mínimo cero. La
+comparación paginada contiene `{items,total,nextCursor,receipt,beforeSummary,afterSummary,sourceFiles?}`;
+cada item `{key,before?,after?}` empareja resultados por identidad semántica independiente de runId.
+No expone snapshots completos ni devuelve la colección completa de cambios en el resumen.
+El historial restaura una aplicación a través de appliedReceiptId de la preview aplicada y
+las consultas de aplicación/comparación, sin una colección HTTP adicional de aplicaciones.
+
+## Procedencia acumulada de exportación
+
+Para exportar report, la rama del conjunto se delimita mediante la firma de los pares (kind,id)
+de sources ordenados. Una importación crea IDs de fuente nuevos y reemplaza sources; configuración
+y aplicación conservan el array/IDs. Los archivos de una exportación no se añaden como fuentes.
+Recorrer parentVersionId del snapshot elegido hasta la última importación permite incluir solo
+los recibos/cambios de sus antecesores en esa rama, nunca aplicaciones posteriores ni otro conjunto.
+El snapshot original exporta receipts y changes vacíos. Una cadena rota, fuentes ausentes o IDs
+duplicados, o metadatos necesarios incompletos rechazan la exportación; no se reconstruyen por
+suposición ni se considera expandedBytes ausente igual a cero.
+Estos fallos de disponibilidad usan EXPORT_NOT_AVAILABLE (409) con reason cerrado:
+MISSING_IMPORT_STATS, INVALID_REPORT_SOURCE o INCOMPLETE_VERSION_HISTORY. No revelan rutas.
+EXPORT_LIMIT corresponde a límites de tamaño/carga medidos, no a una cadena de procedencia rota.
+
+El manifiesto de report vincula cada XLSX con su SourceFile report, contextIds, hash, size y
+expandedBytes. Se conservan también contextos sin coordenadas mediante su procedencia de Contexts.
+Los cambios acumulados identifican recibo/propuesta/dirección/destino y valores antes/después;
+los numéricos incluyen política de redondeo y evidencia numérica, los booleanos no inventan esos
+campos. Forma completa y cuotas: [workbook](contracts/workbook.md#exportación-y-roundtrip).
 
 ## Capacidad y limpieza
 
@@ -209,6 +263,13 @@ La métrica es la suma de bytes UTF-8 de la serialización canónica de snapshot
 propuestas, diagnósticos y caché de idempotencia, contando objetos compartidos una sola vez;
 el cálculo se realiza antes de publicar cada incorporación. No es una promesa de límite RSS exacto.
 La caché conserva hashes/referencias, no copias repetidas de cargas.
+
+Las representaciones temporales del lector no forman parte del snapshot. En informes, el
+preflight por bloques retiene cabeceras/sharedStrings/metadatos y la lectura por filas alimenta
+el mismo normalizador Contexts → Coordinates → Facts; no conserva todos los RawCells de datos
+ni una segunda matriz del libro. El catálogo mantiene su ruta raw. El estado normalizado se
+transfiere para publicarse con la comprobación de versión del hilo principal; el cambio de lector
+no altera la identidad/procedencia ni permite una publicación parcial.
 
 Existe además una cuota **separada de 512 MiB de archivos propios por workspace**: suma de bytes
 de staging de subidas, archivos de trabajo y exportaciones retenidas, más las reservas pendientes
@@ -223,6 +284,13 @@ reservado por el sistema de archivos.
 
 Las exportaciones results tienen también límites individuales: 64 MiB por contenido serializado
 (`results.json` / `results.xlsx`), con suma de contenidos y ZIP completo ≤100 MiB cada uno.
+Report conserva ese máximo de paquete y admite 64 MiB por log changes.json/changes.xlsx,
+pero cada informe ce-report-1 tiene máximo 10 MiB. Los informes junto con el catálogo original
+deben caber en 50 MiB serializados y 100 MiB descomprimidos, además de las demás cuotas de
+preflight, incluidos 64 MiB descomprimidos reales por entrada ZIP. Los informes ce-report-1 se
+escriben incrementalmente con inlineStr/ZIP DEFLATE y se controlan por bytes reales, sin guard
+XML estimado. Ese guard de 64 MiB permanece solo para results.xlsx y changes.xlsx. El worker
+mantiene `maxOldGenerationSizeMb: 256`; no representa un límite exacto de RSS ni de buffers.
 Excederlos produce `EXPORT_LIMIT`, sin truncar ni publicar una descarga parcial. La respuesta
 413 previa a aceptar o el Job failed
 posterior a 202, así como su exposición en capabilities, se fijan en

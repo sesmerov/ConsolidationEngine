@@ -40,3 +40,5 @@ export { evaluateCandidate } from './recalculation/candidate.js';
 export type { CandidateResult } from './recalculation/candidate.js';
 export { simulate, uuidV5, SimulationError } from './recalculation/simulate.js';
 export type { SimulateOptions } from './recalculation/simulate.js';
+export { applyCandidate, ApplicationError, selectionClosureHash, sameReportedValue } from './recalculation/apply-candidate.js';
+export type { ApplicationCandidate, ApplyCandidateOptions, ApplicationErrorCode } from './recalculation/apply-candidate.js';

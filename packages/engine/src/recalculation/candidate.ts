@@ -34,7 +34,8 @@ export function evaluateCandidate(snapshot: Snapshot, direction: DirectionDTO, o
   const before: FactReadDTO = { factKey: target.factKey, coordinate: target,
     presence: previous ? previous.presence === 'null' ? 'explicit_null' : 'value' : 'implicit_null',
     ...(previous?.originalText !== undefined ? { originalText: previous.originalText } : {}),
-    ...(previous?.normalizedValue !== undefined ? { normalizedValue: previous.normalizedValue } : {}), sourceLocator: previous?.sourceLocator ?? target.sourceLocator };
+    ...(previous?.normalizedValue !== undefined ? { normalizedValue: previous.normalizedValue } : {}),
+    ...(previous?.derivation ? { derivation: previous.derivation } : {}), sourceLocator: previous?.sourceLocator ?? target.sourceLocator };
   const readSet = new Set([...readKeys, target.factKey]);
   const sources = uniqueSources([...snapshot.content.catalog.variants.filter(variant => direction.variantIds.includes(variant.variantId)).flatMap(variant => variant.sourceLocators),
     ...snapshot.content.coordinates.filter(cell => readSet.has(cell.factKey)).map(cell => cell.sourceLocator),

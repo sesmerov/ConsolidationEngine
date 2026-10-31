@@ -30,7 +30,7 @@ describe('preview explanation and explicit closure', () => {
     const request = http.expectOne(request => request.url.endsWith('/selection')); expect(request.request.body).toEqual({ selectedIds: ['b'] }); expect(request.request.headers.has('If-Match')).toBe(false);
     request.flush({ selectedIds: ['b'], requiredIds: ['a'], complete: false, closureHash: 'hash', state: 'ready' }); await selecting; fixture.detectChanges();
     expect(fixture.componentInstance.store.selected()).toEqual(['b']); expect((fixture.nativeElement as HTMLElement).textContent).toContain('Faltan 1');
-    http.expectNone(request => request.url.endsWith('/applications')); expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Aplicar cambios');
+    http.expectNone(request => request.url.endsWith('/applications')); expect(Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find(button => button.textContent?.includes('Aplicar cambios seleccionados'))!.disabled).toBe(true);
   });
   it('ignores a late selection response after a newer explicit selection', async () => {
     const fixture = await render(), store = fixture.componentInstance.store;
@@ -67,6 +67,8 @@ describe('preview explanation and explicit closure', () => {
     const completed = store.toggle('a', true), request = http.expectOne(request => request.url.endsWith('/selection')); expect(request.request.body).toEqual({ selectedIds: ['a', 'b'] });
     request.flush({ selectedIds: ['a', 'b'], requiredIds: [], complete: true, closureHash: 'new', state: 'ready' }); await completed;
     expect(store.selected()).toEqual(['a', 'b']); expect(store.selection()?.complete).toBe(true);
+    expect(store.selectedProposals()).toEqual([b, a]); fixture.detectChanges();
+    const confirmation = (fixture.nativeElement as HTMLElement).querySelector('ce-apply')!.textContent!; expect(confirmation).toContain('SYNTHETIC_A'); expect(confirmation).toContain('SYNTHETIC_B'); expect(confirmation).toContain('0.33');
   });
   it('starts against current CAS and shows no fabricated preview for a cancelled job', async () => {
     const fixture = TestBed.createComponent(PreviewPageComponent); fixture.detectChanges(); http.expectOne(request => request.url.endsWith('/previews')).flush({ items: [], total: 0, nextCursor: null, revision: 'rev' }); await Promise.resolve();
@@ -74,5 +76,30 @@ describe('preview explanation and explicit closure', () => {
     expect(request.request.body).toEqual({ baseVersionId: versionId }); expect(request.request.headers.get('If-Match')).toBe('"v-' + versionId + '"'); expect(request.request.headers.has('Idempotency-Key')).toBe(true);
     request.flush({ jobId: 'job', workspaceId, kind: 'preview', status: 'cancelled', progress: { completed: 0, total: 2, complete: false }, diagnostics: [] }); await starting; TestBed.tick();
     expect(fixture.componentInstance.store.preview()).toBeNull(); expect(fixture.componentInstance.store.history()).toEqual([]);
+  });
+  it('restores an applied receipt after reload, keeps no-op counts and pages all comparisons without posting', async () => {
+    const receiptId = '789588af-2da5-4ef9-b2f6-f34d39e4e7ad', applied = { ...preview, state: 'applied', appliedReceiptId: receiptId };
+    const receipt = { id: receiptId, previewId: id, acceptedIds: ['a', 'b'], baseVersionId: versionId, newVersionId: 'next', beforeValidationRunId: 'before', validationRunId: 'after', appliedAt: preview.createdAt, closureHash: 'hash' };
+    const summary = { complete: true, rows: 2, variants: 2, applicableVariants: 2, duplicateRows: 0, instances: 2, byStatus: { pass: 0, fail: 1, error: 1, not_applicable: 0, not_evaluable: 0 } };
+    const row = { id: 'result', runId: 'after', versionId: 'next', code: 'SYNTHETIC_REMAINING', severity: 'error', status: 'fail', values: {}, factReads: [], metadataReads: [], sources: [], diagnostics: [], variantIds: [], sourceRecordIds: [], tables: [], coverageOnly: false, expression: '1=2' };
+    const detail = { receipt, changeCount: 1, beforeSummary: summary, afterSummary: summary };
+    const comparison = { receipt, beforeSummary: summary, afterSummary: summary, items: [{ key: 'first', after: row }], total: 2, nextCursor: 'next-page' };
+    const fixture = TestBed.createComponent(PreviewPageComponent); fixture.detectChanges();
+    http.expectOne(request => request.url.endsWith('/previews')).flush({ items: [applied], total: 1, nextCursor: null, revision: 'r' }); await Promise.resolve();
+    http.expectOne(request => request.url.endsWith('/previews/' + id)).flush(applied); http.expectOne(request => request.url.endsWith('/proposals')).flush({ ...page, items: page.items.map(row => ({ ...row, state: 'applied' })) });
+    await Promise.resolve(); await Promise.resolve();
+    http.expectOne(request => request.url.endsWith('/applications/' + receiptId)).flush(detail); http.expectOne(request => request.url.endsWith('/comparison')).flush(comparison);
+    await Promise.resolve(); await Promise.resolve(); fixture.detectChanges();
+    const text = (fixture.nativeElement as HTMLElement).textContent!; expect(text).toContain('Aplicación completada'); expect(text).toContain('Valores modificados: 1'); expect(text).toContain('Propuestas sin cambio de valor: 1'); expect(text).toContain('SYNTHETIC_REMAINING'); expect(fixture.componentInstance.store.selected()).toEqual([]);
+    const loading = fixture.componentInstance.store.loadApplication(true); http.expectOne(request => request.url.endsWith('/applications/' + receiptId)).flush(detail);
+    http.expectOne(request => request.url.endsWith('/comparison') && request.params.get('cursor') === 'next-page').flush({ ...comparison, items: [{ key: 'second', after: { ...row, id: 'second', code: 'SYNTHETIC_ERROR', status: 'error' } }], nextCursor: null }); await loading;
+    expect(fixture.componentInstance.store.comparison()?.items.map(row => row.key)).toEqual(['first', 'second']); http.expectNone(request => request.method === 'POST');
+  });
+  it('ignores late receipt and comparison responses after closing the workspace', async () => {
+    const fixture = await render(), store = fixture.componentInstance.store;
+    store.preview.set({ ...store.preview()!, state: 'applied', appliedReceiptId: 'receipt' }); const loading = store.loadApplication();
+    const detail = http.expectOne(request => request.url.endsWith('/applications/receipt')), comparison = http.expectOne(request => request.url.endsWith('/comparison'));
+    session.workspace.set(null); TestBed.tick(); detail.flush({ receipt: { id: 'receipt' } }); comparison.flush({ items: [], receipt: { id: 'receipt' } }); await loading;
+    expect(store.application()).toBeNull(); expect(store.comparison()).toBeNull();
   });
 });

@@ -10,6 +10,7 @@ import type { Coordinate, JsonValue, RuleResultDTO } from '@ce/contracts';
 import { jsonBytes, jsonChunks } from '../../apps/api/src/export/bounded-json.js';
 import { checkExportData, exportLimits, writeResultsExport } from '../../apps/api/src/export/results-export.js';
 import type { ExportPaths, ResultsExportData } from '../../apps/api/src/export/results-export.js';
+import { preflightXlsx } from '../../apps/api/src/import/xlsx-preflight.js';
 
 const directories: string[] = [];
 afterEach(async () => {
@@ -80,6 +81,14 @@ function fixture(): ResultsExportData {
 }
 
 describe('bounded JSON and real results export package', () => {
+  it('preserves literal ST_Xstring-looking text and CR in the spreadsheet view as well as JSON', async () => {
+    const original = fixture(), expression = '  á😀 &<> _x0041_ _x005F_\r\n\t  ', output = await paths();
+    const data = { ...original, results: [{ ...original.results[0]!, expression }] };
+    await writeResultsExport(data, output, exportLimits(), () => {}, () => {});
+    expect(JSON.parse(await readFile(output.json, 'utf8')).results[0].expression).toBe(expression);
+    const workbook = await preflightXlsx(output.xlsx);
+    expect(workbook.sheets.find(sheet => sheet.name === 'Results')!.cells.G2!.text).toBe(expression);
+  });
   it('preserves escaped Unicode across chunk boundaries and measures UTF-8 bytes exactly', () => {
     const text = 'a'.repeat(4095) + '😀' + '\n\t"\\\u0000' + 'á'.repeat(20_000) + '\ud800';
     const input = { text, data: [null, false, -0, 1e100], literal: '=SUM(1,2)' };

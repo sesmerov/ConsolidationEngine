@@ -154,26 +154,56 @@ se probarán sus invariantes, ciclos, conflictos y orden estable.
 
 ## R5. XLSX y precisión de importación
 
-**Decisión.** `read-excel-file` con `parseNumber: text => text` y `trim:false`, después de un
-preflight ZIP/XML con `yauzl` y `sax`. `write-excel-file` generará plantilla y exportaciones.
-Los importes de la plantilla se escribirán como cadenas decimales con tipo, unidad y precisión
-separados. El formato completo se define en [workbook.md](contracts/workbook.md).
+**Decisión actualizada durante implementación.** El catálogo conserva el preflight con celdas
+raw y `read-excel-file` mediante `readWorkbook`, con `parseNumber: text => text` y `trim:false`.
+Los informes ce-report-1 usan `preflightXlsx(...,{retainCells:false})`: conserva celdas de cabecera
+de la fila 1, sharedStrings decodificados y metadatos ZIP/hojas, sin retener los RawCells de datos
+ni una matriz adicional de read-excel-file. Los controles de ocupación temporales se liberan
+por hoja. XML se decodifica por bloques con TextDecoder en modo streaming (UTF-8/UTF-16LE/BE)
+y se entrega a SAX sin construir el XML completo.
+
+`readSheetRows` entrega filas/celdas a `importReportStream`, en orden lógico Contexts → Coordinates
+→ Facts. Comparte `reportNormalizer` con el adaptador raw: tipos, códigos, presencia, precisión,
+unidades, límites y procedencia se normalizan con las mismas reglas. El DTO final se ordena por
+fila de origen. Las cuotas de ZIP/XML y la publicación atómica se mantienen. Los importes siguen
+siendo cadenas decimales con tipo, unidad y precisión separados. El formato completo está en
+[workbook.md](contracts/workbook.md).
+
+La escritura de informes y de XLSX de resultados/cambios es incremental con inlineStr y ZIP
+DEFLATE. El guard XML estimado permanece para resultados/cambios, mientras los informes se
+controlan por bytes reales y cuotas de preflight. `write-excel-file` permanece para la plantilla;
+no se le atribuye la escritura de todas las exportaciones.
 
 Para `kind=results` se concreta una descarga ZIP con `results.json` exacto y `results.xlsx`
 literal, sin fórmulas. Son nombres fijos, con límites de 64 MiB por contenido serializado;
 la suma de contenidos y el ZIP completo deben ser ≤100 MiB cada uno, sin excepción por compresión.
 Un exceso produce `EXPORT_LIMIT`, sin truncar. Se comprueba/reserva
-capacidad antes de buffers grandes y se controla el tamaño real durante la generación. El
-formato `kind=report` permanece ce-report-1. Estos son límites locales de producto, no EBA.
+capacidad antes de buffers grandes y se controla el tamaño real durante la generación.
+`kind=report` empaqueta informes ce-report-1 y el registro acumulado de cambios según el contrato
+de workbook. Estos son límites locales de producto, no EBA.
 
-**Motivo.** El callback conserva el lexema numérico XML sin pasar por la precisión binaria de
-JavaScript. Eso no puede recuperar dígitos ya perdidos al guardar números de más de 15 cifras
-en Excel: la plantilla exigirá texto para los valores decimales. El preflight rechaza código,
-relaciones externas de datos, XML inválido y expansión excesiva antes de materializar el libro.
+**Motivo.** En el caso de 100.000 hechos se observó agotamiento del heap del worker durante el
+preflight anterior: retenía RawCells y un mapa de direcciones para todas las celdas, antes incluso
+de la segunda lectura que creaba otra matriz. El diseño incremental elimina esa retención
+redundante manteniendo `maxOldGenerationSizeMb: 256`; no eleva límites para ocultar el problema.
+Esta es la razón del cambio de diseño, no una afirmación de rendimiento ni un benchmark.
+
+El callback del catálogo conserva el lexema numérico XML sin pasar por Number. En los informes,
+el lector por filas conserva tipo/texto y el normalizador obtiene el racional exacto. Ninguna
+ruta recupera cifras ya perdidas al guardar números de más de 15 dígitos en Excel: Facts.value
+sigue exigiendo texto. El preflight rechaza código, relaciones externas de datos, XML inválido
+y expansión excesiva antes de normalizar las filas.
+
+La ruta incremental admite explícitamente elementos XML de filas/celdas fuera de orden,
+resueltos por identidad y cabeceras; reúne fragmentos disjuntos de una misma fila y rechaza
+celdas duplicadas. El lector anterior read-excel-file rechazaba filas desordenadas: se documenta
+esta diferencia del adaptador y no se afirma equivalencia de admisión con la ruta anterior.
 
 **Alternativas.** Leer todo como `Number`, o usar un importador que ya lo convierta antes de
 entregar el valor, perdería exactitud. No se selecciona el antiguo paquete `xlsx` del registro
 npm ni un motor de fórmulas Excel; las reglas del producto se evalúan mediante DPM-XL.
+Retener todas las celdas raw y volver a materializar los informes repite representaciones del
+mismo contenido; se conserva esa ruta solo para el catálogo reducido, no para informes grandes.
 
 **Fuentes.** [read-excel-file](https://github.com/catamphetamine/read-excel-file),
 [write-excel-file](https://github.com/catamphetamine/write-excel-file),

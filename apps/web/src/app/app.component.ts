@@ -5,11 +5,12 @@ import { SessionStore } from './core/session.store';
 import { ImportPageComponent } from './import/import-page.component';
 import { ValidationPageComponent } from './validation/validation-page.component';
 import { PreviewPageComponent } from './recalculation/preview-page.component';
+import { ExportsComponent } from './recalculation/exports.component';
 
 @Component({
   selector: 'ce-root',
   standalone: true,
-  imports: [FormsModule, ImportPageComponent, ValidationPageComponent, PreviewPageComponent],
+  imports: [FormsModule, ImportPageComponent, ValidationPageComponent, PreviewPageComponent, ExportsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="shell">
@@ -24,7 +25,7 @@ import { PreviewPageComponent } from './recalculation/preview-page.component';
           <section class="workspace-card" aria-labelledby="workspace-name">
             <div class="section-heading"><div><span class="status">{{ workspace.state === 'ready' ? 'Conjunto cargado' : 'Sin informes' }}</span><h2 id="workspace-name">{{ workspace.name }}</h2></div>
               <button class="secondary" (click)="confirmClose.set(true)" [disabled]="session.pending()">Cerrar conjunto</button></div>
-            @if (confirmClose()) { <div class="confirmation"><p>Cerrar descarta los datos de este conjunto y cancela el trabajo en curso.</p><button class="danger" (click)="close()" [disabled]="session.pending()">Cerrar y descartar</button> <button class="secondary" (click)="confirmClose.set(false)">Volver</button></div> }
+            @if (confirmClose()) { <div class="confirmation"><p>Cerrar descarta los datos temporales de este conjunto y cancela el trabajo en curso. Las descargas que ya hayas guardado en tu equipo permanecen.</p><button class="danger" (click)="close()" [disabled]="session.pending()">Cerrar y descartar</button> <button class="secondary" (click)="confirmClose.set(false)">Volver</button></div> }
             @if (workspace.contexts.length) {
               <label for="context-selector">Contexto</label><select id="context-selector" [ngModel]="session.selectedContextId()" (ngModelChange)="session.selectContext($event)">@for (context of workspace.contexts; track context.contextId) { <option [value]="context.contextId">{{ context.entityId }} · {{ context.referenceDate }} · {{ context.moduleVersion }}</option> }</select>
             }
@@ -34,11 +35,13 @@ import { PreviewPageComponent } from './recalculation/preview-page.component';
             <section class="workspace-card" aria-live="polite"><div class="section-heading"><h2>{{ jobStatus[job.status] }}</h2>@if (session.jobActive()) { <button class="secondary" (click)="session.cancelJob()" [disabled]="session.pending()">Cancelar trabajo</button> }</div>
               @if (job.progress.total > 0) { <progress [value]="job.progress.completed" [max]="job.progress.total"></progress><p>{{ job.progress.completed }} de {{ job.progress.total }}</p> }
               @if (!job.progress.complete) { <p class="muted">Progreso incompleto. No representa un resultado final de validación.</p> }
+              @if (job.kind === 'apply' && job.status === 'succeeded') { <p>Aplicación completada. La versión ya está publicada; una petición de cancelación posterior no revierte sus cambios.</p> }
+              @if (job.kind === 'apply' && (job.status === 'cancelled' || job.status === 'failed' || job.status === 'timed_out')) { <p>No se publicó una versión para esta aplicación.</p> }
               @for (diagnostic of job.diagnostics; track $index) { <p class="error" role="alert">{{ diagnostic.message }} @if (diagnostic.fileName) { · {{ diagnostic.fileName }} } @if (diagnostic.locator?.sheet) { · {{ diagnostic.locator.sheet }} } @if (diagnostic.locator?.column) { · {{ diagnostic.locator.column }}{{ diagnostic.locator.row }} }</p> }
             </section>
           }
           <ce-import-page/>
-          @if (workspace.currentVersionId) { <ce-validation-page/><ce-preview-page/> }
+          @if (workspace.currentVersionId) { <ce-validation-page/><ce-preview-page/><ce-exports/> }
         } @else {
           <section class="empty-state"><span class="status">Nueva sesión</span><h2>Crea un conjunto de informes</h2><p>Asigna un nombre para identificar el trabajo de esta sesión.</p>
             <form (ngSubmit)="session.create(name)"><label for="workspace-name-input">Nombre del conjunto</label><input id="workspace-name-input" name="name" [(ngModel)]="name" maxlength="100" required placeholder="Ej. Cierre trimestral"/><button type="submit" [disabled]="session.pending() || !name.trim()">Crear conjunto</button></form>

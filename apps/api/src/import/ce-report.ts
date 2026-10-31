@@ -4,7 +4,9 @@ import { DecimalInputError, parseDecimal, rationalToDTO } from '@ce/engine';
 import { ApiError } from '../errors.js';
 import { canonicalHash, canonicalStringify } from '../session/canonical-state.js';
 import type { RawCell } from './xlsx-preflight.js';
+import type { PreflightWorkbook } from './xlsx-preflight.js';
 import type { RawWorkbook, WorkbookSheet } from './xlsx-reader.js';
+import { readSheetRows } from './xlsx-row-reader.js';
 
 const TABLE_CODE = /^[A-Za-z](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?$/;
 const CELL_CODE = /^[A-Za-z0-9]+$/;
@@ -38,10 +40,11 @@ function table(source: SourceFile, workbook: RawWorkbook, name: string, headers:
   for (let column = 1; column <= headers.length; column++) {
     if (text(source, sheet, 1, column) !== headers[column - 1]) return invalid('INVALID_HEADER', locator(source, sheet, 1, column));
   }
-  for (const raw of Object.values(sheet.cells)) {
-    if (raw.column > headers.length && (raw.text !== '' || raw.lexeme !== '')) return invalid('UNEXPECTED_COLUMN', locator(source, sheet, raw.row, raw.column));
-  }
+  checkColumns(source, sheet, headers);
   return sheet;
+}
+function checkColumns(source: SourceFile, sheet: WorkbookSheet, headers: readonly string[]): void {
+  for (const raw of Object.values(sheet.cells)) if (raw.column > headers.length && (raw.text !== '' || raw.lexeme !== '')) invalid('UNEXPECTED_COLUMN', locator(source, sheet, raw.row, raw.column));
 }
 function rows(sheet: WorkbookSheet): number[] {
   const present = new Set<number>();
@@ -88,17 +91,10 @@ function validUnit(unit: string): boolean {
   }
   return true;
 }
-export function importReport(workbook: RawWorkbook, source: SourceFile): ImportedReport {
-  if (workbook.sheets.length !== REPORT_SHEETS.length || new Set(workbook.sheets.map((sheet) => sheet.name)).size !== REPORT_SHEETS.length
-      || workbook.sheets.some((sheet) => !(REPORT_SHEETS as readonly string[]).includes(sheet.name))) {
-    throw new ApiError('INVALID_WORKBOOK', { reason: 'INVALID_REPORT_SHEETS' });
-  }
-  const contextSheet = table(source, workbook, 'Contexts', CONTEXT_HEADERS);
-  const coordinateSheet = table(source, workbook, 'Coordinates', COORDINATE_HEADERS);
-  const factSheet = table(source, workbook, 'Facts', FACT_HEADERS);
+function reportNormalizer(source: SourceFile) {
   const contexts: ReportContext[] = []; const contextMap = new Map<string, ReportContext>();
   const contextDefinitions = new Map<string, string>();
-  for (const row of rows(contextSheet)) {
+  function addContext(contextSheet: WorkbookSheet, row: number): void {
     const get = (column: number, empty = false) => text(source, contextSheet, row, column, empty);
     if (get(1) !== REPORT_TEMPLATE_VERSION) return invalid('INVALID_TEMPLATE_VERSION', locator(source, contextSheet, row, 1));
     const contextId = get(2), entityId = get(3), referenceDate = get(4), submissionDate = get(5, true), framework = get(6), moduleVersion = get(7);
@@ -118,7 +114,6 @@ export function importReport(workbook: RawWorkbook, source: SourceFile): Importe
     const context: ReportContext = { canonicalContextKey, contextId, entityId, referenceDate, ...(submissionDate ? { submissionDate } : {}), framework, moduleVersion, filingIndicators, filingIndicatorsLocator };
     contexts.push(context); contextMap.set(contextId, context);
   }
-  if (!contexts.length) return invalid('MISSING_CONTEXT', { fileId: source.id, sheet: 'Contexts' });
   const identity = (sheet: WorkbookSheet, row: number): FactIdentity => {
     const contextId = text(source, sheet, row, 1), tableCode = text(source, sheet, row, 2), sheetCode = text(source, sheet, row, 3, true);
     const rowCode = text(source, sheet, row, 4), columnCode = text(source, sheet, row, 5); const context = contextMap.get(contextId);
@@ -130,9 +125,8 @@ export function importReport(workbook: RawWorkbook, source: SourceFile): Importe
   };
   const coordinates: Coordinate[] = []; const coordinateMap = new Map<string, Coordinate>();
   const axesBySheet = new Map<string, string>(); const tableModes = new Map<string, boolean>();
-  const coordinateRows = rows(coordinateSheet); const factRows = rows(factSheet);
-  if (coordinateRows.length > 100_000 || factRows.length > 100_000) throw new ApiError('EXPANSION_LIMIT');
-  for (const row of coordinateRows) {
+  function addCoordinate(coordinateSheet: WorkbookSheet, row: number): void {
+    if (coordinates.length >= 100_000) throw new ApiError('EXPANSION_LIMIT');
     const key = identity(coordinateSheet, row); const get = (column: number, empty = false) => text(source, coordinateSheet, row, column, empty);
     if (coordinateMap.has(key.factKey)) return invalid('DUPLICATE_COORDINATE', locator(source, coordinateSheet, row, 1));
     const dataType = get(6), unit = get(7, true), decimals = get(8, true);
@@ -153,7 +147,8 @@ export function importReport(workbook: RawWorkbook, source: SourceFile): Importe
     coordinates.push(coordinate); coordinateMap.set(key.factKey, coordinate);
   }
   const facts: ReportedFact[] = []; const factKeys = new Set<string>();
-  for (const row of factRows) {
+  function addFact(factSheet: WorkbookSheet, row: number): void {
+    if (facts.length >= 100_000) throw new ApiError('EXPANSION_LIMIT');
     const key = identity(factSheet, row); const coordinate = coordinateMap.get(key.factKey);
     if (!coordinate) return invalid('UNKNOWN_COORDINATE', locator(source, factSheet, row, 1));
     if (factKeys.has(key.factKey)) return invalid('DUPLICATE_FACT', locator(source, factSheet, row, 1));
@@ -162,7 +157,7 @@ export function importReport(workbook: RawWorkbook, source: SourceFile): Importe
     const sourceLocator = locator(source, factSheet, row, 7);
     if (presence === 'null') {
       if (originalText !== '') return invalid('NULL_HAS_VALUE', sourceLocator);
-      facts.push({ ...key, presence, sourceLocator }); continue;
+      facts.push({ ...key, presence, sourceLocator }); return;
     }
     if (presence !== 'value') return invalid('INVALID_PRESENCE', locator(source, factSheet, row, 6));
     if (coordinate.dataType === 'boolean') {
@@ -173,5 +168,41 @@ export function importReport(workbook: RawWorkbook, source: SourceFile): Importe
       catch (error) { if (error instanceof DecimalInputError) return invalid(error.code, sourceLocator); throw error; }
     }
   }
-  return { contexts, coordinates, facts, diagnostics: [] };
+  return { Contexts: addContext, Coordinates: addCoordinate, Facts: addFact,
+    requireContexts() { if (!contexts.length) invalid('MISSING_CONTEXT', { fileId: source.id, sheet: 'Contexts' }); },
+    finish(): ImportedReport {
+      this.requireContexts();
+      contexts.sort((a, b) => (a.filingIndicatorsLocator?.row ?? 0) - (b.filingIndicatorsLocator?.row ?? 0));
+      coordinates.sort((a, b) => (a.sourceLocator.row ?? 0) - (b.sourceLocator.row ?? 0));
+      facts.sort((a, b) => (a.sourceLocator.row ?? 0) - (b.sourceLocator.row ?? 0));
+      return { contexts, coordinates, facts, diagnostics: [] };
+    } };
+}
+const dataSheets = [['Contexts', CONTEXT_HEADERS], ['Coordinates', COORDINATE_HEADERS], ['Facts', FACT_HEADERS]] as const;
+function requireSheets(workbook: { readonly sheets: readonly { readonly name: string }[] }): void {
+  if (workbook.sheets.length !== REPORT_SHEETS.length || new Set(workbook.sheets.map(sheet => sheet.name)).size !== REPORT_SHEETS.length
+    || workbook.sheets.some(sheet => !(REPORT_SHEETS as readonly string[]).includes(sheet.name))) throw new ApiError('INVALID_WORKBOOK', { reason: 'INVALID_REPORT_SHEETS' });
+}
+/** Retained-cell compatibility path and streaming path share the same normalizer for every row. */
+export function importReport(workbook: RawWorkbook, source: SourceFile): ImportedReport {
+  requireSheets(workbook); const normalizer = reportNormalizer(source);
+  const sheets = dataSheets.map(([name, headers]) => ({ name, sheet: table(source, workbook, name, headers) }));
+  for (const { name, sheet } of sheets) { if (name !== 'Contexts') normalizer.requireContexts(); for (const row of rows(sheet)) normalizer[name](sheet, row); }
+  return normalizer.finish();
+}
+export async function importReportStream(filePath: string, preflight: PreflightWorkbook, source: SourceFile, options: { check?: () => void } = {}): Promise<ImportedReport> {
+  requireSheets(preflight); const normalizer = reportNormalizer(source);
+  const workbook: RawWorkbook = { date1904: preflight.date1904, sheets: preflight.sheets.map(sheet => ({ ...sheet, rows: [] })) };
+  // Header cells are retained even in metadata mode, so XML row order never decides the schema.
+  const sheets = dataSheets.map(([name, headers]) => ({ name, headers, sheet: table(source, workbook, name, headers) }));
+  for (const { name, headers, sheet } of sheets) {
+    options.check?.(); if (name !== 'Contexts') normalizer.requireContexts();
+    for await (const item of readSheetRows(filePath, preflight, name, options)) {
+      options.check?.(); if (item.row === 1) continue;
+      const view: WorkbookSheet = { ...sheet, cells: Object.fromEntries(item.cells.map(raw => [raw.address, raw])), rows: [] };
+      checkColumns(source, view, headers);
+      if (item.cells.some(raw => raw.text !== '' || raw.lexeme !== '')) normalizer[name](view, item.row);
+    }
+  }
+  options.check?.(); return normalizer.finish();
 }

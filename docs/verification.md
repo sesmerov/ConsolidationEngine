@@ -229,3 +229,136 @@ La captura `.cache/preview-ui.png` fue inspeccionada: productor 12 antes de cons
 predecesores con código/coordenada, valores y precisión visibles y selección explícita sin
 modificar hechos. Los originales Excel/lexer/parser mantienen los tres hashes registrados.
 Aplicación, comparación, exportación de informes y rendimiento siguen pendientes de US4/polish.
+
+## US4 — preparación y candidato T059–T063
+
+Las pruebas de atomicidad se prepararon antes de la ruta: 1 prerrequisito real correcto y
+18 fallos por 404; se añadió después el caso de identidad compartida en un no-op, también
+reproducido contra la ruta ausente. La comparación preparó 1 prerrequisito correcto y 3 fallos
+por 404. Los 10 casos Angular quedaron sin ejecutar por ausencia de los componentes.
+Los 12 contratos de aplicación/exportación dieron 11 fallos por funcionalidades pendientes y
+1 rechazo de esquema correcto, que por sí solo no acreditaba exportación de informes.
+
+T062 compiló contratos, motor y API y superó 7 pruebas de esquemas. T063 superó 511 pruebas
+del motor y transporte real del worker, incluidas 31 directas de aplicación y 6 de worker.
+Build/typechecks correctos. El candidato devuelve parches y validaciones antes/después con
+presupuesto compartido, sin publicar registros. Un límite alcanzado durante la validación
+posterior impide devolver el candidato completo.
+
+Los destinos sin cambio semántico conservan referencia, texto original y procedencia previa;
+los modificados incorporan derivation, visible también en lecturas y previews posteriores.
+La capa HTTP de publicación y los exportadores se verifican en los siguientes checkpoints.
+
+## US4 — publicación, historial e interfaz T064–T065/T068
+
+La integración de publicación e historial supera 156 pruebas en 13 archivos. Los contratos y
+esquemas existentes pasan 75 casos, más los 4 de aplicación de applications-exports; los 8 casos
+de exportación de esa suite siguen pendientes de T066/T067 y no se cuentan como verificados.
+Build y typecheck de API correctos. Las 44 pruebas focalizadas de atomicidad, comparación y jobs
+incluyen cuota, limpieza del intento retenido y comprobación final de versión/preview/cancelación.
+
+La publicación reconstruye copy-on-write en el hilo principal después del transporte real del
+worker: comparte los hechos sin cambios y publica conjuntamente snapshot, ambas validaciones,
+recibo, cambios y estados históricos. Un no-op conserva texto y derivación anteriores, queda
+auditado como changed:false y no incrementa el número de hechos modificados. El intento privado
+de operación se contabiliza en la cuota y se elimina en todas las transiciones terminales.
+
+T068 supera las 41 pruebas Angular, typecheck y build de producción. La confirmación muestra el
+conjunto completo, incluidos seleccionados fuera de página/filtro; una respuesta incierta conserva
+cuerpo, clave idempotente y ETag originales. El historial recupera recibo y comparación paginada
+mediante appliedReceiptId, distingue propuestas aceptadas de valores modificados y muestra la
+procedencia calculada. Cancelar después del commit conserva el estado aplicado y su nueva versión.
+Estas pruebas de componentes todavía no sustituyen el recorrido Chromium completo de T070.
+
+La preparación de exportación/reimportación detectó que import enviaba innecesariamente el
+snapshot anterior al worker. Tres pruebas fallaron primero por esa retención; después de excluir
+el snapshot del transporte pasan 14 casos (3 de transporte/reemplazo/CAS y 11 contratos de carga).
+La versión base sigue en el Job y el control de publicación permanece en el hilo principal:
+fallo o versión competidora conservan el original. Esto reduce una copia, pero todavía no acredita
+la carga de 100.000 hechos ni el objetivo de rendimiento SC-006.
+
+## US4 — exportadores T066
+
+104 pruebas focalizadas correctas: 18 de report-export y 86 de results-export, file-budget e
+xlsx-import. Builds de contratos/API y typecheck API correctos. El roundtrip pequeño usa lectores
+reales y conserva múltiples archivos, contextos vacíos, booleanos, null/ausencia/cero, códigos y
+valores de más de 15 dígitos. Se comprueban partición por fuente, manifiesto, historial ancestral,
+no-ops, guardas y cuotas; esto todavía no sustituye las rutas T067 ni el navegador T070.
+
+El escritor incremental se comparte entre report, changes y results; sólo results/changes conservan
+el guard conservador de carga XML estimada de 64 MiB. La escritura de informes mide los bytes
+reales comprimidos/expandidos y conserva los límites existentes. Dos fallos se reprodujeron antes
+de corregir ST_Xstring: escapes literales solapados y results.xlsx que convertía `_x0041_` en `A`.
+La decodificación de entrada se realiza una sola vez; se preservan CR, espacios y Unicode.
+
+Prueba de capacidad de exportación (no SC-006): worker real con heap configurado de 256 MiB,
+100.000 coordenadas y 100.000 hechos. XLSX 4.881.114 bytes, expansión 77.528.057 bytes más catálogo
+6.923, ZIP final 4.888.418 bytes; 2.896 ms y máximo de heap muestreado 166.355.968 bytes. La muestra
+de heap no mide un pico absoluto ni limita RSS. Evidencia local en `.cache/report-capacity-NrjYkz/`.
+
+La reimportación del mismo archivo falló realmente con ERR_WORKER_OUT_OF_MEMORY a los 11.674 ms
+en el worker de 256 MiB. Sólo completó el catálogo; RSS máximo del proceso muestreado 531.243.008
+bytes, distinto del heap. Evidencia en `.cache/import-volume-probe/import-measurement.json`.
+La retención del lector queda en corrección: no se acredita todavía capacidad de carga completa
+ni el benchmark y no se cerrará US4 con ese fallo sin resolver.
+
+## US4 — integración de exportación T067
+
+21 contratos de applications/results, 6 pruebas de comparación y 6 de ciclo de vida de exportación
+correctas, con API construida. Se comprueba exportar resultados posteriores a aplicar, incluidos
+fallos/errores restantes y derivation, así como informes originales/históricos y su log acumulado.
+El payload del worker de informe excluye snapshot completo, AST y runs. La aceptación reserva
+200 MiB para los N+3 temporales; tras completar sólo se conserva el ZIP. Replay con CAS antiguo,
+cancelación, rechazo de cuota y razones públicas saneadas conservan el estado y limpian reservas.
+
+Se corrigieron dos expectativas defectuosas de test sin cambiar los datos: la coordenada de gran
+precisión es r0240, y `kind:catalog` en metadatos SourceFile no constituye un catálogo AST filtrado.
+La comparación profunda del roundtrip ya era correcta. La prueba de volumen del lector sigue
+separada de estos casos y pendiente de su corrección.
+
+T069 supera las 46 pruebas Angular, build y typecheck de frontend. El panel permite elegir una
+versión actual/histórica y su informe o una ejecución concreta para resultados, conserva los
+reintentos y descarta respuestas recibidas después del cierre. La selección sólo vive en memoria;
+el cierre comunica qué temporales se eliminan y que las descargas guardadas permanecen.
+
+## US4 — corrección de memoria del lector
+
+El preflight aislado reprodujo el OOM antes de leer el informe. La corrección procesa XML por
+chunks, conserva sólo metadatos en informes y entrega filas al mismo normalizador de ce-report.
+El catálogo mantiene el lector raw/read-excel-file; el informe evita retener todas las celdas y
+materializar una segunda matriz. Los 41 casos ST_Xstring pasan en ambas rutas, incluidos 13 que
+comparan tipo, lexema y texto completos y comprueban que el modo metadata no retiene A2.
+
+El mismo archivo de 100.000 coordenadas/hechos completa ahora importación, transporte del snapshot
+y publicación mediante operation-worker/import.worker y WorkspaceStore reales. Snapshot recibido
+a los 23.205 ms; publicación completa a los 28.551 ms; proceso total 29.747 ms y estado canónico
+80.692.106 bytes, por debajo de 512 MiB. No se modificaron canonicalHash, cuotas ni límites.
+Evidencia local: `.cache/import-volume-probe/import-transport-measurement.json`.
+
+La configuración limita old generation a 256 MiB, no el heap total ni el RSS: el heap total usado
+observado alcanzó 292.495.616 bytes incluyendo young generation. RSS observado en la publicación
+734.412.800 bytes; el muestreo periódico sólo captó 558.788.608 durante el bloqueo síncrono. Son
+mediciones distintas de los bytes canónicos de sesión y se conservan separadas en la evidencia.
+Este caso usa el catálogo reducido de fixtures, por lo que aún no acredita SC-006 de 500 reglas.
+
+## US4 — checkpoint T059–T070
+
+893 pruebas correctas sin omisiones: 505 engine, 241 integración (19 archivos), 87 contrato
+(10 archivos), 46 Angular (8 archivos) y 14 Chromium (4 archivos). Las 505 del motor se conservan
+del checkpoint T063, sin cambios posteriores del motor; sus 6 pruebas de worker ya están dentro
+de integración y no se cuentan dos veces. Se ejecutaron completas integración, contratos y E2E
+tras estabilizar el lector. Typecheck raíz, build API/Angular y `git diff --check` correctos.
+Los esquemas declaran type:object en sus subschemas y ya no emiten los warnings AJV observados.
+
+Los dos E2E nuevos usan servidor de producción y Chromium reales: aplican 4 propuestas
+(12/24/0.33/boolean), conservan fail/error restantes, comprueban replay con ETag antiguo sin
+segunda versión y cancelación antes/después de publicar, recuperan la comparación tras recargar,
+exportan informe/resultados/histórico y reimportan exactamente precisión, null, cero y códigos.
+El cierre elimina temporales y conserva la descarga guardada. Dos fallos iniciales pertenecían
+al test: selector ambiguo y edición de direcciones sin validar antes la nueva base; se corrigieron
+sin alterar las expectativas de negocio. Los tres originales mantienen los hashes registrados.
+
+Se inspeccionó `.cache/apply-export-ui.png` (137.368 bytes): resumen pasa 4→7, falla 4→1 y error
+1→1, detalle 11→12.00, precisión/procedencia visibles y valor calculado diferenciado del Excel
+original. Quedan contrastes, disposición y recorrido de accesibilidad para T073, además de las
+comprobaciones de recursos T071 y el benchmark real T072. US4 no acredita todavía SC-006/SC-007.

@@ -6,25 +6,25 @@ import type { OperationContext } from '../workers/protocol.js';
 import type { StagedFile } from './multipart-staging.js';
 import { preflightXlsx } from './xlsx-preflight.js';
 import { readWorkbook } from './xlsx-reader.js';
-import { importReport } from './ce-report.js';
+import { importReportStream } from './ce-report.js';
 import { conflictingVariants, importCatalog, variantApplicability } from './eba-catalog.js';
 
 export const GRAMMAR_VERSION = 'dpm-xl-0.9-antlr-4.13.2';
 /** Fully builds a candidate. Only JobManager on the main thread can publish it. */
 export async function importWorkspace(files: readonly StagedFile[], operation: OperationContext): Promise<SnapshotContent> {
   if (files.filter((file) => file.kind === 'catalog').length !== 1 || files.filter((file) => file.kind === 'report').length < 1 || files.filter((file) => file.kind === 'report').length > 20) throw new ApiError('INVALID_REQUEST');
-  const check = () => { if (operation.cancelled()) throw new ApiError('INTERNAL_ERROR'); };
+  const check = () => { if (operation.cancelled() || operation.job?.deadline && Date.now() >= Date.parse(operation.job.deadline)) throw new ApiError('INTERNAL_ERROR'); };
   const budget = { expandedBytes: 0 }; const contexts: ReportContext[] = []; const coordinates: Coordinate[] = []; const facts: ReportedFact[] = [];
   const contextIds = new Set<string>(), coordinateKeys = new Set<string>(), factKeys = new Set<string>();
   const definitions = new Map<string, string>(), axesBySheet = new Map<string, string>(), tableModes = new Map<string, boolean>();
+  const expansionBySource = new Map<string, number>();
   let importedCatalog: ReturnType<typeof importCatalog> | undefined;
   for (const [index, file] of files.entries()) {
     try {
-    check(); const preflight = await preflightXlsx(file.path, { budget }); check();
-    const workbook = await readWorkbook(file.path, preflight); check();
-    if (file.kind === 'catalog') importedCatalog = importCatalog(workbook, file);
+    check(); const preflight = await preflightXlsx(file.path, { budget, retainCells: file.kind === 'catalog', check }); expansionBySource.set(file.id, preflight.expandedBytes); check();
+    if (file.kind === 'catalog') { const workbook = await readWorkbook(file.path, preflight); check(); importedCatalog = importCatalog(workbook, file); }
     else {
-      const report = importReport(workbook, file);
+      const report = await importReportStream(file.path, preflight, file, { check });
       const invalid = (reason: string, locator: SourceLocator) => { throw new ApiError('INVALID_WORKBOOK', { reason }, locator); };
       const local = new Map(report.contexts.map((context) => [context.contextId, context]));
       for (const context of report.contexts) {
@@ -84,7 +84,7 @@ export async function importWorkspace(files: readonly StagedFile[], operation: O
     invalidRows: records.filter((record) => record.diagnostics.some((item) => item.severity === 'error' || item.code === 'SYNTAX_ERROR' || item.code === 'UNSUPPORTED_CONSTRUCT')).length,
     duplicateRows: records.filter((record) => record.diagnostics.some((item) => item.code === 'DUPLICATE_RULE')).length, conflictingVariants: conflicts.size,
   } };
-  const sources: SourceFile[] = files.map(({ id, sha256, displayName, kind, size, importedAt }) => ({ id, sha256, displayName, kind, size, importedAt }));
+  const sources: SourceFile[] = files.map(({ id, sha256, displayName, kind, size, importedAt }) => ({ id, sha256, displayName, kind, size, importedAt, expandedBytes: expansionBySource.get(id)! }));
   check(); operation.progress(files.length + 1, files.length + 1);
   return { catalogVersion: canonicalHash(catalog), reportVersion: canonicalHash({ contexts, coordinates, facts }), configVersion: canonicalHash([]), profileId: ENGINE_PROFILE_ID,
     contexts, coordinates, facts, catalog, directions: [], sources };

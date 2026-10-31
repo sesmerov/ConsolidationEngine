@@ -1,12 +1,8 @@
-import { open } from 'node:fs/promises';
-import { createReadStream } from 'node:fs';
-import { createHash } from 'node:crypto';
-import { crc32 } from 'node:zlib';
-import writeXlsxFile from 'write-excel-file/node';
-import type { Readable } from 'node:stream';
 import type { CatalogData, JsonValue, ReportContext, SourceFile, ValidationBundle, ValidationValueDTO } from '@ce/contracts';
 import { ApiError } from '../errors.js';
-import { jsonBytes, jsonChunks } from './bounded-json.js';
+import { jsonBytes } from './bounded-json.js';
+import { jsonBuffers, writeChunks, writeStoredZip, writeIncrementalWorkbook } from './bounded-files.js';
+import { validXmlText } from '../import/ooxml-text.js';
 export const EXPORT_LIMITS = { maxContentBytes: 64 * 1024 * 1024, maxTotalBytes: 100 * 1024 * 1024 } as const;
 export interface ExportLimits { readonly maxContentBytes: number; readonly maxTotalBytes: number }
 export interface ResultsExportData extends ValidationBundle { readonly profileId: string; readonly versionId: string; readonly contentHash: string; readonly contexts: readonly ReportContext[];
@@ -48,48 +44,20 @@ function* spreadsheetRows(data: ResultsExportData): Generator<SheetRow> {
 }
 export function checkExportData(data: ResultsExportData, limits: ExportLimits, check: () => void = () => {}): number {
   const size = jsonBytes(data as unknown as JsonValue, Math.min(limits.maxContentBytes, limits.maxTotalBytes), check);
-  // Bound the writer's uncompressed XML/string workload before allocating its cell objects.
-  // Six escaped XML characters per input code unit is an upper bound; fixed cell/row markup is reserved too.
+  // Preserve the existing conservative XML-work guard even with the incremental writer.
   let xmlBudget = 64 * 1024; const rows = new Map<string, number>();
   for (const row of spreadsheetRows(data)) { check(); const count = (rows.get(row.sheet) ?? 0) + 1; rows.set(row.sheet, count); if (count > 1_048_576) throw new ApiError('EXPORT_LIMIT');
-    xmlBudget += 128; for (const value of row.values) { if (value.length > 32_767) throw new ApiError('EXPORT_LIMIT'); xmlBudget += 128 + Buffer.byteLength(value, 'utf8') * 6; }
+    xmlBudget += 128; for (const value of row.values) { if (value.length > 32_767) throw new ApiError('EXPORT_LIMIT'); if (!validXmlText(value)) throw new ApiError('EXPORT_NOT_AVAILABLE', { reason: 'INVALID_REPORT_SOURCE' }); xmlBudget += 128 + Buffer.byteLength(value, 'utf8') * 6; }
     if (xmlBudget > limits.maxContentBytes) throw new ApiError('EXPORT_LIMIT', { reason: 'XML_WORKLOAD_LIMIT' }); }
   return size;
 }
-interface Written { size: number; crc: number }
-async function writeChunks(location: string, chunks: AsyncIterable<Uint8Array> | Iterable<Uint8Array>, maximum: number, check: () => void): Promise<Written> {
-  const handle = await open(location, 'r+'); let size = 0, crc = 0;
-  try { await handle.truncate(0); for await (const chunk of chunks) { check(); if (size + chunk.byteLength > maximum) throw new ApiError('EXPORT_LIMIT'); size += chunk.byteLength; crc = crc32(chunk, crc); await handle.writeFile(chunk); } }
-  finally { await handle.close(); } return { size, crc };
-}
-function* jsonBuffers(data: ResultsExportData): Generator<Buffer> {
-  let buffer: string[] = [], bytes = 0;
-  for (const chunk of jsonChunks(data as unknown as JsonValue)) { const size = Buffer.byteLength(chunk); if (bytes + size > 64 * 1024 && bytes) { yield Buffer.from(buffer.join('')); buffer = []; bytes = 0; } buffer.push(chunk); bytes += size; }
-  if (bytes) yield Buffer.from(buffer.join(''));
-}
-async function* zipParts(paths: ExportPaths, entries: readonly Written[]): AsyncGenerator<Uint8Array> {
-  const central: Buffer[] = []; let offset = 0;
-  for (const [index, name] of ['results.json', 'results.xlsx'].entries()) {
-    const entry = entries[index]!, filename = Buffer.from(name), local = Buffer.alloc(30), directory = Buffer.alloc(46);
-    local.writeUInt32LE(0x04034b50); local.writeUInt16LE(20, 4); local.writeUInt16LE(0x800, 6); local.writeUInt32LE(entry.crc, 14); local.writeUInt32LE(entry.size, 18); local.writeUInt32LE(entry.size, 22); local.writeUInt16LE(filename.length, 26);
-    directory.writeUInt32LE(0x02014b50); directory.writeUInt16LE(20, 4); directory.writeUInt16LE(20, 6); directory.writeUInt16LE(0x800, 8); directory.writeUInt32LE(entry.crc, 16); directory.writeUInt32LE(entry.size, 20); directory.writeUInt32LE(entry.size, 24); directory.writeUInt16LE(filename.length, 28); directory.writeUInt32LE(offset, 42);
-    central.push(directory, filename); yield local; yield filename;
-    for await (const chunk of createReadStream(index === 0 ? paths.json : paths.xlsx)) yield chunk as Buffer;
-    offset += local.length + filename.length + entry.size;
-  }
-  const end = Buffer.alloc(22), size = central.reduce((sum, part) => sum + part.length, 0); end.writeUInt32LE(0x06054b50); end.writeUInt16LE(2, 8); end.writeUInt16LE(2, 10); end.writeUInt32LE(size, 12); end.writeUInt32LE(offset, 16);
-  for (const chunk of central) yield chunk; yield end;
-}
 export async function writeResultsExport(data: ResultsExportData, paths: ExportPaths, limits: ExportLimits, check: () => void, progress: (completed: number, total: number) => void): Promise<{ size: number; sha256: string }> {
   checkExportData(data, limits, check);
-  const json = await writeChunks(paths.json, jsonBuffers(data), limits.maxContentBytes, check); progress(1, 3);
-  const sheets = new Map<string, { type: StringConstructor; value: string; format: string }[][]>();
-  for (const row of spreadsheetRows(data)) { check(); const rows = sheets.get(row.sheet) ?? []; rows.push(row.values.map((value) => ({ type: String, value, format: '@' }))); sheets.set(row.sheet, rows); }
-  const writer = writeXlsxFile([...sheets].map(([sheet, data]) => ({ sheet, data, stickyRowsCount: 1 })));
-  const stream = await (writer.toStream as () => Promise<Readable>)(); let xlsx: Written;
-  try { xlsx = await writeChunks(paths.xlsx, stream, Math.min(limits.maxContentBytes, limits.maxTotalBytes - json.size), check); } finally { stream.destroy(); }
+  const json = await writeChunks(paths.json, jsonBuffers(data as unknown as JsonValue), limits.maxContentBytes, check); progress(1, 3);
+  const names = new Set<string>(); for (const row of spreadsheetRows(data)) { check(); names.add(row.sheet); }
+  function* rows(name: string): Generator<readonly string[]> { for (const row of spreadsheetRows(data)) { check(); if (row.sheet === name) yield row.values; } }
+  const xlsx = await writeIncrementalWorkbook(paths.xlsx, [...names].map(name => ({ name, rows: rows(name) })), Math.min(limits.maxContentBytes, limits.maxTotalBytes - json.size), { expandedBytes: 0 }, limits.maxContentBytes, check);
   progress(2, 3); if (json.size + xlsx.size > limits.maxTotalBytes) throw new ApiError('EXPORT_LIMIT');
-  const zip = await writeChunks(paths.zip, zipParts(paths, [json, xlsx]), limits.maxTotalBytes, check); progress(3, 3);
-  const hash = createHash('sha256'); for await (const chunk of createReadStream(paths.zip)) { check(); hash.update(chunk as Buffer); }
-  return { size: zip.size, sha256: hash.digest('hex') };
+  const zip = await writeStoredZip(paths.zip, [{ name: 'results.json', path: paths.json, ...json }, { name: 'results.xlsx', path: paths.xlsx, ...xlsx }], limits.maxTotalBytes, check); progress(3, 3);
+  return { size: zip.size, sha256: zip.sha256 };
 }

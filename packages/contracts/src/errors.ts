@@ -3,6 +3,7 @@ export const ERROR_STATUS = {
   INVALID_REQUEST: 400, INVALID_CURSOR: 400, INVALID_SESSION: 403, ORIGIN_NOT_ALLOWED: 403,
   RESOURCE_NOT_FOUND: 404, WORKSPACE_BUSY: 409, ACTIVE_WORKSPACE_EXISTS: 409,
   IDEMPOTENCY_CONFLICT: 409, SELECTION_NOT_CLOSED: 409, PREVIEW_NOT_APPLICABLE: 409,
+  EXPORT_NOT_AVAILABLE: 409,
   STALE_VERSION: 412, UPLOAD_LIMIT: 413, EXPANSION_LIMIT: 413, SESSION_LIMIT: 413, EXPORT_LIMIT: 413,
   UNSUPPORTED_FILE_TYPE: 415, INVALID_WORKBOOK: 422, INVALID_DIRECTION: 422,
   PRECONDITION_REQUIRED: 428, INTERNAL_ERROR: 500,
@@ -22,7 +23,10 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   UPLOAD_LIMIT: 'La carga supera los límites admitidos.', EXPANSION_LIMIT: 'La expansión supera los límites admitidos.',
   SESSION_LIMIT: 'La sesión ha alcanzado su límite. Exporta y cierra el conjunto.',
   EXPORT_LIMIT: 'La exportación supera el límite de contenido o tamaño del paquete.',
+  EXPORT_NOT_AVAILABLE: 'No se puede reconstruir esta exportación con la procedencia conservada.',
   UNSUPPORTED_FILE_TYPE: 'Sólo se admiten archivos XLSX.', INVALID_WORKBOOK: 'El libro contiene datos no válidos.',
   INVALID_DIRECTION: 'La dirección de recálculo no es válida.', PRECONDITION_REQUIRED: 'Se requiere la versión de referencia.',
   INTERNAL_ERROR: 'No se pudo completar la operación.',
 };
+export const EXPORT_UNAVAILABLE_REASONS = ['MISSING_IMPORT_STATS', 'INVALID_REPORT_SOURCE', 'INCOMPLETE_VERSION_HISTORY'] as const;
+export type ExportUnavailableReason = typeof EXPORT_UNAVAILABLE_REASONS[number];

@@ -8,7 +8,8 @@ La implementación está en curso con Spec Kit. El incremento actual permite cre
 descargar la plantilla Excel, importar archivos, analizar reglas con ANTLR y ejecutar validaciones
 con cálculo exacto. Incluye explicaciones, resultados históricos y exportación a ZIP.
 También permite configurar destinos y simular propuestas de recálculo con sus dependencias.
-La aplicación confirmada de las propuestas corresponde al siguiente incremento.
+La aceptación expresa publica una nueva versión, revalida y permite comparar y exportar sus datos.
+Quedan las comprobaciones finales de rendimiento, accesibilidad y recorrido del analista.
 Los resultados comprobados se registran en [verificación](docs/verification.md).
 
 ## Ejecutar el incremento actual
@@ -47,6 +48,20 @@ los propuestos, su precisión, los predecesores y los bloqueos. La selección mu
 que faltan sin seleccionarlos automáticamente. Los informes permanecen intactos durante esta fase.
 El historial de validaciones y previsualizaciones se recupera también al refrescar el navegador;
 descartar una previsualización conserva su estado histórico dentro de la sesión.
+
+Para aplicar cambios, seleccionar un conjunto completo con sus dependencias y confirmar todos
+sus destinos. La aplicación conserva la versión original, publica la nueva sólo cuando termina
+la revalidación y muestra los resultados antes/después, incluidos los fallos y errores restantes.
+Una propuesta aceptada sin cambio de valor queda auditada, pero no cuenta como hecho modificado.
+El recibo y la comparación se recuperan tras recargar; cancelar después de publicar no deshace
+la aplicación. Una respuesta incierta se puede reintentar sin aplicar el conjunto dos veces.
+
+El panel de exportación permite elegir una versión o ejecución histórica. `report.zip` incluye
+un Excel ce-report-1 por informe original y `changes.json`/`changes.xlsx` con su historial de cambios.
+Para reimportar, extraer los informes del ZIP y cargarlos junto con el catálogo original separado.
+Se conservan valores exactos, precisión, códigos, contextos e indicadores; la carga crea una nueva
+versión y no restaura recibos desde el log. Al cerrar el conjunto se eliminan sus temporales del
+servidor y permanecen las descargas ya guardadas por el usuario.
 
 ## Documentos del proyecto
 
@@ -97,8 +112,9 @@ Las skills viven en `.agents/skills/` y los recursos compartidos en `.specify/`.
 
 `$speckit-implement` está en ejecución, siguiendo las dependencias de tasks.md.
 US1 y US2 forman el MVP validador, incluida la exportación de resultados.
-US3 añade las propuestas con dependencias y está completada. US4 añadirá su aplicación confirmada,
-revalidación y exportación de informes recalculados.
+US3 y US4 están completadas: propuestas con dependencias, aplicación confirmada, revalidación y
+exportación de informes recalculados. El checkpoint reúne 893 pruebas correctas sin omisiones;
+incluye 14 recorridos Chromium. La fase final comprobará recursos, rendimiento y accesibilidad.
 Si cambia el alcance, se actualizarán primero la especificación y el plan afectados.
 Estos nombres se invocan en el chat de Codex; no son comandos de PowerShell.
 
