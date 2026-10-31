@@ -451,3 +451,17 @@ se inspeccionaron y resultan legibles. Esto no constituye una certificación gen
 atribuyen pasos ni ayuda ficticios. Se registrarán su recorrido y cualquier asistencia cuando
 pruebe la guía; T073 permanece sin marcar por ese único criterio. La documentación y los checks
 técnicos finales pueden completarse conservando este estado explícito.
+
+## T074 — documentación ejecutable
+
+README, quickstart y scripts/README sustituyen los comandos y afirmaciones de la fase de diseño
+por instalación/arranque reproducibles y la guía final. Se analizaron sin errores los 14 bloques
+PowerShell; todos los scripts npm referidos existen y los enlaces locales resuelven. Las opciones
+se pasan mediante -NpmArguments @(...) y Chromium usa la caché local del proyecto. Esta QA es
+estática; la ejecución consolidada desde npm ci corresponde a T075.
+
+La documentación distingue el ejemplo totalmente sintético, los extractos EBA con datos sintéticos,
+las diez mediciones de rendimiento y la aceptación humana pendiente. Conserva V01–V16 con enlaces
+a evidencia por incremento, explica la selección de versión vigente al exportar, el perfil local
+y la sesión efímera. No declara conformidad EBA completa, un total global aún sin consolidar ni
+un servidor iniciado por el mero hecho de mostrar comandos.
