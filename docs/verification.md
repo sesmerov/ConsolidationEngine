@@ -362,3 +362,19 @@ Se inspeccionó `.cache/apply-export-ui.png` (137.368 bytes): resumen pasa 4→7
 1→1, detalle 11→12.00, precisión/procedencia visibles y valor calculado diferenciado del Excel
 original. Quedan contrastes, disposición y recorrido de accesibilidad para T073, además de las
 comprobaciones de recursos T071 y el benchmark real T072. US4 no acredita todavía SC-006/SC-007.
+
+## T071 — recursos y superficie local
+
+10 pruebas nuevas (4 resource-lifecycle, 6 local-surface) y 40 regresiones correctas: 50/50 en
+7 archivos. Build/typecheck API correctos. Los casos de CPU/cancelación/timeout/cierre utilizan
+workers Node reales con carga sintética y plazos de prueba, observados por una factory; el caso
+de error/stdout/stderr usa la factory de producción. Los límites configurados no se aumentaron.
+IdempotencyStore y WorkspaceStore son reales; las peticiones usan Fastify.inject y los errores
+inyectados son sintéticos. No se presentan esos datos como integración con informes privados.
+
+Se comprueban acumulación de caché, liberación tras cierre, token nuevo al reiniciar y ausencia
+de secretos/rutas en errores y logs. Sesión vecina, original y descarga guardada conservan hashes.
+Un JSON superior al bodyLimit de 1 MiB devuelve 413 UPLOAD_LIMIT público; no requirió corregir
+el handler. El único cambio de producto corrige una descripción de capabilities, que afirmaba
+erróneamente aplicar la estimación XML de 64 MiB a informes: ahora la distingue de sus bytes reales.
+Esa incoherencia falló primero y pasó después del cambio; no cambiaron las cuotas.
