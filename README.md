@@ -4,15 +4,17 @@ Motor de validación y recálculo de informes regulatorios. El analista cargará
 de reglas EBA y sus informes en una plantilla Excel propia, consultará resultados y podrá aceptar
 propuestas de recálculo con sus dependencias.
 
-El proyecto ha completado especificación y planificación con Spec Kit. Hay constitución,
-requisitos y diseño técnico; todavía no existen una aplicación, un parser generado ni resultados
-de rendimiento. La siguiente fase es generar las tareas de implementación.
+El proyecto ha completado especificación, planificación y desglose de tareas con Spec Kit.
+Hay constitución, requisitos, diseño técnico y tareas pendientes; todavía no existen una aplicación,
+un parser generado ni resultados de rendimiento. La siguiente fase es implementar por incrementos.
 
 ## Documentos del proyecto
 
 - [Constitución 1.0.0](.specify/memory/constitution.md): principios y restricciones.
 - [Especificación 001](specs/001-regulatory-validation/spec.md): historias, requisitos y aceptación.
 - [Plan técnico](specs/001-regulatory-validation/plan.md): arquitectura, versiones y secuencia de construcción.
+- [Tareas de implementación](specs/001-regulatory-validation/tasks.md): siete fases con dependencias,
+  pruebas previstas y trazabilidad de requisitos; todas pendientes.
 - [Investigación](specs/001-regulatory-validation/research.md): decisiones, alternativas y fuentes.
 - [Modelo de datos](specs/001-regulatory-validation/data-model.md): identidades, snapshots y estados.
 - Contratos de [HTTP](specs/001-regulatory-validation/contracts/http-api.md),
@@ -52,9 +54,10 @@ documentados y revisables en la especificación.
 Se ha inicializado **Specify CLI 1.1.3**, integración **Codex**, con scripts PowerShell.
 Las skills viven en `.agents/skills/` y los recursos compartidos en `.specify/`.
 
-La siguiente fase es `$speckit-tasks`, que descompondrá el plan en trabajo verificable.
-Después corresponde `$speckit-implement`. Si cambia el alcance, se actualizarán primero
-la especificación y el plan afectados.
+La siguiente fase es `$speckit-implement`, siguiendo las dependencias de tasks.md.
+El primer incremento carga e inspecciona archivos; el MVP validador completa US1 y US2,
+incluida la exportación de resultados. US3 y US4 añaden propuestas y aplicación de recálculos.
+Si cambia el alcance, se actualizarán primero la especificación y el plan afectados.
 Estos nombres se invocan en el chat de Codex; no son comandos de PowerShell.
 
 Para comprobar la instalación desde la raíz:
@@ -64,7 +67,7 @@ specify version
 specify integration status --json
 ```
 
-`plan.md` ya está preparado. `tasks.md` corresponde a la siguiente fase y aún no se ha creado.
+`plan.md` y `tasks.md` están preparados. Generar las tareas no las ejecuta ni acredita pruebas del motor.
 
 ## Fuentes y Git
 
