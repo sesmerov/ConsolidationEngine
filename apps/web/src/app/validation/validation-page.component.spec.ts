@@ -16,33 +16,34 @@ const terminalJob = { jobId: '0cfafc23-142c-48f1-8cdf-c346df5ec02b', workspaceId
 describe('validation page HTTP workflow', () => {
   let http: HttpTestingController, session: SessionStore;
   beforeEach(() => { TestBed.configureTestingModule({ imports: [ValidationPageComponent], providers: [provideHttpClient(), provideHttpClientTesting()] }); http = TestBed.inject(HttpTestingController); session = TestBed.inject(SessionStore); TestBed.inject(ApiClient).setSessionToken('memory-only'); session.workspace.set(workspace); session.etag.set('"v-' + versionId + '"'); });
+  function flushHistory() { for (const request of http.match(request => request.url.endsWith('/runs'))) request.flush({ items: [], total: 0, nextCursor: null, revision: 'rev' }); }
   afterEach(() => { http.verify(); TestBed.resetTestingModule(); });
   it('starts validation against the visible snapshot and separates pass from warning severity with exact values', async () => {
-    const fixture = TestBed.createComponent(ValidationPageComponent); fixture.detectChanges();
+    const fixture = TestBed.createComponent(ValidationPageComponent); fixture.detectChanges(); flushHistory();
     const button = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find((element) => element.textContent?.includes('Validar informes'))!; expect(button).toBeDefined(); button.click();
     const request = http.expectOne((item) => item.url.endsWith('/validations')); expect(request.request.body).toEqual({ baseVersionId: versionId }); expect(request.request.headers.get('If-Match')).toBe('"v-' + versionId + '"'); expect(request.request.headers.get('X-CE-Session')).toBe('memory-only');
     request.flush(terminalJob); await Promise.resolve(); TestBed.tick();
-    http.expectOne((item) => item.url.endsWith('/runs/' + runId + '/results')).flush(page); await Promise.resolve(); fixture.detectChanges();
+    http.expectOne((item) => item.url.endsWith('/runs/' + runId + '/results')).flush(page); await Promise.resolve(); fixture.detectChanges(); flushHistory();
     const text = (fixture.nativeElement as HTMLElement).textContent!; expect(text).toContain('Pasa'); expect(text).toContain('Advertencia'); expect(text).toContain('1/3'); expect(text).toContain('Facts'); expect(text).not.toContain('0.333333');
   });
   it('keeps the historical run visible but labels it after the current snapshot changes', async () => {
-    session.job.set(terminalJob); const fixture = TestBed.createComponent(ValidationPageComponent); fixture.detectChanges(); TestBed.tick();
-    http.expectOne((item) => item.url.endsWith('/runs/' + runId + '/results')).flush(page); await Promise.resolve(); fixture.detectChanges();
-    session.workspace.set({ ...workspace, currentVersionId: '027345c5-36db-4bb2-bcee-0f55b13165ad', versionIds: [versionId, '027345c5-36db-4bb2-bcee-0f55b13165ad'] }); TestBed.tick(); fixture.detectChanges();
+    session.job.set(terminalJob); const fixture = TestBed.createComponent(ValidationPageComponent); fixture.detectChanges(); flushHistory(); TestBed.tick();
+    http.expectOne((item) => item.url.endsWith('/runs/' + runId + '/results')).flush(page); await Promise.resolve(); fixture.detectChanges(); flushHistory();
+    session.workspace.set({ ...workspace, currentVersionId: '027345c5-36db-4bb2-bcee-0f55b13165ad', versionIds: [versionId, '027345c5-36db-4bb2-bcee-0f55b13165ad'] }); TestBed.tick(); fixture.detectChanges(); flushHistory();
     const text = (fixture.nativeElement as HTMLElement).textContent!; expect(text).toContain('histórico'); expect(text).toContain('v0190_m'); expect(text).toContain(versionId);
   });
   it('never presents a cancelled run as a complete approval', async () => {
     session.job.set({ ...terminalJob, status: 'cancelled', progress: { completed: 0, total: 1, complete: false } });
-    const fixture = TestBed.createComponent(ValidationPageComponent); fixture.detectChanges(); TestBed.tick();
+    const fixture = TestBed.createComponent(ValidationPageComponent); fixture.detectChanges(); flushHistory(); TestBed.tick();
     http.expectOne((item) => item.url.endsWith('/runs/' + runId + '/results')).flush({ ...page, items: [], total: 0, run: { ...page.run, status: 'incomplete', summary: { ...summary, complete: false, instances: 0, byStatus: { pass: 0, fail: 0, not_applicable: 0, not_evaluable: 0, error: 0 } }, resultIds: [] } });
-    await Promise.resolve(); fixture.detectChanges(); const text = (fixture.nativeElement as HTMLElement).textContent!.toLowerCase(); expect(text).toContain('incompleta'); expect(text).not.toContain('todo correcto');
+    await Promise.resolve(); fixture.detectChanges(); flushHistory(); const text = (fixture.nativeElement as HTMLElement).textContent!.toLowerCase(); expect(text).toContain('incompleta'); expect(text).not.toContain('todo correcto');
   });
   it('does not equate a completed run with zero evaluated rules to approval', async () => {
-    session.job.set(terminalJob); const fixture = TestBed.createComponent(ValidationPageComponent); fixture.detectChanges(); TestBed.tick();
+    session.job.set(terminalJob); const fixture = TestBed.createComponent(ValidationPageComponent); fixture.detectChanges(); flushHistory(); TestBed.tick();
     http.expectOne((item) => item.url.endsWith('/runs/' + runId + '/results')).flush({ ...page,
       items: [{ ...result, status: 'not_applicable' }, { ...result, id: 'result-2', code: 'unsupported', status: 'not_evaluable' }], total: 2,
       run: { ...page.run, summary: { ...summary, instances: 0, byStatus: { pass: 0, fail: 0, not_applicable: 1, not_evaluable: 1, error: 0 } }, resultIds: ['result-1', 'result-2'] } });
-    await Promise.resolve(); fixture.detectChanges(); const text = (fixture.nativeElement as HTMLElement).textContent!.toLowerCase();
+    await Promise.resolve(); fixture.detectChanges(); flushHistory(); const text = (fixture.nativeElement as HTMLElement).textContent!.toLowerCase();
     expect(text).toContain('sin reglas evaluadas'); expect(text).not.toContain('todo correcto'); expect(text).not.toContain('validación correcta');
   });
 });

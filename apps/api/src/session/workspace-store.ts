@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { MAX_SNAPSHOTS, SESSION_LIMIT_BYTES, isTerminalJob } from '@ce/contracts';
-import type { JobDTO, Snapshot, SnapshotContent, WorkspaceDTO } from '@ce/contracts';
+import type { JobDTO, PreviewBundle, Snapshot, SnapshotContent, WorkspaceDTO } from '@ce/contracts';
 import { ApiError } from '../errors.js';
 import { canonicalHash, canonicalStateBytes, immutable } from './canonical-state.js';
 import type { StateRecord, WorkerOutput } from '../workers/protocol.js';
@@ -60,7 +60,7 @@ export class WorkspaceStore {
   publish(id: string, base: string | undefined, content: SnapshotContent, additions: readonly StateRecord[] = []): Snapshot {
     this.assertBase(id, base); const w = this.require(id); const snapshot = this.candidate(w, content);
     const next = { ...w, state: 'ready' as const, currentVersionId: snapshot.versionId, versionIds: [...w.versionIds, snapshot.versionId] };
-    const snapshots = new Map(this.snapshots).set(snapshot.versionId, snapshot); const records = this.withRecords(additions);
+    const snapshots = new Map(this.snapshots).set(snapshot.versionId, snapshot); const records = this.obsoletePreviews(this.withRecords(additions), snapshot.versionId);
     this.check(next, snapshots, records); this.workspace = next; this.snapshots = snapshots; this.records = records; return snapshot;
   }
   private withRecords(additions: readonly StateRecord[]): Map<string, unknown> {
@@ -73,6 +73,15 @@ export class WorkspaceStore {
   }
   putRecords(additions: readonly StateRecord[]): void { const records = this.withRecords(additions); this.check(this.workspace, this.snapshots, records); this.records = records; }
   getRecord<T = unknown>(key: string): T | undefined { return this.records.get(key) as T | undefined; }
+  listRecords<T>(prefix: string): readonly { key: string; value: T }[] { return [...this.records].filter(([key]) => key.startsWith(prefix)).map(([key, value]) => ({ key, value: value as T })); }
+  private obsoletePreviews(records: Map<string, unknown>, versionId: string): Map<string, unknown> {
+    for (const [key, value] of records) if (key.startsWith('preview:')) {
+      const bundle = value as PreviewBundle;
+      if (bundle.preview?.state === 'ready' && bundle.preview.baseVersionId !== versionId) records.set(key, immutable({ ...bundle,
+        preview: { ...bundle.preview, state: 'obsolete' }, proposals: bundle.proposals.map(proposal => proposal.state === 'available' ? { ...proposal, state: 'obsolete' } : proposal) }));
+    }
+    return records;
+  }
   putInternalRecord(key: string, value: unknown): void {
     const records = new Map(this.records).set(key, immutable(value)); this.check(this.workspace, this.snapshots, records); this.records = records;
   }
@@ -96,9 +105,9 @@ export class WorkspaceStore {
   publishJobResult(job: JobDTO, output: WorkerOutput, assertCommit: () => void = () => undefined): JobDTO {
     this.assertAccepting(job.workspaceId); this.assertBase(job.workspaceId, job.baseVersionId); let w = this.require(job.workspaceId);
     if (w.activeJobId !== job.jobId || this.job(job.workspaceId, job.jobId).status !== 'running' || !output.complete) throw new ApiError('INTERNAL_ERROR');
-    const records = this.withRecords(output.records ?? []); const snapshots = new Map(this.snapshots);
+    let records = this.withRecords(output.records ?? []); const snapshots = new Map(this.snapshots);
     const snapshot = output.snapshotContent ? this.candidate(w, output.snapshotContent) : undefined;
-    if (snapshot) { snapshots.set(snapshot.versionId, snapshot); w = { ...w, state: 'ready', currentVersionId: snapshot.versionId, versionIds: [...w.versionIds, snapshot.versionId] }; }
+    if (snapshot) { snapshots.set(snapshot.versionId, snapshot); records = this.obsoletePreviews(records, snapshot.versionId); w = { ...w, state: 'ready', currentVersionId: snapshot.versionId, versionIds: [...w.versionIds, snapshot.versionId] }; }
     const result: JobDTO = immutable({ ...job, status: 'succeeded', endedAt: new Date().toISOString(), progress: { ...job.progress, complete: true },
       ...(snapshot ? { newVersionId: snapshot.versionId } : {}), ...(output.resultRef ? { resultRef: output.resultRef } : {}), diagnostics: output.diagnostics ?? [] });
     records.set('job:' + job.jobId, result); records.delete('reserve:' + job.jobId);

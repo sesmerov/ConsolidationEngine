@@ -36,4 +36,8 @@ progress { accent-color: #176859; width: 100%; height: 14px; }
 .rule-row { border-top: 1px solid #dce7e5; padding: 16px 0; } summary { cursor: pointer; line-height: 1.6; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 14px; background: #f4f7f7; border-radius: 8px; font-size: 13px; }
 h3 { font-size: 15px; margin: 18px 0 6px; } li { margin: 12px 0; line-height: 1.6; }
+.directions-panel { border-top: 1px solid #dce7e5; margin-top: 24px; padding-top: 8px; }
+.direction-choice { padding: 14px 0; border-bottom: 1px solid #edf2f1; }
+.direction-choice p { margin: 8px 0; } .direction-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+.direction-summary { padding: 12px 0; }
 @media (max-width: 700px) { .shell { grid-template-columns: 1fr; } aside { padding: 18px 24px; } aside strong { display: inline; margin-left: 12px; } aside p { display: none; } main { padding-top: 26px; } }

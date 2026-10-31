@@ -1,9 +1,11 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { uuidSchema } from '@ce/contracts';
+import { resultOrderKey, WorkBudget } from '@ce/engine';
 import { ApiError } from '../errors.js';
-import { canonicalHash, canonicalStringify } from '../session/canonical-state.js';
+import { canonicalHash } from '../session/canonical-state.js';
 import { getValidation } from '../validation/validation-service.js';
+import { directionEligibility } from '../recalculation/directions-service.js';
 interface Query { limit?: string; cursor?: string; status?: string; code?: string; table?: string }
 export function registerResults(app: FastifyInstance): void {
   const secret = randomBytes(32), sign = (payload: string) => createHmac('sha256', secret).update(payload).digest('base64url');
@@ -21,13 +23,18 @@ export function registerResults(app: FastifyInstance): void {
       const value = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { fingerprint?: string; after?: string };
       if (value.fingerprint !== fingerprint || typeof value.after !== 'string') throw new Error(); after = value.after;
     } catch { throw new ApiError('INVALID_CURSOR'); }
-    const key = (row: (typeof bundle.results)[number]) => canonicalStringify([row.code, row.variantIds, row.binding ?? null, row.id]);
+    const key = resultOrderKey;
     const rows = bundle.results.filter((row) => (!query.status || row.status === query.status) && (!query.code || row.code.toLowerCase().includes(query.code.toLowerCase())) && (!query.table || row.tables.includes(query.table)))
       .map((row) => ({ row, key: key(row) })).sort((left, right) => left.key < right.key ? -1 : left.key > right.key ? 1 : 0);
     if (after !== undefined && !rows.some((entry) => entry.key === after)) throw new ApiError('INVALID_CURSOR');
     const remaining = after === undefined ? rows : rows.filter((entry) => entry.key > after!); const entries = remaining.slice(0, Number(query.limit ?? 50));
     let nextCursor: string | null = null;
     if (remaining.length > entries.length) { const payload = Buffer.from(JSON.stringify({ fingerprint, after: entries.at(-1)!.key })).toString('base64url'); nextCursor = payload + '.' + sign(payload); }
-    return { items: entries.map((entry) => entry.row), total: rows.length, nextCursor, versionId: bundle.run.versionId, run: bundle.run, sourceFiles: app.ce.store.snapshot(workspaceId, bundle.run.versionId).content.sources };
+    const snapshot = app.ce.store.snapshot(workspaceId, bundle.run.versionId), budget = new WorkBudget();
+    const items = entries.map(({ row }) => ({ ...row, recalculation: {
+      left: directionEligibility(snapshot, row, 'left', budget), right: directionEligibility(snapshot, row, 'right', budget),
+    } }));
+    return { items, total: rows.length, nextCursor, versionId: bundle.run.versionId, run: bundle.run, sourceFiles: snapshot.content.sources,
+      configuredDirections: snapshot.content.directions.map(({ instanceId, targetSide }) => ({ instanceId, targetSide })) };
   });
 }

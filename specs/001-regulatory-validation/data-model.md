@@ -5,9 +5,15 @@ migraciones, clases ni almacenamiento implementado. El motor recibe snapshots y 
 
 ## Convenciones e identidad
 
-- IDs opacos de sesión, trabajo, snapshot y propuesta: UUID generados por el servidor.
+- IDs opacos de sesión, trabajo, snapshot y preview: UUID generados por el servidor.
 - IDs semánticos: SHA-256 de JSON canónico con claves y conjuntos ordenados; nunca de la posición
-  de una fila. Los campos de procedencia se conservan aparte del contenido semántico.
+  de una fila. Incluyen RecalculationDirection.directionId. Los campos de procedencia se conservan
+  aparte del contenido semántico.
+- Proposal.id es UUIDv5 estándar: SHA-1 de los bytes UUID de Preview.id como namespace, seguidos
+  del directionId en UTF-8 como nombre, con los bits de versión/variante definidos por
+  [RFC 9562 §5.5](https://www.rfc-editor.org/rfc/rfc9562.html#section-5.5). El mismo par
+  previewId/directionId produce el mismo ID, aunque se permuten las direcciones. No es un
+  SHA-256 etiquetado como UUIDv5; los UUID derivados de SHA-256 pertenecen a UUIDv8 según ese RFC.
 - Fechas civiles: `YYYY-MM-DD`. Instantes de ejecución: ISO 8601 UTC.
 - Dinero y otros números: racionales `{numerator: string, denominator: string}`; datos de entrada
   y salida del workbook son cadenas decimales. No se serializa `BigInt` como JSON number.
@@ -37,13 +43,23 @@ migraciones, clases ni almacenamiento implementado. El motor recibe snapshots y 
 | ValidationRun | id, versionId, profileId, status, startedAt, endedAt?, summary, resultIds[] | Los resultados pertenecen a un snapshot. Cambiar el vigente los hace históricos, no los reasigna. |
 | RuleResult | id, runId, instanceId, status, severity, preconditionResult, operands, factReads, metadataReads, locators, diagnostics | Un estado terminal por instancia; valores incluyen nominal/intervalo/unidad o presencia de null. factReads conserva entradas originales leídas; metadataReads conserva contexto/código/valor o ausencia de indicadores y su procedencia. |
 | FactRead | factKey, coordinate, presence, normalizedValue?, originalText?, sourceLocator | presence=value/explicit_null/implicit_null. Valor racional exacto o booleano, cuando existe; coordinate conserva unidad/decimals/ejes y procedencia. Es la entrada original antes de default/interval, no el operando efectivo. |
-| RecalculationDirection | directionId, instanceId, targetSide, targetKey | Configurada expresamente para una igualdad; destino único e identidad canónica. |
-| Preview | id, baseVersionId, profileId, policyId, state, proposalIds[], graphSummary | Solo puede aplicarse contra la base que la produjo. Incluye resultados no disponibles y motivos. |
-| Proposal | id, previewId, directionId, targetKey, before, exactNominal, derivedInterval, after, readKeys[], predecessorIds[], state, diagnostics | after es el valor ya cuantizado y la precisión que leerán sus consumidores y se exportará. |
+| RecalculationDirection | directionId, instanceId, targetSide, targetKey | Configurada expresamente para una igualdad; destino único number o boolean con identidad canónica. Un filingIndicator no es destino. |
+| Preview | id, baseVersionId, profileId, policyId, state, createdAt, proposalIds[], graphSummary | Solo puede aplicarse contra la base que la produjo. createdAt se captura al comenzar la simulación y permanece en todas las transiciones. Incluye resultados no disponibles y motivos. |
+| Proposal | id, previewId, directionId, targetKey, before, exactNominal (solo number), derivedInterval (solo number), after, readKeys[], predecessorIds[], state, diagnostics | Para number, after es el valor cuantizado con precisión destino; para boolean, el booleano conocido propuesto sin unidad/decimals/redondeo. Los consumidores leen exactamente el valor que se aplicaría. |
 | ApplyReceipt | id, previewId, acceptedIds[], closureHash, baseVersionId, newVersionId, validationRunId, appliedAt | Constancia funcional del cambio, no un recibo del sistema de revisión gentle-ai. Solo existe tras publicar la versión completa. |
 | Job | id, workspaceId, kind, baseVersionId?, status, progress, startedAt, deadline, resultRef?, diagnostics | kind=import/validate/preview/apply/export. Una tarea activa global; estado terminal no retrocede. |
 
 `ApplyReceipt` es trazabilidad de negocio. El desarrollo con recibos continúa `disabled/unmanaged`.
+
+El historial expone proyecciones explícitas de los registros conservados en la sesión:
+RunSummary contiene id, versionId, profileId, status, startedAt y endedAt opcional;
+PreviewSummary contiene id, baseVersionId, profileId, policyId, state y createdAt.
+No incluyen resultIds, AST, propuestas ni rutas. Las páginas contienen items, total, nextCursor
+y revision; ordenan por fecha e id y admiten filtro de estado. El cursor HMAC se vincula a la
+revisión de la colección de resúmenes y sus filtros, y deja de ser válido si cambia la colección.
+Estas consultas permiten recuperar el registro más reciente y navegar el historial después de
+refrescar, sin IDs persistidos en localStorage. No prolongan la sesión tras cerrar/reiniciar ni
+permiten modificar snapshots históricos. Véase el [contrato HTTP](contracts/http-api.md#formatos-comunes).
 
 `RuleResult.factReads` siempre existe, como `[]` si no hubo lecturas. FactRead.sourceLocator
 apunta a Facts para valores y null explícitos, y a Coordinates para null implícito; coordinate
@@ -52,6 +68,27 @@ traza. Los operandos efectivos se conservan aparte; leer la misma celda con opci
 no autoriza inventar un intervalo de origen común. Las lecturas del cuerpo omitido por una
 precondición false no se registran como realizadas. Los DTO representan racionales mediante
 cadenas, nunca BigInt, y permiten inspeccionar coordenadas, precisión y fuentes según FR-009.
+
+La respuesta de consulta puede enriquecer RuleResultDTO con
+`recalculation?: {left: DirectionEligibilityDTO, right: DirectionEligibilityDTO}`; cada lado es
+`{eligible: boolean, target?: Coordinate, diagnostics: Diagnostic[]}`. Estos metadatos de petición
+no modifican el resultado almacenado ni su snapshot. Se obtienen con el resolver estructural
+compartido con el guardado de direcciones, sin ejecutar el cuerpo ni enviar AST a Angular.
+Una precondición false conserva la estructura aunque no haya operandos calculados.
+
+Un WorkBudget compartido por página acota las comprobaciones; su memoización es temporal de esa
+petición. Al agotarlo, eligible=false lleva diagnóstico de comprobación incompleta sin eliminar
+resultados. La consulta histórica es informativa; guardar exige una validación completa del
+snapshot vigente y revalida la estructura. La elegibilidad no sustituye la comprobación de
+precondición ni la simulación posterior de una propuesta aplicable.
+
+`ValidationResultsPageDTO.configuredDirections?: readonly DirectionChoiceDTO[]` devuelve la
+lista completa de elecciones `{instanceId, targetSide}` del snapshot del run; targetSide es
+left/right. No se reduce por paginación ni filtros. La UI mantiene un borrador completo con
+esas elecciones, incluidas las ocultas, y lo envía íntegro al PUT de reemplazo; una recarga
+recupera la configuración del mismo snapshot. La ausencia del campo no equivale a una lista
+vacía: impide guardar y requiere diagnóstico, evitando borrar elecciones no visibles.
+La configuración de un run histórico se consulta en modo de solo lectura.
 
 ## Metadatos de presentación
 
@@ -121,11 +158,33 @@ simulación dependiente de recálculo. Las etiquetas visibles son las de la espe
 ready de otra base pasa a obsolete; applied/discarded mantienen su estado histórico. Sus datos se
 conservan para explicar lo sucedido durante la sesión. Tras aplicar un subconjunto, la preview queda
 applied y las propuestas no elegidas quedan obsolete, pues ya no corresponden a la versión vigente.
-Una preview puede contener propuestas available y blocked; solo available admite selección.
+Una preview puede contener propuestas available y blocked; en ready, solo available admite
+selección. Si la preview queda obsolete, solo las propuestas antes available pasan a obsolete;
+las blocked conservan estado/motivo. El cálculo de clausura de una preview obsolete es
+informativo y devuelve state=obsolete: complete no implica aplicabilidad. Incluso una selección
+vacía puede tener clausura completa, aunque no permita aplicar. Selection sobre discarded o
+applied se rechaza; las consultas históricas se conservan.
+
+El descarte explícito actualiza atómicamente ready→discarded y las propuestas
+available→discarded; blocked mantiene su estado y motivo. El registro descartado permanece
+durante la sesión sin modificar hechos, versión ni ETag. Repetirlo sobre discarded no muta;
+applied y obsolete se conservan y rechazan el descarte con PREVIEW_NOT_APPLICABLE.
+La operación HTTP requiere token, If-Match vigente y workspace sin Job no terminal
+(WORKSPACE_BUSY en caso contrario; STALE_VERSION ante versión obsoleta). Devuelve PreviewDTO
+y ETag actual, sin nuevo snapshot, Job ni Idempotency-Key. Véase el
+[contrato HTTP](contracts/http-api.md#rutas).
 
 **Proposal:** `available → accepted → applied`, o `available → discarded | obsolete`;
 `blocked` conserva su motivo. `accepted` existe en el candidato de aplicación mientras se ejecuta
 la revalidación; un fallo/cancelación conserva la preview ready sin mutar los datos vigentes.
+
+El tipo de la coordenada destino determina la semántica de Proposal. Un destino number conserva
+nominal exacto e intervalo derivado y aplica la política de cuantización numérica. Un destino
+boolean exige un lado calculado true/false conocido del mismo tipo, sin unidad, decimals ni
+half-even; no contiene exactNominal ni derivedInterval. Null, unknown o tipo incompatible
+bloquean la propuesta, sin coerción. Antes de ofrecer cualquier tipo se revalida la igualdad
+originaria con el candidato. Los indicadores de presentación no son hechos ni destinos.
+Esta distinción es conceptual; la forma concreta del DTO de propuestas se fijará al implementarlo.
 
 ## Transacción de aplicación
 

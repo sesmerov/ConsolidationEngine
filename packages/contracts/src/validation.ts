@@ -2,6 +2,7 @@ import type { Diagnostic, Rational, SourceLocator } from './common.js';
 import type { Coordinate } from './report.js';
 import type { SourceFile } from './report.js';
 import type { Severity } from './catalog.js';
+import type { DirectionChoiceDTO } from './recalculation.js';
 export type ValidationStatus = 'pass' | 'fail' | 'not_applicable' | 'not_evaluable' | 'error';
 export interface ValidationBinding { readonly contextId?: string; readonly contextIds?: readonly string[]; readonly tableCode?: string; readonly sheetCode?: string; readonly rowCode?: string; readonly columnCode?: string }
 export type ValidationValueDTO = (
@@ -25,7 +26,10 @@ export interface RuleResultDTO {
   readonly values: { readonly left?: ValidationValueDTO; readonly right?: ValidationValueDTO; readonly result?: ValidationValueDTO };
   readonly readKeys: readonly string[]; readonly factReads: readonly FactReadDTO[]; readonly metadataReads: readonly MetadataReadDTO[];
   readonly sources: readonly SourceLocator[]; readonly diagnostics: readonly Diagnostic[];
+  readonly recalculation?: { readonly left: DirectionEligibilityDTO; readonly right: DirectionEligibilityDTO };
 }
+/** Optional, request-scoped eligibility metadata; it never changes the validation result. */
+export interface DirectionEligibilityDTO { readonly eligible: boolean; readonly target?: Coordinate; readonly diagnostics: readonly Diagnostic[] }
 export interface ValidationSummary {
   readonly complete: boolean; readonly rows: number; readonly variants: number; readonly applicableVariants: number;
   readonly instances: number; readonly duplicateRows: number; readonly byStatus: Readonly<Record<ValidationStatus, number>>;
@@ -36,4 +40,4 @@ export interface ValidationRunDTO {
   readonly diagnostics: readonly Diagnostic[];
 }
 export interface ValidationBundle { readonly run: ValidationRunDTO; readonly results: readonly RuleResultDTO[] }
-export interface ValidationResultsPageDTO { readonly items: readonly RuleResultDTO[]; readonly total: number; readonly nextCursor: string | null; readonly versionId: string; readonly run: ValidationRunDTO; readonly sourceFiles?: readonly SourceFile[] }
+export interface ValidationResultsPageDTO { readonly items: readonly RuleResultDTO[]; readonly total: number; readonly nextCursor: string | null; readonly versionId: string; readonly run: ValidationRunDTO; readonly sourceFiles?: readonly SourceFile[]; readonly configuredDirections?: readonly DirectionChoiceDTO[] }

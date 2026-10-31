@@ -15,6 +15,14 @@ export interface RunValidationOptions {
   readonly progress?: (completed: number, total: number) => void; readonly limits?: Partial<WorkLimits>; readonly now?: () => number;
 }
 class ProfileError extends Error { readonly code = 'PROFILE_MISMATCH'; }
+/** Stable within a snapshot, including coverage rows with no instance or binding. */
+export function resultOrderKey(result: RuleResultDTO): string {
+  const binding = result.binding;
+  return JSON.stringify([result.code, [...result.variantIds].sort(ordinal), result.contextId ?? binding?.contextId ?? null,
+    binding ? [binding.contextId ?? null, [...(binding.contextIds ?? [])].sort(ordinal), binding.tableCode ?? null,
+      binding.sheetCode ?? null, binding.rowCode ?? null, binding.columnCode ?? null] : null,
+    result.coverageOnly, result.instanceId ?? null, [...result.sourceRecordIds].sort(ordinal)]);
+}
 export function valueToDTO(value: ScalarValue): ValidationValueDTO {
   const provenance = value.kind === 'unknown' ? {} : { ...(value.coordinate ? { coordinate: value.coordinate } : {}), ...(value.sourceLocator ? { sourceLocator: value.sourceLocator } : {}) };
   switch (value.kind) {
@@ -25,7 +33,7 @@ export function valueToDTO(value: ScalarValue): ValidationValueDTO {
     case 'unknown': return { kind: 'unknown', presence: 'unknown' };
   }
 }
-function effectiveKey(variant: RuleVariant): string {
+export function effectiveRuleKey(variant: RuleVariant): string {
   return stableId([variant.code, variant.expression, variant.precondition ?? null, [...variant.tables].sort(ordinal), variant.crossModule, variant.severity,
     variant.severity === 'unknown' ? variant.severityOriginal : null]);
 }
@@ -129,7 +137,7 @@ export function runValidation(snapshot: Snapshot, options: RunValidationOptions)
           append([variant], context, 'not_applicable', { diagnostics: [{ code: 'RULE_NOT_APPLICABLE', message: 'The submission date precedes the rule window' }] }); continue;
         }
         applicable.add(variant.variantId);
-        const key = effectiveKey(variant); const identity = JSON.stringify([variant.code, context.canonicalContextKey, required.map(item => item.canonicalContextKey), key]);
+        const key = effectiveRuleKey(variant); const identity = JSON.stringify([variant.code, context.canonicalContextKey, required.map(item => item.canonicalContextKey), key]);
         const group = groups.get(identity); if (group) group.variants.push(variant); else groups.set(identity, { context, compatible: required, variants: [variant], key });
       }
     }
@@ -175,7 +183,8 @@ export function runValidation(snapshot: Snapshot, options: RunValidationOptions)
     if (error instanceof WorkLimitError || error instanceof NumericError || error instanceof ProfileError) diagnostics.push({ code: error.code, message: error.message, severity: 'error' });
     else throw error;
   }
-  results.sort((a, b) => ordinal(a.id, b.id)); for (const result of results) counts[result.status]++;
+  const orderKeys = new Map(results.map(result => [result, resultOrderKey(result)]));
+  results.sort((a, b) => ordinal(orderKeys.get(a)!, orderKeys.get(b)!)); for (const result of results) counts[result.status]++;
   const ended = Math.max(Date.parse(options.startedAt), (options.now ?? Date.now)());
   return { run: { id: options.runId, versionId: snapshot.versionId, profileId: content.profileId, status: complete ? 'completed' : 'incomplete', startedAt: options.startedAt, endedAt: new Date(ended).toISOString(),
     summary: { complete, rows: content.catalog.records.length, variants: content.catalog.variants.length, applicableVariants: applicable.size, instances: results.filter(result => !result.coverageOnly).length,

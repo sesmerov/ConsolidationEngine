@@ -1,0 +1,110 @@
+import type { Diagnostic, Rational, SourceFile, SourceLocator } from './common.js';
+import type { FactReadDTO, MetadataReadDTO, ValidationBinding } from './validation.js';
+import { rationalSchema, sourceLocatorSchema, uuidSchema } from './common.schemas.js';
+import { coordinateSchema } from './report.js';
+
+export const RECALCULATION_POLICY_ID = 'half-even-v1' as const;
+export type TargetSide = 'left' | 'right';
+/** Server-resolved identity. HTTP callers choose only instanceId and targetSide. */
+export interface DirectionDTO {
+  readonly id: string; readonly instanceId: string; readonly variantIds: readonly string[];
+  readonly binding: ValidationBinding; readonly targetSide: TargetSide; readonly targetKey: string;
+}
+export interface DirectionChoiceDTO { readonly instanceId: string; readonly targetSide: TargetSide }
+export interface DirectionsRequestDTO { readonly directions: readonly DirectionChoiceDTO[] }
+export interface DirectionsResponseDTO { readonly versionId: string; readonly configVersion: string; readonly directions: readonly DirectionDTO[] }
+export type PreviewState = 'ready' | 'applied' | 'discarded' | 'obsolete';
+export type ProposalState = 'available' | 'blocked' | 'accepted' | 'applied' | 'discarded' | 'obsolete';
+export interface ProducerConflictDTO { readonly targetKey: string; readonly producerIds: readonly string[] }
+export interface GraphSummaryDTO {
+  readonly nodes: number; readonly edges: number; readonly order: readonly string[];
+  readonly conflicts: readonly ProducerConflictDTO[]; readonly cycles: readonly (readonly string[])[]; readonly blocked: number;
+}
+export interface PreviewDTO {
+  readonly id: string; readonly baseVersionId: string; readonly profileId: string; readonly policyId: string;
+  readonly createdAt: string;
+  readonly state: PreviewState; readonly proposalIds: readonly string[]; readonly graphSummary: GraphSummaryDTO;
+  readonly diagnostics: readonly Diagnostic[];
+}
+/** Consumers read this quantized value and its destination precision, never exactNominal. */
+export type ProposalAfterDTO =
+  | { readonly normalizedValue: Rational; readonly originalText: string; readonly decimals: string; readonly unit: string }
+  | { readonly normalizedValue: boolean; readonly originalText: 'true' | 'false' };
+export interface ProposalDTO {
+  readonly id: string; readonly previewId: string; readonly directionId: string; readonly instanceId: string;
+  readonly variantIds: readonly string[]; readonly binding: ValidationBinding; readonly code: string; readonly targetKey: string;
+  readonly before?: FactReadDTO; readonly exactNominal?: Rational; readonly derivedInterval?: { readonly lo: Rational; readonly hi: Rational };
+  readonly after?: ProposalAfterDTO; readonly readKeys: readonly string[]; readonly predecessorIds: readonly string[];
+  readonly metadataReads: readonly MetadataReadDTO[]; readonly sources: readonly SourceLocator[];
+  readonly state: ProposalState; readonly diagnostics: readonly Diagnostic[];
+}
+export interface PreviewBundle { readonly preview: PreviewDTO; readonly proposals: readonly ProposalDTO[] }
+export interface ProposalsPageDTO {
+  readonly items: readonly ProposalDTO[]; readonly nextCursor: string | null; readonly total: number; readonly versionId: string;
+  readonly sourceFiles?: readonly SourceFile[];
+}
+export interface PreviewSelectionDTO {
+  readonly selectedIds: readonly string[]; readonly requiredIds: readonly string[]; readonly closureHash: string;
+  readonly complete: boolean; readonly state: PreviewState;
+}
+const text = { type: 'string' } as const;
+const hash = { type: 'string', pattern: '^[0-9a-f]{64}$' } as const;
+const hashes = { type: 'array', items: hash, uniqueItems: true } as const;
+const uuids = { type: 'array', items: uuidSchema, uniqueItems: true } as const;
+const texts = { type: 'array', items: text, uniqueItems: true } as const;
+const count = { type: 'integer', minimum: 0 } as const;
+const bindingSchema = { type: 'object', additionalProperties: false, properties: {
+  contextId: text, contextIds: texts, tableCode: text, sheetCode: text, rowCode: text, columnCode: text,
+} } as const;
+const diagnosticSchema = { type: 'object', additionalProperties: false, required: ['code', 'message'], properties: {
+  code: text, message: text, locator: sourceLocatorSchema, fileName: text, severity: { enum: ['error', 'warning', 'info'] },
+  line: { type: 'integer', minimum: 1 }, column: count, start: count, end: count,
+} } as const;
+const diagnostics = { type: 'array', items: diagnosticSchema } as const;
+const metadataReads = { type: 'array', items: { type: 'object', additionalProperties: false, required: ['contextId', 'code', 'presence'], properties: {
+  contextId: text, code: text, presence: { enum: ['declared', 'missing'] }, value: { type: 'boolean' }, sourceLocator: sourceLocatorSchema,
+} } } as const;
+const beforeSchema = { type: 'object', additionalProperties: false, required: ['factKey', 'coordinate', 'presence', 'sourceLocator'], properties: {
+  factKey: text, coordinate: coordinateSchema, presence: { enum: ['value', 'explicit_null', 'implicit_null'] },
+  normalizedValue: { anyOf: [rationalSchema, { type: 'boolean' }] }, originalText: text, sourceLocator: sourceLocatorSchema,
+}, allOf: [{ if: { properties: { presence: { const: 'value' } } }, then: { required: ['normalizedValue', 'originalText'] }, else: { not: { anyOf: [{ required: ['normalizedValue'] }, { required: ['originalText'] }] } } }] } as const;
+export const directionChoiceSchema = { type: 'object', additionalProperties: false, required: ['instanceId', 'targetSide'], properties: {
+  instanceId: hash, targetSide: { enum: ['left', 'right'] },
+} } as const;
+export const directionsRequestSchema = { type: 'object', additionalProperties: false, required: ['directions'], properties: {
+  // Uniqueness and structural eligibility are semantic validation, reported as INVALID_DIRECTION.
+  directions: { type: 'array', maxItems: 1_000_000, items: directionChoiceSchema },
+} } as const;
+export const directionSchema = { type: 'object', additionalProperties: false, required: ['id', 'instanceId', 'variantIds', 'binding', 'targetSide', 'targetKey'], properties: {
+  id: hash, instanceId: hash, variantIds: hashes, binding: bindingSchema, targetSide: { enum: ['left', 'right'] }, targetKey: text,
+} } as const;
+const previewStates = { enum: ['ready', 'applied', 'discarded', 'obsolete'] } as const;
+export const previewSchema = { type: 'object', additionalProperties: false,
+  required: ['id', 'baseVersionId', 'profileId', 'policyId', 'createdAt', 'state', 'proposalIds', 'graphSummary', 'diagnostics'], properties: {
+    id: uuidSchema, baseVersionId: uuidSchema, profileId: text, policyId: text, createdAt: { type: 'string', format: 'date-time' }, state: previewStates, proposalIds: uuids, diagnostics,
+    graphSummary: { type: 'object', additionalProperties: false, required: ['nodes', 'edges', 'order', 'conflicts', 'cycles', 'blocked'], properties: {
+      nodes: count, edges: count, order: hashes, blocked: count, cycles: { type: 'array', items: hashes },
+      conflicts: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['targetKey', 'producerIds'], properties: { targetKey: text, producerIds: hashes } } },
+    } },
+  } } as const;
+export const proposalSchema = { type: 'object', additionalProperties: false,
+  required: ['id', 'previewId', 'directionId', 'instanceId', 'variantIds', 'binding', 'code', 'targetKey', 'readKeys', 'predecessorIds', 'metadataReads', 'sources', 'state', 'diagnostics'], properties: {
+    id: uuidSchema, previewId: uuidSchema, directionId: hash, instanceId: hash, variantIds: hashes, binding: bindingSchema, code: text, targetKey: text,
+    before: beforeSchema, exactNominal: rationalSchema,
+    derivedInterval: { type: 'object', additionalProperties: false, required: ['lo', 'hi'], properties: { lo: rationalSchema, hi: rationalSchema } },
+    after: { oneOf: [
+      { type: 'object', additionalProperties: false, required: ['normalizedValue', 'originalText', 'decimals', 'unit'], properties: { normalizedValue: rationalSchema, originalText: text, decimals: { type: 'string', pattern: '^(?:INF|0|-?(?:[1-9]|1[0-8]))$' }, unit: text } },
+      { type: 'object', additionalProperties: false, required: ['normalizedValue', 'originalText'], properties: { normalizedValue: { type: 'boolean' }, originalText: { enum: ['true', 'false'] } },
+        allOf: [{ if: { properties: { normalizedValue: { const: true } } }, then: { properties: { originalText: { const: 'true' } } }, else: { properties: { originalText: { const: 'false' } } } }] },
+    ] },
+    readKeys: texts, predecessorIds: uuids, metadataReads, sources: { type: 'array', items: sourceLocatorSchema }, diagnostics,
+    state: { enum: ['available', 'blocked', 'accepted', 'applied', 'discarded', 'obsolete'] },
+  }, allOf: [
+    { if: { properties: { state: { enum: ['available', 'accepted', 'applied'] } } }, then: { required: ['before', 'after'] } },
+    { if: { properties: { state: { const: 'blocked' } } }, then: { not: { required: ['after'] } } },
+    { if: { required: ['after'], properties: { after: { properties: { normalizedValue: { type: 'boolean' } } } } }, then: { not: { anyOf: [{ required: ['exactNominal'] }, { required: ['derivedInterval'] }] } } },
+  ] } as const;
+export const previewSelectionRequestSchema = { type: 'object', additionalProperties: false, required: ['selectedIds'], properties: { selectedIds: { ...uuids, maxItems: 1_000_000 } } } as const;
+export const previewSelectionSchema = { type: 'object', additionalProperties: false, required: ['selectedIds', 'requiredIds', 'closureHash', 'complete', 'state'], properties: {
+  selectedIds: uuids, requiredIds: uuids, closureHash: hash, complete: { type: 'boolean' }, state: previewStates,
+} } as const;

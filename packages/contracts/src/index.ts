@@ -6,3 +6,5 @@ export * from './common.schemas.js';
 export * from './catalog.js';
 export * from './report.js';
 export * from './validation.js';
+export * from './recalculation.js';
+export * from './history.js';

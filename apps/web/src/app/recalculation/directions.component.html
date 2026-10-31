@@ -1,0 +1,34 @@
+<section class="directions-panel" aria-labelledby="directions-title">
+  <h3 id="directions-title">Configurar destinos de recálculo</h3>
+  <p>Elige expresamente qué lado puede cambiar en cada igualdad. Guardar esta configuración no modifica los valores de los informes.</p>
+  @if (historical()) { <p class="notice">Esta ejecución es histórica. Sus destinos son informativos; valida la versión vigente para configurar cambios.</p> }
+  @else if (!completeRun()) { <p class="notice">Se necesita una validación completa de la versión vigente para configurar destinos.</p> }
+  @else if (!knownConfiguration()) { <p class="notice">No se ha recibido la configuración completa. Recarga los resultados antes de editar para conservar todos los destinos existentes.</p> }
+  @if (message(); as message) { <p class="notice" role="status">{{ message }}</p> }
+  @if (error(); as error) { <p class="error" role="alert">{{ error }}</p> }
+  @for (row of page().items; track row.id) {
+    <div class="direction-choice">
+      <label [for]="'direction-' + row.id">{{ row.code || 'Sin código' }} · Destino</label>
+      <select [id]="'direction-' + row.id" [value]="row.instanceId ? draft()[row.instanceId] || '' : ''" (change)="choose(row, $any($event.target).value)" [disabled]="!editable() || !row.instanceId">
+        <option value="">Sin dirección</option>
+        <option value="left" [disabled]="!row.recalculation?.left?.eligible">Izquierda{{ row.recalculation?.left?.target ? ' · ' + target(row.recalculation.left.target) : '' }}</option>
+        <option value="right" [disabled]="!row.recalculation?.right?.eligible">Derecha{{ row.recalculation?.right?.target ? ' · ' + target(row.recalculation.right.target) : '' }}</option>
+      </select>
+      @if (!row.recalculation?.left?.eligible) { <p class="muted">Izquierda: {{ reason(row, 'left') }}</p> }
+      @if (!row.recalculation?.right?.eligible) { <p class="muted">Derecha: {{ reason(row, 'right') }}</p> }
+    </div>
+  }
+  <p aria-live="polite"><strong>{{ choices().length }} destinos en la configuración completa.</strong>
+    @if (hiddenCount()) { {{ hiddenCount() }} {{ hiddenCount() === 1 ? 'dirección fuera de esta página se conservará' : 'direcciones fuera de esta página se conservarán' }}. }
+  </p>
+  @if (choices().length) {
+    <details class="direction-summary"><summary>Revisar configuración completa ({{ choices().length }})</summary>
+      <ul>@for (choice of choices(); track choice.instanceId) { <li>{{ known()[choice.instanceId]?.code || 'Dirección configurada fuera de esta página' }} · {{ choice.targetSide === 'left' ? 'Izquierda' : 'Derecha' }}
+        @if (known()[choice.instanceId]?.[choice.targetSide]; as cell) { · {{ target(cell) }} }
+      </li> }</ul>
+    </details>
+  }
+  <div class="direction-actions"><button type="button" (click)="save()" [disabled]="!canSave()">{{ pending() ? 'Guardando configuración…' : 'Guardar configuración' }}</button>
+    <button type="button" class="secondary" (click)="clear()" [disabled]="!editable() || !choices().length">Quitar todas las direcciones</button></div>
+  <p class="muted">Se guardará la lista completa mostrada en el resumen. Las propuestas y sus dependencias se revisan en una previsualización posterior.</p>
+</section>

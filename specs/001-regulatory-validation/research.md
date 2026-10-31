@@ -132,6 +132,13 @@ productores se detectan antes de ordenar. Kahn usa una cola estable por clave se
 Tarjan sobre el residuo identifica componentes cíclicos y separa sus consumidores bloqueados.
 Una condición falsa, nula o fallida no permite sustituir silenciosamente el productor por su valor viejo.
 
+La identidad de dirección continúa siendo SHA-256 semántico y Preview.id un UUID del servidor.
+Proposal.id será UUIDv5 estándar: namespace formado por los bytes del UUID previewId y nombre
+directionId codificado en UTF-8, con SHA-1 y los bits de versión/variante correspondientes.
+Así, el mismo par conserva el ID al permutar direcciones dentro de la preview. La elección sigue
+[RFC 9562 §5.5](https://www.rfc-editor.org/rfc/rfc9562.html#section-5.5): UUIDv5 utiliza SHA-1;
+un UUID derivado de SHA-256 se identifica como UUIDv8, no como v5.
+
 El nominal calculado se cuantiza a la precisión declarada del destino con redondeo half-even,
 política local visible en la propuesta. Los consumidores usan ese valor ya cuantizado, que es el
 que se aplicaría. La propuesta conserva nominal exacto, intervalo derivado y redondeo. No se

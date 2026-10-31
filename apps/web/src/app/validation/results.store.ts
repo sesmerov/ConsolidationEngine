@@ -1,24 +1,34 @@
 import { DestroyRef, computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { isTerminalJob } from '@ce/contracts';
-import type { Diagnostic, Rational, SourceLocator, ValidationResultsPageDTO, ValidationRunDTO, ValidationStatus, ValidationValueDTO } from '@ce/contracts';
+import type { Diagnostic, Rational, RunSummaryDTO, SourceLocator, ValidationResultsPageDTO, ValidationStatus, ValidationValueDTO } from '@ce/contracts';
 import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
 @Injectable()
 export class ResultsStore {
   private readonly api = inject(ApiClient); readonly session = inject(SessionStore);
-  private generation = 0; private observed = '';
+  private generation = 0; private historyGeneration = 0; private observed = ''; private workspaceId: string | undefined;
   readonly pending = signal(false); readonly loading = signal(false); readonly error = signal<string | null>(null);
-  readonly page = signal<ValidationResultsPageDTO | null>(null); readonly history = signal<readonly ValidationRunDTO[]>([]); readonly selectedRunId = signal<string | null>(null);
+  readonly page = signal<ValidationResultsPageDTO | null>(null); readonly history = signal<readonly RunSummaryDTO[]>([]); readonly selectedRunId = signal<string | null>(null);
+  readonly historyCursor = signal<string | null>(null); readonly historyLoading = signal(false);
   readonly status = signal(''); readonly code = signal(''); readonly table = signal('');
   readonly historical = computed(() => Boolean(this.page() && this.page()!.versionId !== this.session.versionId()));
   readonly noEvaluatedRules = computed(() => { const summary = this.page()?.run.summary; return !!summary && summary.byStatus.pass + summary.byStatus.fail === 0; });
   readonly labels: Record<ValidationStatus, string> = { pass: 'Pasa', fail: 'Falla', not_applicable: 'No aplica', not_evaluable: 'No evaluable', error: 'Error' };
   constructor() {
-    effect(() => { const job = this.session.job(); if (job?.kind === 'validate' && isTerminalJob(job.status) && job.resultRef?.type === 'validation') {
+    effect(() => { const id = this.session.workspace()?.id; if (id !== this.workspaceId) { this.workspaceId = id; untracked(() => { this.generation++; this.historyGeneration++; this.observed = ''; this.history.set([]); this.historyCursor.set(null); this.selectedRunId.set(null); this.page.set(null); this.loading.set(false); if (id) void this.loadHistory(); }); } });
+    effect(() => { const job = this.session.job(); if (job?.workspaceId === this.session.workspace()?.id && job?.kind === 'validate' && isTerminalJob(job.status) && job.resultRef?.type === 'validation') {
       const observed = job.jobId + ':' + job.status; if (observed !== this.observed) { this.observed = observed; untracked(() => { this.selectedRunId.set(job.resultRef!.id); void this.load(); }); }
     } });
-    inject(DestroyRef).onDestroy(() => { this.generation++; });
+    inject(DestroyRef).onDestroy(() => { this.generation++; this.historyGeneration++; });
+  }
+  async loadHistory(append = false): Promise<void> {
+    const workspaceId = this.session.workspace()?.id; if (!workspaceId) return; const generation = ++this.historyGeneration, cursor = append ? this.historyCursor() : null; this.historyLoading.set(true);
+    try { const history = await this.api.runs(workspaceId, cursor ?? undefined); if (generation !== this.historyGeneration || workspaceId !== this.session.workspace()?.id) return;
+      const retained = this.history().find(run => run.id === this.selectedRunId());
+      this.history.set(append ? [...this.history(), ...history.items.filter(row => !this.history().some(existing => existing.id === row.id))] : retained && !history.items.some(row => row.id === retained.id) ? [retained, ...history.items] : history.items); this.historyCursor.set(history.nextCursor);
+      if (!this.selectedRunId() && history.items[0]) this.selectRun(history.items[0].id);
+    } catch (error) { if (generation === this.historyGeneration) this.report(error); } finally { if (generation === this.historyGeneration) this.historyLoading.set(false); }
   }
   async execute(): Promise<void> {
     const workspace = this.session.workspace(), version = this.session.versionId(), etag = this.session.etag(); if (!workspace || !version || !etag || this.pending() || this.session.jobActive()) return;

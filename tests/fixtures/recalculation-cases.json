@@ -1,0 +1,36 @@
+{
+  "profileId": "ce-dpmxl-0.9-closed-v1",
+  "policyId": "half-even-v1",
+  "synthetic": true,
+  "basis": "Expected values from the local language profile; quantized values are revalidated before a proposal is available.",
+  "rounding": [
+    { "id": "positive-even-tie", "n": "201", "d": "200", "decimals": "2", "text": "1.00", "after": { "numerator": "1", "denominator": "1" } },
+    { "id": "positive-odd-tie", "n": "203", "d": "200", "decimals": "2", "text": "1.02", "after": { "numerator": "51", "denominator": "50" } },
+    { "id": "negative-even-tie", "n": "-201", "d": "200", "decimals": "2", "text": "-1.00", "after": { "numerator": "-1", "denominator": "1" } },
+    { "id": "negative-odd-tie", "n": "-203", "d": "200", "decimals": "2", "text": "-1.02", "after": { "numerator": "-51", "denominator": "50" } },
+    { "id": "positive-zero-tie", "n": "1", "d": "200", "decimals": "2", "text": "0.00", "after": { "numerator": "0", "denominator": "1" } },
+    { "id": "negative-zero-tie", "n": "-1", "d": "200", "decimals": "2", "text": "0.00", "after": { "numerator": "0", "denominator": "1" } },
+    { "id": "below-tie", "n": "10049", "d": "10000", "decimals": "2", "text": "1.00", "after": { "numerator": "1", "denominator": "1" } },
+    { "id": "above-tie", "n": "10051", "d": "10000", "decimals": "2", "text": "1.01", "after": { "numerator": "101", "denominator": "100" } },
+    { "id": "negative-integer-even", "n": "-5", "d": "2", "decimals": "0", "text": "-2", "after": { "numerator": "-2", "denominator": "1" } },
+    { "id": "negative-integer-odd", "n": "-7", "d": "2", "decimals": "0", "text": "-4", "after": { "numerator": "-4", "denominator": "1" } },
+    { "id": "hundreds-even", "n": "1250", "d": "1", "decimals": "-2", "text": "1200", "after": { "numerator": "1200", "denominator": "1" } },
+    { "id": "hundreds-odd", "n": "1350", "d": "1", "decimals": "-2", "text": "1400", "after": { "numerator": "1400", "denominator": "1" } },
+    { "id": "negative-hundreds-even", "n": "-1250", "d": "1", "decimals": "-2", "text": "-1200", "after": { "numerator": "-1200", "denominator": "1" } },
+    { "id": "negative-hundreds-odd", "n": "-1350", "d": "1", "decimals": "-2", "text": "-1400", "after": { "numerator": "-1400", "denominator": "1" } },
+    { "id": "repeating-to-cents", "n": "1", "d": "3", "decimals": "2", "text": "0.33", "after": { "numerator": "33", "denominator": "100" } },
+    { "id": "repeating-round-up", "n": "2", "d": "3", "decimals": "2", "text": "0.67", "after": { "numerator": "67", "denominator": "100" } },
+    { "id": "finite-inf", "n": "1", "d": "8", "decimals": "INF", "text": "0.125", "after": { "numerator": "1", "denominator": "8" } },
+    { "id": "negative-finite-inf", "n": "-7", "d": "8", "decimals": "INF", "text": "-0.875", "after": { "numerator": "-7", "denominator": "8" } },
+    { "id": "normalized-finite-inf", "n": "20", "d": "80", "decimals": "INF", "text": "0.25", "after": { "numerator": "1", "denominator": "4" } },
+    { "id": "zero-inf", "n": "0", "d": "1", "decimals": "INF", "text": "0", "after": { "numerator": "0", "denominator": "1" } }
+  ],
+  "scenarios": {
+    "integerChain": { "beforeA": "10", "beforeD": "20", "b": "5", "c": "7", "afterA": "12.00", "afterD": "24.00" },
+    "quantizedChain": {
+      "afterA": "0.33", "afterD": "0.99", "exactA": { "numerator": "1", "denominator": "3" },
+      "exactD": { "numerator": "99", "denominator": "100" },
+      "derivedD": { "lo": { "numerator": "39", "denominator": "40" }, "hi": { "numerator": "201", "denominator": "200" } }
+    }
+  }
+}

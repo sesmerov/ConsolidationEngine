@@ -23,6 +23,9 @@ import { registerRules } from './routes/rules.js';
 import { registerCapabilities } from './routes/capabilities.js';
 import { registerValidations } from './routes/validations.js';
 import { registerResults } from './routes/results.js';
+import { registerDirections } from './routes/directions.js';
+import { registerPreviews } from './routes/previews.js';
+import { registerHistory } from './routes/history.js';
 import type { WorkLimits } from '@ce/engine';
 import { registerExports } from './routes/exports.js';
 import type { ExportLimits } from './export/results-export.js';
@@ -34,6 +37,7 @@ export interface AppOptions extends JobManagerOptions {
   uploadLimits?: Partial<UploadLimits>;
   serveWeb?: boolean;
   validationLimits?: Partial<WorkLimits>;
+  previewLimits?: Partial<WorkLimits>;
   exportLimits?: Partial<ExportLimits>; fileLimitBytes?: number;
 }
 export async function createApp(options: AppOptions = {}): Promise<FastifyInstance> {
@@ -42,7 +46,7 @@ export async function createApp(options: AppOptions = {}): Promise<FastifyInstan
   await app.register(multipart, { limits: { fileSize: UPLOAD_LIMITS.maxFileBytes, files: UPLOAD_LIMITS.maxReports + 1, fields: 1 } });
   const store = options.store ?? new WorkspaceStore();
   const files = options.files ?? await SessionFiles.create(store.sessionId, undefined, options.fileLimitBytes);
-  const jobs = options.jobs ?? new JobManager(store, { ...options, workerModules: { import: new URL('./workers/import.worker.js', import.meta.url), validate: new URL('./workers/validate.worker.js', import.meta.url), export: new URL('./workers/export.worker.js', import.meta.url), ...options.workerModules } });
+  const jobs = options.jobs ?? new JobManager(store, { ...options, workerModules: { import: new URL('./workers/import.worker.js', import.meta.url), validate: new URL('./workers/validate.worker.js', import.meta.url), preview: new URL('./workers/preview.worker.js', import.meta.url), export: new URL('./workers/export.worker.js', import.meta.url), ...options.workerModules } });
   const uploads = new UploadManager(store);
   const preparations = new PreparationManager(store);
   app.decorate('ce', { store, files, jobs, uploads, preparations, idempotency: new IdempotencyStore(store) });
@@ -64,6 +68,8 @@ export async function createApp(options: AppOptions = {}): Promise<FastifyInstan
   registerBootstrap(app, token); registerWorkspaces(app); registerJobs(app);
   registerImports(app, options.uploadLimits); registerRules(app); registerCapabilities(app);
   registerValidations(app, options.validationLimits); registerResults(app);
+  registerDirections(app);
+  registerPreviews(app, options.previewLimits); registerHistory(app);
   registerExports(app, options.exportLimits);
   app.addHook('preClose', async () => {
     const id = store.currentWorkspaceId; if (id) store.beginClose(id);

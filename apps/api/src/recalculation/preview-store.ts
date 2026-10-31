@@ -1,0 +1,35 @@
+import type { JsonValue, PreviewBundle, PreviewSelectionDTO } from '@ce/contracts';
+import { WorkBudget, WorkLimitError } from '@ce/engine';
+import { ApiError } from '../errors.js';
+import { canonicalHash } from '../session/canonical-state.js';
+import type { WorkspaceStore } from '../session/workspace-store.js';
+export const previewKey = (workspaceId: string, previewId: string) => 'preview:' + workspaceId + ':' + previewId;
+export function getPreview(store: WorkspaceStore, workspaceId: string, previewId: string): PreviewBundle {
+  store.get(workspaceId); const bundle = store.getRecord<PreviewBundle>(previewKey(workspaceId, previewId));
+  if (!bundle) throw new ApiError('RESOURCE_NOT_FOUND'); return bundle;
+}
+/** Read-only exact transitive closure. Missing ancestors are reported, never selected implicitly. */
+export function selectPreview(bundle: PreviewBundle, selection: readonly string[], budget = new WorkBudget()): PreviewSelectionDTO {
+  const { preview, proposals } = bundle;
+  if (preview.state !== 'ready' && preview.state !== 'obsolete') throw new ApiError('PREVIEW_NOT_APPLICABLE');
+  try {
+    const byId = new Map(proposals.map(proposal => [proposal.id, proposal]));
+    const selectedIds = [...new Set(selection)].sort(), selected = new Set(selectedIds), visited = new Set<string>(), pending = [...selectedIds];
+    for (const id of selectedIds) if (!byId.has(id)) throw new ApiError('INVALID_REQUEST');
+    while (pending.length) {
+      const id = pending.pop()!; if (visited.has(id)) continue; budget.consume('instances'); visited.add(id);
+      const proposal = byId.get(id); if (!proposal || proposal.state !== (preview.state === 'ready' ? 'available' : 'obsolete')) throw new ApiError('PREVIEW_NOT_APPLICABLE');
+      for (const ancestor of proposal.predecessorIds) { budget.consume('edges'); if (!visited.has(ancestor)) pending.push(ancestor); }
+    }
+    const requiredIds = [...visited].filter(id => !selected.has(id)).sort();
+    return { selectedIds, requiredIds, complete: requiredIds.length === 0, state: preview.state,
+      closureHash: canonicalHash({ previewId: preview.id, baseVersionId: preview.baseVersionId, profileId: preview.profileId, policyId: preview.policyId, selectedIds, requiredIds }) };
+  } catch (error) { if (error instanceof WorkLimitError) throw new ApiError('EXPANSION_LIMIT', { reason: error.code }); throw error; }
+}
+export function discardPreview(store: WorkspaceStore, workspaceId: string, previewId: string): PreviewBundle {
+  store.assertAccepting(workspaceId); store.assertIdle(workspaceId); const bundle = getPreview(store, workspaceId, previewId);
+  if (bundle.preview.state === 'discarded') return bundle;
+  if (bundle.preview.state !== 'ready') throw new ApiError('PREVIEW_NOT_APPLICABLE');
+  const discarded: PreviewBundle = { preview: { ...bundle.preview, state: 'discarded' }, proposals: bundle.proposals.map(proposal => proposal.state === 'available' ? { ...proposal, state: 'discarded' } : proposal) };
+  store.putRecords([{ key: previewKey(workspaceId, previewId), value: discarded as unknown as JsonValue }]); return discarded;
+}

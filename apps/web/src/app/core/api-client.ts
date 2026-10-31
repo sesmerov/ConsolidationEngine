@@ -2,7 +2,8 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import type { HttpResponse } from '@angular/common/http';
 import { firstValueFrom, fromEvent, takeUntil } from 'rxjs';
-import type { BootstrapDTO, CapabilitiesDTO, JobDTO, RulesPageDTO, WorkspaceDTO, ValidationResultsPageDTO } from '@ce/contracts';
+import type { BootstrapDTO, CapabilitiesDTO, DirectionChoiceDTO, DirectionsResponseDTO, JobDTO, RulesPageDTO, WorkspaceDTO, ValidationResultsPageDTO } from '@ce/contracts';
+import type { HistoryPageDTO, PreviewDTO, PreviewSelectionDTO, PreviewSummaryDTO, ProposalsPageDTO, RunSummaryDTO } from '@ce/contracts';
 @Injectable({ providedIn: 'root' })
 export class ApiClient {
   private readonly http = inject(HttpClient);
@@ -48,6 +49,27 @@ export class ApiClient {
   results(workspaceId: string, runId: string, filters: { code?: string; status?: string; table?: string; cursor?: string } = {}): Promise<ValidationResultsPageDTO> {
     return firstValueFrom(this.http.get<ValidationResultsPageDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/runs/' + encodeURIComponent(runId) + '/results', { headers: this.headers(), params: { limit: '50', ...filters } }));
   }
+  replaceDirections(workspaceId: string, directions: readonly DirectionChoiceDTO[], etag: string): Promise<HttpResponse<DirectionsResponseDTO>> {
+    return firstValueFrom(this.http.put<DirectionsResponseDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/directions', { directions }, { headers: this.headers(etag), observe: 'response' }));
+  }
+  runs(workspaceId: string, cursor?: string): Promise<HistoryPageDTO<RunSummaryDTO>> {
+    return firstValueFrom(this.http.get<HistoryPageDTO<RunSummaryDTO>>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/runs', { headers: this.headers(), params: { limit: '50', ...(cursor ? { cursor } : {}) } }));
+  }
+  previews(workspaceId: string, cursor?: string): Promise<HistoryPageDTO<PreviewSummaryDTO>> {
+    return firstValueFrom(this.http.get<HistoryPageDTO<PreviewSummaryDTO>>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/previews', { headers: this.headers(), params: { limit: '50', ...(cursor ? { cursor } : {}) } }));
+  }
+  createPreview(workspaceId: string, baseVersionId: string, etag: string, key: string): Promise<JobDTO> {
+    return firstValueFrom(this.http.post<JobDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/previews', { baseVersionId }, { headers: this.headers(etag).set('Idempotency-Key', key) }));
+  }
+  preview(workspaceId: string, previewId: string): Promise<PreviewDTO> { return firstValueFrom(this.http.get<PreviewDTO>(this.previewUrl(workspaceId, previewId), { headers: this.headers() })); }
+  proposals(workspaceId: string, previewId: string, filters: { status?: string; code?: string; table?: string; cursor?: string } = {}): Promise<ProposalsPageDTO> {
+    return firstValueFrom(this.http.get<ProposalsPageDTO>(this.previewUrl(workspaceId, previewId) + '/proposals', { headers: this.headers(), params: { limit: '50', ...filters } }));
+  }
+  previewSelection(workspaceId: string, previewId: string, selectedIds: readonly string[]): Promise<PreviewSelectionDTO> {
+    return firstValueFrom(this.http.post<PreviewSelectionDTO>(this.previewUrl(workspaceId, previewId) + '/selection', { selectedIds }, { headers: this.headers() }));
+  }
+  discardPreview(workspaceId: string, previewId: string, etag: string): Promise<PreviewDTO> { return firstValueFrom(this.http.delete<PreviewDTO>(this.previewUrl(workspaceId, previewId), { headers: this.headers(etag) })); }
+  private previewUrl(workspaceId: string, previewId: string): string { return '/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/previews/' + encodeURIComponent(previewId); }
   exportResults(workspaceId: string, versionId: string, runId: string, etag: string, key: string): Promise<JobDTO> {
     return firstValueFrom(this.http.post<JobDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/exports', { versionId, runId, kind: 'results' }, { headers: this.headers(etag).set('Idempotency-Key', key) }));
   }

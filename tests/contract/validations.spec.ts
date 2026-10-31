@@ -9,6 +9,7 @@ import { importWorkspace } from '../../apps/api/src/import/import-workspace.js';
 import type { OperationContext } from '../../apps/api/src/workers/protocol.js';
 import type { JobManagerOptions } from '../../apps/api/src/jobs/job-manager.js';
 import { controlledFactory, nextTurn } from '../helpers/foundation.js';
+import type { JsonValue, ValidationBundle } from '@ce/contracts';
 
 const applications: Awaited<ReturnType<typeof createApp>>[] = [], directories: string[] = [];
 afterEach(async () => {
@@ -114,5 +115,18 @@ describe('validation jobs and versioned result contract', () => {
     const [first, second] = await Promise.all([validate(undefined, key), validate(undefined, key)]);
     expect(first.statusCode).toBe(202); expect(second.statusCode).toBe(202); expect(second.json().jobId).toBe(first.json().jobId); expect(second.json().resultRef).toEqual(first.json().resultRef);
     await nextTurn(); expect(control.workers).toHaveLength(1);
+  });
+  it('paginates tied coverage rows semantically rather than by generated result IDs', async () => {
+    const { app, workspace, validate, poll, results } = await setup(); const accepted = await validate(), job = await poll(accepted.json().jobId);
+    const original = app.ce.store.getRecord<ValidationBundle>(`validation:${workspace.id}:${job.resultRef.id}`)!;
+    const { instanceId: _instance, binding: _binding, ...row } = original.results[0]!;
+    const ids = [randomUUID(), randomUUID()];
+    for (const [index, id] of ids.entries()) {
+      // Explicit projection fixtures force opposite opaque-ID order while semantic context identity stays fixed.
+      const rows = ['context-A', 'context-B'].map((contextId, position) => ({ ...row, runId: id, contextId, coverageOnly: true, id: index === position ? 'z' : 'a' }));
+      app.ce.store.putRecords([{ key: `validation:${workspace.id}:${id}`, value: { run: { ...original.run, id, resultIds: rows.map(row => row.id) }, results: rows } as unknown as JsonValue }]);
+      const first = (await results(id, '?limit=1')).json(); expect(first.items[0].contextId).toBe('context-A');
+      const second = (await results(id, '?limit=1&cursor=' + encodeURIComponent(first.nextCursor))).json(); expect(second.items[0].contextId).toBe('context-B'); expect(second.nextCursor).toBeNull();
+    }
   });
 });

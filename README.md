@@ -7,7 +7,8 @@ propuestas de recálculo con sus dependencias.
 La implementación está en curso con Spec Kit. El incremento actual permite crear una sesión local,
 descargar la plantilla Excel, importar archivos, analizar reglas con ANTLR y ejecutar validaciones
 con cálculo exacto. Incluye explicaciones, resultados históricos y exportación a ZIP.
-Las propuestas y la aplicación de recálculos corresponden a los siguientes incrementos.
+También permite configurar destinos y simular propuestas de recálculo con sus dependencias.
+La aplicación confirmada de las propuestas corresponde al siguiente incremento.
 Los resultados comprobados se registran en [verificación](docs/verification.md).
 
 ## Ejecutar el incremento actual
@@ -40,6 +41,13 @@ conservan como históricos durante la sesión.
 seleccionada. Los límites de tamaño y espacio acumulado se publican en las capacidades de la API;
 si se superan, el trabajo falla sin ofrecer un archivo parcial.
 
+Para previsualizar recálculos, elegir los lados elegibles en **Configurar destinos de recálculo** y guardar
+la configuración completa. Después, **Simular recálculos** muestra los valores anteriores,
+los propuestos, su precisión, los predecesores y los bloqueos. La selección muestra los antecesores
+que faltan sin seleccionarlos automáticamente. Los informes permanecen intactos durante esta fase.
+El historial de validaciones y previsualizaciones se recupera también al refrescar el navegador;
+descartar una previsualización conserva su estado histórico dentro de la sesión.
+
 ## Documentos del proyecto
 
 - [Constitución 1.0.0](.specify/memory/constitution.md): principios y restricciones.
@@ -66,8 +74,8 @@ si se superan, el trabajo falla sin ofrecer un archivo parcial.
 - ANTLR genera lexer y parser JavaScript a partir de las gramáticas de `grammar/`.
 - El motor interpreta las reglas con semántica explícita; reconocer sintaxis no equivale a
   ejecutar una validación correctamente.
-- Kahn ordenará los recálculos por sus productores y consumidores. Compartir una lectura no crea
-  precedencia; los ciclos y los consumidores bloqueados se explicarán por separado.
+- Kahn ordena los recálculos por sus productores y consumidores. Compartir una lectura no crea
+  precedencia; los ciclos y los consumidores bloqueados se explican por separado.
 - Los informes usarán una plantilla Excel propia, confirmada por el usuario, con coordenadas
   regulatorias, contexto y precisión. La plantilla está disponible para descargar desde la aplicación.
 - Las igualdades de validación no decidirán por sí solas qué celda modificar. Las propuestas
@@ -89,7 +97,8 @@ Las skills viven en `.agents/skills/` y los recursos compartidos en `.specify/`.
 
 `$speckit-implement` está en ejecución, siguiendo las dependencias de tasks.md.
 US1 y US2 forman el MVP validador, incluida la exportación de resultados.
-US3 y US4 añaden propuestas y aplicación de recálculos; todavía están pendientes.
+US3 añade las propuestas con dependencias y está completada. US4 añadirá su aplicación confirmada,
+revalidación y exportación de informes recalculados.
 Si cambia el alcance, se actualizarán primero la especificación y el plan afectados.
 Estos nombres se invocan en el chat de Codex; no son comandos de PowerShell.
 

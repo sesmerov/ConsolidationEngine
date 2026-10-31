@@ -191,20 +191,32 @@ indicadores siguen en metadataReads, conforme al [contrato HTTP](http-api.md#for
 
 Solo una igualdad con un lado de una única celda puede tener dirección. El usuario selecciona
 ese lado para una instancia concreta; el otro lado debe ser calculable sin leer el destino.
+El destino puede ser una coordenada `number` o `boolean` de ce-report-1; un indicador de
+presentación es metadato y nunca es un destino recalculable.
 La elegibilidad de la dirección se basa en estructura, actividad y vigencia; no se reduce a
 instancias cuyo resultado inicial sea pass/fail. Conservar una instancia con precondición false
 o indeterminada permite volver a comprobarla durante la simulación, después de sus productores.
 Solo se ofrece un cambio aplicable cuando la regla y su contexto siguen siendo válidos y la
 precondición es true en esa versión simulada; esto permite el caso V09 false→true por productor.
 
-El nominal exacto del lado calculado se cuantiza al `decimals` del destino con half-even.
+Para un destino number, el nominal exacto del lado calculado se cuantiza al `decimals` del
+destino con half-even.
 Con `INF` se exige decimal finito; un racional periódico no tiene propuesta. Tanto con INF como
 con precisión finita, el valor exportable debe respetar ce-report-1 (128 dígitos significativos y
 128 posiciones decimales); en otro caso se devuelve `OUTPUT_VALUE_LIMIT`, aunque el racional interno
 quepa en 4096 bits. La propuesta muestra
 valor anterior, nominal exacto, intervalo derivado, valor cuantizado, precisión y política
 `half-even-v1`. El dato que leerán los consumidores es el valor cuantizado con la precisión del
-destino, exactamente como se exportaría. La regla originaria se reevalúa con el candidato:
+destino, exactamente como se exportaría.
+
+Para un destino boolean, el lado calculado debe producir un booleano conocido, true o false,
+del mismo tipo que la coordenada. Se propone ese valor directamente: no tiene unidad, decimals,
+cuantización ni política half-even. `exactNominal` y `derivedInterval` solo existen en propuestas
+numéricas. Un resultado null, unknown o de tipo incompatible bloquea la propuesta con su motivo;
+no se convierte a booleano ni se interpreta cero/uno como false/true. Los consumidores leen el
+booleano que se aplicaría. Estas condiciones no convierten indicadores en destinos de escritura.
+
+Para ambos tipos, la regla originaria se reevalúa con el candidato:
 si no pasa, se informa `CANDIDATE_DOES_NOT_SATISFY_RULE` y no se ofrece como aplicable.
 
 Para obtener el grafo se expanden estáticamente todas las lecturas de hechos del lado calculado,
@@ -240,6 +252,8 @@ de hechos, además del límite temporal de 60 segundos. Exceder una cuota produc
 | half-even de 1.005 y 1.015 a p=2 | 1.00 y 1.02. |
 | A=1/3 a p=2; D=A*3 a p=2, con interval:true | A=0.33; D=0.99; ambas igualdades pasan al revalidar sus intervalos. |
 | A=1/3 a p=2, con interval:false | Sin propuesta aplicable: 0.33 no satisface la igualdad puntual con 1/3. |
+| Igualdad con destino boolean false y lado calculado true conocido | Propuesta true sin precisión ni redondeo; revalidar la igualdad antes de ofrecerla. |
+| Destino boolean con lado calculado null, unknown o number | Propuesta bloqueada; no conversión implícita a booleano. |
 | `1=1 @` | Error léxico, aunque una parte tenga árbol válido. |
 | Indicador declarado true/false | La selección devuelve respectivamente true/false; false en la precondición puede dar `not_applicable`. |
 | Indicador ausente necesario para decidir | unknown y `not_evaluable`, con `MISSING_FILING_INDICATOR`. |

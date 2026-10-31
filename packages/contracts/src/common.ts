@@ -14,7 +14,7 @@ export interface SnapshotContent {
   readonly catalogVersion: string; readonly reportVersion: string; readonly configVersion: string;
   readonly profileId: string; readonly contexts: readonly ReportContext[];
   readonly catalog: CatalogData; readonly coordinates: readonly Coordinate[];
-  readonly facts: readonly ReportedFact[]; readonly directions: readonly JsonObject[];
+  readonly facts: readonly ReportedFact[]; readonly directions: readonly DirectionDTO[];
   readonly sources: readonly SourceFile[];
 }
 export interface Snapshot {
@@ -55,4 +55,5 @@ export function safeDisplayName(value: string): string {
 }
 import type { CatalogData } from './catalog.js';
 import type { Coordinate, ReportedFact, ReportContext, SourceFile } from './report.js';
+import type { DirectionDTO } from './recalculation.js';
 export type { ReportContext, SourceFile } from './report.js';

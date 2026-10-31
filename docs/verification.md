@@ -163,3 +163,69 @@ dependencias. `git diff --check` correcto.
 
 US1+US2 acreditan carga, validación, explicación y exportación de resultados. Propuestas,
 aplicación de recálculos y medición de rendimiento todavía corresponden a fases posteriores.
+
+## US3 — preparación T046–T049
+
+Las pruebas se prepararon antes de sus módulos: T046 define 23 casos de grafo, pero inicialmente
+falló al importar read-set (0 aserciones ejecutadas); T047 descubre 47 casos, con 2 prerrequisitos
+de fixtures correctos y 45 sin ejecutar por los hooks de módulos todavía ausentes. T048 ejecutó
+13 contratos HTTP que fallaron por 404 de rutas inexistentes, usando importación/validación reales.
+Estas ejecuciones no acreditan aún recálculos. T049 compiló los DTO y superó 2 pruebas reales AJV
+de sus esquemas, incluidos racionales, booleanos y rechazo de campos ajenos.
+
+## US3 — núcleo y direcciones T050–T054/T056
+
+El motor completo pasa 470 pruebas en 8 archivos tras integrar simulación: 25 de grafo y 87 de
+cuantización/candidatos/simulación, además de las 358 anteriores, sin omisiones. Build/typecheck
+de contratos y motor correctos. Kahn usa cola estable y Tarjan iterativo identifica SCC, autociclos
+y descendientes; los casos incluyen 20.000 nodos. Los conflictos preceden al ordenamiento.
+
+Las simulaciones comprueban A12/D24, consumo de 0.33 para obtener 0.99, precondiciones que cambian,
+cuotas compartidas, cancelación tras un candidato sin resultado parcial y ramas independientes
+sin fallback al valor anterior. UUIDv5 usa el procedimiento estándar y supera el vector RFC 9562;
+la fecha de creación de preview no participa en la identidad de las propuestas.
+
+T050 verifica direcciones con publicación atómica, rechazo por cuota sin mutación, autorreferencia
+del RHS y tratamiento separado de la precondición. GET results aporta elegibilidad estructural y
+la configuración completa del snapshot. La interfaz T056 supera 7 pruebas nuevas (16 Angular
+totales): conserva elecciones fuera de filtros/páginas y tras recrearse, envía reemplazo completo,
+mantiene el histórico y bloquea guardado ante 412 incluso si falla refrescar la sesión.
+
+## US3 — checkpoint T046–T058
+
+701 pruebas correctas sin omisiones: 474 engine, 119 integración, 70 contrato, 26 Angular y
+12 E2E. Build API/Angular, typecheck completo y `git diff --check` correctos. No cambiaron
+dependencias. Se usó el mismo toolchain aislado y Chromium de los incrementos anteriores.
+
+El worker de preview publica únicamente un bundle completo. La selección calcula una clausura
+iterativa (probada con 20.000 nodos) y no acepta antecesores por el usuario. Cuotas/cancelación
+no publican una preview ready parcial. El descarte es atómico, exige CAS y ausencia de trabajo
+activo, y conserva los estados históricos; un rechazo por cuota conserva registros y bytes.
+Los casos applied/obsolete del contrato de descarte se preparan como fixtures de estado: no
+constituyen evidencia de aplicación real, que pertenece a US4.
+
+Se completó la recuperación de historial: GET runs/previews devuelve resúmenes paginados
+explícitos, sin AST, datos completos ni rutas. El cursor HMAC queda ligado a recurso, filtros,
+sesión y revisión de la colección. La interfaz recupera referencias tras refrescar, sin
+localStorage. Las 13 pruebas nuevas de historial/descarte fallaron inicialmente por 404 y
+pasaron después con las rutas reales. Los fallos de restauración de UI se reprodujeron antes
+de incorporar las consultas, y se conserva la selección a través de filtros/páginas.
+
+Durante la integración se reprodujeron cuatro problemas de orden: los IDs dependientes del run
+o preview alteraban el orden visible, y el listado de propuestas podía colocar al consumidor
+antes que a su productor. La corrección usa una clave semántica compartida con la API, conserva
+los IDs y enumera las propuestas según Kahn, seguidas de bloqueadas estáticas. Antecesores y
+causas se ordenan por dirección antes de convertirlos a UUID. Los 124 casos afectados pasaron
+tras la corrección; después se ejecutó la suite completa del motor (474).
+
+Los cinco E2E nuevos verifican V06 con 11/5/7/22 → 12/24, V07 con 0.33/0.99 y rechazo puntual,
+V08 con ciclo/autociclo/descendiente/rama independiente, V09 con conflicto de valores iguales
+y precondición false→true, además de cancelación real, descarte y recarga del navegador.
+La primera prueba visual de V07 necesitó acotar un selector a su encabezado porque el nombre
+también aparecía como predecesor; los valores/bloqueos API ya eran correctos. La suite completa
+de 12 E2E pasó después en 58,4 segundos; esto no es el benchmark de SC-006.
+
+La captura `.cache/preview-ui.png` fue inspeccionada: productor 12 antes de consumidor 24,
+predecesores con código/coordenada, valores y precisión visibles y selección explícita sin
+modificar hechos. Los originales Excel/lexer/parser mantienen los tres hashes registrados.
+Aplicación, comparación, exportación de informes y rendimiento siguen pendientes de US4/polish.

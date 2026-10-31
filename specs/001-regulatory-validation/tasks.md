@@ -6,7 +6,7 @@ description: "Tareas de implementación del motor local de validación y recálc
 
 **Input**: `specs/001-regulatory-validation/`: spec, plan, research, data-model, contracts y quickstart.
 **Prerequisites**: [plan.md](plan.md), [spec.md](spec.md) y constitución 1.0.0.
-**Estado**: implementación en curso. Setup, foundation, US1 y US2 T001–T045 completados y verificados; las tareas restantes se cierran con evidencia en cada checkpoint.
+**Estado**: implementación en curso. Setup, foundation y US1–US3 T001–T058 completados y verificados; las tareas restantes se cierran con evidencia en cada checkpoint.
 
 **Tests**: Se incluyen pruebas porque spec.md exige escenarios verificables y criterios SC-001–007,
 y la constitución exige evidencia de comportamiento. Las tareas de pruebas preparan casos de negocio
@@ -134,22 +134,22 @@ ciclos versus descendientes, conflictos y precondiciones reevaluadas; snapshot o
 
 ### Tests for User Story 3
 
-- [ ] T046 [P] [US3] Preparar `packages/engine/test/dependency-graph.spec.ts` con productores únicos, lecturas RHS/ámbito/precondiciones, Kahn estable, SCC residual, autociclo, descendientes y rama independiente; permutar nodos/filas sin alterar orden semántico ni resultados (depende de T045).
-- [ ] T047 [P] [US3] Preparar `packages/engine/test/simulation.spec.ts` y `tests/fixtures/recalculation-cases.json` con elegibilidad, destino explícito, half-even/negativos, A=1/3 p2→0.33/D0.99 con interval:true, rechazo puntual, INF periódico, OUTPUT_VALUE_LIMIT y productores fallidos sin fallback (depende de T045).
-- [ ] T048 [P] [US3] Preparar `tests/contract/previews.spec.ts` con directions/preview/proposals/selection, If-Match, ausencia de destino, rechazo de código subido, clausura incompleta y prueba de que consultar/seleccionar preview no modifica hechos (depende de T045).
+- [X] T046 [P] [US3] Preparar `packages/engine/test/dependency-graph.spec.ts` con productores únicos, lecturas RHS/ámbito/precondiciones, Kahn estable, SCC residual, autociclo, descendientes y rama independiente; permutar nodos/filas sin alterar orden semántico ni resultados (depende de T045).
+- [X] T047 [P] [US3] Preparar `packages/engine/test/simulation.spec.ts` y `tests/fixtures/recalculation-cases.json` con elegibilidad, destino explícito, half-even/negativos, A=1/3 p2→0.33/D0.99 con interval:true, rechazo puntual, INF periódico, OUTPUT_VALUE_LIMIT y productores fallidos sin fallback (depende de T045).
+- [X] T048 [P] [US3] Preparar `tests/contract/previews.spec.ts` con directions/preview/proposals/selection, If-Match, ausencia de destino, rechazo de código subido, clausura incompleta y prueba de que consultar/seleccionar preview no modifica hechos (depende de T045).
 
 ### Implementation for User Story 3
 
-- [ ] T049 [US3] Definir `packages/contracts/src/recalculation.ts` y esquemas cerrados para Direction/Preview/Proposal: dirección «Configurada expresamente para una igualdad; destino único e identidad canónica», preview «Solo puede aplicarse contra la base que la produjo» y proposal «after es el valor ya cuantizado y la precisión que leerán sus consumidores y se exportará»; conservar before/exactNominal/derivedInterval/readKeys/predecessorIds/diagnósticos (depende de T046, T047, T048).
-- [ ] T050 [US3] Implementar `apps/api/src/recalculation/directions-service.ts` y `apps/api/src/routes/directions.ts`: PUT completo usando instancias de validación del snapshot vigente, targetSide left/right de celda única, nuevo configVersion/ETag y previews ready anteriores obsoletas; no aceptar expresiones ni inferir dirección del signo= (depende de T049, T041, T014).
-- [ ] T051 [US3] Implementar `packages/engine/src/dependencies/read-set.ts` y `packages/engine/src/dependencies/producers.ts` con expansión estática finita de RHS/precondición/ámbito, claves contextuales completas y detección de múltiples productores antes de ordenar, incluso si los valores coinciden (depende de T050, T037).
-- [ ] T052 [US3] Implementar `packages/engine/src/dependencies/kahn.ts` y `packages/engine/src/dependencies/scc.ts`: cola por clave canónica, aristas productor→consumidor, SCC>1/self-edge en residuo, propagación de bloqueos y ramas independientes; no etiquetar todo el residuo como ciclo ni crear dependencia por lectura compartida (depende de T051, T046).
-- [ ] T053 [US3] Implementar `packages/engine/src/recalculation/quantize.ts` y `packages/engine/src/recalculation/candidate.ts`: half-even a precisión destino, INF solo decimal finito, salida≤128 significativos/128 posiciones o OUTPUT_VALUE_LIMIT, unidad compatible y revalidación originaria; si el candidato no satisface la igualdad devolver CANDIDATE_DOES_NOT_SATISFY_RULE (depende de T049, T047, T038).
-- [ ] T054 [US3] Implementar `packages/engine/src/recalculation/simulate.ts`: recorrer orden Kahn sobre copia, consumir valores ya cuantizados, reevaluar precondiciones y bloquear dependientes si productor no resulta disponible; registrar nominal/intervalo/política/base/lecturas con cuotas y cancelación, sin fallback al valor antiguo ni escritura del snapshot (depende de T052, T053, T038).
-- [ ] T055 [US3] Implementar `apps/api/src/workers/preview.worker.ts`, `apps/api/src/recalculation/preview-store.ts` y `apps/api/src/routes/previews.ts` con POST preview, GET detalle/propuestas y POST selection; calcular requiredIds/closureHash sin aceptar ancestros por el usuario, páginas versionadas, previews ready/obsolete y propuestas available/blocked, manteniendo separados ambos estados según contrato (depende de T054, T049, T048).
-- [ ] T056 [US3] Crear `apps/web/src/app/recalculation/directions.component.ts` y su template para elegir solo lados elegibles desde resultados, mostrar motivo de inelegibilidad y actualizar versión/configuración sin tratar igualdades como correcciones automáticas (depende de T050, T043).
-- [ ] T057 [US3] Crear `apps/web/src/app/recalculation/preview-page.component.ts`, su template y `apps/web/src/app/recalculation/preview.store.ts`: antes/después/precisión, dependencias/ciclos/conflictos/causas, selección con ancestros faltantes y obsolescencia; seleccionar o descartar preview no aplica cambios (depende de T055, T056).
-- [ ] T058 [US3] Implementar y ejecutar `tests/e2e/preview.spec.ts` para V06-preview/V07/V08/V09 y snapshot intacto tras cancelar; ejecutar T046–T048, incluidos orden independiente de filas y consumidor que lee precisión cuantizada, antes de cerrar US3 (depende de T057).
+- [X] T049 [US3] Definir `packages/contracts/src/recalculation.ts` y esquemas cerrados para Direction/Preview/Proposal: dirección «Configurada expresamente para una igualdad; destino único e identidad canónica», preview «Solo puede aplicarse contra la base que la produjo» y proposal «after es el valor ya cuantizado y la precisión que leerán sus consumidores y se exportará»; conservar before/exactNominal/derivedInterval/readKeys/predecessorIds/diagnósticos (depende de T046, T047, T048).
+- [X] T050 [US3] Implementar `apps/api/src/recalculation/directions-service.ts` y `apps/api/src/routes/directions.ts`: PUT completo usando instancias de validación del snapshot vigente, targetSide left/right de celda única, nuevo configVersion/ETag y previews ready anteriores obsoletas; no aceptar expresiones ni inferir dirección del signo= (depende de T049, T041, T014).
+- [X] T051 [P] [US3] Implementar `packages/engine/src/dependencies/read-set.ts` y `packages/engine/src/dependencies/producers.ts` con expansión estática finita de RHS/precondición/ámbito, claves contextuales completas y detección de múltiples productores antes de ordenar, incluso si los valores coinciden (depende de T050, T037).
+- [X] T052 [P] [US3] Implementar `packages/engine/src/dependencies/kahn.ts` y `packages/engine/src/dependencies/scc.ts`: cola por clave canónica, aristas productor→consumidor, SCC>1/self-edge en residuo, propagación de bloqueos y ramas independientes; no etiquetar todo el residuo como ciclo ni crear dependencia por lectura compartida (depende de T051, T046).
+- [X] T053 [P] [US3] Implementar `packages/engine/src/recalculation/quantize.ts` y `packages/engine/src/recalculation/candidate.ts`: half-even a precisión destino, INF solo decimal finito, salida≤128 significativos/128 posiciones o OUTPUT_VALUE_LIMIT, unidad compatible y revalidación originaria; si el candidato no satisface la igualdad devolver CANDIDATE_DOES_NOT_SATISFY_RULE (depende de T049, T047, T038, T051).
+- [X] T054 [US3] Implementar `packages/engine/src/recalculation/simulate.ts`: recorrer orden Kahn sobre copia, consumir valores ya cuantizados, reevaluar precondiciones y bloquear dependientes si productor no resulta disponible; registrar nominal/intervalo/política/base/lecturas con cuotas y cancelación, sin fallback al valor antiguo ni escritura del snapshot (depende de T052, T053, T038).
+- [X] T055 [US3] Implementar `apps/api/src/workers/preview.worker.ts`, `apps/api/src/recalculation/preview-store.ts` y `apps/api/src/routes/previews.ts` con POST preview, GET detalle/propuestas, POST selection, DELETE para descarte persistente y listados paginados de resúmenes de runs/previews que permitan recuperar historial sin almacenamiento del navegador; calcular requiredIds/closureHash sin aceptar ancestros por el usuario, páginas versionadas, previews ready/obsolete y propuestas available/blocked, manteniendo separados ambos estados según contrato (depende de T054, T049, T048).
+- [X] T056 [P] [US3] Crear `apps/web/src/app/recalculation/directions.component.ts` y su template para elegir solo lados elegibles desde resultados, mostrar motivo de inelegibilidad y actualizar versión/configuración sin tratar igualdades como correcciones automáticas (depende de T050, T043).
+- [X] T057 [US3] Crear `apps/web/src/app/recalculation/preview-page.component.ts`, su template y `apps/web/src/app/recalculation/preview.store.ts`: antes/después/precisión, dependencias/ciclos/conflictos/causas, selección con ancestros faltantes y obsolescencia; recuperar historial desde el servidor tras refrescar, sin localStorage; seleccionar o descartar preview no aplica cambios (depende de T055, T056).
+- [X] T058 [US3] Implementar y ejecutar `tests/e2e/preview.spec.ts` para V06-preview/V07/V08/V09 y snapshot intacto tras cancelar; ejecutar T046–T048, incluidos orden independiente de filas y consumidor que lee precisión cuantizada, antes de cerrar US3 (depende de T057).
 
 **Checkpoint**: hay propuestas y explicaciones, pero ninguna edición automática del informe.
 El analista puede comprobar la clausura necesaria antes de la futura aplicación.
@@ -226,6 +226,7 @@ comprobar el resultado final. Ninguna tarea está autorizada a afirmar un test e
 | US2 pruebas | T030 terminada | T031 numeric, T032 resolver/nulls-units y T033 validations/UI spec. |
 | US2 primitivas | T034 y T032 terminadas | T035 interval.ts y T036 nulls.ts/units.ts. |
 | US3 pruebas | T045 terminada | T046 dependency-graph, T047 simulation/fixture y T048 previews. |
+| US3 implementación | T050 terminada | T051 y T056 en archivos separados; tras T051, T052 y T053, con contratos comunes T049 y API de resolución ya fijados. |
 | US4 pruebas | T058 terminada | T059 application-atomicity, T060 applications-exports y T061 apply/UI comparison. |
 
 ## Parallel Example: User Story 1
@@ -241,6 +242,7 @@ Después de T034 y T032, T035/T036 pueden avanzar a la vez; T037 espera a ambos.
 ## Parallel Example: User Story 3
 
 Tras T045, T046/T047/T048 preparan pruebas independientes de grafo, simulación y HTTP.
+Tras fijar contratos y direcciones (T049/T050), T056 puede desarrollar los controles de dirección mientras T051 prepara las lecturas. T052 y T053 se ejecutan en paralelo después de T051, sin modificar sus archivos compartidos. Esta distribución se precisó al iniciar US3, una vez acordadas las interfaces; no cambia requisitos ni adelanta una tarea a sus dependencias.
 No iniciar T054 hasta disponer tanto del grafo terminado T052 como del candidato cuantizado T053.
 
 ## Parallel Example: User Story 4

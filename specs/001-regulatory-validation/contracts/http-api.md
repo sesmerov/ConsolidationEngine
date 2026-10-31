@@ -42,12 +42,15 @@ Todas las rutas siguientes, salvo bootstrap, requieren token. `{w}` es workspace
 | PUT `/workspaces/{w}/directions` | `{directions:[{instanceId,targetSide:"left"|"right"}]}` → 200 nuevo snapshot/ETag. Reemplazo completo de configuración; invalida previews. |
 | POST `/workspaces/{w}/validations` | `{baseVersionId}` → 202 Job de validación. |
 | POST `/workspaces/{w}/previews` | `{baseVersionId}` → 202 Job que simula las direcciones configuradas. |
+| GET `/workspaces/{w}/runs` | Historial paginado de RunSummary, con filtro de estado opcional `status`; token, sin If-Match. |
+| GET `/workspaces/{w}/previews` | Historial paginado de PreviewSummary, con filtro de estado opcional `status`; token, sin If-Match. |
 | GET `/workspaces/{w}/jobs/{j}` | 200 estado/progreso/diagnósticos y resultRef cuando termina. |
 | DELETE `/workspaces/{w}/jobs/{j}` | 202 si solicita cancelación; 200 estado final si ya terminó. |
-| GET `/workspaces/{w}/runs/{runId}/results` | Página de resultados del run, aunque su snapshot ya sea histórico. |
+| GET `/workspaces/{w}/runs/{runId}/results` | Página de resultados del run, aunque su snapshot ya sea histórico; cada resultado puede añadir recalculation con elegibilidad estructural por lado. |
 | GET `/workspaces/{w}/previews/{previewId}` | Estado, base, resumen del grafo y conteos. |
+| DELETE `/workspaces/{w}/previews/{previewId}` | Sin cuerpo; token e If-Match vigente → 200 PreviewDTO y ETag actual. Descarta la preview sin crear Job ni snapshot. |
 | GET `/workspaces/{w}/previews/{previewId}/proposals` | Página de propuestas, dependencias, valores y bloqueos. |
-| POST `/workspaces/{w}/previews/{previewId}/selection` | `{selectedIds}` → 200 `{selectedIds,requiredIds,closureHash,complete}`; no aplica ni acepta cambios. |
+| POST `/workspaces/{w}/previews/{previewId}/selection` | `{selectedIds}` → 200 `{selectedIds,requiredIds,closureHash,complete,state}` para ready/obsolete; informa clausura, no aplica ni acepta cambios. |
 | POST `/workspaces/{w}/applications` | `{baseVersionId,previewId,selectedIds,closureHash}` → 202 Job de aplicación confirmada. |
 | POST `/workspaces/{w}/exports` | `{versionId,runId?,kind}` → 202 Job; kind=`report` o `results`. Para results, runId es obligatorio y pertenece a versionId; produce el ZIP descrito abajo. |
 | GET `/workspaces/{w}/exports/{exportId}` | 200 descarga producida, con Content-Disposition seguro; nunca una ruta del filesystem. |
@@ -61,7 +64,22 @@ Se revalida su elegibilidad durante preview y se exige precondición true en la 
 incluidas las condiciones que pasen de false a true por un productor. Un cambio de contexto se realiza reimportando el
 conjunto completo de forma atómica; no hay edición parcial de hechos en v1.
 
-Imports, directions, validations, previews, applications, exports y cierre de workspace exigen
+El campo opcional `RuleResultDTO.recalculation` tiene exactamente la forma
+`{left: DirectionEligibilityDTO, right: DirectionEligibilityDTO}`; cada lado contiene
+`{eligible: boolean, target?: Coordinate, diagnostics: Diagnostic[]}`. Es información calculada
+para esa consulta con el mismo resolver estructural que PUT directions, sin evaluar valores
+ni ejecutar el cuerpo de la regla. Una precondición false no elimina la instancia estructural ni obliga
+a tener values para mostrar el destino. Angular presenta coordenadas/diagnósticos recibidos;
+no recibe AST ni interpreta expresiones para decidir qué lado es elegible.
+
+La página comparte un WorkBudget entre sus lados e instancias. La memoización vive únicamente
+con ese presupuesto durante la petición; no se conserva como caché de sesión. Si se agota,
+el lado devuelve eligible=false con diagnóstico de comprobación incompleta, conservando la fila
+y el resultado de validación. En un run histórico la elegibilidad es informativa: guardar
+direcciones exige una validación completa de la versión vigente y vuelve a comprobar cada lado
+en el servidor. eligible=true expresa validez estructural, no que exista ya un cambio aplicable.
+
+Imports, directions, validations, creación/descarte de previews, applications, exports y cierre de workspace exigen
 If-Match. Consultas GET, cálculo de selection y cancelación por jobId están exentos; selection
 se refiere a una preview fija y devuelve también su estado vigente/obsoleto. Cancelar un Job no
 requiere conocer la versión que pudiera haber cambiado mientras corría.
@@ -70,6 +88,21 @@ contra cierre/cambio concurrente, y versionId indica exactamente los datos expor
 Una aplicación requiere selección no vacía, completa y sin destinos en conflicto.
 `selection` devuelve los antecesores que faltan; la interfaz debe mostrarlos y obtener una nueva
 confirmación. El servidor nunca amplía selectedIds silenciosamente durante la aplicación.
+
+En ready, selection admite propuestas available. En obsolete responde 200 informativo con
+`state:"obsolete"`: las propuestas que eran available pasan a obsolete y las blocked conservan
+su estado/motivo. `complete` solo indica clausura, nunca aplicabilidad; una selección vacía puede
+ser complete=true, pero aplicar siempre exige selección no vacía y preview válida. Selection sobre
+discarded/applied devuelve 409 `PREVIEW_NOT_APPLICABLE`; las consultas GET conservan el historial.
+
+El descarte mediante DELETE no requiere Idempotency-Key. En una actualización atómica cambia
+la preview ready a discarded y sus propuestas available a discarded; las blocked conservan
+estado y motivo. Se conserva el registro durante la sesión, con hechos, versión y ETag intactos.
+Repetir el descarte de una preview discarded devuelve 200 sin mutarla, con If-Match vigente.
+Una preview applied u obsolete devuelve 409 `PREVIEW_NOT_APPLICABLE` y conserva su estado.
+La operación exige que no exista ningún Job no terminal: en caso contrario responde 409
+`WORKSPACE_BUSY` para evitar una carrera con la aplicación. Un If-Match obsoleto produce 412
+`STALE_VERSION`; ningún rechazo altera la preview ni el snapshot.
 
 ## Exportación de resultados y cuotas
 
@@ -130,16 +163,40 @@ Job terminado: campos anteriores más `startedAt`, `endedAt`, `progress:{complet
 `resultRef:{type,id}`, `diagnostics:[]`. No devuelve todos los hechos o resultados en polling.
 Un job succeeded puede contener reglas que fallan; el resultado de negocio se consulta en el run.
 
-Página: `{items:[],nextCursor:null|"opaque",total,versionId}`. Parámetros `limit` (1–200,
+Página asociada a resultados: `{items:[],nextCursor:null|"opaque",total,versionId}`. Parámetros `limit` (1–200,
 por defecto 50), `cursor`, `status`, `code` y `table`. Cursor opaco vinculado a recurso, filtro y
 versión; filtros incompatibles dan 400. Orden estable por código de regla, variante y binding
 canónico. El cursor no usa un offset que cambie al aplicar una versión nueva.
+
+Las listas de historial runs/previews usan `{items,total,nextCursor,revision}`, con `limit`
+entre 1 y 200 (por defecto 50), cursor opcional y filtro de estado opcional `status`. Sus elementos son
+proyecciones explícitas, no registros completos:
+
+| Elemento | Campos |
+| --- | --- |
+| RunSummary | id, versionId, profileId, status, startedAt, endedAt? |
+| PreviewSummary | id, baseVersionId, profileId, policyId, state, createdAt |
+
+No incluyen resultIds, AST, propuestas ni rutas. El orden es estable por fecha (startedAt en
+runs, createdAt en previews) e id. El cursor está firmado con HMAC y vinculado a la revisión de
+la colección de resúmenes y sus filtros. Un cambio de colección/revisión invalida el cursor
+anterior (`INVALID_CURSOR`); el cliente vuelve a consultar desde la primera página.
+Preview.createdAt se captura al comenzar la simulación y se conserva al cambiar su estado.
 
 La página de resultados `ValidationResultsPageDTO` añade `run` y, opcionalmente,
 `sourceFiles: SourceFile[]`. Estos archivos pertenecen al snapshot de ese run, aunque ya sea
 histórico: permiten resolver los fileId de los locadores a displayNames y procedencia correctos,
 sin usar los nombres de la versión vigente. sourceFiles no contiene rutas locales ni autoriza
 acceso al filesystem; su ausencia no se sustituye por archivos de otro snapshot.
+
+La misma página puede incluir `configuredDirections?: readonly DirectionChoiceDTO[]`, donde
+cada elemento es `{instanceId, targetSide:"left"|"right"}`. Contiene la configuración **completa**
+del snapshot del run, independiente de la página y los filtros de resultados. La UI recupera
+con ella el borrador completo al cargar/recargar, conserva las elecciones al navegar o filtrar
+y muestra el total y las elecciones ocultas conservadas. PUT directions envía ese borrador
+completo porque reemplaza la configuración, no solo las elecciones de la página visible.
+Si el campo está ausente, no significa configuración vacía: se bloquea guardar y se muestra
+un diagnóstico para evitar un reemplazo incompleto. En resultados históricos es de solo lectura.
 
 Resultado abreviado:
 
@@ -228,6 +285,11 @@ diagnósticos/cobertura → validar → filtrar y abrir detalle → elegir desti
 ver clausura de cambios → confirmar → comparar resultados → exportar. La pantalla mantiene
 visible entidad/fecha/versión y señala datos sintéticos del ejemplo. Durante un trabajo muestra
 progreso/cancelación; un resultado incompleto nunca usa el mensaje «todo correcto».
+
+Tras refrescar el navegador, bootstrap permite recuperar el workspace y estas listas restauran
+el run/preview más reciente disponible y el acceso al historial paginado. Los IDs se recuperan
+del servidor durante la sesión; no se depende de Signals anteriores ni se guardan en localStorage.
+Consultar historial no habilita cambios sobre una versión histórica.
 
 La ayuda de capacidades explica el subconjunto y las diferencias numéricas conocidas en términos
 de cálculo. No presenta hashes, AST ni configuración interna como pasos que el analista deba ejecutar.

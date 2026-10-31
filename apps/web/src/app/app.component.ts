@@ -4,11 +4,12 @@ import type { JobStatus } from '@ce/contracts';
 import { SessionStore } from './core/session.store';
 import { ImportPageComponent } from './import/import-page.component';
 import { ValidationPageComponent } from './validation/validation-page.component';
+import { PreviewPageComponent } from './recalculation/preview-page.component';
 
 @Component({
   selector: 'ce-root',
   standalone: true,
-  imports: [FormsModule, ImportPageComponent, ValidationPageComponent],
+  imports: [FormsModule, ImportPageComponent, ValidationPageComponent, PreviewPageComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="shell">
@@ -37,7 +38,7 @@ import { ValidationPageComponent } from './validation/validation-page.component'
             </section>
           }
           <ce-import-page/>
-          @if (workspace.currentVersionId) { <ce-validation-page/> }
+          @if (workspace.currentVersionId) { <ce-validation-page/><ce-preview-page/> }
         } @else {
           <section class="empty-state"><span class="status">Nueva sesión</span><h2>Crea un conjunto de informes</h2><p>Asigna un nombre para identificar el trabajo de esta sesión.</p>
             <form (ngSubmit)="session.create(name)"><label for="workspace-name-input">Nombre del conjunto</label><input id="workspace-name-input" name="name" [(ngModel)]="name" maxlength="100" required placeholder="Ej. Cierre trimestral"/><button type="submit" [disabled]="session.pending() || !name.trim()">Crear conjunto</button></form>

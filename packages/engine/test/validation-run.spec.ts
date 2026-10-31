@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ImportedReport, RawRuleRecord, RuleVariant, Snapshot } from '@ce/contracts';
-import { runValidation } from '../src/validation/run.js';
+import { resultOrderKey, runValidation } from '../src/validation/run.js';
 import { parseRule } from '../src/parser/parse-rule.js';
 import { context, coordinate, fact, G113, report, twoSheetReport } from './helpers/report-fixture.js';
 const PROFILE = 'ce-dpmxl-0.9-closed-v1';
@@ -176,5 +176,20 @@ describe('pure versioned validation runs', () => {
     const result = runValidation(snapshot([variant('unknown-before-body', '1/0=1', { precondition: '{v_MISSING}' })]), OPTIONS).results[0]!;
     expect(result).toMatchObject({ status: 'not_evaluable', coverageOnly: false }); expect(result.instanceId).toBeDefined();
     expect(result.factReads).toEqual([]); expect(result.diagnostics).not.toContainEqual(expect.objectContaining({ code: 'DIVISION_BY_ZERO' }));
+  });
+  it('keeps result enumeration stable across run IDs, including contextual coverage and invalid rows', () => {
+    const contexts = [context({ contextId: 'context-a', moduleVersion: 'A' }), context({ contextId: 'context-b', moduleVersion: 'B' })];
+    const invalid = ['a', 'b'].map((id, index): RawRuleRecord => ({ id: 'invalid-' + id, code: 'invalid', sourceLocator: { sheet: 'Rules', row: index + 20 },
+      originalFields: {}, diagnostics: [{ code: 'INVALID_RULE_METADATA', message: 'Uninterpretable row', severity: 'error' }] }));
+    const input = snapshot([variant('first', 'true', { modules: ['A', 'B'] }), variant('second', 'false', { modules: ['A', 'B'] }),
+      variant('unsupported', 'abs(1)=1', { modules: ['A', 'B'] })], report([], [], contexts), invalid);
+    const first = runValidation(input, { ...OPTIONS, runId: 'first-run' }), second = runValidation(input, { ...OPTIONS, runId: 'second-run' });
+    const material = (output: typeof first) => output.results.map(result => ({ code: result.code, variantIds: result.variantIds, contextId: result.contextId,
+      binding: result.binding, sourceRecordIds: result.sourceRecordIds, coverageOnly: result.coverageOnly }));
+    expect(first.results).toHaveLength(8); expect(material(first)).toEqual(material(second));
+    expect(first.results.map(resultOrderKey)).toEqual(second.results.map(resultOrderKey));
+    expect(new Set(first.results.map(resultOrderKey)).size).toBe(first.results.length);
+    expect(first.results.map(result => result.id)).not.toEqual(second.results.map(result => result.id));
+    expect(first.run.resultIds).toEqual(first.results.map(result => result.id)); expect(second.run.resultIds).toEqual(second.results.map(result => result.id));
   });
 });
