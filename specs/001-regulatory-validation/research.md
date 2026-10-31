@@ -109,6 +109,12 @@ Las comparaciones, nulos, ámbitos, unidades y casos exactos se fijan en
 [language-profile.md](contracts/language-profile.md). La igualdad de intervalos no es transitiva:
 no se utilizará para claves, deduplicación ni ordenar el grafo.
 
+La política local de unidades permite a un literal numérico de `nvl` adoptar la unidad conocida
+de la otra rama, incluido un null tipado: `nvl(nullEUR,0)` devuelve cero EUR y
+`nvl(valorEUR,0)` conserva el valor EUR; dos literales permanecen pure. Tras adoptar la unidad,
+el resultado pierde la condición de literal libre. No permite EUR/USD ni rescata indicadores
+unknown. Son notaciones semánticas, no nuevas formas de literal de la gramática.
+
 **Alternativas.** Copiar literalmente las fórmulas inconsistentes produciría intervalos inválidos;
 usar un epsilon global perdería la precisión declarada. Excluir todos los intervalos dejaría fuera
 incluso reglas sencillas del catálogo. El perfil local delimita y hace visible la diferencia.
@@ -146,6 +152,13 @@ preflight ZIP/XML con `yauzl` y `sax`. `write-excel-file` generará plantilla y 
 Los importes de la plantilla se escribirán como cadenas decimales con tipo, unidad y precisión
 separados. El formato completo se define en [workbook.md](contracts/workbook.md).
 
+Para `kind=results` se concreta una descarga ZIP con `results.json` exacto y `results.xlsx`
+literal, sin fórmulas. Son nombres fijos, con límites de 64 MiB por contenido serializado;
+la suma de contenidos y el ZIP completo deben ser ≤100 MiB cada uno, sin excepción por compresión.
+Un exceso produce `EXPORT_LIMIT`, sin truncar. Se comprueba/reserva
+capacidad antes de buffers grandes y se controla el tamaño real durante la generación. El
+formato `kind=report` permanece ce-report-1. Estos son límites locales de producto, no EBA.
+
 **Motivo.** El callback conserva el lexema numérico XML sin pasar por la precisión binaria de
 JavaScript. Eso no puede recuperar dígitos ya perdidos al guardar números de más de 15 cifras
 en Excel: la plantilla exigirá texto para los valores decimales. El preflight rechaza código,
@@ -168,6 +181,14 @@ Versiones verificadas: [lector](https://registry.npmjs.org/read-excel-file/9.3.1
 locales identificados por UUID. No habrá base de datos ni recuperación de sesión entre reinicios.
 La interfaz lo indicará y permitirá exportar. Cerrar el workspace cancela sus tareas y elimina sus
 copias temporales; nunca elimina archivos originales ni exportaciones guardadas por el usuario.
+
+La sesión limita por separado el estado JSON canónico a 512 MiB y sus archivos propios a
+512 MiB acumulados. La segunda cuota incluye staging, trabajo y exports retenidos, con reservas
+antes de materializar y ajuste/publicación sin doble conteo; fallo o cancelación limpia parciales
+y libera reservas. Un exceso acumulado produce `SESSION_LIMIT`. Los exports ya publicados no se
+borran para dar cabida a otro, y el cierre solo limpia la sesión. La contabilidad precisa y su
+exposición en capabilities están en [data-model](data-model.md#capacidad-y-limpieza) y
+[HTTP](contracts/http-api.md#exportación-de-resultados-y-cuotas); no son mediciones del producto.
 
 Un único worker activo ejecutará importación, validación, simulación o aplicación. El hilo principal
 posee el estado y publica un candidato solo tras comprobar su versión base, completar la revalidación
@@ -221,6 +242,13 @@ ausente es unknown. Si la lógica ternaria no permite decidir, produce `not_eval
 `MISSING_FILING_INDICATOR`; un false explícito o una combinación determinista puede producir
 `not_applicable`. Las lecturas se trazan como metadatos, sin FactKeys, aristas ni destinos de
 recálculo. Cambiar el mapa crea una versión e invalida previews de la base anterior.
+
+En crossModule, la política local es una instancia por contexto aplicable, con indicadores solo
+de ese contexto. Puede resolver hechos de contextos compatibles declarados y requeridos; una
+tabla/coordenada ambigua se diagnostica sin first match y los mapas de indicadores no se fusionan.
+Las identidades usan claves canónicas y conjuntos de contextos ordenados, nunca alias contextId
+ni orden de importación. Esta política de ejecución pertenece al perfil del producto; no se
+atribuye a las fuentes EBA citadas a continuación.
 
 **Motivo y evidencia.** La presentación EBA sobre DPM-XL dedica las diapositivas 40–41 a
 precondiciones y sus indicadores. Filing Rules §1.6 describe indicadores positivos y negativos

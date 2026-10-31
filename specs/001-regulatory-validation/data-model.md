@@ -33,9 +33,10 @@ migraciones, clases ni almacenamiento implementado. El motor recibe snapshots y 
 | ReportedFact | factKey, presence, originalText?, normalizedValue?, sourceLocator | presence=value/null. Un null explícito tiene fila; ausencia de fila en coordenada válida es null implícito al resolver. |
 | Workspace | id, state, currentVersionId?, versionIds[], activeJobId?, sessionId | Un workspace por proceso; el hilo principal es el único propietario mutable del puntero vigente. |
 | Snapshot | versionId, parentVersionId?, contentHash, catalogVersion, reportVersion, configVersion, profileId, contexts, coordinates, facts, directions, sources, createdAt | Inmutable. Versiona cualquier cambio de reglas, datos, contexto o direcciones. Conserva el original dentro de la sesión. |
-| RuleInstance | instanceId, variantIds[], binding, applicableContext, diagnostic? | Clave estable por contenido de regla efectivo y binding completo, sin ordinal de importación. |
+| RuleInstance | instanceId, variantIds[], binding, applicableContext, diagnostic? | Clave estable por contenido de regla efectivo, binding completo, clave canónica del contexto aplicable y contextos de resolución ordenados; sin alias contextId ni ordinal de importación. Una precondición actual false/indeterminada no elimina una instancia estructural con cuerpo soportado y binding finito. |
 | ValidationRun | id, versionId, profileId, status, startedAt, endedAt?, summary, resultIds[] | Los resultados pertenecen a un snapshot. Cambiar el vigente los hace históricos, no los reasigna. |
-| RuleResult | id, runId, instanceId, status, severity, preconditionResult, operands, metadataReads, locators, diagnostics | Un estado terminal por instancia; valores incluyen nominal/intervalo/unidad o presencia de null. metadataReads conserva contexto/código/valor o ausencia de indicadores y su procedencia. |
+| RuleResult | id, runId, instanceId, status, severity, preconditionResult, operands, factReads, metadataReads, locators, diagnostics | Un estado terminal por instancia; valores incluyen nominal/intervalo/unidad o presencia de null. factReads conserva entradas originales leídas; metadataReads conserva contexto/código/valor o ausencia de indicadores y su procedencia. |
+| FactRead | factKey, coordinate, presence, normalizedValue?, originalText?, sourceLocator | presence=value/explicit_null/implicit_null. Valor racional exacto o booleano, cuando existe; coordinate conserva unidad/decimals/ejes y procedencia. Es la entrada original antes de default/interval, no el operando efectivo. |
 | RecalculationDirection | directionId, instanceId, targetSide, targetKey | Configurada expresamente para una igualdad; destino único e identidad canónica. |
 | Preview | id, baseVersionId, profileId, policyId, state, proposalIds[], graphSummary | Solo puede aplicarse contra la base que la produjo. Incluye resultados no disponibles y motivos. |
 | Proposal | id, previewId, directionId, targetKey, before, exactNominal, derivedInterval, after, readKeys[], predecessorIds[], state, diagnostics | after es el valor ya cuantizado y la precisión que leerán sus consumidores y se exportará. |
@@ -43,6 +44,14 @@ migraciones, clases ni almacenamiento implementado. El motor recibe snapshots y 
 | Job | id, workspaceId, kind, baseVersionId?, status, progress, startedAt, deadline, resultRef?, diagnostics | kind=import/validate/preview/apply/export. Una tarea activa global; estado terminal no retrocede. |
 
 `ApplyReceipt` es trazabilidad de negocio. El desarrollo con recibos continúa `disabled/unmanaged`.
+
+`RuleResult.factReads` siempre existe, como `[]` si no hubo lecturas. FactRead.sourceLocator
+apunta a Facts para valores y null explícitos, y a Coordinates para null implícito; coordinate
+conserva también su propia procedencia. Un default no altera la presencia original de esta
+traza. Los operandos efectivos se conservan aparte; leer la misma celda con opciones distintas
+no autoriza inventar un intervalo de origen común. Las lecturas del cuerpo omitido por una
+precondición false no se registran como realizadas. Los DTO representan racionales mediante
+cadenas, nunca BigInt, y permiten inspeccionar coordenadas, precisión y fuentes según FR-009.
 
 ## Metadatos de presentación
 
@@ -71,6 +80,22 @@ de recálculo. La consistencia entre archivos se comprueba antes de publicar el 
 El resumen distingue filas importadas, variantes distintas, variantes aplicables e instancias.
 Su reconciliación informa explícitamente duplicados, no aplicables y registros sin instancia por error.
 Un resultado `pass` nunca compensa un registro que no pudo interpretarse.
+
+El resultado dinámico de una precondición false/indeterminada no borra una identidad de instancia
+si el cuerpo está soportado y tiene binding finito. Con false se registra not_applicable sin
+ejecutar el cuerpo; con indeterminación se conserva not_evaluable. Una construcción no soportada
+o sin binding válido continúa en cobertura con diagnóstico, sin una instancia ejecutable falsa.
+Las futuras direcciones usan validez estructural, actividad y vigencia, no un filtro pass/fail.
+Su precondición debe reevaluarse como true sobre la versión simulada antes de ofrecer un cambio,
+incluido el caso V09 donde un productor transforma false en true.
+
+La política local crossModule crea una instancia por contexto aplicable. El conjunto de
+resolución puede contener hechos de contextos compatibles declarados y requeridos; no unifica
+sus identidades ni sus mapas filingIndicators. Estos últimos se leen solo en applicableContext.
+Las claves canónicas de contextos ordenadas intervienen en la identidad de instancia; cambiar
+alias o permutar filas no cambia esa identidad. Una tabla/coordenada con resolución ambigua es
+diagnóstico, no una elección por orden de origen. Véase el
+[perfil de resolución](contracts/language-profile.md#resolución-de-referencias-y-ámbito).
 
 ## Estados y transiciones
 
@@ -124,7 +149,26 @@ Se conservan hasta 20 snapshots por workspace y hasta 512 MiB de estado contabil
 La métrica es la suma de bytes UTF-8 de la serialización canónica de snapshots, resultados,
 propuestas, diagnósticos y caché de idempotencia, contando objetos compartidos una sola vez;
 el cálculo se realiza antes de publicar cada incorporación. No es una promesa de límite RSS exacto.
-La caché conserva hashes/referencias, no copias repetidas de cargas. Además se aplican cuotas de
+La caché conserva hashes/referencias, no copias repetidas de cargas.
+
+Existe además una cuota **separada de 512 MiB de archivos propios por workspace**: suma de bytes
+de staging de subidas, archivos de trabajo y exportaciones retenidas, más las reservas pendientes
+de materialización; no se mezcla con la métrica de JSON canónico. Antes de crear/escribir archivos
+o buffers grandes se reserva capacidad y se cuenta el tamaño real durante el trabajo. Las
+reservas se ajustan al materializar los bytes sin contarlos dos veces; publicar un export cambia
+su contabilidad de trabajo a retenido. Fallo/cancelación/timeout libera reservas y archivos
+parciales propios; un export publicado continúa contabilizado hasta la limpieza de la sesión.
+Superar el acumulado produce `SESSION_LIMIT`, conserva el snapshot y exports ya publicados y no
+descarta el original para hacer espacio. No implica un límite exacto de RSS ni de espacio físico
+reservado por el sistema de archivos.
+
+Las exportaciones results tienen también límites individuales: 64 MiB por contenido serializado
+(`results.json` / `results.xlsx`), con suma de contenidos y ZIP completo ≤100 MiB cada uno.
+Excederlos produce `EXPORT_LIMIT`, sin truncar ni publicar una descarga parcial. La respuesta
+413 previa a aceptar o el Job failed
+posterior a 202, así como su exposición en capabilities, se fijan en
+[HTTP](contracts/http-api.md#exportación-de-resultados-y-cuotas).
+Además se aplican cuotas de
 buffers, XML y recursos del worker descritas en los contratos. Si un nuevo candidato excede
 cualquiera de las cuotas de sesión, se rechaza sin descartar el original.
 La interfaz permite exportar y cerrar para iniciar otra sesión. Estos son límites locales

@@ -1,0 +1,37 @@
+<section class="workspace-card" aria-labelledby="validation-title">
+  <div class="section-heading"><h2 id="validation-title">Validación y explicación</h2><button (click)="store.execute()" [disabled]="!session.versionId() || session.jobActive() || store.pending() || session.pending()">Validar informes</button></div>
+  <p>Evalúa las reglas del conjunto vigente. El estado de cada regla y su severidad se muestran por separado.</p>
+  @if (session.jobActive() && session.job()?.kind === 'validate') { <p aria-live="polite">Validación en curso. Los resultados todavía están incompletos.</p><button class="secondary" (click)="session.cancelJob()" [disabled]="session.pending()">Cancelar validación</button> }
+  @if (store.error(); as error) { <p class="error" role="alert">{{ error }}</p> }
+  @if (store.history().length) { <label for="validation-run">Ejecución</label><select id="validation-run" [ngModel]="store.selectedRunId()" (ngModelChange)="store.selectRun($event)">@for (run of store.history(); track run.id) { <option [value]="run.id">{{ run.startedAt }} · {{ run.status === 'completed' ? 'Terminada' : 'Incompleta' }}</option> }</select> }
+  @if (store.page(); as page) {
+    @if (store.historical()) { <p class="notice" role="status">Resultado histórico: pertenece a otra versión y no describe el conjunto vigente.</p> }
+    <p class="muted">Versión evaluada: {{ page.versionId }}</p>
+    <ce-results-export [run]="page.run"/>
+    @if (!page.run.summary.complete || page.run.status !== 'completed') { <h3>Ejecución incompleta</h3><p class="notice">Estos datos no constituyen un resumen completo de validación.</p> }
+    @else if (store.noEvaluatedRules()) { <h3>Sin reglas evaluadas</h3><p class="notice">La ejecución terminó, pero no hay resultados de cumplimiento. Revisa aplicabilidad y diagnósticos.</p> }
+    @else { <h3>Ejecución terminada</h3><p>El resumen incluye los resultados de cumplimiento y las reglas que no pudieron evaluarse.</p> }
+    <dl class="workspace-meta validation-summary"><div><dt>Filas importadas</dt><dd>{{ page.run.summary.rows }}</dd></div><div><dt>Variantes</dt><dd>{{ page.run.summary.variants }}</dd></div><div><dt>Instancias expandidas</dt><dd>{{ page.run.summary.instances }}</dd></div><div><dt>Duplicadas</dt><dd>{{ page.run.summary.duplicateRows }}</dd></div>
+      <div><dt>Pasa</dt><dd>{{ page.run.summary.byStatus.pass }}</dd></div><div><dt>Falla</dt><dd>{{ page.run.summary.byStatus.fail }}</dd></div><div><dt>No aplica</dt><dd>{{ page.run.summary.byStatus.not_applicable }}</dd></div><div><dt>No evaluable</dt><dd>{{ page.run.summary.byStatus.not_evaluable }}</dd></div><div><dt>Error</dt><dd>{{ page.run.summary.byStatus.error }}</dd></div></dl>
+    @for (diagnostic of page.run.diagnostics; track $index) { <p class="error">{{ diagnostic.code }}: {{ store.diagnostic(diagnostic) }}</p> }
+    <form class="filters" (ngSubmit)="store.load()"><label for="result-status">Estado del resultado<select id="result-status" name="status" [ngModel]="store.status()" (ngModelChange)="store.status.set($event)"><option value="">Todos</option><option value="pass">Pasa</option><option value="fail">Falla</option><option value="not_applicable">No aplica</option><option value="not_evaluable">No evaluable</option><option value="error">Error</option></select></label>
+      <label for="result-code">Código del resultado<input id="result-code" name="code" [ngModel]="store.code()" (ngModelChange)="store.code.set($event)"/></label><label for="result-table">Tabla<input id="result-table" name="table" [ngModel]="store.table()" (ngModelChange)="store.table.set($event)"/></label><button type="submit" class="secondary" [disabled]="store.loading()">Filtrar resultados</button></form>
+    <p aria-live="polite">{{ page.items.length }} de {{ page.total }} resultados</p>
+    @for (result of page.items; track result.id) {
+      <details class="result-row rule-row"><summary><strong>{{ result.code || 'Sin código' }}</strong> · {{ store.labels[result.status] }} · {{ result.severity === 'warning' ? 'Advertencia' : result.severity === 'error' ? 'Severidad error' : 'Severidad desconocida' }}</summary>
+        @if (result.coverageOnly) { <p class="muted">Registro de cobertura; no representa una instancia expandida.</p> }
+        <h3>Expresión</h3><pre>{{ result.expression }}</pre>@if (result.precondition) { <h3>Precondición</h3><pre>{{ result.precondition }}</pre><p>{{ store.value(result.preconditionResult) }}</p> }
+        <h3>Operandos exactos</h3><p>Izquierda: {{ store.value(result.values.left) }}</p><p>Derecha: {{ store.value(result.values.right) }}</p>
+        @if (result.factReads.length) { <h3>Hechos leídos</h3><p class="muted">Valores declarados antes de aplicar default o intervalos.</p>
+          @for (read of result.factReads; track read.factKey) { <div class="fact-read"><p><strong>{{ read.coordinate.tableCode }} · r{{ read.coordinate.rowCode }} · c{{ read.coordinate.columnCode }} @if (read.coordinate.sheetCode) { · s{{ read.coordinate.sheetCode }} }</strong></p>
+            <p>{{ read.presence === 'explicit_null' ? 'Nulo explícito' : read.presence === 'implicit_null' ? 'Nulo implícito' : read.originalText }} · {{ read.coordinate.unit }} · precisión {{ read.coordinate.decimals || 'No numérica' }}</p><p class="muted">{{ store.source(read.sourceLocator) }}</p></div> }
+        }
+        @if (result.metadataReads.length) { <h3>Indicadores de presentación</h3>@for (read of result.metadataReads; track read.contextId + ':' + read.code) { <p>{{ read.code }} · {{ read.presence === 'missing' ? 'No declarado' : read.value ? 'true' : 'false' }}</p> } }
+        @for (diagnostic of result.diagnostics; track $index) { <p [class.error]="diagnostic.severity !== 'info' && diagnostic.severity !== 'warning'" [class.notice]="diagnostic.severity === 'warning'">{{ diagnostic.code }}: {{ store.diagnostic(diagnostic) }} @if (diagnostic.locator) { · {{ store.source(diagnostic.locator) }} }</p> }
+        <h3>Procedencia</h3>@for (source of result.sources; track $index) { <p class="muted">{{ store.source(source) }}</p> }
+      </details>
+    }
+    @if (page.nextCursor) { <button class="secondary" (click)="store.load(true)" [disabled]="store.loading()">Cargar más resultados</button> }
+    <p class="muted">Los valores se muestran como fracciones exactas. Los intervalos cerrados son una política local conservadora; no se declara conformidad completa con EBA.</p>
+  }
+</section>

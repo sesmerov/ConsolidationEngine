@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { Worker } from 'node:worker_threads';
 import { ERROR_MESSAGES, JOB_DEADLINE_MS, isTerminalJob } from '@ce/contracts';
-import type { JobDTO, JobKind, JsonValue } from '@ce/contracts';
+import type { JobDTO, JobKind, JsonValue, ResultRef } from '@ce/contracts';
 import { ApiError } from '../errors.js';
 import type { WorkspaceStore } from '../session/workspace-store.js';
-import type { WorkerMessage, WorkerRequest } from '../workers/protocol.js';
+import type { StateRecord, WorkerMessage, WorkerRequest } from '../workers/protocol.js';
 import { receivedDiagnostic } from '../public-diagnostic.js';
 
 export type WorkerHandle = Pick<Worker, 'on' | 'terminate'>;
@@ -12,8 +12,10 @@ export type WorkerFactory = (request: WorkerRequest) => WorkerHandle;
 export interface JobManagerOptions {
   workerFactory?: WorkerFactory; workerModules?: Partial<Record<JobKind, URL>>; deadlineMs?: number; workerEntry?: URL;
 }
-export interface StartJob { workspaceId: string; kind: JobKind; baseVersionId?: string; input: JsonValue; jobId?: string; finalize?: () => Promise<void> }
-interface Running { cancellation: Int32Array; worker?: WorkerHandle; timer?: NodeJS.Timeout; expiresAt: number; stopping: boolean; stopPromise?: Promise<JobDTO>; finalize?: () => Promise<void> }
+export interface JobAcceptance { input?: JsonValue; initialRecords?: readonly StateRecord[]; resultRef?: ResultRef; includeSnapshot?: boolean;
+  onTerminal?: (job: JobDTO) => readonly StateRecord[]; finalize?: () => Promise<void> }
+export interface StartJob extends JobAcceptance { workspaceId: string; kind: JobKind; baseVersionId?: string; input: JsonValue; jobId?: string }
+interface Running extends Pick<JobAcceptance, 'onTerminal' | 'includeSnapshot' | 'finalize'> { cancellation: Int32Array; worker?: WorkerHandle; timer?: NodeJS.Timeout; expiresAt: number; stopping: boolean; stopPromise?: Promise<JobDTO> }
 class DeadlineElapsed extends Error {}
 export class JobManager {
   private readonly running = new Map<string, Running>();
@@ -37,9 +39,10 @@ export class JobManager {
   start(input: StartJob): JobDTO {
     if (this.disposed) throw new ApiError('RESOURCE_NOT_FOUND');
     const job: JobDTO = { jobId: input.jobId ?? randomUUID(), workspaceId: input.workspaceId, kind: input.kind, status: 'queued',
-      ...(input.baseVersionId ? { baseVersionId: input.baseVersionId } : {}), progress: { completed: 0, total: 0, complete: false }, diagnostics: [], pollAfterMs: 1000 };
-    this.store.registerJob(job);
-    const running: Running = { cancellation: new Int32Array(new SharedArrayBuffer(4)), expiresAt: Infinity, stopping: false, ...(input.finalize ? { finalize: input.finalize } : {}) };
+      ...(input.baseVersionId ? { baseVersionId: input.baseVersionId } : {}), ...(input.resultRef ? { resultRef: input.resultRef } : {}), progress: { completed: 0, total: 0, complete: false }, diagnostics: [], pollAfterMs: 1000 };
+    this.store.registerJob(job, input.initialRecords);
+    const running: Running = { cancellation: new Int32Array(new SharedArrayBuffer(4)), expiresAt: Infinity, stopping: false, ...(input.finalize ? { finalize: input.finalize } : {}),
+      ...(input.onTerminal ? { onTerminal: input.onTerminal } : {}), ...(input.includeSnapshot !== undefined ? { includeSnapshot: input.includeSnapshot } : {}) };
     this.running.set(job.jobId, running);
     queueMicrotask(() => this.begin(job, input.input, running)); return this.get(job.workspaceId, job.jobId);
   }
@@ -50,7 +53,7 @@ export class JobManager {
       const now = Date.now(); running.expiresAt = now + this.deadlineMs;
       const job: JobDTO = { ...queued, status: 'running', startedAt: new Date(now).toISOString(), deadline: new Date(running.expiresAt).toISOString() };
       this.store.updateJob(job);
-      const snapshot = job.baseVersionId ? this.store.snapshot(job.workspaceId, job.baseVersionId) : undefined;
+      const snapshot = job.baseVersionId && running.includeSnapshot !== false ? this.store.snapshot(job.workspaceId, job.baseVersionId) : undefined;
       const moduleUrl = this.modules[job.kind]?.href;
       const request: WorkerRequest = { job, input, cancellation: running.cancellation.buffer as SharedArrayBuffer,
         ...(snapshot ? { snapshot } : {}), ...(moduleUrl ? { moduleUrl } : {}) };
@@ -73,6 +76,10 @@ export class JobManager {
         if (!Number.isSafeInteger(message.completed) || !Number.isSafeInteger(message.total) || message.completed < 0 || message.total < message.completed) throw new ApiError('INTERNAL_ERROR');
         this.store.updateJob({ ...job, progress: { completed: message.completed, total: message.total, complete: false } });
       } else if (message.type === 'result') {
+        if (message.output?.complete === false) {
+          const failed: JobDTO = { ...job, status: 'failed', endedAt: new Date().toISOString(), progress: { ...job.progress, complete: false }, diagnostics: (message.output.diagnostics ?? []).map(receivedDiagnostic) };
+          this.store.updateJob(failed, running.onTerminal?.(failed)); this.cleanup(job.jobId); return;
+        }
         if (!message.output || message.output.complete !== true) throw new ApiError('INTERNAL_ERROR');
         // All three guards run again immediately before the synchronous main-thread commit.
         this.store.assertBase(job.workspaceId, job.baseVersionId);
@@ -85,7 +92,8 @@ export class JobManager {
         });
         this.cleanup(job.jobId);
       } else if (message.type === 'failure') {
-        this.store.updateJob({ ...job, status: 'failed', endedAt: new Date().toISOString(), progress: { ...job.progress, complete: false }, diagnostics: [receivedDiagnostic(message.diagnostic)] });
+        const failed: JobDTO = { ...job, status: 'failed', endedAt: new Date().toISOString(), progress: { ...job.progress, complete: false }, diagnostics: [receivedDiagnostic(message.diagnostic)] };
+        this.store.updateJob(failed, running.onTerminal?.(failed));
         this.cleanup(job.jobId);
       } else throw new ApiError('INTERNAL_ERROR');
     } catch (error) { if (error instanceof DeadlineElapsed) void this.stop(original, 'timed_out'); else this.fail(original, error); }
@@ -94,7 +102,8 @@ export class JobManager {
     const running = this.running.get(original.jobId); if (!running || running.stopping) return;
     const current = this.get(original.workspaceId, original.jobId); if (isTerminalJob(current.status)) return;
     const code = error instanceof ApiError ? error.code : 'INTERNAL_ERROR';
-    this.store.updateJob({ ...current, status: 'failed', endedAt: new Date().toISOString(), progress: { ...current.progress, complete: false }, diagnostics: [{ code, message: ERROR_MESSAGES[code] }] });
+    const failed: JobDTO = { ...current, status: 'failed', endedAt: new Date().toISOString(), progress: { ...current.progress, complete: false }, diagnostics: [{ code, message: ERROR_MESSAGES[code] }] };
+    this.store.updateJob(failed, running.onTerminal?.(failed));
     this.cleanup(original.jobId);
   }
   private cleanup(id: string): void {
@@ -116,7 +125,7 @@ export class JobManager {
       const current = this.get(original.workspaceId, original.jobId);
       const result: JobDTO = isTerminalJob(current.status) ? current : { ...current, status, endedAt: new Date().toISOString(), progress: { ...current.progress, complete: false },
         diagnostics: status === 'timed_out' ? [{ code: 'JOB_TIMEOUT', message: 'El trabajo superó el plazo de ejecución y quedó incompleto.' }] : [] };
-      if (!isTerminalJob(current.status)) this.store.updateJob(result);
+      if (!isTerminalJob(current.status)) this.store.updateJob(result, running.onTerminal?.(result));
       this.running.delete(original.jobId); return result;
     })();
     return running.stopPromise;

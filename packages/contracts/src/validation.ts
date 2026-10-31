@@ -1,0 +1,39 @@
+import type { Diagnostic, Rational, SourceLocator } from './common.js';
+import type { Coordinate } from './report.js';
+import type { SourceFile } from './report.js';
+import type { Severity } from './catalog.js';
+export type ValidationStatus = 'pass' | 'fail' | 'not_applicable' | 'not_evaluable' | 'error';
+export interface ValidationBinding { readonly contextId?: string; readonly contextIds?: readonly string[]; readonly tableCode?: string; readonly sheetCode?: string; readonly rowCode?: string; readonly columnCode?: string }
+export type ValidationValueDTO = (
+  | { readonly kind: 'number'; readonly nominal: Rational; readonly interval: { readonly lo: Rational; readonly hi: Rational }; readonly unit: string }
+  | { readonly kind: 'boolean'; readonly value: boolean }
+  | { readonly kind: 'null'; readonly presence: 'explicit_null' | 'implicit_null' | 'derived_null'; readonly dataType: 'number' | 'boolean'; readonly unit?: string }
+  | { readonly kind: 'unknown'; readonly presence: 'unknown' }
+) & { readonly coordinate?: Coordinate; readonly sourceLocator?: SourceLocator };
+export interface MetadataReadDTO { readonly contextId: string; readonly code: string; readonly presence: 'declared' | 'missing'; readonly value?: boolean; readonly sourceLocator?: SourceLocator }
+/** Original snapshot input, before selection-specific default and interval options. */
+export interface FactReadDTO {
+  readonly factKey: string; readonly coordinate: Coordinate; readonly presence: 'value' | 'explicit_null' | 'implicit_null';
+  readonly normalizedValue?: Rational | boolean; readonly originalText?: string; readonly sourceLocator: SourceLocator;
+}
+export interface RuleResultDTO {
+  readonly id: string; readonly runId: string; readonly versionId: string; readonly profileId: string;
+  readonly instanceId?: string; readonly coverageOnly: boolean; readonly binding?: ValidationBinding; readonly contextId?: string;
+  readonly code: string; readonly variantIds: readonly string[]; readonly sourceRecordIds: readonly string[]; readonly tables: readonly string[];
+  readonly status: ValidationStatus; readonly severity: Severity; readonly severityOriginal: string;
+  readonly expression: string; readonly precondition?: string; readonly preconditionResult?: ValidationValueDTO;
+  readonly values: { readonly left?: ValidationValueDTO; readonly right?: ValidationValueDTO; readonly result?: ValidationValueDTO };
+  readonly readKeys: readonly string[]; readonly factReads: readonly FactReadDTO[]; readonly metadataReads: readonly MetadataReadDTO[];
+  readonly sources: readonly SourceLocator[]; readonly diagnostics: readonly Diagnostic[];
+}
+export interface ValidationSummary {
+  readonly complete: boolean; readonly rows: number; readonly variants: number; readonly applicableVariants: number;
+  readonly instances: number; readonly duplicateRows: number; readonly byStatus: Readonly<Record<ValidationStatus, number>>;
+}
+export interface ValidationRunDTO {
+  readonly id: string; readonly versionId: string; readonly profileId: string; readonly status: 'running' | 'completed' | 'incomplete';
+  readonly startedAt: string; readonly endedAt?: string; readonly summary: ValidationSummary; readonly resultIds: readonly string[];
+  readonly diagnostics: readonly Diagnostic[];
+}
+export interface ValidationBundle { readonly run: ValidationRunDTO; readonly results: readonly RuleResultDTO[] }
+export interface ValidationResultsPageDTO { readonly items: readonly RuleResultDTO[]; readonly total: number; readonly nextCursor: string | null; readonly versionId: string; readonly run: ValidationRunDTO; readonly sourceFiles?: readonly SourceFile[] }

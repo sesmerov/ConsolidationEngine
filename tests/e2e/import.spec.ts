@@ -35,7 +35,7 @@ test('V01/V14: real template download, exact import, null/zero summary and brows
   await expect(page.getByLabel('Contexto', { exact: true })).toHaveText(/SYNTHETIC.*2026-06-30.*COREP_OF_4.2/);
   await page.locator('summary').filter({ hasText: /^v0190_m · Aplicable$/ }).click();
   await expect(page.locator('.rule-row[open] pre').filter({ hasText: '{v_C_01.00} and {v_C_05.01}' })).toBeVisible();
-  await expect(page.getByText('Reglas analizadas. Todavía no se han evaluado los informes.')).toBeVisible();
+  await expect(page.getByText('Este panel describe la carga y el soporte de las reglas. El cumplimiento se consulta en Validación y explicación.')).toBeVisible();
   await page.screenshot({ path: path.resolve('.cache/import-ui.png'), fullPage: true });
   expect(await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length }))).toEqual({ local: 0, session: 0 });
   await page.reload(); await expect(page.getByText('3 de 3 registros', { exact: true })).toBeVisible();

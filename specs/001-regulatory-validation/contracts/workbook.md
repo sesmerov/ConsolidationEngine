@@ -31,6 +31,14 @@ por sí misma ni permite inferir módulos adicionales. Repetir el mismo contextI
 coincidan. No se fusionan contextos por semejanza. Si una regla requiere fecha de remisión y falta,
 queda no evaluable; no se sustituye por la fecha del ordenador.
 
+Para reglas crossModule, el perfil local crea una instancia por contexto aplicable. Esa instancia
+puede resolver hechos de los contextos compatibles declarados y requeridos por la regla; sus
+indicadores de presentación proceden solo de su propio contexto, sin fusionar mapas. Una tabla
+o coordenada ambigua entre contextos produce diagnóstico, nunca selección por orden de archivo.
+La identidad usa claves canónicas y contextos ordenados, no los alias contextId; el detalle es
+política local del [perfil](language-profile.md#resolución-de-referencias-y-ámbito), no una
+afirmación de equivalencia regulatoria.
+
 `filingIndicators` es la última columna de Contexts; la plantilla conserva sus cuatro hojas y
 su versión `ce-report-1`, todavía en desarrollo. El objeto admite únicamente claves no vacías
 y valores JSON `true`/`false`: no cadenas, números, null ni claves duplicadas. Se conservan
@@ -185,7 +193,25 @@ reglas individuales quedan registrados y no impiden importar otras reglas válid
 El informe recalculado usa ce-report-1, conserva contextos/coordenadas, incluido el mapa explícito
 filingIndicators, y escribe importes como texto. Exportar/reimportar conserva las diferencias
 entre indicador true, false y no declarado; no reconstruye el mapa a partir de los hechos.
-La versión original no se sobrescribe. Los resultados y cambios se exportan como JSON con racionales
-en cadenas; una vista Excel adicional de resultados usa texto literal, nunca fórmulas ni enlaces
-activos. La exportación incluye perfil, versiones, procedencias, redondeos y datos sintéticos
-identificados cuando corresponda. No se presenta como fichero oficial de remisión.
+La versión original no se sobrescribe. `kind=results` descarga un ZIP con entradas de nombres
+fijos `results.json` (valores exactos y racionales en cadenas) y `results.xlsx` (vista literal,
+nunca fórmulas ni enlaces activos). La exportación incluye perfil, versiones, procedencias,
+redondeos y datos sintéticos identificados cuando corresponda. El formato de `kind=report`
+sigue siendo ce-report-1; no se sustituye por ese paquete de resultados. No se presenta ninguno
+como fichero oficial de remisión.
+
+La exportación results admite hasta 64 MiB por contenido serializado; tanto la suma de contenidos
+como el ZIP completo deben ser ≤100 MiB. No se truncan resultados al alcanzar esos límites:
+se informa `EXPORT_LIMIT` antes de publicar una descarga. Además, los archivos propios de cada
+workspace tienen una cuota acumulada
+separada de 512 MiB, que incluye staging, trabajo y exports retenidos; excederla produce
+`SESSION_LIMIT`. Contabilidad, reservas y respuestas están en el
+[contrato HTTP](http-api.md#exportación-de-resultados-y-cuotas) y el
+[modelo de sesión](../data-model.md#capacidad-y-limpieza). Son límites de diseño; estos contratos
+no acreditan pruebas de exportación ejecutadas.
+
+Antes de construir las celdas del XLSX también se limita su carga XML estimada a 64 MiB
+(`exportXmlWorkloadBytes`): `64 KiB + 128 × filas + 128 × celdas + 6 × bytes UTF-8 de los valores`.
+Incluye cabeceras y es independiente del tamaño comprimido/serializado: excederlo informa el
+motivo `XML_WORKLOAD_LIMIT` dentro del error público `EXPORT_LIMIT`, según la fase HTTP/Job
+descrita en el contrato. Este control previo no cambia los máximos de 64/100 MiB anteriores.

@@ -45,6 +45,16 @@ de la misma tabla; si declara una tabla distinta no hereda fila/columna/hoja de 
 sí las opciones default e interval. Un override más local prevalece. Una referencia ambigua entre
 módulos no elige la primera coincidencia: `AMBIGUOUS_REFERENCE`.
 
+Para crossModule se aplica una política **local** del perfil: se crea una instancia por cada
+contexto aplicable, y las lecturas de hechos pueden resolverse en los contextos compatibles
+declarados que requiera la regla. Tablas/coordenadas con más de una resolución posible producen
+`AMBIGUOUS_REFERENCE`; no se escoge el primer contexto ni se unen hechos por parecido. Los
+filingIndicators se consultan únicamente en el contexto de esa instancia, incluso cuando sus
+hechos procedan de otros contextos; no se fusionan indicadores. Las claves canónicas del contexto
+aplicable y del conjunto de contextos de resolución ordenado forman parte de la identidad, junto
+al contenido de la regla y su binding; los alias contextId y el orden de importación no la cambian.
+Esta decisión acota la ejecución del producto y no se atribuye a la EBA.
+
 Los rangos son inclusivos sobre códigos existentes, ordenados ordinalmente por sus caracteres;
 no son secuencias de enteros. `s*` recorre hojas finitas en ese mismo orden. El catálogo debe
 contener las coordenadas y su metadato aunque falte el hecho. Coordenada válida sin fila en Facts
@@ -94,7 +104,11 @@ La compatibilidad de unidades es una política local explícita: cada unidad es 
 átomos a exponentes enteros; `pure` es el mapa vacío. Suma/resta y comparación de hechos requieren
 unidades idénticas. Multiplicar/dividir suma/resta exponentes. Un literal numérico puede adoptar
 la unidad del otro operando en suma, resta o comparación (`importe > 0`); como factor o divisor
-es `pure`. `default` adopta tipo/unidad de la coordenada. EUR y USD no son intercambiables;
+es `pure`. `default` adopta tipo/unidad de la coordenada. En `nvl`, un literal numérico también
+puede adoptar la unidad conocida de la otra rama, incluso si esta es un null tipado:
+`nvl(nullEUR,0)` produce cero EUR; dos literales permanecen pure. Una vez adoptada la unidad,
+el resultado no se trata como literal libre para otra unidad. Esta política local no sustituye
+indicadores desconocidos ni oculta errores. EUR y USD no son intercambiables;
 no hay conversión de moneda. Un resultado destinado a una celda debe coincidir con su unidad.
 
 ## Aritmética de intervalos
@@ -160,11 +174,28 @@ precondición false → `not_applicable`; precondición null → `not_evaluable`
 Falta de soporte o metadatos necesarios para decidir → `not_evaluable`; aritmética inválida → `error`.
 La precondición ausente equivale a true. La validación inicial nunca espera recálculos.
 
+La identidad estructural de instancia es independiente del resultado de su precondición actual.
+Si el cuerpo está soportado y su binding finito puede determinarse, false o indeterminado no
+eliminan esa identidad. La validación con precondición false no ejecuta el cuerpo: conserva la
+instancia con `not_applicable`; una indeterminada conserva `not_evaluable`, sin suponer true.
+La falta de soporte, los errores sintácticos o la imposibilidad de obtener un binding válido
+siguen visibles en cobertura y no se convierten en instancias ejecutables ficticias.
+
+La evidencia distingue los operandos/resultados efectivos de las lecturas originales `factReads`.
+Cada lectura conserva coordenada, presencia, valor exacto cuando exista, precisión y procedencia
+del snapshot antes de default/interval. No se fabrican lecturas de un cuerpo que no se ejecutó,
+ni un intervalo único de origen si una celda se consulta con opciones distintas. Las lecturas de
+indicadores siguen en metadataReads, conforme al [contrato HTTP](http-api.md#formatos-comunes).
+
 ## Direcciones, simulación y aplicación
 
 Solo una igualdad con un lado de una única celda puede tener dirección. El usuario selecciona
 ese lado para una instancia concreta; el otro lado debe ser calculable sin leer el destino.
-La regla debe estar activa/aplicable y su precondición ser true en la versión simulada.
+La elegibilidad de la dirección se basa en estructura, actividad y vigencia; no se reduce a
+instancias cuyo resultado inicial sea pass/fail. Conservar una instancia con precondición false
+o indeterminada permite volver a comprobarla durante la simulación, después de sus productores.
+Solo se ofrece un cambio aplicable cuando la regla y su contexto siguen siendo válidos y la
+precondición es true en esa versión simulada; esto permite el caso V09 false→true por productor.
 
 El nominal exacto del lado calculado se cuantiza al `decimals` del destino con half-even.
 Con `INF` se exige decimal finito; un racional periódico no tiene propuesta. Tanto con INF como
@@ -214,5 +245,7 @@ de hechos, además del límite temporal de 60 segundos. Exceder una cuota produc
 | Indicador ausente necesario para decidir | unknown y `not_evaluable`, con `MISSING_FILING_INDICATOR`. |
 | Indicador true sin ninguna fila Facts | El indicador sigue siendo true; los hechos de la expresión se resuelven por separado. |
 | false and indicador ausente, en precondición | false y `not_applicable`, conservando la ausencia en la traza de metadatos. |
+| crossModule con dos contextos aplicables e indicadores distintos | Instancias separadas; cada una usa su propio mapa y solo resuelve hechos inequívocos de contextos compatibles requeridos. |
+| Renombrar alias contextId o permutar contextos/filas sin cambiar contenido | Identidades y resultados semánticos iguales; una resolución ambigua sigue siendo diagnóstico. |
 
 Son resultados esperados para futuras pruebas, no pruebas ya ejecutadas.

@@ -4,9 +4,10 @@ Motor de validación y recálculo de informes regulatorios. El analista cargará
 de reglas EBA y sus informes en una plantilla Excel propia, consultará resultados y podrá aceptar
 propuestas de recálculo con sus dependencias.
 
-La implementación está en curso con Spec Kit. T001–T030 están completadas: sesión local,
-plantilla Excel, importación atómica, análisis ANTLR y pantalla de carga con cobertura y diagnósticos.
-La evaluación de reglas y los recálculos corresponden a los siguientes incrementos.
+La implementación está en curso con Spec Kit. El incremento actual permite crear una sesión local,
+descargar la plantilla Excel, importar archivos, analizar reglas con ANTLR y ejecutar validaciones
+con cálculo exacto. Incluye explicaciones, resultados históricos y exportación a ZIP.
+Las propuestas y la aplicación de recálculos corresponden a los siguientes incrementos.
 Los resultados comprobados se registran en [verificación](docs/verification.md).
 
 ## Ejecutar el incremento actual
@@ -27,6 +28,17 @@ Para probar la carga, usar `tests/fixtures/generated/eba-subset.xlsx` con
 y declaraciones de presentación son sintéticos; las tres filas de reglas proceden del Excel EBA
 original y conservan sus precondiciones. El catálogo completo supera el límite de 500 filas.
 También se puede descargar la plantilla desde la aplicación.
+
+Tras cargar los archivos, pulsar **Validar informes**. Los resultados separan estado y severidad;
+cada detalle muestra valores comparados, datos leídos, precisión, indicadores y procedencia.
+Los filtros permiten consultar por estado, código y tabla. Una ejecución incompleta o sin reglas
+evaluadas no acredita que el informe sea correcto. Los resultados de una versión anterior se
+conservan como históricos durante la sesión.
+
+**Exportar resultados (ZIP)** descarga `results.json`, con valores exactos y trazabilidad, y
+`results.xlsx`, como vista literal sin fórmulas activas. La descarga corresponde a la ejecución
+seleccionada. Los límites de tamaño y espacio acumulado se publican en las capacidades de la API;
+si se superan, el trabajo falla sin ofrecer un archivo parcial.
 
 ## Documentos del proyecto
 
@@ -52,7 +64,7 @@ También se puede descargar la plantilla desde la aplicación.
 
 - Frontend Angular y backend Node.js.
 - ANTLR genera lexer y parser JavaScript a partir de las gramáticas de `grammar/`.
-- El motor interpretará las reglas con semántica explícita; reconocer sintaxis no equivale a
+- El motor interpreta las reglas con semántica explícita; reconocer sintaxis no equivale a
   ejecutar una validación correctamente.
 - Kahn ordenará los recálculos por sus productores y consumidores. Compartir una lectura no crea
   precedencia; los ciclos y los consumidores bloqueados se explicarán por separado.
@@ -60,8 +72,8 @@ También se puede descargar la plantilla desde la aplicación.
   regulatorias, contexto y precisión. La plantilla está disponible para descargar desde la aplicación.
 - Las igualdades de validación no decidirán por sí solas qué celda modificar. Las propuestas
   requerirán destino explícito, previsualización y aceptación; conservarán los datos originales.
-- La primera versión tendrá un perfil de lenguaje acotado, con intervalos cuando la regla los
-  declare. Las construcciones no soportadas se mostrarán como no evaluables.
+- El perfil de lenguaje es acotado, con intervalos cuando la regla los declare. Las construcciones
+  no soportadas se muestran como no evaluables.
 - El perfil documenta una diferencia frente a fórmulas inconsistentes observadas en el PDF v0.9
   para multiplicación/división de intervalos. No afirma conformidad literal completa con DPM-XL.
 - La sesión inicial será local y efímera: los datos cargados no se recuperan tras reiniciar la
@@ -76,8 +88,8 @@ Se ha inicializado **Specify CLI 1.1.3**, integración **Codex**, con scripts Po
 Las skills viven en `.agents/skills/` y los recursos compartidos en `.specify/`.
 
 `$speckit-implement` está en ejecución, siguiendo las dependencias de tasks.md.
-El primer incremento carga e inspecciona archivos; el MVP validador completa US1 y US2,
-incluida la exportación de resultados. US3 y US4 añaden propuestas y aplicación de recálculos.
+US1 y US2 forman el MVP validador, incluida la exportación de resultados.
+US3 y US4 añaden propuestas y aplicación de recálculos; todavía están pendientes.
 Si cambia el alcance, se actualizarán primero la especificación y el plan afectados.
 Estos nombres se invocan en el chat de Codex; no son comandos de PowerShell.
 

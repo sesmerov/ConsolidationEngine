@@ -1,8 +1,26 @@
-/** Identifies the explicitly bounded profile; evaluation is not implemented yet. */
+/** Identifies the explicitly bounded language and evaluation profile. */
 export const ENGINE_PROFILE_ID = 'ce-dpmxl-0.9-closed-v1' as const;
-export { DecimalInputError, parseDecimal, rationalToDTO } from './numeric/rational.js';
-export type { ExactRational } from './numeric/rational.js';
+export { DecimalInputError, NumericError, RATIONAL_BITS, parseDecimal, parseLanguageNumber, rationalToDTO, rational, add, subtract, multiply, divide, negate, compare } from './numeric/rational.js';
+export type { ExactRational, NumericErrorCode } from './numeric/rational.js';
 export { parseRule } from './parser/parse-rule.js';
 export type { ParseRuleResult } from './parser/parse-rule.js';
 export { PARSER_LIMITS } from './ast/ast.js';
 export type { Ast, Expression, Selection, AxisSelector, DefaultLiteral, NumberLiteral, BooleanLiteral, BinaryOperator, SourceSpan } from './ast/ast.js';
+export { fromPrecision, intervalAdd, intervalSubtract, intervalMultiply, intervalDivide, intervalNegate, intervalCompare } from './numeric/interval.js';
+export type { NumericValue, IntervalComparison } from './numeric/interval.js';
+export { parseUnit, formatUnit, unitsEqual, multiplyUnits, divideUnits, contextualUnits } from './numeric/units.js';
+export type { UnitMap } from './numeric/units.js';
+export { ValueError } from './evaluator/value.js';
+export type { ScalarValue, NumericScalar, BooleanScalar, NullScalar, UnknownScalar } from './evaluator/value.js';
+export { evaluate } from './evaluator/evaluate.js';
+export type { EvaluationResult, EvaluationContext, MetadataRead } from './evaluator/evaluate.js';
+export { resolveSelection } from './resolver/coordinates.js';
+export type { ResolverReport } from './resolver/coordinates.js';
+export { mergeScope, bindScope } from './resolver/scope.js';
+export type { Binding } from './resolver/scope.js';
+export { expandRuleInstances, outerScope } from './resolver/instances.js';
+export type { RuleInstance } from './resolver/instances.js';
+export { WorkBudget, WorkLimitError, WORK_LIMITS } from './execution/budget.js';
+export type { WorkLimits } from './execution/budget.js';
+export { runValidation, valueToDTO } from './validation/run.js';
+export type { RunValidationOptions } from './validation/run.js';

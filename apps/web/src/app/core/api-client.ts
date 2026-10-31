@@ -2,7 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import type { HttpResponse } from '@angular/common/http';
 import { firstValueFrom, fromEvent, takeUntil } from 'rxjs';
-import type { BootstrapDTO, CapabilitiesDTO, JobDTO, RulesPageDTO, WorkspaceDTO } from '@ce/contracts';
+import type { BootstrapDTO, CapabilitiesDTO, JobDTO, RulesPageDTO, WorkspaceDTO, ValidationResultsPageDTO } from '@ce/contracts';
 @Injectable({ providedIn: 'root' })
 export class ApiClient {
   private readonly http = inject(HttpClient);
@@ -41,6 +41,18 @@ export class ApiClient {
   rules(workspaceId: string, versionId: string, filters: { code?: string; status?: string; cursor?: string } = {}): Promise<RulesPageDTO> {
     return firstValueFrom(this.http.get<RulesPageDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/rules',
       { headers: this.headers(), params: { versionId, limit: '50', ...filters } }));
+  }
+  validate(workspaceId: string, baseVersionId: string, etag: string, key: string): Promise<JobDTO> {
+    return firstValueFrom(this.http.post<JobDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/validations', { baseVersionId }, { headers: this.headers(etag).set('Idempotency-Key', key) }));
+  }
+  results(workspaceId: string, runId: string, filters: { code?: string; status?: string; table?: string; cursor?: string } = {}): Promise<ValidationResultsPageDTO> {
+    return firstValueFrom(this.http.get<ValidationResultsPageDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/runs/' + encodeURIComponent(runId) + '/results', { headers: this.headers(), params: { limit: '50', ...filters } }));
+  }
+  exportResults(workspaceId: string, versionId: string, runId: string, etag: string, key: string): Promise<JobDTO> {
+    return firstValueFrom(this.http.post<JobDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/exports', { versionId, runId, kind: 'results' }, { headers: this.headers(etag).set('Idempotency-Key', key) }));
+  }
+  downloadExport(workspaceId: string, exportId: string): Promise<Blob> {
+    return firstValueFrom(this.http.get('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/exports/' + encodeURIComponent(exportId), { headers: this.headers(), responseType: 'blob' }));
   }
   private jobUrl(workspaceId: string, jobId: string): string {
     return '/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/jobs/' + encodeURIComponent(jobId);

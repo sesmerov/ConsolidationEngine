@@ -15,17 +15,18 @@ export async function stageMultipart(request: FastifyRequest, storage: SessionFi
   const limits = { ...UPLOAD_LIMITS, ...overrides };
   for (const key of Object.keys(limits) as (keyof UploadLimits)[]) if (!Number.isSafeInteger(limits[key]) || limits[key] <= 0 || limits[key] > UPLOAD_LIMITS[key]) throw new ApiError('INTERNAL_ERROR');
   if (!request.isMultipart()) throw new ApiError('INVALID_REQUEST');
+  const lease = storage.reserve(workspaceId, limits.maxBatchBytes);
   const files: StagedFile[] = []; const allocated: string[] = [];
   let total = 0; let catalogs = 0; let reports = 0; let aborted = false; let active: Readable | undefined; let work: Promise<void> | undefined;
   let cleaned = false;
-  const cleanup = async () => { if (!cleaned) { await storage.removeFiles(workspaceId, allocated); cleaned = true; } };
+  const cleanup = async () => { if (!cleaned) { await storage.removeFiles(workspaceId, allocated); lease.release(); cleaned = true; } };
   async function consume(part: MultipartFile): Promise<void> {
     const kind = part.fieldname === 'catalog' ? 'catalog' : part.fieldname === 'reports' ? 'report' : undefined;
     if (!kind) throw new ApiError('INVALID_REQUEST');
     if (kind === 'catalog' && ++catalogs > 1) throw new ApiError('INVALID_REQUEST');
     if (kind === 'report' && ++reports > limits.maxReports) throw new ApiError('UPLOAD_LIMIT');
     if (!/\.xlsx$/i.test(part.filename)) throw new ApiError('UNSUPPORTED_FILE_TYPE');
-    const stored = await storage.openFile(workspaceId); allocated.push(stored.id);
+    const stored = await storage.openFile(workspaceId, lease); allocated.push(stored.id);
     const hash = createHash('sha256'); let size = 0; let signature = Buffer.alloc(0);
     try {
       for await (const chunk of part.file) {
@@ -64,6 +65,7 @@ export async function stageMultipart(request: FastifyRequest, storage: SessionFi
     await Promise.race([processing, timeout, externalAbort]);
     const descriptors = files.map((file) => ({ field: file.kind === 'catalog' ? 'catalog' : 'reports', metadata: { kind: file.kind, displayName: file.displayName }, sha256: file.sha256, size: file.size }));
     descriptors.sort((a, b) => canonicalHash(a).localeCompare(canonicalHash(b)));
+    lease.resize(total);
     return { files, bodyHash: canonicalHash({ files: descriptors, metadata: {} }), cleanup };
   } catch (error) {
     aborted = true; active?.destroy(); await work?.catch(() => undefined); await cleanup();

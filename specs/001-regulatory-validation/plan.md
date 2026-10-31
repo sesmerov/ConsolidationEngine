@@ -48,9 +48,13 @@ cancelación y corte a 60 segundos. Objetivos pendientes de medición, no garant
 
 **Constraints**: Originales intactos; sin eval, macros ni fórmulas Excel; operaciones numéricas
 exactas y perfil versionado; una tarea CPU activa; publicación atómica; sin despliegue público.
+Cuotas de sesión separadas: 512 MiB de JSON canónico y 512 MiB de archivos propios por workspace.
+Results exporta ZIP (64 MiB por contenido; suma de contenidos y ZIP completo ≤100 MiB cada uno),
+sin truncar y con reservas de capacidad.
 Cuotas: [workbook](contracts/workbook.md#preflight-y-cuotas-de-archivos),
 [lenguaje](contracts/language-profile.md#límites-y-casos-de-referencia) y
-[sesión](data-model.md#capacidad-y-limpieza).
+[sesión](data-model.md#capacidad-y-limpieza); formato/límites de
+[exportación results](contracts/http-api.md#exportación-de-resultados-y-cuotas).
 
 **Scale/Scope**: Un analista, una entidad/fecha por conjunto, hasta 20 informes, tablas cerradas,
 un subconjunto numérico/booleano e indicadores de presentación explícitos en Contexts de

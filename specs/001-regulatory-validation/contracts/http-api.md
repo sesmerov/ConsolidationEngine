@@ -32,7 +32,7 @@ Todas las rutas siguientes, salvo bootstrap, requieren token. `{w}` es workspace
 | Método y ruta | Petición / respuesta satisfactoria |
 | --- | --- |
 | GET `/bootstrap` | 200 `{sessionToken, apiVersion, sessionPersistence:"ephemeral", activeWorkspaceId?}`. |
-| GET `/capabilities` | 200 perfil/gramática, diferencias semánticas conocidas, soporte y cuotas. |
+| GET `/capabilities` | 200 perfil/gramática, diferencias semánticas conocidas, soporte y cuotas de importación, ejecución, exportación y sesión detalladas en estos contratos. |
 | GET `/templates/report` | 200 plantilla ce-report-1 con instrucciones y ejemplo sintético. |
 | POST `/workspaces` | `{name}` → 201 workspace empty y ETag `"empty"`; 409 si ya hay uno activo. |
 | GET `/workspaces/{w}` | 200 contexto, versión vigente, conteos y trabajo activo; ETag. |
@@ -49,13 +49,16 @@ Todas las rutas siguientes, salvo bootstrap, requieren token. `{w}` es workspace
 | GET `/workspaces/{w}/previews/{previewId}/proposals` | Página de propuestas, dependencias, valores y bloqueos. |
 | POST `/workspaces/{w}/previews/{previewId}/selection` | `{selectedIds}` → 200 `{selectedIds,requiredIds,closureHash,complete}`; no aplica ni acepta cambios. |
 | POST `/workspaces/{w}/applications` | `{baseVersionId,previewId,selectedIds,closureHash}` → 202 Job de aplicación confirmada. |
-| POST `/workspaces/{w}/exports` | `{versionId,runId?,kind}` → 202 Job; kind=`report` o `results`. |
+| POST `/workspaces/{w}/exports` | `{versionId,runId?,kind}` → 202 Job; kind=`report` o `results`. Para results, runId es obligatorio y pertenece a versionId; produce el ZIP descrito abajo. |
 | GET `/workspaces/{w}/exports/{exportId}` | 200 descarga producida, con Content-Disposition seguro; nunca una ruta del filesystem. |
 
 Directions utiliza instancias de una validación completa del snapshot actual. La configuración
 solo elige un lado; no acepta una expresión nueva ni código. Al crear su nueva versión se conservan
-las identidades semánticas de instancias. Se revalida su elegibilidad durante preview, incluidas
-las precondiciones que cambien por un productor. Un cambio de contexto se realiza reimportando el
+las identidades semánticas de instancias. No se filtran destinos solo por status pass/fail:
+una instancia estructuralmente válida, activa y vigente puede conservarse aunque su precondición
+actual sea false o indeterminada. La configuración no significa que el cambio ya sea aplicable.
+Se revalida su elegibilidad durante preview y se exige precondición true en la versión simulada,
+incluidas las condiciones que pasen de false a true por un productor. Un cambio de contexto se realiza reimportando el
 conjunto completo de forma atómica; no hay edición parcial de hechos en v1.
 
 Imports, directions, validations, previews, applications, exports y cierre de workspace exigen
@@ -67,6 +70,47 @@ contra cierre/cambio concurrente, y versionId indica exactamente los datos expor
 Una aplicación requiere selección no vacía, completa y sin destinos en conflicto.
 `selection` devuelve los antecesores que faltan; la interfaz debe mostrarlos y obtener una nueva
 confirmación. El servidor nunca amplía selectedIds silenciosamente durante la aplicación.
+
+## Exportación de resultados y cuotas
+
+`kind=results` genera una única descarga ZIP, `Content-Type: application/zip`, con dos entradas
+de nombres fijos en su raíz: `results.json` y `results.xlsx`. JSON conserva valores exactos,
+racionales como cadenas, estados, diagnósticos, versiones y procedencias del run solicitado;
+XLSX presenta esos resultados mediante celdas literales, sin fórmulas ni enlaces activos. No se
+truncan filas ni valores para completar el trabajo. El nombre de descarga lo genera el servidor
+y nunca procede de una ruta o nombre aportado por el usuario. `kind=report` mantiene el informe
+ce-report-1 definido en [workbook](workbook.md#exportación-y-roundtrip); este ZIP corresponde
+exclusivamente a results y no redefine el formato de report.
+
+Las capacidades publican separadamente estos límites locales (1 MiB = 1.048.576 bytes):
+
+| Límite | Valor y métrica |
+| --- | --- |
+| Cada contenido de results | 64 MiB por `results.json` (bytes UTF-8) y por `results.xlsx` (bytes del XLSX). |
+| Paquete results | Tanto la suma de los dos contenidos serializados como el ZIP completo deben ser ≤100 MiB. |
+| Carga XML previa de XLSX | `limits.exportXmlWorkloadBytes = 64 MiB`: estimación conservadora antes de construir las celdas. |
+| Estado de sesión | 512 MiB de JSON canónico contabilizado, según el modelo. |
+| Archivos propios del workspace | 512 MiB acumulados, incluidos staging, archivos de trabajo y exports retenidos. |
+
+La estimación XML es `64 KiB + 128 × filas + 128 × celdas + 6 × bytes UTF-8 de los valores`,
+sumando todas las filas/celdas previstas del libro, incluidas cabeceras. Es una comprobación
+previa a reservar las estructuras de celdas del escritor, separada de los límites de contenidos
+serializados y del ZIP final. Un XLSX comprimido inferior a 64 MiB puede exceder esta estimación.
+El motivo `XML_WORKLOAD_LIMIT` explica ese caso; el error público continúa siendo `EXPORT_LIMIT`:
+413 si se conoce antes de aceptar o Job failed si se detecta tras el 202. Capabilities publica
+el límite y explica esta diferencia; no se sustituyen los controles de bytes reales de salida.
+
+Se comprueba/reserva capacidad antes de crear buffers grandes y se cuentan los bytes reales
+durante la generación; una estimación inicial no autoriza exceder el límite. La compresión no
+permite exceder el presupuesto: se verifican la suma de contenidos y el ZIP final. Superar una
+cuota de contenido/paquete produce `EXPORT_LIMIT`; superar el total de archivos propios produce
+`SESSION_LIMIT`. Si se detecta antes de aceptar la petición se devuelve 413; si ya se respondió
+202, el Job termina failed con ese código, sin publicar una descarga parcial. Fallo, cancelación
+o timeout liberan las reservas al limpiar los archivos de trabajo. Publicar convierte la reserva
+en bytes retenidos, ajustándola al tamaño real sin contarlos dos veces. Los exports de la sesión
+siguen ocupando cuota mientras se conserven; el cierre solo elimina copias propias de la sesión,
+nunca archivos originales ni exportaciones ya guardadas por el usuario. Véase
+[capacidad y limpieza](../data-model.md#capacidad-y-limpieza).
 
 ## Formatos comunes
 
@@ -91,6 +135,12 @@ por defecto 50), `cursor`, `status`, `code` y `table`. Cursor opaco vinculado a 
 versión; filtros incompatibles dan 400. Orden estable por código de regla, variante y binding
 canónico. El cursor no usa un offset que cambie al aplicar una versión nueva.
 
+La página de resultados `ValidationResultsPageDTO` añade `run` y, opcionalmente,
+`sourceFiles: SourceFile[]`. Estos archivos pertenecen al snapshot de ese run, aunque ya sea
+histórico: permiten resolver los fileId de los locadores a displayNames y procedencia correctos,
+sin usar los nombres de la versión vigente. sourceFiles no contiene rutas locales ni autoriza
+acceso al filesystem; su ausencia no se sustituye por archivos de otro snapshot.
+
 Resultado abreviado:
 
 ```json
@@ -113,6 +163,21 @@ El contrato completo de valor es `{nominal, interval:{lo,hi}, unit}` con raciona
 o `{presence:"explicit_null"|"implicit_null",coordinate}`. El ejemplo abreviado omite campos
 para legibilidad; la implementación devolverá los campos del modelo, con expresión/precondición,
 variante, coordenadas y locadores. No serializa el AST ni rutas locales.
+
+FR-009 incluye además `factReads`, obligatorio aunque sea `[]`, para explicar cada hecho leído:
+`{factKey, coordinate, presence, normalizedValue?, originalText?, sourceLocator}`. Presence es
+`value`, `explicit_null` o `implicit_null`; normalizedValue es racional con enteros en cadenas
+o booleano cuando existe valor. Coordinate conserva la clave completa, unidad, `decimals`, ejes
+y su localizador de Coordinates. El sourceLocator principal apunta a Facts para un valor/null
+explícito y a Coordinates para un null implícito. No se inventa una fila Facts ausente.
+
+Estas lecturas describen las entradas originales del snapshot, anteriores a default/interval:
+no se cambia su presencia por haber usado un default ni se les asigna un único intervalo si la
+misma celda se usa con opciones distintas. `values` conserva los operandos/resultados efectivos;
+`factReads` permite reconstruir sus entradas, precisión y fuentes, incluidas las de agregados.
+Solo se informan lecturas realmente realizadas: una precondición false no genera lecturas del
+cuerpo omitido. Los indicadores se conservan separados en metadataReads. JSON usa valores exactos,
+sin BigInt ni AST serializados. Esta trazabilidad también forma parte de la exportación results.
 
 Error común:
 
@@ -141,7 +206,7 @@ El frontend traduce estados y mensajes al español sin recalcular valores.
 | 404 | RESOURCE_NOT_FOUND: ID desconocido, cerrado o de otra sesión. |
 | 409 | WORKSPACE_BUSY, ACTIVE_WORKSPACE_EXISTS, IDEMPOTENCY_CONFLICT, SELECTION_NOT_CLOSED, PREVIEW_NOT_APPLICABLE. |
 | 412 | STALE_VERSION: If-Match/baseVersion/preview no concuerdan. |
-| 413 | UPLOAD_LIMIT, EXPANSION_LIMIT, SESSION_LIMIT: conservar estado anterior. |
+| 413 | UPLOAD_LIMIT, EXPANSION_LIMIT, EXPORT_LIMIT, SESSION_LIMIT: conservar estado anterior; no publicar archivos parciales. |
 | 415 | UNSUPPORTED_FILE_TYPE: solo XLSX admitido. |
 | 422 | INVALID_WORKBOOK, INVALID_DIRECTION: errores de datos con locador. |
 | 428 | PRECONDITION_REQUIRED: falta If-Match en mutación. |

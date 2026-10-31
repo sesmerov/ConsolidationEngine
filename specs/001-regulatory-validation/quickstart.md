@@ -73,7 +73,7 @@ El libro EBA completo supera el límite de 500 registros: no es el archivo de ca
 | V13 | Fórmula, macro, XML con DOCTYPE, ZIP con ruta ascendente o expansión excesiva. | Rechazo antes de materializar datos; no acceso a red ni modificación del conjunto previo. |
 | V14 | Valor textual 123456789012345678901234567890.123456789, cero y null; exportar/reimportar. | Igualdad exacta de valor/tipo/precisión/presencia y ceros en códigos. Valor numérico Excel en Facts se rechaza. |
 | V15 | Bordes de intervalos, negativos, división puntual 1/3 y half-even de 1.005/1.015. | Resultados de language-profile; sin radio negativo ni radio espurio para puntos. |
-| V16 | Exportar informe y resultados después de V06; cerrar workspace. | Nuevos archivos contienen versiones/cambios; originales intactos; temporales de sesión eliminados. |
+| V16 | Exportar resultados de una validación y, después de V06, informe/resultados; cerrar workspace. | results descarga ZIP con results.json exacto y results.xlsx literal; report conserva ce-report-1. Versiones/cambios trazables, originales intactos; solo temporales de sesión eliminados. |
 
 Los alias A/B/C/D se materializarán como coordenadas de tablas sintéticas y expresiones válidas
 del lexer, no se pasarán como si fueran sintaxis DPM-XL. Las fechas de V02–V04 se contrastaron con
@@ -88,6 +88,16 @@ siguen siendo true: el resultado de la expresión depende por separado de sus he
 sin presumir que la regla pasa. Comprobar también false and unknown determinista y que
 exportar/reimportar conserva true/false/ausencia; un mapa inconsistente del mismo contexto rechaza
 el lote, sin reemplazar el snapshot previo.
+
+Para las cuotas de V16, preparar casos en el límite y excedidos: 64 MiB por contenido
+`results.json`/`results.xlsx`, 100 MiB tanto para su suma como para el ZIP final, y 512 MiB
+acumulados de archivos propios del workspace, separados de los 512 MiB de JSON canónico.
+Esperar `EXPORT_LIMIT` para contenido/
+paquete y `SESSION_LIMIT` para el acumulado: 413 si se conoce antes de aceptar; Job failed si
+se detecta tras 202. Comprobar conteo/reservas antes de buffers grandes, ajuste a bytes reales,
+liberación tras fallo/cancelación y contabilización de exports retenidos sin doble conteo.
+No debe haber truncamiento, descarga parcial, borrado de exports anteriores para liberar sitio
+ni eliminación de archivos guardados por el usuario. Son pruebas esperadas, no ejecutadas.
 
 ## Medición y recorrido del analista
 

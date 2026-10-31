@@ -13,7 +13,7 @@
 </section>
 @if (store.page(); as page) {
   <section class="workspace-card" aria-labelledby="coverage-title">
-    <h2 id="coverage-title">Carga y cobertura</h2><p>Reglas analizadas. Todavía no se han evaluado los informes.</p>
+    <h2 id="coverage-title">Carga y cobertura</h2><p>Este panel describe la carga y el soporte de las reglas. El cumplimiento se consulta en Validación y explicación.</p>
     <dl class="workspace-meta"><div><dt>Filas del catálogo</dt><dd>{{ page.coverage.rows }}</dd></div><div><dt>Variantes</dt><dd>{{ page.coverage.variants }}</dd></div><div><dt>Aplicables al contexto</dt><dd>{{ page.coverage.applicableVariants }}</dd></div><div><dt>Con sintaxis y soporte</dt><dd>{{ page.coverage.supportedVariants }}</dd></div><div><dt>Filas con errores</dt><dd>{{ page.coverage.invalidRows }}</dd></div><div><dt>Duplicadas</dt><dd>{{ page.coverage.duplicateRows }}</dd></div><div><dt>Variantes incompatibles</dt><dd>{{ page.coverage.conflictingVariants }}</dd></div></dl>
     <p class="data-summary">{{ session.workspace()?.counts?.coordinates }} coordenadas · {{ session.workspace()?.counts?.facts }} hechos · {{ page.dataSummary.zeroValues }} ceros · {{ page.dataSummary.explicitNulls }} nulos explícitos · {{ page.dataSummary.implicitNulls }} nulos implícitos</p>
     <p class="muted">Los nulos explícitos tienen una fila Facts con presence=null; los implícitos son coordenadas declaradas sin fila Facts.</p>

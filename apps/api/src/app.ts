@@ -8,6 +8,7 @@ import { ApiError } from './errors.js';
 import { WorkspaceStore } from './session/workspace-store.js';
 import { IdempotencyStore } from './session/idempotency-store.js';
 import { JobManager } from './jobs/job-manager.js';
+import { PreparationManager } from './jobs/preparation-manager.js';
 import type { JobManagerOptions } from './jobs/job-manager.js';
 import { SessionFiles } from './storage/session-files.js';
 import { installLocalSession } from './plugins/local-session.js';
@@ -20,23 +21,31 @@ import { UploadManager } from './import/upload-manager.js';
 import { registerImports } from './routes/imports.js';
 import { registerRules } from './routes/rules.js';
 import { registerCapabilities } from './routes/capabilities.js';
-export interface AppServices { readonly store: WorkspaceStore; readonly idempotency: IdempotencyStore; readonly jobs: JobManager; readonly files: SessionFiles; readonly uploads: UploadManager }
+import { registerValidations } from './routes/validations.js';
+import { registerResults } from './routes/results.js';
+import type { WorkLimits } from '@ce/engine';
+import { registerExports } from './routes/exports.js';
+import type { ExportLimits } from './export/results-export.js';
+export interface AppServices { readonly store: WorkspaceStore; readonly idempotency: IdempotencyStore; readonly jobs: JobManager; readonly files: SessionFiles; readonly uploads: UploadManager; readonly preparations: PreparationManager }
 declare module 'fastify' { interface FastifyInstance { ce: AppServices } }
 export interface AppOptions extends JobManagerOptions {
   mode?: 'development' | 'production'; apiPort?: number; webPort?: number;
   store?: WorkspaceStore; files?: SessionFiles; jobs?: JobManager;
   uploadLimits?: Partial<UploadLimits>;
   serveWeb?: boolean;
+  validationLimits?: Partial<WorkLimits>;
+  exportLimits?: Partial<ExportLimits>; fileLimitBytes?: number;
 }
 export async function createApp(options: AppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: false, requestIdHeader: false, genReqId: () => randomUUID(), bodyLimit: 1024 * 1024,
     ajv: { customOptions: { removeAdditional: false, coerceTypes: false, useDefaults: false } }, requestTimeout: 120_000 });
   await app.register(multipart, { limits: { fileSize: UPLOAD_LIMITS.maxFileBytes, files: UPLOAD_LIMITS.maxReports + 1, fields: 1 } });
   const store = options.store ?? new WorkspaceStore();
-  const files = options.files ?? await SessionFiles.create(store.sessionId);
-  const jobs = options.jobs ?? new JobManager(store, { ...options, workerModules: { import: new URL('./workers/import.worker.js', import.meta.url), ...options.workerModules } });
+  const files = options.files ?? await SessionFiles.create(store.sessionId, undefined, options.fileLimitBytes);
+  const jobs = options.jobs ?? new JobManager(store, { ...options, workerModules: { import: new URL('./workers/import.worker.js', import.meta.url), validate: new URL('./workers/validate.worker.js', import.meta.url), export: new URL('./workers/export.worker.js', import.meta.url), ...options.workerModules } });
   const uploads = new UploadManager(store);
-  app.decorate('ce', { store, files, jobs, uploads, idempotency: new IdempotencyStore(store) });
+  const preparations = new PreparationManager(store);
+  app.decorate('ce', { store, files, jobs, uploads, preparations, idempotency: new IdempotencyStore(store) });
   const token = randomBytes(32).toString('base64url');
   installLocalSession(app, { token, mode: options.mode ?? 'production', apiPort: options.apiPort ?? 3000, webPort: options.webPort ?? 4200 });
   app.setErrorHandler((error, request, reply) => {
@@ -54,7 +63,12 @@ export async function createApp(options: AppOptions = {}): Promise<FastifyInstan
   app.addHook('onSend', async (_request, reply) => { reply.header('Cache-Control', 'no-store'); reply.header('X-Content-Type-Options', 'nosniff'); });
   registerBootstrap(app, token); registerWorkspaces(app); registerJobs(app);
   registerImports(app, options.uploadLimits); registerRules(app); registerCapabilities(app);
-  app.addHook('preClose', async () => { await uploads.dispose(); });
+  registerValidations(app, options.validationLimits); registerResults(app);
+  registerExports(app, options.exportLimits);
+  app.addHook('preClose', async () => {
+    const id = store.currentWorkspaceId; if (id) store.beginClose(id);
+    await uploads.dispose(); if (id) await preparations.settle(id);
+  });
   app.addHook('onClose', async () => { await jobs.dispose(); await files.close(); const id = store.currentWorkspaceId; if (id) store.close(id); });
   return app;
 }

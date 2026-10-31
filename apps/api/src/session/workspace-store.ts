@@ -81,15 +81,15 @@ export class WorkspaceStore {
     this.require(id); const job = this.getRecord<JobDTO>('job:' + jobId);
     if (!job || job.workspaceId !== id) throw new ApiError('RESOURCE_NOT_FOUND'); return job;
   }
-  registerJob(job: JobDTO): void {
+  registerJob(job: JobDTO, additions: readonly StateRecord[] = []): void {
     this.assertAccepting(job.workspaceId); this.assertIdle(job.workspaceId); this.assertBase(job.workspaceId, job.baseVersionId);
-    const w = { ...this.require(job.workspaceId), activeJobId: job.jobId }; const records = new Map(this.records).set('job:' + job.jobId, immutable(job));
+    const w = { ...this.require(job.workspaceId), activeJobId: job.jobId }; const records = this.withRecords(additions).set('job:' + job.jobId, immutable(job));
     // Account an actual retained reserve so terminal diagnostics fit even when the candidate exhausts the quota.
     records.set('reserve:' + job.jobId, ' '.repeat(4096)); this.check(w, this.snapshots, records); this.workspace = w; this.records = records;
   }
-  updateJob(job: JobDTO): void {
+  updateJob(job: JobDTO, additions: readonly StateRecord[] = []): void {
     const prior = this.job(job.workspaceId, job.jobId); if (isTerminalJob(prior.status)) return;
-    const records = new Map(this.records).set('job:' + job.jobId, immutable(job)); let w = this.require(job.workspaceId);
+    const records = this.withRecords(additions).set('job:' + job.jobId, immutable(job)); let w = this.require(job.workspaceId);
     if (isTerminalJob(job.status)) { records.delete('reserve:' + job.jobId); const { activeJobId: _active, ...rest } = w; w = rest; }
     this.check(w, this.snapshots, records); this.workspace = w; this.records = records;
   }

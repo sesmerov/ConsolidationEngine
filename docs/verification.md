@@ -96,3 +96,70 @@ Hashes originales comprobados antes y después del E2E:
 
 Esto acredita carga/análisis y su recorrido de usuario. Evaluación, recálculos, aplicación,
 exportación de resultados y medición de rendimiento siguen pendientes.
+
+## US2 — comprobaciones del núcleo T031–T039
+
+Antes de integrar la API, el motor superó 353 pruebas: parser, racionales/intervalos,
+primitivas de valores y unidades, resolución, evaluación y ejecuciones de validación.
+Build y typecheck de contratos y motor correctos. Las pruebas de contrato/UI T033 se
+prepararon antes de implementar sus rutas/componentes; no se contaron como pruebas superadas.
+
+Los casos numéricos conservan racionales exactos, distinguen límites de recursos de división
+por cero y comprueban intervalos con extremos negativos, contacto y denominadores que contienen
+cero. No se usa Number para importes ni una tolerancia global. La resolución comprueba ámbitos
+entre tablas, rangos sobre coordenadas existentes, hojas finitas, ambigüedad e identidades estables.
+
+Las ejecuciones comprueban G113/G169 con hechos sintéticos, vigencias, precondiciones e indicadores,
+variantes equivalentes/conflictivas y conciliación de registros frente a instancias reales.
+Una ejecución técnicamente completa puede contener reglas fallidas o con errores aritméticos;
+una interrupción o límite global la deja incompleta. Los resultados serializados no contienen
+AST ni BigInt. Se concretaron en el perfil la unidad de nvl con literales y el contexto de lectura
+de indicadores para crossModule; no se afirma compatibilidad con todo el lenguaje EBA.
+
+Al integrar FR-009 se añadieron las lecturas individuales originales (`factReads`) con presencia,
+precisión y procedencia. Un null sustituido por default conserva su ausencia original en la traza.
+También se conserva la identidad estructural de una instancia soportada cuando su precondición
+sea false/null/unknown, sin ejecutar el cuerpo. Esto permite reevaluar la condición durante una
+futura simulación. Cuatro fallos se reprodujeron antes de corregir estos casos; la suite del run
+pasó después sus 33 pruebas. No se asignan instancias ficticias a cuerpos no soportados.
+
+## US2 — checkpoint T031–T045
+
+527 pruebas correctas: 358 engine, 9 Angular, 119 integración, 34 contrato y 7 E2E.
+Typecheck global, build API y build Angular de producción correctos. Los comandos se ejecutaron
+con el toolchain aislado mediante los scripts existentes y Vitest/Playwright fijados. La suite
+engine se ejecutó por separado; tras el último arreglo de coordinación de API se repitieron
+build/typecheck API e integración/contratos, sin repetir las suites no afectadas.
+
+La API publica un run desde la aceptación y lo conserva como incomplete si el trabajo falla,
+se cancela o excede límites. La aceptación rechazada por cuota no deja un run huérfano. Las páginas
+y filtros históricos permanecen ligados a la versión evaluada; la severidad no se confunde con
+el estado. Se comprobó también el reintento simultáneo de una misma clave idempotente durante
+la aceptación asíncrona, además del replay con ETag antiguo.
+
+La descarga results es un ZIP con results.json exacto y results.xlsx literal. Diez pruebas de
+integración independientes verifican lectura con yauzl, CRC/tamaños/hash, JSON con 1/3 y más de
+15 dígitos, nulls, texto XLSX mediante lector y SAX, límites UTF-8/preconteo, cancelación y cuotas
+de archivos con reservas. Las reservas no se cuentan dos veces; tras una descarga real el
+retenido coincide con el tamaño del ZIP y no quedan reservas. El guard de carga XML previo al
+writer está publicado por separado del límite de tamaño serializado. No se publica salida parcial.
+
+Se reprodujo y corrigió una carrera de cierre durante la preparación asíncrona del export,
+antes de registrar el Job. Dos pruebas controladas comprueban cierre de workspace y servidor:
+se espera a transferir o limpiar la preparación antes de borrar la carpeta propia, sin archivos
+huérfanos. La respuesta rechazada conserva la clasificación WORKSPACE_BUSY.
+
+Los siete E2E usan Chromium y el servidor de producción reales, sin sustituir parser/importador
+ni workers. Los cuatro nuevos recorren V02/V03/V04/V05/V12/V15: G169 en contacto de intervalos y
+fuera del borde, G113 con dos hojas y sumandos explicados, null explícito/implícito/cero, falta de
+soporte, sintaxis y división por cero, 1/3 exacto, descarga e históricos y permutación de filas.
+El primer recorrido detectó un error de fixture (`not isnull(...)`); se corrigió a la forma
+admitida por la gramática original (`not(isnull(...))`), sin cambiar el lenguaje del producto.
+
+La captura `.cache/validation-ui.png` fue inspeccionada: conteos coherentes, detalle legible,
+advertencia separada de fallo, valores originales/precisión/fuentes e indicadores visibles.
+Los originales Excel/lexer/parser mantienen los hashes registrados en US1. No se añadieron
+dependencias. `git diff --check` correcto.
+
+US1+US2 acreditan carga, validación, explicación y exportación de resultados. Propuestas,
+aplicación de recálculos y medición de rendimiento todavía corresponden a fases posteriores.

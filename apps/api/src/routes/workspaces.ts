@@ -12,7 +12,7 @@ export function registerWorkspaces(app: FastifyInstance): void {
   });
   app.delete<{ Params: { workspaceId: string } }>('/api/v1/workspaces/:workspaceId', { schema: { params: workspaceParamsSchema, querystring: emptyQuerySchema } }, async (request, reply) => {
     const id = request.params.workspaceId; requireCurrentVersion(request, app.ce.store, id);
-    app.ce.store.beginClose(id); await app.ce.uploads.cancel(id); await app.ce.jobs.cancelActive(id);
+    app.ce.store.beginClose(id); await app.ce.uploads.cancel(id); await app.ce.preparations.settle(id); await app.ce.jobs.cancelActive(id);
     await app.ce.files.removeWorkspace(id); app.ce.store.close(id); return reply.code(204).send();
   });
 }
