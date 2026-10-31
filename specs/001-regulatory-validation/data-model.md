@@ -13,8 +13,12 @@ migraciones, clases ni almacenamiento implementado. El motor recibe snapshots y 
   y salida del workbook son cadenas decimales. No se serializa `BigInt` como JSON number.
 - `FactKey = (contextId, tableCode, sheetCode, rowCode, columnCode)`. ContextId identifica
   inequívocamente entidad, referencia y módulo/versión; la cadena vacía de sheetCode es significativa.
-- Un contexto lógico tiene una clave canónica derivada de sus atributos. El alias contextId
+- Un contexto lógico tiene una clave canónica derivada de entidad, referencia, framework y módulo/versión. El alias contextId
   del workbook no altera la identidad semántica ni se usa para resolver versiones por parecido.
+- El mapa filingIndicators pertenece al contenido del contexto y del snapshot: ordenar sus
+  claves antes de calcular hashes conserva la identidad ante una permutación JSON. No se deriva
+  de hechos/coordenadas; true, false y ausencia son contenidos distintos. Este mapa modifica el hash
+  de contenido, no la identidad de la celda ni canonicalContextKey.
 
 ## Entidades
 
@@ -24,14 +28,14 @@ migraciones, clases ni almacenamiento implementado. El motor recibe snapshots y 
 | RawRuleRecord | id, sourceLocator, originalFields, diagnostics, variantId? | Una entrada por fila importada; ninguna desaparece por ser inválida o duplicada. |
 | RuleVariant | variantId, code, framework, modules[], crossModule, tables[], expression, precondition?, active, referenceWindow, submissionFrom?, severityOriginal, severity, sourceRecords[] | variantId no incluye fila/archivo. La vigencia y los módulos distinguen variantes. Un código puede tener varias. |
 | RuleAnalysis | variantId, grammarVersion, profileId, syntaxStatus, supportStatus, AST?, diagnostics | Solo hay AST ejecutable con cero errores y construcciones soportadas. El árbol ANTLR no sale por HTTP. |
-| ReportContext | canonicalContextKey, contextId, entityId, referenceDate, submissionDate?, framework, moduleVersion | Una entidad/fecha por workspace. Contextos declarados compatibles; referencias ambiguas son diagnóstico. |
+| ReportContext | canonicalContextKey, contextId, entityId, referenceDate, submissionDate?, framework, moduleVersion, filingIndicators | Una entidad/fecha por workspace. filingIndicators es un mapa de códigos exactos a booleanos; vacío significa no declarados. Repetir contexto con mapa inconsistente rechaza el lote. Contextos declarados compatibles; referencias ambiguas son diagnóstico. |
 | Coordinate | factKey, dataType, unit, decimals, axes | Es parte del catálogo cerrado, incluso sin hecho. No admite claves repetidas. |
 | ReportedFact | factKey, presence, originalText?, normalizedValue?, sourceLocator | presence=value/null. Un null explícito tiene fila; ausencia de fila en coordenada válida es null implícito al resolver. |
 | Workspace | id, state, currentVersionId?, versionIds[], activeJobId?, sessionId | Un workspace por proceso; el hilo principal es el único propietario mutable del puntero vigente. |
 | Snapshot | versionId, parentVersionId?, contentHash, catalogVersion, reportVersion, configVersion, profileId, contexts, coordinates, facts, directions, sources, createdAt | Inmutable. Versiona cualquier cambio de reglas, datos, contexto o direcciones. Conserva el original dentro de la sesión. |
 | RuleInstance | instanceId, variantIds[], binding, applicableContext, diagnostic? | Clave estable por contenido de regla efectivo y binding completo, sin ordinal de importación. |
 | ValidationRun | id, versionId, profileId, status, startedAt, endedAt?, summary, resultIds[] | Los resultados pertenecen a un snapshot. Cambiar el vigente los hace históricos, no los reasigna. |
-| RuleResult | id, runId, instanceId, status, severity, preconditionResult, operands, locators, diagnostics | Un estado terminal por instancia; valores incluyen nominal/intervalo/unidad o presencia de null. |
+| RuleResult | id, runId, instanceId, status, severity, preconditionResult, operands, metadataReads, locators, diagnostics | Un estado terminal por instancia; valores incluyen nominal/intervalo/unidad o presencia de null. metadataReads conserva contexto/código/valor o ausencia de indicadores y su procedencia. |
 | RecalculationDirection | directionId, instanceId, targetSide, targetKey | Configurada expresamente para una igualdad; destino único e identidad canónica. |
 | Preview | id, baseVersionId, profileId, policyId, state, proposalIds[], graphSummary | Solo puede aplicarse contra la base que la produjo. Incluye resultados no disponibles y motivos. |
 | Proposal | id, previewId, directionId, targetKey, before, exactNominal, derivedInterval, after, readKeys[], predecessorIds[], state, diagnostics | after es el valor ya cuantizado y la precisión que leerán sus consumidores y se exportará. |
@@ -39,6 +43,19 @@ migraciones, clases ni almacenamiento implementado. El motor recibe snapshots y 
 | Job | id, workspaceId, kind, baseVersionId?, status, progress, startedAt, deadline, resultRef?, diagnostics | kind=import/validate/preview/apply/export. Una tarea activa global; estado terminal no retrocede. |
 
 `ApplyReceipt` es trazabilidad de negocio. El desarrollo con recibos continúa `disabled/unmanaged`.
+
+## Metadatos de presentación
+
+`ReportContext.filingIndicators` procede exclusivamente de Contexts en ce-report-1. Sus códigos
+son unidades de reporte/indicadores, sin el prefijo sintáctico `v_`; no se supone equivalencia con
+tableCode ni Variable.Code. No declarado se evalúa como unknown y genera
+`MISSING_FILING_INDICATOR` cuando impide decidir. Un false explícito puede dar `not_applicable`;
+un true no requiere filas Facts. No se heredan coordenadas/default/interval al resolverlos.
+
+Los snapshots y exportaciones conservan el mapa. Modificarlo versiona el contexto, su contenido
+y el snapshot; las previews de la base anterior quedan obsoletas. Las trazas metadataReads no
+forman parte de `Proposal.readKeys`: no producen FactKeys, aristas de productores ni destinos
+de recálculo. La consistencia entre archivos se comprueba antes de publicar el lote completo.
 
 ## Catálogo y resolución de variantes
 

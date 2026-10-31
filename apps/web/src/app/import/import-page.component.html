@@ -1,0 +1,34 @@
+<section class="workspace-card" aria-labelledby="import-title">
+  <div class="section-heading"><h2 id="import-title">Cargar catálogo e informes</h2><button class="secondary" (click)="store.downloadTemplate()">Descargar plantilla Excel</button></div>
+  <p>Selecciona un catálogo EBA y entre 1 y 20 informes con nuestra plantilla. La carga sustituye el conjunto cuando todos los archivos son válidos.</p>
+  <p class="muted">Hasta 10 MiB por archivo y 50 MiB por lote. La plantilla contiene datos sintéticos y explica cómo conservar códigos, importes y valores nulos.</p>
+  <form (ngSubmit)="upload()">
+    <label for="catalog-file">Catálogo de reglas (.xlsx)</label><input id="catalog-file" type="file" accept=".xlsx" (change)="chooseCatalog($event)" [disabled]="busy()"/>
+    <label for="report-files">Informes (.xlsx)</label><input id="report-files" type="file" accept=".xlsx" multiple (change)="chooseReports($event)" [disabled]="busy()"/>
+    <p class="muted">{{ reports().length }} informes seleccionados</p>
+    <button type="submit" [disabled]="busy() || !catalog() || reports().length < 1 || reports().length > 20">{{ store.uploading() ? 'Recibiendo archivos…' : 'Cargar archivos' }}</button>
+    @if (store.uploading()) { <button type="button" class="secondary" (click)="store.cancelUpload()">Cancelar carga</button> }
+  </form>
+  @if (store.error(); as error) { <p class="error" role="alert">{{ error }}</p> }
+</section>
+@if (store.page(); as page) {
+  <section class="workspace-card" aria-labelledby="coverage-title">
+    <h2 id="coverage-title">Carga y cobertura</h2><p>Reglas analizadas. Todavía no se han evaluado los informes.</p>
+    <dl class="workspace-meta"><div><dt>Filas del catálogo</dt><dd>{{ page.coverage.rows }}</dd></div><div><dt>Variantes</dt><dd>{{ page.coverage.variants }}</dd></div><div><dt>Aplicables al contexto</dt><dd>{{ page.coverage.applicableVariants }}</dd></div><div><dt>Con sintaxis y soporte</dt><dd>{{ page.coverage.supportedVariants }}</dd></div><div><dt>Filas con errores</dt><dd>{{ page.coverage.invalidRows }}</dd></div><div><dt>Duplicadas</dt><dd>{{ page.coverage.duplicateRows }}</dd></div><div><dt>Variantes incompatibles</dt><dd>{{ page.coverage.conflictingVariants }}</dd></div></dl>
+    <p class="data-summary">{{ session.workspace()?.counts?.coordinates }} coordenadas · {{ session.workspace()?.counts?.facts }} hechos · {{ page.dataSummary.zeroValues }} ceros · {{ page.dataSummary.explicitNulls }} nulos explícitos · {{ page.dataSummary.implicitNulls }} nulos implícitos</p>
+    <p class="muted">Los nulos explícitos tienen una fila Facts con presence=null; los implícitos son coordenadas declaradas sin fila Facts.</p>
+    <form class="filters" (ngSubmit)="filter()"><label>Código de regla<input name="code" [ngModel]="store.code()" (ngModelChange)="store.code.set($event)"/></label><label>Estado<select name="status" [ngModel]="store.status()" (ngModelChange)="store.status.set($event)"><option value="">Todos</option><option value="error">Error de sintaxis</option><option value="unsupported">No soportada</option><option value="applicable">Aplicable</option><option value="not_applicable">No aplicable</option><option value="not_evaluable">Falta contexto</option></select></label><button type="submit" class="secondary" [disabled]="store.loading()">Filtrar reglas</button></form>
+    <p aria-live="polite">{{ page.items.length }} de {{ page.total }} registros</p>
+    @for (row of page.items; track row.id) {
+      <details class="rule-row"><summary><strong>{{ row.code || 'Sin código' }}</strong> · {{ row.syntaxStatus === 'error' ? 'Error de sintaxis' : row.supportStatus === 'unsupported' ? 'No soportada' : row.applicability === 'applicable' ? 'Aplicable' : row.applicability === 'not_evaluable' ? 'Falta contexto' : row.active === false ? 'Inactiva' : row.variantId ? 'No aplicable' : 'Metadatos inválidos' }}</summary>
+        <p class="muted">{{ store.fileName(row.sourceLocator.fileId) }} · {{ row.sourceLocator.sheet }} · fila {{ row.sourceLocator.row }}</p>
+        <p>Módulos: {{ row.modules?.join(', ') || 'Sin metadatos válidos' }} · Severidad: {{ row.severity || 'Desconocida' }}</p>
+        @if (row.expression) { <h3>Expresión</h3><pre>{{ row.expression }}</pre> }
+        @if (row.precondition) { <h3>Precondición</h3><pre>{{ row.precondition }}</pre> }
+        @for (diagnostic of row.diagnostics; track $index) { <p [class.error]="diagnostic.severity === 'error' || !diagnostic.severity" [class.notice]="diagnostic.severity === 'warning'" [class.muted]="diagnostic.severity === 'info'">{{ diagnostic.code }}: {{ diagnostic.message }} @if (diagnostic.locator?.column) { · {{ diagnostic.locator.column }}{{ diagnostic.locator.row }} } @if (diagnostic.line) { · expresión: línea {{ diagnostic.line }}, posición {{ diagnostic.column }} }</p> }
+      </details>
+    }
+    @if (page.nextCursor) { <button class="secondary" (click)="store.load(undefined, true)" [disabled]="store.loading()">Cargar más registros</button> }
+  </section>
+}
+@if (store.capabilities(); as capabilities) { <details class="workspace-card"><summary>Alcance y límites del perfil de cálculo</summary><ul>@for (difference of capabilities.knownDifferences; track difference) { <li>{{ difference }}</li> }</ul><p>Se admiten hasta 500 filas de reglas, 100 000 coordenadas y 100 000 hechos por conjunto. Los trabajos tienen un plazo máximo de 60 segundos.</p></details> }

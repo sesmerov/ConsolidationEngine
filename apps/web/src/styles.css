@@ -28,7 +28,12 @@ button.secondary { color: #23534c; background: #fff; border-color: #c7d9d4; }
 button.danger { background: #963f3f; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #78b5a6; outline-offset: 3px; }
 .error, .confirmation { background: #fff1ee; color: #7f3531; padding: 16px; border-radius: 8px; }
+.notice { background: #fff8e6; color: #705815; padding: 16px; border-radius: 8px; }
 .workspace-meta { display: flex; gap: 32px; flex-wrap: wrap; font-size: 14px; margin: 24px 0; }
 dt { color: #6f8183; } dd { margin: 6px 0 0; overflow-wrap: anywhere; }
 progress { accent-color: #176859; width: 100%; height: 14px; }
+.filters { display: flex; flex-wrap: wrap; align-items: end; max-width: none; }.filters input { display: block; margin-top: 8px; }
+.rule-row { border-top: 1px solid #dce7e5; padding: 16px 0; } summary { cursor: pointer; line-height: 1.6; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 14px; background: #f4f7f7; border-radius: 8px; font-size: 13px; }
+h3 { font-size: 15px; margin: 18px 0 6px; } li { margin: 12px 0; line-height: 1.6; }
 @media (max-width: 700px) { .shell { grid-template-columns: 1fr; } aside { padding: 18px 24px; } aside strong { display: inline; margin-left: 12px; } aside p { display: none; } main { padding-top: 26px; } }

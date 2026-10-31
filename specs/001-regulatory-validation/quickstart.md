@@ -59,9 +59,9 @@ El libro EBA completo supera el límite de 500 registros: no es el archivo de ca
 | ID | Preparación y acción | Resultado esperado |
 | --- | --- | --- |
 | V01 | Plantilla válida y catálogo reducido; después cargar una copia con hecho duplicado. | Primera carga crea snapshot; segunda se rechaza con locador y conserva la versión anterior. |
-| V02 | G169, v0190_m, COREP_OF_4.2, entidad SYNTHETIC, referencia/remisión 2026-06-30; valores 10.00 y 10.00, p=2. | Regla activa/aplicable y pasa. Segundo valor 10.02 hace fallar; 10.01 pasa por contacto de intervalos. |
-| V03 | G113, v0002_h, COREP_OF_4.0, referencia/remisión 2025-12-31; dos hojas finitas, total 12 y sumandos 5/7, p=2. | Una instancia por hoja; ambas pasan. Una hoja con total 11 falla sin afectar la otra. |
-| V04 | Incluir variantes G169 y G170; elegir contexto 2026-06-30/4.2. | G169 aplica; G170 es inactiva/fuera de contexto. Permutar filas no cambia resultados. |
+| V02 | G169, v0190_m, COREP_OF_4.2, entidad SYNTHETIC, referencia/remisión 2026-06-30; filingIndicators `{"C_01.00":true,"C_05.01":true}`; valores 10.00 y 10.00, p=2. | Regla activa/aplicable y pasa. Segundo valor 10.02 hace fallar; 10.01 pasa por contacto de intervalos. |
+| V03 | G113, v0002_h, COREP_OF_4.0, referencia/remisión 2025-12-31; filingIndicators `{"C_18.00":true}`; dos hojas finitas, total 12 y sumandos 5/7, p=2. | Una instancia por hoja; ambas pasan. Una hoja con total 11 falla sin afectar la otra. |
+| V04 | Incluir variantes G169 y G170; elegir contexto 2026-06-30/4.2 e indicadores declarados de V02. | G169 aplica; G170 es inactiva/fuera de contexto. Permutar filas no cambia resultados. |
 | V05 | Coordenada válida sin Facts, presence=null, valor 0, isnull/nvl/default y sum all-null. | Se conserva procedencia explícita/implícita; cero no es null; sum all-null es null con diagnóstico, no cero. |
 | V06 | Puntuales A=11,B=5,C=7,D=22; igualdades A=B+C y D=A*2 con interval:false, destinos A/D elegidos. | Validación A falla; preview A12/D24; D requiere A; confirmar ambos crea nueva versión y conserva original. |
 | V07 | A=1/3 p2, D=A*3 p2 con interval:true. Repetir A con interval:false. | Primer caso propone 0.33/0.99 y revalida; segundo no ofrece cambio aplicable porque 0.33 no satisface 1/3 puntual. |
@@ -78,6 +78,16 @@ El libro EBA completo supera el límite de 500 registros: no es el archivo de ca
 Los alias A/B/C/D se materializarán como coordenadas de tablas sintéticas y expresiones válidas
 del lexer, no se pasarán como si fueran sintaxis DPM-XL. Las fechas de V02–V04 se contrastaron con
 las vigencias reales del catálogo; los demás datos son de prueba.
+
+Las expresiones **y precondiciones** reales de G113/G169 se preservan intactas. Los mapas de
+indicadores anteriores son declaraciones sintéticas del informe, no deducciones de sus hechos.
+Para V02/V03 se preparan además variantes: indicadores true; false explícito que desactiva la
+precondición (`not_applicable`); indicador necesario ausente (`not_evaluable` con
+`MISSING_FILING_INDICATOR`); y true sin filas Facts. En esta última, el indicador y la precondición
+siguen siendo true: el resultado de la expresión depende por separado de sus hechos/defaults,
+sin presumir que la regla pasa. Comprobar también false and unknown determinista y que
+exportar/reimportar conserva true/false/ausencia; un mapa inconsistente del mismo contexto rechaza
+el lote, sin reemplazar el snapshot previo.
 
 ## Medición y recorrido del analista
 

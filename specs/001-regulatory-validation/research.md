@@ -66,6 +66,9 @@ La entrada `start` exige EOF; aun así, se registrarán errores tanto del lexer 
 un árbol recuperado tras un error no autoriza evaluar. El catálogo admite una sola expresión
 booleana por registro. La dirección del recálculo será configuración separada de una igualdad;
 las sentencias `:=`, `<-` y los scripts quedan fuera de este perfil inicial.
+El caso `PRECONDITION_ELEMENT` se transforma en el nodo acotado `filing_indicator` para las
+precondiciones de presentación; no supone admitir variables genéricas. Su fuente de datos y
+semántica se precisan en R8.
 
 **Alternativas.** Editar los originales impediría compararlos con la entrega EBA. Usar listeners
 para calcular durante el parseo mezclaría errores sintácticos, resolución de referencias y datos.
@@ -200,3 +203,45 @@ No quedan decisiones técnicas bloqueantes para esta fase. La diferencia de inte
 local de agregados vacíos, unidades, redondeo y almacenamiento efímero son decisiones explícitas del
 perfil, no afirmaciones de equivalencia regulatoria. La implementación deberá contrastarlas con los
 casos de aceptación; cualquier nueva fuente que cambie su significado requiere versionar el perfil.
+
+## R8. Indicadores de presentación en precondiciones
+
+**Decisión.** Precisar el diseño aún en desarrollo de ce-report-1 con una columna textual final
+`Contexts.filingIndicators`: objeto JSON de códigos exactos de indicador/unidad de reporte a
+booleanos. Conserva cuatro hojas y la versión de plantilla actual; no es una nueva versión de
+una plantilla publicada. Celda vacía u objeto vacío significan no declarados, nunca false.
+El mapa se incorpora a ReportContext, contenido del snapshot, hashes y exportaciones. Un mismo
+contexto repetido debe aportar mapas canónicos iguales o se rechaza la importación.
+
+El AST admite únicamente el selector de la gramática `PRECONDITION_ELEMENT`, como
+`{v_C_01.00}`, con clase `filing_indicator`. Se elimina exactamente `v_`, conservando código,
+mayúsculas y sufijos. Se consulta el mapa del contexto de la instancia, sin heredar coordenadas,
+default o interval; no se habilitan variables ni operaciones referenciadas generales. Un código
+ausente es unknown. Si la lógica ternaria no permite decidir, produce `not_evaluable` y
+`MISSING_FILING_INDICATOR`; un false explícito o una combinación determinista puede producir
+`not_applicable`. Las lecturas se trazan como metadatos, sin FactKeys, aristas ni destinos de
+recálculo. Cambiar el mapa crea una versión e invalida previews de la base anterior.
+
+**Motivo y evidencia.** La presentación EBA sobre DPM-XL dedica las diapositivas 40–41 a
+precondiciones y sus indicadores. Filing Rules §1.6 describe indicadores positivos y negativos
+para unidades de reporte; la edición v5.8 contempla un indicador positivo aunque no haya hechos.
+Taxonomy Architecture §9.4 ilustra códigos como C_01.00/C_07.00 y distingue el alcance de las
+plantillas de reporte: no corresponde asumir que todo código sea literalmente un tableCode o
+Variable.Code. Por ello, ni una tabla presente ni un importe pueden sustituir la declaración.
+
+Esta precisión es necesaria para ejecutar las precondiciones reales de G169 y G113 sin
+alterarlas. Los fixtures sintéticos declaran respectivamente `{"C_01.00":true,"C_05.01":true}`
+y `{"C_18.00":true}`; se contrastarán true, false, ausente y true sin Facts. El texto EBA de
+Expression y Precondtion permanece intacto. Estos son casos esperados, no resultados ejecutados.
+
+**Alternativas descartadas.** Inferir el indicador de Facts/Coordinates confunde presentación
+de la unidad con presencia de datos y falla con true sin hechos. Sustituir la precondición por
+true haría que los fixtures dejaran de comprobar la regla real. Admitir variables genéricas
+ampliaría el lenguaje sin un contrato de resolución necesario para esta primera versión.
+
+**Fuentes.** Presentación primaria EBA, *Introduction to validation rules DPM-XL language*,
+diapositivas 40–41: el [enlace oficial](https://www.eba.europa.eu/sites/default/files/2025-05/bd082f19-c754-479c-adc7-880c7e747857/Introduction%20to%20validation%20rules%20DPM-XL%20language.pdf)
+devolvió 403; se consultó la [copia de la presentación EBA](https://www.dirittobancario.it/wp-content/uploads/2025/05/Introduction-to-validation-rules-DPM-XL-language.pdf#page=40).
+[EBA Filing Rules v5.6](https://eba.europa.eu/sites/default/files/2025-05/681d27b9-6744-4b7c-bea7-848cb910844e/EBA%20Filing%20Rules%20v5.6_2025_05_27.pdf), §1.6, p.14;
+[EBA Filing Rules v5.8](https://www.eba.europa.eu/sites/default/files/2026-02/10436139-46ae-4a7d-880f-c399ba6de669/EBA%20Filing%20Rules%20v5.8_2026_02_25.pdf), p.16;
+[EBA/EIOPA Taxonomy Architecture v2.0](https://www.eba.europa.eu/sites/default/files/2024-12/8fdac0fc-ddf7-4244-831c-20be53b2605a/EBA%2520and%2520EIOPA%2520taxonomy%2520architecture%2520v2.0-20241218.pdf#page=32), §9.4, p.32.

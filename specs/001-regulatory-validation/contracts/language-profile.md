@@ -1,7 +1,7 @@
 # Contrato del perfil de lenguaje y cálculo
 
 Identificador: `ce-dpmxl-0.9-closed-v1`. Estado: diseño; sin implementación comprobada.
-Fuentes y alternativas: [research.md](../research.md), R2–R4.
+Fuentes y alternativas: [research.md](../research.md), R2–R4 y R8.
 
 ## Frontera sintáctica
 
@@ -17,13 +17,14 @@ El visitor construye un AST tipado de la siguiente lista; cualquier otra constru
 | Paréntesis, signos unarios, `+ - * /` | Operandos compatibles y límites numéricos respetados. |
 | `= != < <= > >=`, `and or not` | Semántica inferior; se conserva la sintaxis que exige la gramática. |
 | Referencia a celda dentro/entre tablas | Resolución inequívoca en el contexto seleccionado. |
+| Selector de indicador de presentación | Solo `PRECONDITION_ELEMENT` de la gramática, como `{v_C_01.00}`, convertido en AST `filing_indicator`. |
 | `with`, `default`, `interval` | Ámbito estático sobre tablas cerradas. |
 | `isnull`, `nvl` | Tipos compatibles; no ocultan errores ni falta de soporte. |
 | `sum` y rangos finitos | Solo coordenadas del catálogo; no joins ni agrupaciones generales. |
 | `s*` | Binding por cada hoja declarada del catálogo cerrado. |
 
 Una regla contiene una sola expresión cuyo resultado final es booleano o null. Scripts,
-asignaciones `:=`/`<-`, variables, operaciones referenciadas, grupos de tablas, `where`, `group by`,
+asignaciones `:=`/`<-`, variables genéricas, operaciones referenciadas, grupos de tablas, `where`, `group by`,
 operadores temporales y selecciones dimensionales generales están fuera del perfil. Las direcciones
 de recálculo se configuran aparte; reconocer un token de asignación no habilita escritura.
 
@@ -39,7 +40,7 @@ La identidad de un hecho es `(contextId, tableCode, sheetCode, rowCode, columnCo
 contexto que fija entidad, fecha y módulo/versión. Los prefijos DPM `t/r/c/s` pertenecen a la
 expresión y se separan de los códigos del [workbook](workbook.md).
 
-`with` aporta tabla, coordenadas, default e interval. Una selección parcial hereda las coordenadas
+Para selecciones de celdas, `with` aporta tabla, coordenadas, default e interval. Una selección parcial hereda las coordenadas
 de la misma tabla; si declara una tabla distinta no hereda fila/columna/hoja de la anterior, aunque
 sí las opciones default e interval. Un override más local prevalece. Una referencia ambigua entre
 módulos no elige la primera coincidencia: `AMBIGUOUS_REFERENCE`.
@@ -50,6 +51,32 @@ contener las coordenadas y su metadato aunque falte el hecho. Coordenada válida
 es null implícito; coordenada que no existe en Coordinates no es null: `UNKNOWN_COORDINATE`.
 Una selección múltiple solo puede consumirse por `sum` o por el binding explícito de la regla.
 No se elige una celda de ella ni se aplica un producto cartesiano implícito.
+
+## Indicadores de presentación
+
+El visitor solo admite el caso sintáctico `PRECONDITION_ELEMENT` para crear un nodo
+`filing_indicator`. Quita exactamente el prefijo `v_` del token y conserva el resto, incluidos
+sufijos y mayúsculas: `{v_C_01.00}` consulta la clave `C_01.00` de
+`ReportContext.filingIndicators`. Este soporte no habilita variables ni operaciones genéricas.
+El código es una unidad de reporte/indicador declarada, no una equivalencia supuesta con
+tableCode ni con Variable.Code. Una referencia se resuelve exclusivamente en el contexto de la
+instancia; no se busca la primera coincidencia en otros contextos.
+
+El indicador es metadato booleano explícito. No lee Facts ni Coordinates y no hereda tabla,
+fila, columna, hoja, default o interval de `with`. Un true sin hechos sigue siendo true;
+un false explícito puede hacer que la precondición sea false y la regla `not_applicable`.
+Un código ausente produce unknown, con lógica ternaria: `false and unknown = false`,
+`true or unknown = true`, `true and unknown = unknown`, `not(unknown) = unknown`.
+Si el resultado desconocido impide decidir la aplicabilidad o el resultado, se devuelve
+`not_evaluable` con `MISSING_FILING_INDICATOR`; no se convierte en false ni en null de un hecho. `default`, `nvl` e `isnull` no sustituyen
+un indicador desconocido ni convierten su ausencia en un booleano conocido.
+Si la lógica determina el resultado pese a la ausencia, se conserva esa ausencia en la traza
+de metadatos, sin reemplazar el resultado determinista por `not_evaluable`.
+
+Las trazas registran contexto, código, valor declarado o ausencia y localizador de Contexts.
+Estas lecturas no generan FactKeys ni aristas del grafo de productores y nunca son destinos
+recalculables. Cambiar indicadores crea otra versión del snapshot e invalida previews de la
+base anterior. Las expresiones y precondiciones EBA se conservan intactas.
 
 ## Racionales, precisión y unidades
 
@@ -130,7 +157,7 @@ es una decisión local documentada, no una regla EBA inferida. Una expresión ex
 Aplicabilidad se resuelve antes del resultado: inactiva/fuera de contexto/fuera de vigencia o
 precondición false → `not_applicable`; precondición null → `not_evaluable`; precondición con error
 → `error`. Una regla aplicable true → `pass`, false → `fail`, null → `not_evaluable`.
-Falta de soporte o metadatos → `not_evaluable`; aritmética inválida → `error`.
+Falta de soporte o metadatos necesarios para decidir → `not_evaluable`; aritmética inválida → `error`.
 La precondición ausente equivale a true. La validación inicial nunca espera recálculos.
 
 ## Direcciones, simulación y aplicación
@@ -149,8 +176,9 @@ valor anterior, nominal exacto, intervalo derivado, valor cuantizado, precisión
 destino, exactamente como se exportaría. La regla originaria se reevalúa con el candidato:
 si no pasa, se informa `CANDIDATE_DOES_NOT_SATISFY_RULE` y no se ofrece como aplicable.
 
-Para obtener el grafo se expanden estáticamente todas las lecturas del lado calculado,
-precondición y ámbito admitido. Se crean nodos por dirección/instancia y aristas del productor
+Para obtener el grafo se expanden estáticamente todas las lecturas de hechos del lado calculado,
+precondición y ámbito admitido. Las lecturas de indicadores se conservan aparte como metadatos
+de la versión, sin aristas ni productores de hechos. Se crean nodos por dirección/instancia y aristas del productor
 al consumidor. Dos productores de la misma clave son conflicto incluso si proponen igual valor.
 Se bloquean sus consumidores antes de ejecutar Kahn. La cola de Kahn ordena claves canónicas,
 no filas de origen. En el residuo, Tarjan identifica SCC de más de un nodo o con autociclo;
@@ -182,5 +210,9 @@ de hechos, además del límite temporal de 60 segundos. Exceder una cuota produc
 | A=1/3 a p=2; D=A*3 a p=2, con interval:true | A=0.33; D=0.99; ambas igualdades pasan al revalidar sus intervalos. |
 | A=1/3 a p=2, con interval:false | Sin propuesta aplicable: 0.33 no satisface la igualdad puntual con 1/3. |
 | `1=1 @` | Error léxico, aunque una parte tenga árbol válido. |
+| Indicador declarado true/false | La selección devuelve respectivamente true/false; false en la precondición puede dar `not_applicable`. |
+| Indicador ausente necesario para decidir | unknown y `not_evaluable`, con `MISSING_FILING_INDICATOR`. |
+| Indicador true sin ninguna fila Facts | El indicador sigue siendo true; los hechos de la expresión se resuelven por separado. |
+| false and indicador ausente, en precondición | false y `not_applicable`, conservando la ausencia en la traza de metadatos. |
 
 Son resultados esperados para futuras pruebas, no pruebas ya ejecutadas.

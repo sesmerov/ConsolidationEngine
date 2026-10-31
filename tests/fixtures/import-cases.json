@@ -1,0 +1,59 @@
+{
+  "syntheticEntity": "SYNTHETIC",
+  "cases": [
+    {
+      "report": "report-42.xlsx",
+      "referenceDate": "2026-06-30",
+      "module": "COREP_OF_4.2",
+      "applicableSourceCells": [
+        "G169"
+      ]
+    },
+    {
+      "report": "report-40.xlsx",
+      "referenceDate": "2025-12-31",
+      "module": "COREP_OF_4.0",
+      "applicableSourceCells": [
+        "G113"
+      ],
+      "inactiveSourceCells": [
+        "G170"
+      ],
+      "note": "Inactive rows remain visible and are not evaluated."
+    }
+  ],
+  "expected": {
+    "catalogRows": 3,
+    "coordinates": 6,
+    "facts": 5,
+    "explicitNulls": 1,
+    "implicitNulls": 1,
+    "zeroText": "0",
+    "exactText": "123456789012345678901234567890.123456789"
+  },
+  "expectedByReport": {
+    "report-42.xlsx": {
+      "coordinates": 6,
+      "facts": 5,
+      "applicableSourceCells": [
+        "G169"
+      ]
+    },
+    "report-40.xlsx": {
+      "coordinates": 6,
+      "facts": 6,
+      "finiteSheets": [
+        "001",
+        "002"
+      ],
+      "target": "12",
+      "summands": [
+        "5",
+        "7"
+      ],
+      "applicableSourceCells": [
+        "G113"
+      ]
+    }
+  }
+}

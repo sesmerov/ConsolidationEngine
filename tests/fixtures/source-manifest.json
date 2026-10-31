@@ -1,0 +1,348 @@
+{
+  "sourceName": "(from 4.0) EBA_Validation_rules_2025-12-12.xlsx",
+  "sha256": "36636afe42b2ef2247822a31ad710afe1128b5b65a250b657e1f20d5a75bba79",
+  "sheet": "EBA_Validation_rules_2025-12-12",
+  "cases": [
+    {
+      "cell": "G113",
+      "row": 113,
+      "code": "v0002_h",
+      "values": {
+        "VR Code": "v0002_h",
+        "Source": "hierarchy",
+        "Framework": "COREP",
+        "Modules": "COREP_OF_4.0",
+        "Cross module": "No",
+        "Tables": "C_18.00",
+        "Expression": "with{tC_18.00, c0060, s*, default: 0, interval: true}: {r0011} = {r0020} + {r0210}",
+        "Precondtion": "{v_C_18.00} ",
+        "Description": "{r0011} = +{r0210} + {r0020}",
+        "IsActive": "Active",
+        "FromReferenceDate": "2025-03-31",
+        "ToReferenceDate": "2026-03-30",
+        "Severity": "Error",
+        "FromSubmissionDate": "2025-03-31",
+        "Implemented in XBRL": "Yes"
+      },
+      "raw": [
+        {
+          "address": "A113",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "335"
+        },
+        {
+          "address": "B113",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "336"
+        },
+        {
+          "address": "C113",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "77"
+        },
+        {
+          "address": "D113",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "82"
+        },
+        {
+          "address": "E113",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "19"
+        },
+        {
+          "address": "F113",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "337"
+        },
+        {
+          "address": "G113",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "338"
+        },
+        {
+          "address": "H113",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "339"
+        },
+        {
+          "address": "I113",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "340"
+        },
+        {
+          "address": "J113",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "24"
+        },
+        {
+          "address": "K113",
+          "xmlType": "n",
+          "style": "1",
+          "lexeme": "45747"
+        },
+        {
+          "address": "L113",
+          "xmlType": "n",
+          "style": "1",
+          "lexeme": "46111"
+        },
+        {
+          "address": "M113",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "162"
+        },
+        {
+          "address": "N113",
+          "xmlType": "n",
+          "style": "1",
+          "lexeme": "45747"
+        },
+        {
+          "address": "O113",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "27"
+        }
+      ]
+    },
+    {
+      "cell": "G169",
+      "row": 169,
+      "code": "v0190_m",
+      "values": {
+        "VR Code": "v0190_m",
+        "Source": "user_defined",
+        "Framework": "COREP",
+        "Modules": "COREP_OF_4.2",
+        "Cross module": "No",
+        "Tables": "C_01.00, C_05.01",
+        "Expression": "with {default: 0, interval: true}: {tC_01.00, r0230, c0010} = {tC_05.01, r0090, c0060}",
+        "Precondtion": "{v_C_01.00} and {v_C_05.01} ",
+        "Description": null,
+        "IsActive": "Active",
+        "FromReferenceDate": "2026-03-31",
+        "ToReferenceDate": "NULL",
+        "Severity": "warning",
+        "FromSubmissionDate": "2026-03-31",
+        "Implemented in XBRL": "Yes"
+      },
+      "raw": [
+        {
+          "address": "A169",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "439"
+        },
+        {
+          "address": "B169",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "16"
+        },
+        {
+          "address": "C169",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "77"
+        },
+        {
+          "address": "D169",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "78"
+        },
+        {
+          "address": "E169",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "19"
+        },
+        {
+          "address": "F169",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "440"
+        },
+        {
+          "address": "G169",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "441"
+        },
+        {
+          "address": "H169",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "442"
+        },
+        null,
+        {
+          "address": "J169",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "24"
+        },
+        {
+          "address": "K169",
+          "xmlType": "n",
+          "style": "1",
+          "lexeme": "46112"
+        },
+        {
+          "address": "L169",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "25"
+        },
+        {
+          "address": "M169",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "26"
+        },
+        {
+          "address": "N169",
+          "xmlType": "n",
+          "style": "1",
+          "lexeme": "46112"
+        },
+        {
+          "address": "O169",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "27"
+        }
+      ]
+    },
+    {
+      "cell": "G170",
+      "row": 170,
+      "code": "v0190_m",
+      "values": {
+        "VR Code": "v0190_m",
+        "Source": "user_defined",
+        "Framework": "COREP",
+        "Modules": "COREP_OF_4.0",
+        "Cross module": "No",
+        "Tables": "C_01.00, C_05.01",
+        "Expression": "with {default: 0, interval: true}: {tC_01.00, r0230, c0010} = {tC_05.01, r0090, c0060}",
+        "Precondtion": "{v_C_01.00} and {v_C_05.01} ",
+        "Description": "Deactivated",
+        "IsActive": "Inactive",
+        "FromReferenceDate": "2025-03-31",
+        "ToReferenceDate": "2026-03-30",
+        "Severity": "Error",
+        "FromSubmissionDate": "2025-03-31",
+        "Implemented in XBRL": "Yes"
+      },
+      "raw": [
+        {
+          "address": "A170",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "439"
+        },
+        {
+          "address": "B170",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "16"
+        },
+        {
+          "address": "C170",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "77"
+        },
+        {
+          "address": "D170",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "82"
+        },
+        {
+          "address": "E170",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "19"
+        },
+        {
+          "address": "F170",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "440"
+        },
+        {
+          "address": "G170",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "441"
+        },
+        {
+          "address": "H170",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "442"
+        },
+        {
+          "address": "I170",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "443"
+        },
+        {
+          "address": "J170",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "35"
+        },
+        {
+          "address": "K170",
+          "xmlType": "n",
+          "style": "1",
+          "lexeme": "45747"
+        },
+        {
+          "address": "L170",
+          "xmlType": "n",
+          "style": "1",
+          "lexeme": "46111"
+        },
+        {
+          "address": "M170",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "162"
+        },
+        {
+          "address": "N170",
+          "xmlType": "n",
+          "style": "1",
+          "lexeme": "45747"
+        },
+        {
+          "address": "O170",
+          "xmlType": "s",
+          "style": null,
+          "lexeme": "27"
+        }
+      ]
+    }
+  ],
+  "grammarHashes": {
+    "lexer": "dda7b8de2c8e1430448cad7a342c712d52ba1b5bd533730b4eafede02bb5805a",
+    "parser": "30fd37bddfdd356294801e53c7cf4864547a71d0ed13d1b884a3d9c6b6d884b4"
+  }
+}

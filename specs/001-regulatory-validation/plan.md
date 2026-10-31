@@ -12,8 +12,10 @@ sin implementación ni tasks.md.
 Aplicación web local para importar un catálogo reducido de reglas EBA y reportes en una plantilla
 propia, evaluar un perfil explícito de DPM-XL y proponer recálculos dirigidos por el usuario.
 Angular presenta cobertura, resultados y cambios; Node.js posee los datos, coordina trabajos y
-publica snapshots. Un motor puro interpreta AST generado desde ANTLR, resuelve coordenadas,
-evalúa racionales/intervalos y ordena recálculos con Kahn.
+publica snapshots. Un motor puro interpreta AST generado desde ANTLR, resuelve coordenadas e
+indicadores de presentación declarados por contexto, evalúa racionales/intervalos y ordena
+recálculos con Kahn. El selector `PRECONDITION_ELEMENT` tiene un nodo acotado `filing_indicator`;
+no habilita variables genéricas ni infiere indicadores a partir de hechos.
 
 Los recálculos no se deducen automáticamente de cualquier igualdad. Se simulan sobre una copia,
 se muestran sus dependencias y se aplican solo tras confirmación coherente, comprobación de versión
@@ -51,7 +53,8 @@ Cuotas: [workbook](contracts/workbook.md#preflight-y-cuotas-de-archivos),
 [sesión](data-model.md#capacidad-y-limpieza).
 
 **Scale/Scope**: Un analista, una entidad/fecha por conjunto, hasta 20 informes, tablas cerradas,
-un subconjunto numérico/booleano. Fuera: tablas abiertas, filtros/agrupaciones generales, XBRL,
+un subconjunto numérico/booleano e indicadores de presentación explícitos en Contexts de
+ce-report-1. Fuera: tablas abiertas, filtros/agrupaciones generales, XBRL,
 remisión oficial, álgebra general, iteración de ciclos, colaboración y persistencia multiusuario.
 
 ## Constitution Check
@@ -149,10 +152,10 @@ la siguiente fase de tareas; no constituye una lista de tareas ya ejecutadas.
 | --- | --- | --- |
 | FR-001 | Adaptador EBA con campos/procedencia exactos. | V01/V04 y fixture de cabeceras/fechas. |
 | FR-002 | Variantes/contextos/vigencia e identidad estable. | V04, duplicados equivalentes/conflictos, permutación. |
-| FR-003 | ce-report-1 y catálogo cerrado. | V01/V03/V14. |
+| FR-003 | ce-report-1, catálogo cerrado y filingIndicators por contexto. | V01/V03/V14 y roundtrip de true/false/ausencia. |
 | FR-004 | Staging y reemplazo atómico. | V01/V13. |
 | FR-005 | Capacidades/profileId y diagnóstico por regla. | V12 y resumen de cobertura. |
-| FR-006 | AST admitido y semántica acotada. | V02/V03/V05/V15. |
+| FR-006 | AST admitido, incluido filing_indicator, y semántica acotada. | V02/V03 con precondiciones intactas y variantes true/false/ausente/sin hechos; V05/V15. |
 | FR-007 | Racionales, intervalos, null y unidades. | V05/V07/V14/V15. |
 | FR-008 | Estados separados de severidad. | Tabla completa de estados con errores/indeterminados. |
 | FR-009 | Resultado paginado con valores/fuentes/versiones. | Conciliación de totales y V16. |

@@ -8,21 +8,13 @@ export interface SourceLocator {
   readonly fileId?: UUID; readonly sheet?: string; readonly row?: number;
   readonly column?: string; readonly ruleCode?: string;
 }
-export interface Diagnostic { readonly code: string; readonly message: string; readonly locator?: SourceLocator }
-export interface SourceFile {
-  readonly id: UUID; readonly sha256: string; readonly displayName: string;
-  readonly kind: 'catalog' | 'report'; readonly size: number; readonly importedAt: string;
-}
-export interface ReportContext {
-  readonly canonicalContextKey: string; readonly contextId: string; readonly entityId: string;
-  readonly referenceDate: CivilDate; readonly submissionDate?: CivilDate;
-  readonly framework: string; readonly moduleVersion: string;
-}
+export interface Diagnostic { readonly code: string; readonly message: string; readonly locator?: SourceLocator;
+  readonly fileName?: string; readonly severity?: 'error' | 'warning' | 'info'; readonly line?: number; readonly column?: number; readonly start?: number; readonly end?: number }
 export interface SnapshotContent {
   readonly catalogVersion: string; readonly reportVersion: string; readonly configVersion: string;
   readonly profileId: string; readonly contexts: readonly ReportContext[];
-  readonly catalog: JsonObject; readonly coordinates: readonly JsonObject[];
-  readonly facts: readonly JsonObject[]; readonly directions: readonly JsonObject[];
+  readonly catalog: CatalogData; readonly coordinates: readonly Coordinate[];
+  readonly facts: readonly ReportedFact[]; readonly directions: readonly JsonObject[];
   readonly sources: readonly SourceFile[];
 }
 export interface Snapshot {
@@ -61,3 +53,6 @@ export function isCivilDate(value: string): boolean {
 export function safeDisplayName(value: string): string {
   return (value.split(/[\\/]/).at(-1) ?? '').replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 200) || 'archivo.xlsx';
 }
+import type { CatalogData } from './catalog.js';
+import type { Coordinate, ReportedFact, ReportContext, SourceFile } from './report.js';
+export type { ReportContext, SourceFile } from './report.js';

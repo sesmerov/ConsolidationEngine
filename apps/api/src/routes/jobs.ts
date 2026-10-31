@@ -5,7 +5,8 @@ import type { JobKind, JsonValue } from '@ce/contracts';
 import { ApiError } from '../errors.js';
 import { requireCurrentVersion } from '../plugins/version-guard.js';
 import { hashJsonBody } from '../session/idempotency-store.js';
-export interface JobPreparation { readonly input: JsonValue; readonly bodyHash?: string; readonly baseVersionId?: string }
+export interface JobPreparation { readonly input: JsonValue; readonly bodyHash?: string; readonly baseVersionId?: string;
+  readonly cleanup?: () => Promise<void>; readonly release?: () => void }
 export interface JobRouteDefinition {
   readonly path: string; readonly kind: JobKind; readonly bodySchema?: object;
   // Parse/normalize/hash only: version/snapshot checks must remain AFTER idempotency lookup.
@@ -20,23 +21,30 @@ export function registerJobRoute(app: FastifyInstance, definition: JobRouteDefin
     const workspaceId = request.params.workspaceId;
     const key = request.headers['idempotency-key']; if (typeof key !== 'string' || !UUID_PATTERN.test(key)) throw new ApiError('INVALID_REQUEST');
     const prepared = await definition.prepare(request);
+    let transferred = false;
+    try {
     const bodyHash = prepared.bodyHash ?? hashJsonBody(request.body);
     const scope = { workspaceId, key, operation: definition.kind + ':' + definition.path };
     // onRequest already authenticated. A replay must precede any If-Match/base-version rejection.
     const priorId = app.ce.idempotency.lookup(scope, bodyHash);
-    if (priorId) return reply.code(202).send(app.ce.jobs.get(workspaceId, priorId));
+    if (priorId) { await prepared.cleanup?.(); await app.ce.jobs.settle(priorId); return reply.code(202).send(app.ce.jobs.get(workspaceId, priorId)); }
     requireCurrentVersion(request, app.ce.store, workspaceId);
     const baseVersionId = prepared.baseVersionId ?? app.ce.store.get(workspaceId).currentVersionId;
     app.ce.store.assertBase(workspaceId, baseVersionId);
     const jobId = randomUUID(); app.ce.idempotency.remember(scope, bodyHash, jobId);
     try {
-      const job = app.ce.jobs.start({ workspaceId, jobId, kind: definition.kind, input: prepared.input, ...(baseVersionId ? { baseVersionId } : {}) });
+      const job = app.ce.jobs.start({ workspaceId, jobId, kind: definition.kind, input: prepared.input, ...(baseVersionId ? { baseVersionId } : {}), ...(prepared.cleanup ? { finalize: prepared.cleanup } : {}) });
+      transferred = true;
       return reply.code(202).send(job);
     } catch (error) { app.ce.idempotency.forget(scope); throw error; }
+    } finally { try { if (!transferred) await prepared.cleanup?.(); } finally { prepared.release?.(); } }
   });
 }
 export function registerJobs(app: FastifyInstance): void {
-  app.get<{ Params: { workspaceId: string; jobId: string } }>('/api/v1/workspaces/:workspaceId/jobs/:jobId', { schema: { params: jobParamsSchema, querystring: emptyQuerySchema } }, async (request) => app.ce.jobs.get(request.params.workspaceId, request.params.jobId));
+  app.get<{ Params: { workspaceId: string; jobId: string } }>('/api/v1/workspaces/:workspaceId/jobs/:jobId', { schema: { params: jobParamsSchema, querystring: emptyQuerySchema } }, async (request) => {
+    const { workspaceId, jobId } = request.params; const job = app.ce.jobs.get(workspaceId, jobId);
+    if (isTerminalJob(job.status)) await app.ce.jobs.settle(jobId); return app.ce.jobs.get(workspaceId, jobId);
+  });
   app.delete<{ Params: { workspaceId: string; jobId: string } }>('/api/v1/workspaces/:workspaceId/jobs/:jobId', { schema: { params: jobParamsSchema, querystring: emptyQuerySchema } }, async (request, reply) => {
     const { workspaceId, jobId } = request.params; const previous = app.ce.jobs.get(workspaceId, jobId);
     const job = await app.ce.jobs.cancel(workspaceId, jobId); return reply.code(isTerminalJob(previous.status) ? 200 : 202).send(job);

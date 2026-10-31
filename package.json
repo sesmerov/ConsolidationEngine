@@ -14,6 +14,7 @@
   "packageManager": "npm@11.19.1",
   "scripts": {
     "generate:parser": "node scripts/generate-parser.mjs",
+    "fixtures": "node scripts/create-fixtures.mjs",
     "build:packages": "npm run build --workspace @ce/contracts && npm run build --workspace @ce/engine",
     "build:api": "npm run build:packages && npm run build --workspace @ce/api",
     "build": "npm run generate:parser && npm run build:api && npm run build --workspace @ce/web",

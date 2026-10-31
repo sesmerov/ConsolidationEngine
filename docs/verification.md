@@ -56,3 +56,43 @@ comprueban esa restauración, cancelación y que respuestas tardías no repueble
 
 Pendientes: importación, evaluación, recálculos, contratos de negocio, E2E y rendimiento.
 No se han declarado suites vacías como superadas.
+## US1 T016–T030
+
+Checkpoint: 218 pruebas correctas (85 engine, 5 Angular, 106 integración, 19 contrato y 3 E2E).
+Los comandos se ejecutaron mediante `scripts/run-with-toolchain.ps1`: `run typecheck`,
+`run build:api`, `run build --workspace @ce/web`, `run test` y `run test:e2e`.
+Typecheck/build y `git diff --check` correctos. No se añadieron dependencias ni se repitió audit
+sin cambios del árbol de dependencias.
+
+Los E2E usan Chromium 156.0.8078.4 (build1248), instalado únicamente en `.cache/playwright`,
+contra el servidor Node de producción y Angular compilado. No sustituyen importador, parser
+ni workers por mocks. Comprueban descarga y carga, cero/null/ausencia, refresco de sesión,
+reglas inválidas/duplicadas, carga fallida que conserva versión, archivos estáticos y protección API.
+La captura `.cache/import-ui.png` fue inspeccionada; contiene sólo el conjunto SYNTHETIC.
+
+La suite de importación completa ejecuta 75 casos, incluido un worker real. Comprueba raw XML,
+fechas 1900/1904/serial60, precisión textual, ZIP/XML adversos, fórmulas/componentes activos,
+cuotas y atomicidad. Otros casos comprueban catálogo/variantes y composición de informes.
+Los 11 contratos de imports incluyen recepción lenta/simultánea, cierre de workspace/servidor
+durante subida, cancelación y limpieza, replay con boundary distinto y ETag antiguo, y conflicto.
+La plantilla tiene formato Texto real en su XML y pasa roundtrip por el importador.
+
+Se corrigieron dos discrepancias descubiertas durante la integración: NULL de fecha sólo es
+válido como texto, y los esquemas aceptan los mismos códigos que el lexer/importador. Los errores
+del parser conservan la columna real incluso con cabeceras reordenadas; los fallos de importación
+indican archivo saneado, hoja y celda sin exponer rutas internas.
+
+Las precondiciones reales usan filing indicators. Se precisó el contrato con declaraciones
+explícitas en Contexts, apoyadas en las fuentes de research R8, sin inferirlas de los hechos ni
+alterar las precondiciones. T025 incluye AST filing_indicator; su evaluación aún corresponde a US2.
+El parser rechaza errores léxicos/sintácticos aunque ANTLR recupere un árbol, scripts, asignaciones,
+construcciones fuera del perfil y entradas que exceden límites. Nunca se envía AST por HTTP.
+
+Hashes originales comprobados antes y después del E2E:
+
+- Excel EBA: `36636afe42b2ef2247822a31ad710afe1128b5b65a250b657e1f20d5a75bba79`.
+- Lexer: `dda7b8de2c8e1430448cad7a342c712d52ba1b5bd533730b4eafede02bb5805a`.
+- Parser: `30fd37bddfdd356294801e53c7cf4864547a71d0ed13d1b884a3d9c6b6d884b4`.
+
+Esto acredita carga/análisis y su recorrido de usuario. Evaluación, recálculos, aplicación,
+exportación de resultados y medición de rendimiento siguen pendientes.

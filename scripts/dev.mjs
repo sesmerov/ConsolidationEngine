@@ -4,7 +4,7 @@ import path from 'node:path';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const children = [
-  spawn(process.execPath, [path.join(root, 'apps/api/dist/server.js')], { cwd: root, stdio: 'inherit', windowsHide: true }),
+  spawn(process.execPath, [path.join(root, 'apps/api/dist/server.js')], { cwd: root, env: { ...process.env, NODE_ENV: 'development' }, stdio: 'inherit', windowsHide: true }),
   spawn(process.execPath, [path.join(root, 'node_modules/@angular/cli/bin/ng.js'), 'serve', '--host', '127.0.0.1', '--port', '4200'], { cwd: path.join(root, 'apps/web'), stdio: 'inherit', windowsHide: true }),
 ];
 let stopping = false;

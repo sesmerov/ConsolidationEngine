@@ -12,7 +12,7 @@ export interface WorkerRequest {
 export type WorkerMessage =
   | { readonly type: 'progress'; readonly completed: number; readonly total: number }
   | { readonly type: 'result'; readonly output: WorkerOutput }
-  | { readonly type: 'failure'; readonly code: string };
+  | { readonly type: 'failure'; readonly diagnostic: Diagnostic };
 export interface OperationContext {
   readonly job: JobDTO; readonly snapshot?: Snapshot;
   readonly cancelled: () => boolean; readonly progress: (completed: number, total: number) => void;

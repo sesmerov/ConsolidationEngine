@@ -1,5 +1,6 @@
 import { parentPort, workerData } from 'node:worker_threads';
 import type { WorkerOperation, WorkerRequest } from './protocol.js';
+import { publicDiagnostic } from '../public-diagnostic.js';
 const request = workerData as WorkerRequest;
 const port = parentPort;
 if (!port) throw new Error('Worker entry requires a parent port.');
@@ -12,6 +13,6 @@ try {
     progress: (completed, total) => port.postMessage({ type: 'progress', completed, total }),
   });
   if (Atomics.load(cancellation, 0) === 0) port.postMessage({ type: 'result', output });
-} catch {
-  port.postMessage({ type: 'failure', code: 'INTERNAL_ERROR' });
+} catch (error) {
+  port.postMessage({ type: 'failure', diagnostic: publicDiagnostic(error) });
 } finally { port.close(); }

@@ -5,18 +5,20 @@ import type { JobDTO, JobKind, JsonValue } from '@ce/contracts';
 import { ApiError } from '../errors.js';
 import type { WorkspaceStore } from '../session/workspace-store.js';
 import type { WorkerMessage, WorkerRequest } from '../workers/protocol.js';
+import { receivedDiagnostic } from '../public-diagnostic.js';
 
 export type WorkerHandle = Pick<Worker, 'on' | 'terminate'>;
 export type WorkerFactory = (request: WorkerRequest) => WorkerHandle;
 export interface JobManagerOptions {
   workerFactory?: WorkerFactory; workerModules?: Partial<Record<JobKind, URL>>; deadlineMs?: number; workerEntry?: URL;
 }
-export interface StartJob { workspaceId: string; kind: JobKind; baseVersionId?: string; input: JsonValue; jobId?: string }
-interface Running { cancellation: Int32Array; worker?: WorkerHandle; timer?: NodeJS.Timeout; expiresAt: number; stopping: boolean; stopPromise?: Promise<JobDTO> }
+export interface StartJob { workspaceId: string; kind: JobKind; baseVersionId?: string; input: JsonValue; jobId?: string; finalize?: () => Promise<void> }
+interface Running { cancellation: Int32Array; worker?: WorkerHandle; timer?: NodeJS.Timeout; expiresAt: number; stopping: boolean; stopPromise?: Promise<JobDTO>; finalize?: () => Promise<void> }
 class DeadlineElapsed extends Error {}
 export class JobManager {
   private readonly running = new Map<string, Running>();
   private readonly terminations = new Set<Promise<unknown>>();
+  private readonly settling = new Map<string, Promise<unknown>>();
   private readonly factory: WorkerFactory;
   private readonly deadlineMs: number;
   private readonly modules: Partial<Record<JobKind, URL>>;
@@ -37,7 +39,7 @@ export class JobManager {
     const job: JobDTO = { jobId: input.jobId ?? randomUUID(), workspaceId: input.workspaceId, kind: input.kind, status: 'queued',
       ...(input.baseVersionId ? { baseVersionId: input.baseVersionId } : {}), progress: { completed: 0, total: 0, complete: false }, diagnostics: [], pollAfterMs: 1000 };
     this.store.registerJob(job);
-    const running: Running = { cancellation: new Int32Array(new SharedArrayBuffer(4)), expiresAt: Infinity, stopping: false };
+    const running: Running = { cancellation: new Int32Array(new SharedArrayBuffer(4)), expiresAt: Infinity, stopping: false, ...(input.finalize ? { finalize: input.finalize } : {}) };
     this.running.set(job.jobId, running);
     queueMicrotask(() => this.begin(job, input.input, running)); return this.get(job.workspaceId, job.jobId);
   }
@@ -82,6 +84,9 @@ export class JobManager {
           if (Atomics.load(running.cancellation, 0)) throw new ApiError('INTERNAL_ERROR');
         });
         this.cleanup(job.jobId);
+      } else if (message.type === 'failure') {
+        this.store.updateJob({ ...job, status: 'failed', endedAt: new Date().toISOString(), progress: { ...job.progress, complete: false }, diagnostics: [receivedDiagnostic(message.diagnostic)] });
+        this.cleanup(job.jobId);
       } else throw new ApiError('INTERNAL_ERROR');
     } catch (error) { if (error instanceof DeadlineElapsed) void this.stop(original, 'timed_out'); else this.fail(original, error); }
   }
@@ -95,10 +100,9 @@ export class JobManager {
   private cleanup(id: string): void {
     const running = this.running.get(id); if (!running) return;
     running.stopping = true; Atomics.store(running.cancellation, 0, 1); if (running.timer) clearTimeout(running.timer);
-    if (running.worker) {
-      const termination = running.worker.terminate().catch(() => undefined);
-      this.terminations.add(termination); void termination.finally(() => this.terminations.delete(termination));
-    }
+    const termination = (async () => { await running.worker?.terminate().catch(() => undefined); await running.finalize?.(); })();
+    this.terminations.add(termination); this.settling.set(id, termination);
+    void termination.then(() => { this.terminations.delete(termination); this.settling.delete(id); }, () => { /* Retain cleanup failure for settle/close; never create an unhandled rejection. */ });
     this.running.delete(id);
   }
   private stop(original: JobDTO, status: 'cancelled' | 'timed_out'): Promise<JobDTO> {
@@ -108,6 +112,7 @@ export class JobManager {
     running.stopping = true; Atomics.store(running.cancellation, 0, 1); if (running.timer) clearTimeout(running.timer);
     running.stopPromise = (async () => {
       if (running.worker) await running.worker.terminate().catch(() => undefined);
+      await running.finalize?.();
       const current = this.get(original.workspaceId, original.jobId);
       const result: JobDTO = isTerminalJob(current.status) ? current : { ...current, status, endedAt: new Date().toISOString(), progress: { ...current.progress, complete: false },
         diagnostics: status === 'timed_out' ? [{ code: 'JOB_TIMEOUT', message: 'El trabajo superó el plazo de ejecución y quedó incompleto.' }] : [] };
@@ -121,6 +126,7 @@ export class JobManager {
     const id = this.store.get(workspaceId).activeJobId; if (id) await this.cancel(workspaceId, id);
     await Promise.all(this.terminations);
   }
+  async settle(jobId: string): Promise<void> { await this.settling.get(jobId); }
   async dispose(): Promise<void> {
     this.disposed = true; const id = this.store.currentWorkspaceId; if (id) await this.cancelActive(id);
   }

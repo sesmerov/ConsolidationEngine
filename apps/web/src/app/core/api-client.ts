@@ -1,8 +1,8 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import type { HttpResponse } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
-import type { BootstrapDTO, JobDTO, WorkspaceDTO } from '@ce/contracts';
+import { firstValueFrom, fromEvent, takeUntil } from 'rxjs';
+import type { BootstrapDTO, CapabilitiesDTO, JobDTO, RulesPageDTO, WorkspaceDTO } from '@ce/contracts';
 @Injectable({ providedIn: 'root' })
 export class ApiClient {
   private readonly http = inject(HttpClient);
@@ -30,6 +30,17 @@ export class ApiClient {
   }
   cancelJob(workspaceId: string, jobId: string): Promise<JobDTO> {
     return firstValueFrom(this.http.delete<JobDTO>(this.jobUrl(workspaceId, jobId), { headers: this.headers() }));
+  }
+  capabilities(): Promise<CapabilitiesDTO> { return firstValueFrom(this.http.get<CapabilitiesDTO>('/api/v1/capabilities', { headers: this.headers() })); }
+  reportTemplate(): Promise<Blob> { return firstValueFrom(this.http.get('/api/v1/templates/report', { headers: this.headers(), responseType: 'blob' })); }
+  importFiles(workspaceId: string, etag: string, catalog: File, reports: readonly File[], key: string, signal: AbortSignal): Promise<JobDTO> {
+    const body = new FormData(); body.append('catalog', catalog, catalog.name); for (const report of reports) body.append('reports', report, report.name);
+    return firstValueFrom(this.http.post<JobDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/imports', body,
+      { headers: this.headers(etag).set('Idempotency-Key', key) }).pipe(takeUntil(fromEvent(signal, 'abort'))));
+  }
+  rules(workspaceId: string, versionId: string, filters: { code?: string; status?: string; cursor?: string } = {}): Promise<RulesPageDTO> {
+    return firstValueFrom(this.http.get<RulesPageDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/rules',
+      { headers: this.headers(), params: { versionId, limit: '50', ...filters } }));
   }
   private jobUrl(workspaceId: string, jobId: string): string {
     return '/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/jobs/' + encodeURIComponent(jobId);

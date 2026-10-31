@@ -8,7 +8,8 @@ Todos los archivos son `.xlsx`. El catálogo EBA y los informes tienen formatos 
 Hojas exactas: `Instructions`, `Contexts`, `Coordinates`, `Facts`. Fila 1 contiene las cabeceras
 exactas, sin celdas combinadas en tablas de datos. El orden de filas no tiene significado.
 `Instructions` contiene instrucciones en español, versión, ejemplo sintético y explicación de
-null/ausencia/precisión. No se importa como hechos. No se ejecuta ninguna fórmula del libro.
+null/ausencia/precisión e indicadores de presentación declarados. No se importa como hechos.
+No se ejecuta ninguna fórmula del libro.
 
 ### Contexts
 
@@ -21,6 +22,7 @@ null/ausencia/precisión. No se importa como hechos. No se ejecuta ninguna fórm
 | submissionDate | ISO o vacío si ninguna vigencia aplicable lo necesita. |
 | framework | Texto del contexto regulatorio, por ejemplo `COREP`. |
 | moduleVersion | Identificador exacto, por ejemplo `COREP_OF_4.2`. |
+| filingIndicators | Texto JSON: objeto de códigos exactos de indicador de presentación/unidad de reporte, sin prefijo `v_`, a valores booleanos; por ejemplo `{"C_01.00":true,"C_05.01":true}`. Celda vacía equivale a `{}`. |
 
 Un lote tiene una entidad y fecha de referencia. Incluir varios módulos en Contexts constituye la
 declaración expresa del usuario de que esos contextos forman el conjunto compatible que desea
@@ -28,6 +30,21 @@ validar; la importación muestra esa lista para comprobarla. No acredita compati
 por sí misma ni permite inferir módulos adicionales. Repetir el mismo contextId entre archivos exige que todos sus atributos
 coincidan. No se fusionan contextos por semejanza. Si una regla requiere fecha de remisión y falta,
 queda no evaluable; no se sustituye por la fecha del ordenador.
+
+`filingIndicators` es la última columna de Contexts; la plantilla conserva sus cuatro hojas y
+su versión `ce-report-1`, todavía en desarrollo. El objeto admite únicamente claves no vacías
+y valores JSON `true`/`false`: no cadenas, números, null ni claves duplicadas. Se conservan
+mayúsculas y sufijos del código, sin añadir ni quitar prefijos de tabla. Un código identifica
+la unidad de reporte indicada por la precondición; no se presupone que sea un tableCode ni un
+Variable.Code del modelo DPM.
+
+Un mapa vacío o un código ausente significa **no declarado**, nunca false. La presencia de
+Coordinates, Facts o un importe distinto de cero no permite deducir el indicador. Un true
+explícito sigue siendo true aunque no existan hechos. El lector conserva procedencia de esta
+celda como metadato de contexto; el [perfil](language-profile.md#indicadores-de-presentación)
+define su lógica ternaria y `MISSING_FILING_INDICATOR`. Repetir un contexto exige el mismo mapa
+canónico, además de los restantes atributos; un mapa inconsistente rechaza el lote. El orden de
+claves JSON no cambia su contenido. Cualquier cambio del mapa versiona el snapshot y su hash.
 
 ### Coordinates
 
@@ -88,9 +105,11 @@ según la política de recálculo antes de proponerse.
 ### Ejemplo mínimo sintético
 
 Context `demo`, entidad `SYNTHETIC`, referencia y remisión `2026-06-30`, framework `COREP`, módulo
-`COREP_OF_4.2`. Coordinates declara C_01.00/r0230/c0010 y C_05.01/r0090/c0060, ambas sin hoja,
+`COREP_OF_4.2`, con filingIndicators `{"C_01.00":true,"C_05.01":true}` declarado expresamente.
+Coordinates declara C_01.00/r0230/c0010 y C_05.01/r0090/c0060, ambas sin hoja,
 number/EUR/decimals=2. Facts contiene valores textuales `10.00` y `10.00` con presence=value.
-La regla real de G169 se conserva con su fuente; los importes y la entidad son sintéticos.
+La expresión y la precondición reales de G169 se conservan con su fuente; los importes, la entidad
+y la declaración de indicadores son sintéticos.
 
 ## Adaptador del catálogo de reglas EBA
 
@@ -163,7 +182,9 @@ reglas individuales quedan registrados y no impiden importar otras reglas válid
 
 ## Exportación y roundtrip
 
-El informe recalculado usa ce-report-1, conserva contextos/coordenadas y escribe importes como texto.
+El informe recalculado usa ce-report-1, conserva contextos/coordenadas, incluido el mapa explícito
+filingIndicators, y escribe importes como texto. Exportar/reimportar conserva las diferencias
+entre indicador true, false y no declarado; no reconstruye el mapa a partir de los hechos.
 La versión original no se sobrescribe. Los resultados y cambios se exportan como JSON con racionales
 en cadenas; una vista Excel adicional de resultados usa texto literal, nunca fórmulas ni enlaces
 activos. La exportación incluye perfil, versiones, procedencias, redondeos y datos sintéticos

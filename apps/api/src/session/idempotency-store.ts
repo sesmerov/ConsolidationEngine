@@ -18,6 +18,7 @@ export class IdempotencyStore {
     if (entry && entry.bodyHash !== bodyHash) throw new ApiError('IDEMPOTENCY_CONFLICT');
     return entry?.jobId;
   }
+  has(scope: IdempotencyScope): boolean { this.store.get(scope.workspaceId); return this.store.getRecord<Entry>(this.recordKey(scope)) !== undefined; }
   remember(scope: IdempotencyScope, bodyHash: string, jobId: string): void { this.store.putInternalRecord(this.recordKey(scope), { bodyHash, jobId }); }
   forget(scope: IdempotencyScope): void { this.store.deleteInternalRecord(this.recordKey(scope)); }
 }

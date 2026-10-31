@@ -13,17 +13,17 @@ describe('session snapshots and accounted state', () => {
     const store = new WorkspaceStore();
     const workspace = store.create('Prueba');
     const first = store.publish(workspace.id, undefined, content());
-    expect(() => { (first.content.facts[0] as { value: string }).value = '99'; }).toThrow();
+    expect(() => { (first.content.facts[0] as { originalText: string }).originalText = '99'; }).toThrow();
     const second = store.publish(workspace.id, first.versionId, { ...first.content, configVersion: 'two' });
     expect(second.content.facts).toBe(first.content.facts);
-    expect(store.snapshot(workspace.id, first.versionId).content.facts[0]).toEqual({ value: '10' });
+    expect(store.snapshot(workspace.id, first.versionId).content.facts[0]).toMatchObject({ originalText: '10' });
     expect(() => store.publish(workspace.id, first.versionId, content())).toThrowError(/STALE_VERSION/);
   });
   it('does not trust a shallow-frozen object supplied by a caller', () => {
     const store = new WorkspaceStore(); const w = store.create('Prueba');
-    const mutable = { value: '10' }; const source = { ...content(), facts: Object.freeze([mutable]) };
-    const first = store.publish(w.id, undefined, source); mutable.value = '99';
-    expect(first.content.facts[0]).toEqual({ value: '10' });
+    const mutable = { ...content().facts[0]!, originalText: '10' }; const source = { ...content(), facts: Object.freeze([mutable]) };
+    const first = store.publish(w.id, undefined, source); mutable.originalText = '99';
+    expect(first.content.facts[0]).toMatchObject({ originalText: '10' });
   });
   it('counts shared JSON once, canonicalizes keys, rejects BigInt and invalid JSON', () => {
     const shared = Object.freeze({ value: 'á'.repeat(50) });

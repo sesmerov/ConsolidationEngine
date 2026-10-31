@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile, lstat } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile, lstat, open } from 'node:fs/promises';
+import type { FileHandle } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { UUID_PATTERN } from '@ce/contracts';
@@ -31,6 +32,20 @@ export class SessionFiles {
     if ((await lstat(directory)).isSymbolicLink() || await realpath(directory) !== directory) throw new ApiError('INTERNAL_ERROR');
     const id = randomUUID(); const location = path.join(directory, id); await writeFile(location, bytes, { flag: 'wx' });
     return { id, sha256: createHash('sha256').update(bytes).digest('hex'), path: location, size: bytes.byteLength };
+  }
+  async openFile(workspaceId: string): Promise<{ id: string; path: string; handle: FileHandle }> {
+    await this.verify(); const directory = this.workspacePath(workspaceId);
+    if ((await lstat(directory)).isSymbolicLink() || await realpath(directory) !== directory) throw new ApiError('INTERNAL_ERROR');
+    const id = randomUUID(); const location = path.join(directory, id);
+    return { id, path: location, handle: await open(location, 'wx') };
+  }
+  async removeFiles(workspaceId: string, ids: readonly string[]): Promise<void> {
+    await this.verify(); const directory = this.workspacePath(workspaceId);
+    if ((await lstat(directory)).isSymbolicLink() || await realpath(directory) !== directory) throw new ApiError('INTERNAL_ERROR');
+    for (const id of ids) {
+      if (!UUID_PATTERN.test(id)) throw new ApiError('INTERNAL_ERROR');
+      await rm(path.join(directory, id), { force: true });
+    }
   }
   async removeWorkspace(workspaceId: string): Promise<void> {
     await this.verify(); const target = this.workspacePath(workspaceId);

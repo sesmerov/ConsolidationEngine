@@ -2,7 +2,8 @@ import { EventEmitter } from 'node:events';
 import type { SnapshotContent } from '@ce/contracts';
 export function content(): SnapshotContent {
   return { catalogVersion: 'one', reportVersion: 'one', configVersion: 'one', profileId: 'ce-dpmxl-0.9-closed-v1',
-    contexts: [], catalog: { records: [] }, coordinates: [], facts: [{ value: '10' }], directions: [], sources: [] };
+    contexts: [], catalog: { records: [], variants: [], analyses: [], coverage: { rows: 0, variants: 0, applicableVariants: 0, supportedVariants: 0, invalidRows: 0, duplicateRows: 0, conflictingVariants: 0 } },
+    coordinates: [], facts: [{ factKey: 'fixture', contextId: 'demo', tableCode: 'C_01.00', sheetCode: '', rowCode: '0230', columnCode: '0010', presence: 'value', originalText: '10', normalizedValue: { numerator: '10', denominator: '1' }, sourceLocator: {} }], directions: [], sources: [] };
 }
 export class ControlledWorker extends EventEmitter {
   terminated = false;
