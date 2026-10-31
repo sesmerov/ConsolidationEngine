@@ -4,13 +4,22 @@ Motor de validación y recálculo de informes regulatorios. El analista cargará
 de reglas EBA y sus informes en una plantilla Excel propia, consultará resultados y podrá aceptar
 propuestas de recálculo con sus dependencias.
 
-El proyecto está en la primera fase de Spec Kit. Hay una constitución y una especificación inicial;
-todavía no existen una aplicación, un parser generado ni resultados de rendimiento.
+El proyecto ha completado especificación y planificación con Spec Kit. Hay constitución,
+requisitos y diseño técnico; todavía no existen una aplicación, un parser generado ni resultados
+de rendimiento. La siguiente fase es generar las tareas de implementación.
 
 ## Documentos del proyecto
 
 - [Constitución 1.0.0](.specify/memory/constitution.md): principios y restricciones.
 - [Especificación 001](specs/001-regulatory-validation/spec.md): historias, requisitos y aceptación.
+- [Plan técnico](specs/001-regulatory-validation/plan.md): arquitectura, versiones y secuencia de construcción.
+- [Investigación](specs/001-regulatory-validation/research.md): decisiones, alternativas y fuentes.
+- [Modelo de datos](specs/001-regulatory-validation/data-model.md): identidades, snapshots y estados.
+- Contratos de [HTTP](specs/001-regulatory-validation/contracts/http-api.md),
+  [Excel](specs/001-regulatory-validation/contracts/workbook.md) y
+  [lenguaje/cálculo](specs/001-regulatory-validation/contracts/language-profile.md).
+- [Guía de validación](specs/001-regulatory-validation/quickstart.md): comandos y escenarios previstos;
+  distingue lo verificable hoy de lo que requiere implementar el producto.
 - [Comprobación de calidad](specs/001-regulatory-validation/checklists/requirements.md): estado
   documental de la especificación, sin acreditar pruebas de producto.
 - [Notas de las fuentes](specs/001-regulatory-validation/source-notes.md): evidencia del Excel,
@@ -30,6 +39,10 @@ todavía no existen una aplicación, un parser generado ni resultados de rendimi
   requerirán destino explícito, previsualización y aceptación; conservarán los datos originales.
 - La primera versión tendrá un perfil de lenguaje acotado, con intervalos cuando la regla los
   declare. Las construcciones no soportadas se mostrarán como no evaluables.
+- El perfil documenta una diferencia frente a fórmulas inconsistentes observadas en el PDF v0.9
+  para multiplicación/división de intervalos. No afirma conformidad literal completa con DPM-XL.
+- La sesión inicial será local y efímera: los datos cargados no se recuperan tras reiniciar la
+  aplicación. Las exportaciones guardadas por el usuario se conservan.
 
 El uso local por un analista, los límites de carga y el perfil inicial son supuestos de alcance
 documentados y revisables en la especificación.
@@ -39,9 +52,9 @@ documentados y revisables en la especificación.
 Se ha inicializado **Specify CLI 1.1.3**, integración **Codex**, con scripts PowerShell.
 Las skills viven en `.agents/skills/` y los recursos compartidos en `.specify/`.
 
-La siguiente fase es `$speckit-plan`. Antes puede utilizarse `$speckit-clarify` si se desea ajustar
-el alcance. En planificación se concretarán la plantilla, las versiones de herramientas, las
-políticas de cálculo y los contratos. Después: `$speckit-tasks` y `$speckit-implement`.
+La siguiente fase es `$speckit-tasks`, que descompondrá el plan en trabajo verificable.
+Después corresponde `$speckit-implement`. Si cambia el alcance, se actualizarán primero
+la especificación y el plan afectados.
 Estos nombres se invocan en el chat de Codex; no son comandos de PowerShell.
 
 Para comprobar la instalación desde la raíz:
@@ -51,7 +64,7 @@ specify version
 specify integration status --json
 ```
 
-No se ha creado `plan.md` ni `tasks.md`: corresponden a las siguientes fases.
+`plan.md` ya está preparado. `tasks.md` corresponde a la siguiente fase y aún no se ha creado.
 
 ## Fuentes y Git
 
