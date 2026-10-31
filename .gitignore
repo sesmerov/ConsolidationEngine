@@ -1,0 +1,37 @@
+# Dependencies and generated application output
+node_modules/
+dist/
+build/
+coverage/
+.angular/
+.cache/
+*.tsbuildinfo
+
+# Local imports, exports and execution data (reference EBA files remain tracked)
+data/uploads/
+data/reports/
+data/exports/
+data/workspaces/
+outputs/
+tmp/
+temp/
+logs/
+*.log
+
+# Local credentials and agent state; share the installed skills
+.env
+.env.*
+!.env.example
+!.env.template
+.codex/auth.json
+.codex/sessions/
+.codex/history.jsonl
+.agents/auth.json
+.agents/sessions/
+.agents/history.jsonl
+
+# Local indexes and operating-system files
+.codegraph/
+.DS_Store
+Thumbs.db
+Desktop.ini

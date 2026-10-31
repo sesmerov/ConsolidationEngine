@@ -1,0 +1,15 @@
+# Preserve the supplied ANTLR source bytes, including line endings.
+*.g4 -text
+
+# Original reference documents and spreadsheets are binary.
+*.xlsx binary
+*.pdf binary
+
+# Keep project text and bundled PowerShell scripts portable.
+.gitattributes text eol=lf
+.gitignore text eol=lf
+*.ps1 text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
