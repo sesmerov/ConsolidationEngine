@@ -3,9 +3,9 @@
   <p>Se aplicará exclusivamente este conjunto de {{ selection()?.selectedIds?.length || 0 }} propuestas, incluidos los predecesores elegidos expresamente. Se creará una versión y se volverá a validar todo el catálogo.</p>
   @for (row of selectedProposals(); track row.id) {
     <article class="rule-row"><h4>{{ row.code }} · {{ target(row) }}</h4>
-      @if (row.before; as before) { <p>Antes: {{ before.presence === 'explicit_null' ? 'Nulo explícito' : before.presence === 'implicit_null' ? 'Nulo implícito' : before.originalText }}</p><p class="muted">{{ source(before.sourceLocator) }}</p>@if (before.derivation) { <p>Valor calculado en la aplicación {{ before.derivation.receiptId }}; se conserva la localización de origen.</p> } }
+      @if (row.before; as before) { <p>Antes: {{ before.presence === 'explicit_null' ? 'Nulo explícito' : before.presence === 'implicit_null' ? 'Nulo implícito' : before.originalText }}</p><p class="muted">{{ source(before.sourceLocator) }}</p>@if (before.derivation) { <p>Valor calculado; se conserva la localización de origen.</p><details class="trace-details"><summary>Trazabilidad del valor anterior</summary><p>Aplicación {{ before.derivation.receiptId }}</p></details> } }
       @if (row.after; as after) { <p>Después propuesto: <strong>{{ after.originalText }}</strong>@if ('unit' in after) { · {{ after.unit }} · precisión {{ after.decimals }} }</p> }
-      @if (row.exactNominal; as exact) { <p>Resultado antes del redondeo: {{ fraction(exact) }} · política {{ preview().policyId }}</p> }
+      @if (row.exactNominal; as exact) { <p>Resultado antes del redondeo: {{ fraction(exact) }} · redondeo al par</p> }
       @if (row.derivedInterval; as interval) { <p>Intervalo calculado: [{{ fraction(interval.lo) }}, {{ fraction(interval.hi) }}]</p> }
       @if (noChange(row)) { <p>Sin cambio de valor: se conservarán el texto y el origen existentes aunque se acepte esta propuesta.</p> }
       @if (row.predecessorIds.length) { <p>Predecesores incluidos:</p><ul>@for (id of row.predecessorIds; track id) { <li>{{ predecessor(id) }}</li> }</ul> }

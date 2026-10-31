@@ -87,7 +87,7 @@ test('V07: consumers read .33 at p2 and propose .99; a punctual 1/3 and its cons
   expect(find('synthetic_fraction').after.originalText).toBe('0.33'); expect(find('synthetic_fraction').exactNominal).toEqual({ numerator: '1', denominator: '3' });
   expect(find('synthetic_tripled').after.originalText).toBe('0.99'); expect(find('synthetic_tripled').exactNominal).toEqual({ numerator: '99', denominator: '100' });
   expect(find('synthetic_point').state).toBe('blocked'); expect(find('synthetic_point').diagnostics).toContainEqual(expect.objectContaining({ code: 'CANDIDATE_DOES_NOT_SATISFY_RULE' })); expect(find('synthetic_blocked_consumer').state).toBe('blocked');
-  await expect(page.locator('.proposal-row').filter({ has: page.getByRole('heading', { name: 'synthetic_fraction · Disponible', exact: true }) })).toContainText('Nominal exacto antes de cuantizar: 1/3');
+  await expect(page.locator('.proposal-row').filter({ has: page.getByRole('heading', { name: 'synthetic_fraction · Disponible', exact: true }) })).toContainText('Resultado antes del redondeo: 1/3');
   await expect(page.locator('.proposal-row').filter({ has: page.getByRole('heading', { name: 'synthetic_tripled · Disponible', exact: true }) })).toContainText('0.99');
 });
 test('a real queued preview can be cancelled without publishing a partial preview or changing its snapshot', async ({ page }) => {

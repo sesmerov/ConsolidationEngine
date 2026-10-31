@@ -1,15 +1,24 @@
 <section class="workspace-card" aria-labelledby="import-title">
-  <div class="section-heading"><h2 id="import-title">Cargar catálogo e informes</h2><button class="secondary" (click)="store.downloadTemplate()">Descargar plantilla Excel</button></div>
+  <div class="section-heading"><h2 id="import-title" tabindex="-1">Cargar catálogo e informes</h2><button class="secondary" (click)="store.downloadTemplate()">Descargar plantilla Excel</button></div>
   <p>Selecciona un catálogo EBA y entre 1 y 20 informes con nuestra plantilla. La carga sustituye el conjunto cuando todos los archivos son válidos.</p>
   <p class="muted">Hasta 10 MiB por archivo y 50 MiB por lote. La plantilla contiene datos sintéticos y explica cómo conservar códigos, importes y valores nulos.</p>
+  <details class="guided-example"><summary>Empezar con el ejemplo guiado</summary>
+    <p>Datos y reglas 100 % SYNTHETIC: A = 11, B = 5, C = 7 y D = 22. Descarga los dos archivos y sigue las instrucciones de su hoja Instructions; no necesitas editar Excel.</p>
+    <div class="direction-actions"><button type="button" class="secondary" (click)="store.downloadExample('catalog')">Descargar catálogo del ejemplo</button><button type="button" class="secondary" (click)="store.downloadExample('report')">Descargar informe del ejemplo</button></div>
+    <ol><li>Carga ambos archivos en los campos siguientes. Esta acción sustituye los datos de un conjunto ya cargado.</li><li>Valida: SYNTHETIC_A falla y SYNTHETIC_D pasa.</li><li>Elige <strong>Izquierda</strong> como destino en ambas reglas y guarda la configuración.</li><li>Simula: A propone 12.00 y D propone 24.00.</li><li>Selecciona D primero para ver su dependencia; selecciona también A expresamente.</li><li>Revisa ambos cambios, marca la confirmación y aplícalos.</li><li>Compara: antes pasa una regla y falla otra; después pasan dos y ninguna falla.</li><li>En Guardar, elige la versión marcada <strong>vigente</strong> y el contenido <strong>Informes y registro de cambios</strong>. Pulsa <strong>Preparar y descargar ZIP</strong> antes de cerrar el conjunto.</li></ol>
+  </details>
   <form (ngSubmit)="upload()">
-    <label for="catalog-file">Catálogo de reglas (.xlsx)</label><input id="catalog-file" type="file" accept=".xlsx" (change)="chooseCatalog($event)" [disabled]="busy()"/>
-    <label for="report-files">Informes (.xlsx)</label><input id="report-files" type="file" accept=".xlsx" multiple (change)="chooseReports($event)" [disabled]="busy()"/>
+    <label for="catalog-file">Catálogo de reglas (.xlsx)</label><input id="catalog-file" type="file" accept=".xlsx" aria-required="true" aria-describedby="catalog-help catalog-error catalog-server-errors" [attr.aria-invalid]="!!catalogError() || catalogServerErrors().length > 0" (change)="chooseCatalog($event)" [disabled]="busy()"/>
+    <p id="catalog-help" class="muted field-help">Elige un catálogo. Máximo 10 MiB.</p><p id="catalog-error" class="error field-help" role="alert" [hidden]="!catalogError()">{{ catalogError() }}</p>
+    <div id="catalog-server-errors">@for (error of catalogServerErrors(); track $index) { <p class="error">{{ error.message }} · {{ error.fileName }} · {{ error.locator?.sheet }} {{ error.locator?.column }}{{ error.locator?.row }}</p> }</div>
+    <label for="report-files">Informes (.xlsx)</label><input id="report-files" type="file" accept=".xlsx" multiple aria-required="true" aria-describedby="reports-help reports-error reports-server-errors" [attr.aria-invalid]="!!reportsError() || reportsServerErrors().length > 0" (change)="chooseReports($event)" [disabled]="busy()"/>
+    <p id="reports-help" class="muted field-help">Elige entre 1 y 20 informes. Máximo 10 MiB por archivo y 50 MiB junto con el catálogo.</p><p id="reports-error" class="error field-help" role="alert" [hidden]="!reportsError()">{{ reportsError() }}</p>
+    <div id="reports-server-errors">@for (error of reportsServerErrors(); track $index) { <p class="error">{{ error.message }} · {{ error.fileName }} · {{ error.locator?.sheet }} {{ error.locator?.column }}{{ error.locator?.row }}</p> }</div>
     <p class="muted">{{ reports().length }} informes seleccionados</p>
-    <button type="submit" [disabled]="busy() || !catalog() || reports().length < 1 || reports().length > 20">{{ store.uploading() ? 'Recibiendo archivos…' : 'Cargar archivos' }}</button>
+    <button type="submit" [disabled]="busy() || !catalog() || reports().length < 1 || !!catalogError() || !!reportsError()">{{ store.uploading() ? 'Recibiendo archivos…' : 'Cargar archivos' }}</button>
     @if (store.uploading()) { <button type="button" class="secondary" (click)="store.cancelUpload()">Cancelar carga</button> }
   </form>
-  @if (store.error(); as error) { <p class="error" role="alert">{{ error }}</p> }
+  @if (store.error(); as error) { <p #feedback class="error" role="alert" tabindex="-1">{{ error }}</p> }
 </section>
 @if (store.page(); as page) {
   <section class="workspace-card" aria-labelledby="coverage-title">

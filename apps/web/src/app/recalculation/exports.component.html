@@ -1,12 +1,12 @@
 <section class="workspace-card" aria-labelledby="exports-title">
-  <h2 id="exports-title">Guardar informes y resultados</h2>
+  <h2 id="exports-title" tabindex="-1">Guardar informes y resultados</h2>
   <label for="export-version">Versión para exportar</label><select id="export-version" [value]="session.exportVersionId() || ''" (change)="session.selectExportVersion($any($event.target).value)">
-    @for (version of session.workspace()?.versionIds || []; track version) { <option [value]="version">{{ version }}{{ version === session.versionId() ? ' · vigente' : ' · histórica' }}</option> }
+    @for (version of session.workspace()?.versionIds || []; track version) { <option [value]="version">{{ versionLabel(session.workspace(), version) }}{{ version === session.versionId() ? ' · vigente' : ' · histórica' }}</option> }
   </select>
   <label for="export-kind">Contenido</label><select id="export-kind" [value]="kind()" (change)="kind.set($any($event.target).value)"><option value="report">Informes y registro de cambios</option><option value="results">Resultados de validación</option></select>
   @if (kind() === 'report') { <p>report.zip contiene un ce-report-1 por informe de origen, changes.json exacto y changes.xlsx literal. El registro reúne las aplicaciones anteriores de esta versión desde la última importación.</p><p class="notice">La salida permite reimportar los datos en este sistema; no es un fichero oficial de remisión.</p> }
   @else {
-    <label for="export-run">Ejecución de la versión elegida</label><select id="export-run" [value]="selectedRunId()" (change)="selectedRunId.set($any($event.target).value)"><option value="">Selecciona una ejecución</option>@for (run of runs(); track run.id) { <option [value]="run.id" [disabled]="run.status === 'running'">{{ run.startedAt }} · {{ run.status === 'completed' ? 'Terminada' : run.status === 'running' ? 'En curso' : 'Incompleta' }} · {{ run.id }}</option> }</select>
+    <label for="export-run">Ejecución de la versión elegida</label><select id="export-run" [value]="selectedRunId()" (change)="selectedRunId.set($any($event.target).value)"><option value="">Selecciona una ejecución</option>@for (run of runs(); track run.id) { <option [value]="run.id" [disabled]="run.status === 'running'">{{ run.startedAt | date:'dd/MM/yyyy HH:mm:ss' }} · {{ run.status === 'completed' ? 'Terminada' : run.status === 'running' ? 'En curso' : 'Incompleta' }}</option> }</select>
     <p>results.zip contiene results.json exacto y results.xlsx literal de la ejecución elegida. Una ejecución incompleta se conserva como tal.</p>
     <button class="secondary" (click)="loadHistory()" [disabled]="historyLoading()">Actualizar ejecuciones exportables</button>@if (cursor()) { <button class="secondary" (click)="loadHistory(true)" [disabled]="historyLoading()">Cargar más ejecuciones exportables</button> }
     @if (!runs().length) { <p class="notice">No hay una ejecución cargada para esta versión. Consulta más historial o ejecuta una validación de la versión vigente.</p> }
@@ -15,6 +15,7 @@
   @if (uncertain()) { <p class="notice">La respuesta no está confirmada. El reintento recupera la misma solicitud y conserva la versión elegida inicialmente.</p><button class="secondary" (click)="retry()" [disabled]="pending() || session.jobActive() || session.pending()">Reintentar misma exportación</button> }
   @if (pending()) { <p aria-live="polite">Preparando la descarga…</p> }
   @if (error(); as message) { <p class="error" role="alert">{{ message }}</p> }
-  @if (ready(); as artifact) { <p>Paquete disponible: {{ artifact.filename }} · versión {{ artifact.versionId }}</p><button class="secondary" (click)="download()" [disabled]="pending()">Descargar paquete de nuevo</button> }
+  @if (ready(); as artifact) { <p>Paquete disponible: {{ artifact.filename }} · {{ versionLabel(session.workspace(), artifact.versionId) }}</p><button class="secondary" (click)="download()" [disabled]="pending()">Descargar paquete de nuevo</button> }
+  <details class="trace-details"><summary>Identificadores de la exportación elegida</summary><p>Versión: {{ session.exportVersionId() }}</p>@if (kind() === 'results') { <p>Ejecución: {{ selectedRunId() || 'Sin elegir' }}</p> }</details>
   <p class="muted">Guarda los paquetes que necesites antes de cerrar. Cerrar el conjunto cancela su trabajo y borra los datos temporales del servidor. Las descargas ya guardadas en tu equipo permanecen. Reiniciar el servidor también termina la sesión.</p>
 </section>

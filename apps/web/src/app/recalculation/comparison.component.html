@@ -2,14 +2,15 @@
   <h3 id="comparison-title">Aplicación completada · comparación de validaciones</h3>
   <p>Propuestas aceptadas: <strong>{{ page().receipt.acceptedIds.length }}</strong>.@if (detail(); as application) { Valores modificados: <strong>{{ application.changeCount }}</strong>. Propuestas sin cambio de valor: {{ page().receipt.acceptedIds.length - application.changeCount }}. }</p>
   <p>La aplicación creó una versión y terminó la revalidación. Consulta los fallos, errores y reglas no evaluables restantes.</p>
-  <p class="muted">Antes: {{ page().receipt.baseVersionId }}<br/>Después: {{ page().receipt.newVersionId }}</p>
+  <p class="muted">Antes: {{ versionLabel(session.workspace(), page().receipt.baseVersionId) }} · Después: {{ versionLabel(session.workspace(), page().receipt.newVersionId) }}</p>
+  <details class="trace-details"><summary>Identificadores del recibo y las versiones</summary><p>Recibo: {{ page().receipt.id }}</p><p>Antes: {{ page().receipt.baseVersionId }}<br/>Después: {{ page().receipt.newVersionId }}</p></details>
   <table><caption>Resultados de todo el catálogo</caption><thead><tr><th scope="col">Estado</th><th scope="col">Antes</th><th scope="col">Después</th></tr></thead><tbody>
     @for (status of statuses; track status) { <tr><th scope="row">{{ labels[status] }}</th><td>{{ page().beforeSummary.byStatus[status] }}</td><td>{{ page().afterSummary.byStatus[status] }}</td></tr> }
   </tbody></table>
   <p aria-live="polite">{{ page().items.length }} de {{ page().total }} resultados comparados</p>
   @for (row of page().items; track row.key) {
     <details class="rule-row"><summary><strong>{{ row.after?.code || row.before?.code || 'Sin código' }}</strong> · {{ row.before ? labels[row.before.status] : 'Sin registro anterior' }} → {{ row.after ? labels[row.after.status] : 'Sin registro posterior' }}</summary>
-      @for (side of sides(row); track side.label) { <div class="comparison-side"><h4>{{ side.label }}</h4>
+      <div class="comparison-columns">@for (side of sides(row); track side.label) { <div class="comparison-side"><h4>{{ side.label }}</h4>
         @if (side.result; as result) {
           <p>{{ labels[result.status] }} · {{ result.severity === 'warning' ? 'Advertencia' : result.severity === 'error' ? 'Severidad error' : 'Severidad desconocida' }}</p>
           @if (result.coverageOnly) { <p class="muted">Registro de cobertura; no representa una instancia expandida.</p> }
@@ -17,13 +18,13 @@
           <p>Izquierda: {{ value(result.values.left) }}</p><p>Derecha: {{ value(result.values.right) }}</p><p>Resultado: {{ value(result.values.result) }}</p>
           @for (read of result.factReads; track read.factKey) { <div class="fact-read"><p><strong>{{ read.coordinate.contextId }} · {{ read.coordinate.tableCode }} · r{{ read.coordinate.rowCode }} · c{{ read.coordinate.columnCode }}@if (read.coordinate.sheetCode) { · s{{ read.coordinate.sheetCode }} }</strong></p>
             <p>{{ read.presence === 'explicit_null' ? 'Nulo explícito' : read.presence === 'implicit_null' ? 'Nulo implícito' : read.originalText }} · {{ read.coordinate.unit }} · precisión {{ read.coordinate.decimals || 'No numérica' }}</p>
-            @if (read.derivation; as derivation) { <p>Valor calculado en la aplicación {{ derivation.receiptId }} · propuesta {{ derivation.proposalId }}. La localización siguiente identifica el origen, no el valor recalculado en el Excel original.</p> }
+            @if (read.derivation; as derivation) { <p>Valor calculado. La localización siguiente identifica el origen, no el valor recalculado en el Excel original.</p><details class="trace-details"><summary>Trazabilidad del cálculo</summary><p>Valor calculado en la aplicación {{ derivation.receiptId }} · propuesta {{ derivation.proposalId }}.</p></details> }
             <p class="muted">{{ source(read.sourceLocator) }}</p></div> }
           @for (read of result.metadataReads; track read.contextId + read.code) { <p>Indicador {{ read.contextId }} · {{ read.code }} · {{ read.presence === 'missing' ? 'No declarado' : read.value ? 'true' : 'false' }}</p> }
           @for (diagnostic of result.diagnostics; track $index) { <p [class.error]="diagnostic.severity !== 'warning' && diagnostic.severity !== 'info'" [class.notice]="diagnostic.severity === 'warning'">{{ diagnostic.code }}: {{ diagnostic.message }}@if (diagnostic.locator) { · {{ source(diagnostic.locator) }} }</p> }
-          @for (locator of result.sources; track $index) { <p class="muted">{{ source(locator) }}</p> }
+          <details class="trace-details"><summary>Todas las fuentes utilizadas ({{ result.sources.length }})</summary>@for (locator of result.sources; track $index) { <p class="muted">{{ source(locator) }}</p> }</details>
         } @else { <p>No hay registro para esta versión. Revisa la cobertura y la expansión de instancias.</p> }
-      </div> }
+      </div> }</div>
     </details>
   }
   @if (page().nextCursor) { <button class="secondary" (click)="more.emit()" [disabled]="loading()">Cargar más comparaciones</button> }

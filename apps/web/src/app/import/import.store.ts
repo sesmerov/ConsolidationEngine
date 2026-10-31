@@ -30,6 +30,10 @@ export class ImportStore {
     try { const blob = await this.api.reportTemplate(); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'ce-report-1.xlsx'; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 0); }
     catch (error) { this.report(error); }
   }
+  async downloadExample(kind: 'catalog' | 'report'): Promise<void> {
+    try { const blob = await this.api.guidedExample(kind); const url = URL.createObjectURL(blob), anchor = document.createElement('a'); anchor.href = url; anchor.download = kind === 'catalog' ? 'ejemplo-catalogo.xlsx' : 'ejemplo-informe.xlsx'; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 0); }
+    catch (error) { this.report(error); }
+  }
   async load(version = this.session.versionId(), append = false): Promise<void> {
     const workspaceId = this.session.workspace()?.id; if (!version || !workspaceId) return;
     const generation = ++this.pageGeneration; this.loading.set(true);

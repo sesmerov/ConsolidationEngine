@@ -13,7 +13,7 @@ h1 { font-size: clamp(28px, 3vw, 40px); letter-spacing: -.035em; margin: 12px 0 
 .status { display: inline-block; color: #35655b; background: #e9f4ef; border-radius: 20px; padding: 6px 12px; font-size: 12px; font-weight: 650; }
 h2 { font-size: 23px; margin-top: 22px; }
 p { line-height: 1.65; max-width: 58ch; }
-.muted { color: #6f8183; font-size: 14px; }
+.muted { color: #4d6465; font-size: 14px; }
 .session-notice { font-size: 14px; color: #526f71; border-left: 3px solid #86b8a9; padding-left: 16px; margin-bottom: 26px; }
 .workspace-card { background: #fff; border: 1px solid #dce7e5; border-radius: 16px; padding: 28px; margin: 20px 0; }
 .section-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
@@ -26,11 +26,11 @@ button { font: inherit; font-weight: 600; background: #176859; color: #fff; padd
 button:hover { filter: brightness(.94); } button:disabled { opacity: .5; cursor: default; }
 button.secondary { color: #23534c; background: #fff; border-color: #c7d9d4; }
 button.danger { background: #963f3f; }
-button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #78b5a6; outline-offset: 3px; }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visible, [tabindex="-1"]:focus { outline: 3px solid #176859; outline-offset: 3px; }
 .error, .confirmation { background: #fff1ee; color: #7f3531; padding: 16px; border-radius: 8px; }
 .notice { background: #fff8e6; color: #705815; padding: 16px; border-radius: 8px; }
 .workspace-meta { display: flex; gap: 32px; flex-wrap: wrap; font-size: 14px; margin: 24px 0; }
-dt { color: #6f8183; } dd { margin: 6px 0 0; overflow-wrap: anywhere; }
+dt { color: #4d6465; } dd { margin: 6px 0 0; overflow-wrap: anywhere; }
 progress { accent-color: #176859; width: 100%; height: 14px; }
 .filters { display: flex; flex-wrap: wrap; align-items: end; max-width: none; }.filters input { display: block; margin-top: 8px; }
 .rule-row { border-top: 1px solid #dce7e5; padding: 16px 0; } summary { cursor: pointer; line-height: 1.6; }
@@ -40,4 +40,27 @@ h3 { font-size: 15px; margin: 18px 0 6px; } li { margin: 12px 0; line-height: 1.
 .direction-choice { padding: 14px 0; border-bottom: 1px solid #edf2f1; }
 .direction-choice p { margin: 8px 0; } .direction-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
 .direction-summary { padding: 12px 0; }
+main { min-width: 0; width: 100%; }
+h2, h3 { scroll-margin-top: 20px; }
+.skip-link { position: fixed; top: 8px; left: 8px; z-index: 10; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; white-space: nowrap; background: #fff; color: #103d40; padding: 12px; }
+.skip-link:focus { clip-path: none; width: auto; height: auto; overflow: visible; }
+.stage-nav { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 12px 0; }
+a { color: #175e53; text-underline-offset: .2em; }
+.stage-nav a { padding: 8px 4px; }
+.field-help { margin: 0; }
+[hidden] { display: none !important; }
+.guided-example { padding: 18px; border: 1px solid #b4cbc5; border-radius: 10px; background: #f3faf7; }
+input[type="checkbox"] { width: 18px; height: 18px; accent-color: #176859; vertical-align: middle; margin-right: 8px; }
+.trace-details { font-size: 13px; color: #4d6465; overflow-wrap: anywhere; margin: 12px 0; }
+table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; }
+caption { text-align: left; font-weight: 700; margin-bottom: 10px; }
+th, td { padding: 12px; border-bottom: 1px solid #dce7e5; text-align: left; }
+thead { background: #eef5f2; }
+.comparison-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.comparison-side { min-width: 0; }
+.comparison-side h4 { padding-bottom: 10px; border-bottom: 2px solid #b4cbc5; }
+.fact-read { padding: 12px; margin: 12px 0; background: #f5f8f7; border-radius: 8px; }
+.confirmation > button { margin: 12px 8px 0 0; }
+@media (max-width: 900px) { .comparison-columns { grid-template-columns: 1fr; } }
+@media (max-width: 500px) { main { padding: 20px 12px; } .workspace-card, .empty-state { padding: 18px; } .workspace-meta { gap: 16px; } input, select { width: 100%; min-width: 0; } input[type="checkbox"] { width: 18px; } th, td { padding: 8px; } .direction-actions button { width: 100%; } }
 @media (max-width: 700px) { .shell { grid-template-columns: 1fr; } aside { padding: 18px 24px; } aside strong { display: inline; margin-left: 12px; } aside p { display: none; } main { padding-top: 26px; } }

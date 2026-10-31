@@ -35,6 +35,7 @@ export class ApiClient {
   }
   capabilities(): Promise<CapabilitiesDTO> { return firstValueFrom(this.http.get<CapabilitiesDTO>('/api/v1/capabilities', { headers: this.headers() })); }
   reportTemplate(): Promise<Blob> { return firstValueFrom(this.http.get('/api/v1/templates/report', { headers: this.headers(), responseType: 'blob' })); }
+  guidedExample(kind: 'catalog' | 'report'): Promise<Blob> { return firstValueFrom(this.http.get('/api/v1/templates/guided-' + kind, { headers: this.headers(), responseType: 'blob' })); }
   importFiles(workspaceId: string, etag: string, catalog: File, reports: readonly File[], key: string, signal: AbortSignal): Promise<JobDTO> {
     const body = new FormData(); body.append('catalog', catalog, catalog.name); for (const report of reports) body.append('reports', report, report.name);
     return firstValueFrom(this.http.post<JobDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/imports', body,

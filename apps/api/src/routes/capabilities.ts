@@ -4,6 +4,7 @@ import { ENGINE_PROFILE_ID, PARSER_LIMITS } from '@ce/engine';
 import { UPLOAD_LIMITS } from '../import/multipart-staging.js';
 import { GRAMMAR_VERSION } from '../import/import-workspace.js';
 import { reportTemplate } from '../export/report-template.js';
+import { guidedExample } from '../export/guided-example.js';
 import { EXPORT_LIMITS } from '../export/results-export.js';
 import { FILE_SESSION_LIMIT } from '../storage/session-files.js';
 export function registerCapabilities(app: FastifyInstance): void {
@@ -14,4 +15,6 @@ export function registerCapabilities(app: FastifyInstance): void {
       expandedBatchBytes: 100 * 1024 * 1024, entryBytes: 64 * 1024 * 1024, exportContentBytes: EXPORT_LIMITS.maxContentBytes, exportTotalBytes: EXPORT_LIMITS.maxTotalBytes, exportXmlWorkloadBytes: EXPORT_LIMITS.maxContentBytes, fileSessionBytes: FILE_SESSION_LIMIT, ...PARSER_LIMITS } }));
   app.get('/api/v1/templates/report', { schema: { querystring: emptyQuerySchema } }, async (_request, reply) => reply
     .header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').header('Content-Disposition', 'attachment; filename="ce-report-1.xlsx"').send(await reportTemplate()));
+  for (const kind of ['catalog', 'report'] as const) app.get('/api/v1/templates/guided-' + kind, { schema: { querystring: emptyQuerySchema } }, async (_request, reply) => reply
+    .header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').header('Content-Disposition', 'attachment; filename="' + (kind === 'catalog' ? 'ejemplo-catalogo.xlsx' : 'ejemplo-informe.xlsx') + '"').send(await guidedExample(kind)));
 }

@@ -32,7 +32,7 @@ test('V01/V14: real template download, exact import, null/zero summary and brows
   await expect(page.getByRole('heading', { name: 'Carga y cobertura' })).toBeVisible({ timeout: 15000 });
   await expect(page.locator('.data-summary')).toHaveText('6 coordenadas · 5 hechos · 1 ceros · 1 nulos explícitos · 1 nulos implícitos');
   await expect(page.getByText('3 de 3 registros', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('Contexto', { exact: true })).toHaveText(/SYNTHETIC.*2026-06-30.*COREP_OF_4.2/);
+  await expect(page.getByLabel('Contexto', { exact: true })).toHaveText(/SYNTHETIC.*30\/06\/2026.*COREP_OF_4.2/);
   await page.locator('summary').filter({ hasText: /^v0190_m · Aplicable$/ }).click();
   await expect(page.locator('.rule-row[open] pre').filter({ hasText: '{v_C_01.00} and {v_C_05.01}' })).toBeVisible();
   await expect(page.getByText('Este panel describe la carga y el soporte de las reglas. El cumplimiento se consulta en Validación y explicación.')).toBeVisible();
@@ -53,13 +53,16 @@ test('V04/V13: invalid and duplicate rules remain visible; a rejected replacemen
   await page.getByLabel('Código de regla').fill('synthetic_invalid'); await page.getByRole('button', { name: 'Filtrar reglas' }).click();
   await expect(page.getByText('1 de 1 registros', { exact: true })).toBeVisible(); await page.locator('summary').filter({ hasText: 'synthetic_invalid' }).click();
   await expect(page.getByText(/SYNTAX_ERROR:/).first()).toBeVisible();
-  const version = await page.locator('.workspace-meta').first().locator('dd').first().innerText();
+  const version = await page.getByTestId('current-version-id').textContent();
   const bad = zipBytes(changeXml(await readZipParts(reportPath), 'xl/worksheets/sheet4.xml', (xml) => replaceCell(xml, 'G2', '<c r="G2"><v>12345678901234567890</v></c>')));
   await page.getByLabel('Informes (.xlsx)', { exact: true }).setInputFiles({ name: 'importe-invalido.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: bad });
   await page.getByRole('button', { name: 'Cargar archivos', exact: true }).click();
   await expect(page.getByRole('alert').filter({ hasText: 'importe-invalido.xlsx' })).toContainText('Facts · G2', { timeout: 15000 });
   await expect(page.getByRole('alert').filter({ hasText: 'importe-invalido.xlsx' })).toContainText('texto');
-  await expect(page.locator('.workspace-meta').first().locator('dd').first()).toHaveText(version); await expect(page.getByText('1 de 1 registros', { exact: true })).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: 'importe-invalido.xlsx' })).toBeFocused();
+  await expect(page.getByLabel('Informes (.xlsx)', { exact: true })).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.locator('#reports-server-errors')).toContainText('Facts G2');
+  await expect(page.getByTestId('current-version-id')).toHaveText(version!); await expect(page.getByText('1 de 1 registros', { exact: true })).toBeVisible();
 });
 test('production serves only the Angular build, protects API routes and supports SPA fallback', async ({ page }) => {
   expect((await page.request.get('/package.json')).status()).toBe(404); expect((await page.request.get('/.git/config')).status()).toBe(404);

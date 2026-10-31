@@ -1,7 +1,10 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import { SessionStore } from '../core/session.store';
+import { versionLabel } from '../core/display';
 import type { ApplicationDetailDTO, ComparisonPageDTO, ComparisonRowDTO, Rational, SourceLocator, ValidationStatus, ValidationValueDTO } from '@ce/contracts';
 @Component({ selector: 'ce-comparison', standalone: true, changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './comparison.component.html' })
 export class ComparisonComponent {
+  readonly session = inject(SessionStore); readonly versionLabel = versionLabel;
   readonly page = input.required<ComparisonPageDTO>(); readonly detail = input<ApplicationDetailDTO | null>(null); readonly loading = input(false); readonly more = output<void>();
   readonly labels: Record<ValidationStatus, string> = { pass: 'Pasa', fail: 'Falla', not_applicable: 'No aplica', not_evaluable: 'No evaluable', error: 'Error' };
   readonly statuses: readonly ValidationStatus[] = ['pass', 'fail', 'not_applicable', 'not_evaluable', 'error'];

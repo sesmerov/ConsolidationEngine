@@ -38,7 +38,7 @@ async function upload(page: Page, catalog: Buffer, reports: { name: string; buff
   await page.getByLabel('Catálogo de reglas (.xlsx)').setInputFiles({ name: 'synthetic-apply-catalog.xlsx', mimeType, buffer: catalog });
   await page.getByLabel('Informes (.xlsx)', { exact: true }).setInputFiles(reports.map(report => ({ ...report, mimeType })));
   const response = page.waitForResponse(response => response.url().endsWith('/imports') && response.request().method() === 'POST'); await page.getByRole('button', { name: 'Cargar archivos', exact: true }).click();
-  const accepted = await (await response).json(), job = await poll(page, accepted.jobId); expect(job.status).toBe('succeeded'); await expect(page.locator('.workspace-meta').first().locator('dd').first()).toHaveText(job.newVersionId); return job.newVersionId as string;
+  const accepted = await (await response).json(), job = await poll(page, accepted.jobId); expect(job.status).toBe('succeeded'); await expect(page.getByTestId('current-version-id')).toHaveText(job.newVersionId); return job.newVersionId as string;
 }
 async function validate(page: Page) {
   const response = page.waitForResponse(response => response.url().endsWith('/validations') && response.request().method() === 'POST'); await page.getByRole('button', { name: 'Validar informes', exact: true }).click(); const accepted = await (await response).json(); expect((await poll(page, accepted.jobId)).status).toBe('succeeded');

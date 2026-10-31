@@ -406,3 +406,48 @@ de auditoría equivalente, conservando todos los valores comprobados. Los cuatro
 separados de las diez ejecuciones formales. No hubo otros builds/pruebas nuestros durante la serie.
 La memoria observada y sus límites de muestreo están separados de las cuotas JSON/worker en el informe.
 Este resultado no se extrapola a cualquier expresión o equipo ni sustituye SC-007 humano.
+
+## T073 — interfaz y recorrido automatizado; aceptación humana pendiente
+
+La guía «Empezar con el ejemplo guiado» y los dos Excel descargables contienen los mismos ocho
+pasos. El catálogo y el informe son 100% SYNTHETIC, generados sin leer el Excel EBA original:
+A11/B5/C7/D22, igualdades A=B+C y D=A*2, precisión 2 EUR. Las rutas autenticadas entregan
+`ejemplo-catalogo.xlsx` y `ejemplo-informe.xlsx` con nombres fijos e Instructions.
+
+El recorrido automatizado crea el conjunto desde la UI con teclado y usa esos archivos sin
+editarlos. El setup API sólo limpia la sesión anterior y consulta estados; no crea los datos ni
+ejecuta las acciones del recorrido. `setInputFiles` sustituye el selector nativo de archivos, lo
+que se declara como una limitación de esta automatización.
+
+| Paso de la guía | Resultado observado por automatización |
+| --- | --- |
+| 1. Crear conjunto y cargar los dos archivos | Importación completa de cuatro coordenadas/hechos. |
+| 2. Validar | SYNTHETIC_A falla; SYNTHETIC_D pasa. |
+| 3. Elegir izquierda en ambas y guardar | Nueva configuración con destinos explícitos. |
+| 4. Simular | A12.00 y D24.00, en el orden de dependencia. |
+| 5. Seleccionar D y después A expresamente | Clausura incompleta hasta aceptar también el productor. |
+| 6. Revisar, confirmar y aplicar | Dos propuestas aceptadas y dos valores modificados. |
+| 7. Comparar | Antes 1 pasa/1 falla; después 2 pasan/0 fallan; original conservado. |
+| 8. Elegir versión vigente y descargar | report.zip real contiene A12.00/D24.00 y B5/C7. |
+
+La verificación detectó una ambigüedad de la instrucción de exportación: el panel conserva la
+selección histórica. La guía ahora pide elegir «vigente», «Informes y registro de cambios» y
+«Preparar y descargar ZIP», sin cambiar el comportamiento de los históricos. También se corrigió
+un selector de captura que apuntaba a un panel cerrado, sin modificar cálculo o UI por ese fallo.
+
+Contratos completos 94/94 y Angular 46/46 correctos. La primera ejecución global de navegador
+tuvo 15 correctos y el fallo de selector; después los 2 casos de analyst-journey pasan con descarga
+verificada: 16 casos distintos comprobados, sin afirmar una ejecución global verde que aún no se
+había repetido. Typecheck global y builds API/Angular correctos. T075 hará la comprobación final.
+
+Se comprueban teclado, enlace para saltar al contenido, navegación, foco en errores y cierre,
+errores junto al campo con aria-invalid, contraste y ausencia de desbordamiento a 390/320 px.
+Fechas civiles conservan el día; fechas de ejecución usan presentación local. Versiones ordinales
+y comparación adaptable mantienen los identificadores técnicos en detalles de trazabilidad.
+Las capturas de guía/comparación desktop y errores/resumen/detalle móvil en `.cache/analyst-*.png`
+se inspeccionaron y resultan legibles. Esto no constituye una certificación general de accesibilidad.
+
+**SC-007 humano: pendiente.** No ha participado una persona analista en esta prueba y no se le
+atribuyen pasos ni ayuda ficticios. Se registrarán su recorrido y cualquier asistencia cuando
+pruebe la guía; T073 permanece sin marcar por ese único criterio. La documentación y los checks
+técnicos finales pueden completarse conservando este estado explícito.

@@ -16,7 +16,7 @@ async function upload(page: Page, report: string | Buffer, catalog?: Buffer) {
   const response = page.waitForResponse((response) => response.url().endsWith('/imports') && response.request().method() === 'POST'); await page.getByRole('button', { name: 'Cargar archivos', exact: true }).click();
   const accepted = await (await response).json(); const connection = await session(page); let version: string | undefined;
   await expect.poll(async () => { const job = await (await page.request.get(`/api/v1/workspaces/${connection.id}/jobs/${accepted.jobId}`, { headers: connection.headers })).json(); version = job.newVersionId; return job.status; }).toBe('succeeded');
-  await expect(page.locator('.workspace-meta').first().locator('dd').first()).toHaveText(version!); return version!;
+  await expect(page.getByTestId('current-version-id')).toHaveText(version!); return version!;
 }
 async function validate(page: Page) {
   const response = page.waitForResponse((response) => response.url().endsWith('/validations') && response.request().method() === 'POST'); await page.getByRole('button', { name: 'Validar informes', exact: true }).click();

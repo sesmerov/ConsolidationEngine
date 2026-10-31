@@ -1,13 +1,16 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
+import { DatePipe } from '@angular/common';
+import { versionLabel } from '../core/display';
 import { isTerminalJob } from '@ce/contracts';
 import type { RunSummaryDTO } from '@ce/contracts';
 import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
 interface ExportAttempt { workspaceId: string; versionId: string; kind: 'report' | 'results'; runId?: string; etag: string; key: string }
 interface Download { workspaceId: string; versionId: string; id: string; filename: 'report.zip' | 'results.zip' }
-@Component({ selector: 'ce-exports', standalone: true, changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './exports.component.html' })
+@Component({ selector: 'ce-exports', standalone: true, imports: [DatePipe], changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './exports.component.html' })
 export class ExportsComponent {
+  readonly versionLabel = versionLabel;
   readonly session = inject(SessionStore); private readonly api = inject(ApiClient);
   readonly kind = signal<'report' | 'results'>('report'); readonly selectedRunId = signal(''); readonly history = signal<readonly RunSummaryDTO[]>([]); readonly cursor = signal<string | null>(null);
   readonly historyLoading = signal(false); readonly pending = signal(false); readonly error = signal<string | null>(null); readonly uncertain = signal(false); readonly ready = signal<Download | null>(null);

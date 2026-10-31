@@ -1,14 +1,14 @@
 <section class="workspace-card" aria-labelledby="validation-title">
-  <div class="section-heading"><h2 id="validation-title">Validación y explicación</h2><button (click)="store.execute()" [disabled]="!session.versionId() || session.jobActive() || store.pending() || session.pending()">Validar informes</button></div>
+  <div class="section-heading"><h2 id="validation-title" tabindex="-1">Validación y explicación</h2><button (click)="store.execute()" [disabled]="!session.versionId() || session.jobActive() || store.pending() || session.pending()">Validar informes</button></div>
   <p>Evalúa las reglas del conjunto vigente. El estado de cada regla y su severidad se muestran por separado.</p>
   @if (session.jobActive() && session.job()?.kind === 'validate') { <p aria-live="polite">Validación en curso. Los resultados todavía están incompletos.</p><button class="secondary" (click)="session.cancelJob()" [disabled]="session.pending()">Cancelar validación</button> }
   @if (store.error(); as error) { <p class="error" role="alert">{{ error }}</p> }
-  @if (store.history().length) { <label for="validation-run">Ejecución</label><select id="validation-run" [ngModel]="store.selectedRunId()" (ngModelChange)="store.selectRun($event)">@for (run of store.history(); track run.id) { <option [value]="run.id">{{ run.startedAt }} · {{ run.status === 'completed' ? 'Terminada' : run.status === 'running' ? 'En curso' : 'Incompleta' }}</option> }</select> }
+  @if (store.history().length) { <label for="validation-run">Ejecución</label><select id="validation-run" [ngModel]="store.selectedRunId()" (ngModelChange)="store.selectRun($event)">@for (run of store.history(); track run.id) { <option [value]="run.id">{{ run.startedAt | date:'dd/MM/yyyy HH:mm' }} · {{ run.status === 'completed' ? 'Terminada' : run.status === 'running' ? 'En curso' : 'Incompleta' }}</option> }</select> }
   <button class="secondary" (click)="store.loadHistory()" [disabled]="store.historyLoading()">Actualizar historial de validaciones</button>
   @if (store.historyCursor()) { <button class="secondary" (click)="store.loadHistory(true)" [disabled]="store.historyLoading()">Cargar más ejecuciones</button> }
   @if (store.page(); as page) {
     @if (store.historical()) { <p class="notice" role="status">Resultado histórico: pertenece a otra versión y no describe el conjunto vigente.</p> }
-    <p class="muted">Versión evaluada: {{ page.versionId }}</p>
+    <p class="muted">{{ versionLabel(session.workspace(), page.versionId) }} evaluada</p><details class="trace-details"><summary>Identificadores de ejecución y versión</summary><p>{{ page.run.id }} · {{ page.versionId }}</p></details>
     <ce-results-export [run]="page.run"/>
     @if (!page.run.summary.complete || page.run.status !== 'completed') { <h3>Ejecución incompleta</h3><p class="notice">Estos datos no constituyen un resumen completo de validación.</p> }
     @else if (store.noEvaluatedRules()) { <h3>Sin reglas evaluadas</h3><p class="notice">La ejecución terminó, pero no hay resultados de cumplimiento. Revisa aplicabilidad y diagnósticos.</p> }
@@ -26,7 +26,7 @@
         <h3>Operandos exactos</h3><p>Izquierda: {{ store.value(result.values.left) }}</p><p>Derecha: {{ store.value(result.values.right) }}</p>
         @if (result.factReads.length) { <h3>Hechos leídos</h3><p class="muted">Valores declarados antes de aplicar default o intervalos.</p>
           @for (read of result.factReads; track read.factKey) { <div class="fact-read"><p><strong>{{ read.coordinate.tableCode }} · r{{ read.coordinate.rowCode }} · c{{ read.coordinate.columnCode }} @if (read.coordinate.sheetCode) { · s{{ read.coordinate.sheetCode }} }</strong></p>
-            <p>{{ read.presence === 'explicit_null' ? 'Nulo explícito' : read.presence === 'implicit_null' ? 'Nulo implícito' : read.originalText }} · {{ read.coordinate.unit }} · precisión {{ read.coordinate.decimals || 'No numérica' }}</p>@if (read.derivation) { <p>Valor calculado en la aplicación {{ read.derivation.receiptId }}. La localización identifica el origen, no el valor recalculado en el Excel original.</p> }<p class="muted">{{ store.source(read.sourceLocator) }}</p></div> }
+            <p>{{ read.presence === 'explicit_null' ? 'Nulo explícito' : read.presence === 'implicit_null' ? 'Nulo implícito' : read.originalText }} · {{ read.coordinate.unit }} · precisión {{ read.coordinate.decimals || 'No numérica' }}</p>@if (read.derivation) { <p>Valor calculado. La localización identifica el origen, no el valor recalculado en el Excel original.</p><details class="trace-details"><summary>Trazabilidad del cálculo</summary><p>Aplicación {{ read.derivation.receiptId }}</p></details> }<p class="muted">{{ store.source(read.sourceLocator) }}</p></div> }
         }
         @if (result.metadataReads.length) { <h3>Indicadores de presentación</h3>@for (read of result.metadataReads; track read.contextId + ':' + read.code) { <p>{{ read.code }} · {{ read.presence === 'missing' ? 'No declarado' : read.value ? 'true' : 'false' }}</p> } }
         @for (diagnostic of result.diagnostics; track $index) { <p [class.error]="diagnostic.severity !== 'info' && diagnostic.severity !== 'warning'" [class.notice]="diagnostic.severity === 'warning'">{{ diagnostic.code }}: {{ store.diagnostic(diagnostic) }} @if (diagnostic.locator) { · {{ store.source(diagnostic.locator) }} }</p> }
