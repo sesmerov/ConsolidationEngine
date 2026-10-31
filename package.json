@@ -24,6 +24,7 @@
     "test:contract": "vitest run --project contract",
     "test:foundation": "npm run build:api && vitest run --project integration --project contract tests/integration/session-jobs.spec.ts tests/contract/local-session.spec.ts",
     "test:e2e": "playwright test",
+    "bench": "node scripts/benchmark.mjs",
     "test": "npm run test:unit && npm run test:integration && npm run test:contract",
     "dev": "npm run build:api && node scripts/dev.mjs",
     "start": "node apps/api/dist/server.js"

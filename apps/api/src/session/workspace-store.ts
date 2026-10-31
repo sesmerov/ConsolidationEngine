@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { MAX_SNAPSHOTS, SESSION_LIMIT_BYTES, UUID_PATTERN, isTerminalJob } from '@ce/contracts';
 import type { JobDTO, JsonValue, PreviewBundle, Snapshot, SnapshotContent, WorkspaceDTO } from '@ce/contracts';
 import { ApiError } from '../errors.js';
-import { canonicalHash, canonicalStateBytes, immutable } from './canonical-state.js';
+import { canonicalHash, immutable } from './canonical-state.js';
+import { RetainedSize } from './retained-size.js';
 import type { StateRecord, WorkerOutput } from '../workers/protocol.js';
 /** Reserved version identifiers are supplied only by main-thread publication preparation. */
 export interface PublicationOutput extends WorkerOutput { readonly snapshotVersionId?: string }
@@ -15,6 +16,8 @@ export class WorkspaceStore {
   private workspace: WorkspaceState | undefined;
   private snapshots = new Map<string, Snapshot>();
   private records = new Map<string, unknown>();
+  private readonly retained = new RetainedSize();
+  private recordRoots = new Map<string, Readonly<{ key: string; value: unknown }>>();
   private readonly maxBytes: number;
   private readonly maxSnapshots: number;
   constructor(options: StoreOptions = {}) {
@@ -23,8 +26,8 @@ export class WorkspaceStore {
   }
   create(name: string): WorkspaceDTO {
     if (this.workspace && this.workspace.state !== 'closed') throw new ApiError('ACTIVE_WORKSPACE_EXISTS');
-    const workspace: WorkspaceState = { id: randomUUID(), name, state: 'empty', sessionId: this.sessionId, versionIds: [] };
-    this.check(workspace, new Map(), new Map()); this.workspace = workspace; this.snapshots = new Map(); this.records = new Map();
+    const workspace: WorkspaceState = { id: randomUUID(), name, state: 'empty', sessionId: this.sessionId, versionIds: [], closing: false };
+    const commitSize = this.check(workspace, new Map(), new Map()); commitSize(); this.workspace = workspace; this.snapshots = new Map(); this.records = new Map();
     return this.get(workspace.id);
   }
   private require(id: string): WorkspaceState {
@@ -39,7 +42,7 @@ export class WorkspaceStore {
         facts: current?.content.facts.length ?? 0, sources: current?.content.sources.length ?? 0 }, sessionBytes: this.bytes });
   }
   get currentWorkspaceId(): string | undefined { return this.workspace?.state === 'closed' ? undefined : this.workspace?.id; }
-  get bytes(): number { return this.size(this.workspace, this.snapshots, this.records); }
+  get bytes(): number { return this.retained.bytes; }
   current(id: string): Snapshot | undefined { const w = this.require(id); return w.currentVersionId ? this.snapshot(id, w.currentVersionId) : undefined; }
   snapshot(id: string, versionId: string): Snapshot { this.require(id); const result = this.snapshots.get(versionId); if (!result) throw new ApiError('RESOURCE_NOT_FOUND'); return result; }
   etag(id: string): string { const version = this.require(id).currentVersionId; return version ? '"v-' + version + '"' : '"empty"'; }
@@ -48,12 +51,14 @@ export class WorkspaceStore {
   }
   assertIdle(id: string): void { if (this.require(id).activeJobId) throw new ApiError('WORKSPACE_BUSY'); }
   assertAccepting(id: string): void { if (this.require(id).closing) throw new ApiError('WORKSPACE_BUSY'); }
-  beginClose(id: string): void { this.workspace = { ...this.require(id), closing: true }; }
-  private size(w: WorkspaceState | undefined, snapshots: Map<string, Snapshot>, records: Map<string, unknown>): number {
-    return canonicalStateBytes([...(w ? [w] : []), ...snapshots.values(), ...Array.from(records, ([key, value]) => ({ key, value }))]);
-  }
-  private check(w: WorkspaceState | undefined, snapshots: Map<string, Snapshot>, records: Map<string, unknown>): void {
-    if (snapshots.size > this.maxSnapshots || this.size(w, snapshots, records) > this.maxBytes) throw new ApiError('SESSION_LIMIT');
+  beginClose(id: string): void { const workspace = { ...this.require(id), closing: true }; const commitSize = this.check(workspace, this.snapshots, this.records); commitSize(); this.workspace = workspace; }
+  private check(w: WorkspaceState | undefined, snapshots: Map<string, Snapshot>, records: Map<string, unknown>): () => void {
+    if (snapshots.size > this.maxSnapshots) throw new ApiError('SESSION_LIMIT');
+    const recordRoots = new Map<string, Readonly<{ key: string; value: unknown }>>();
+    for (const [key, value] of records) { const prior = this.recordRoots.get(key); recordRoots.set(key, prior && prior.value === value ? prior : Object.freeze({ key, value })); }
+    const prepared = this.retained.prepare([...(w ? [w] : []), ...snapshots.values(), ...recordRoots.values()]);
+    if (prepared.bytes > this.maxBytes) throw new ApiError('SESSION_LIMIT');
+    return () => { prepared.commit(); this.recordRoots = recordRoots; };
   }
   private candidate(w: WorkspaceState, content: SnapshotContent, versionId: string = randomUUID()): Snapshot {
     if (!UUID_PATTERN.test(versionId) || this.snapshots.has(versionId)) throw new ApiError('INTERNAL_ERROR');
@@ -64,7 +69,7 @@ export class WorkspaceStore {
     this.assertBase(id, base); const w = this.require(id); const snapshot = this.candidate(w, content);
     const next = { ...w, state: 'ready' as const, currentVersionId: snapshot.versionId, versionIds: [...w.versionIds, snapshot.versionId] };
     const snapshots = new Map(this.snapshots).set(snapshot.versionId, snapshot); const records = this.obsoletePreviews(this.withRecords(additions), snapshot.versionId);
-    this.check(next, snapshots, records); this.workspace = next; this.snapshots = snapshots; this.records = records; return snapshot;
+    const commitSize = this.check(next, snapshots, records); commitSize(); this.workspace = next; this.snapshots = snapshots; this.records = records; return snapshot;
   }
   private withRecords(additions: readonly StateRecord[]): Map<string, unknown> {
     const records = new Map(this.records);
@@ -74,7 +79,7 @@ export class WorkspaceStore {
     }
     return records;
   }
-  putRecords(additions: readonly StateRecord[]): void { const records = this.withRecords(additions); this.check(this.workspace, this.snapshots, records); this.records = records; }
+  putRecords(additions: readonly StateRecord[]): void { const records = this.withRecords(additions); const commitSize = this.check(this.workspace, this.snapshots, records); commitSize(); this.records = records; }
   getRecord<T = unknown>(key: string): T | undefined { return this.records.get(key) as T | undefined; }
   listRecords<T>(prefix: string): readonly { key: string; value: T }[] { return [...this.records].filter(([key]) => key.startsWith(prefix)).map(([key, value]) => ({ key, value: value as T })); }
   private obsoletePreviews(records: Map<string, unknown>, versionId: string): Map<string, unknown> {
@@ -86,9 +91,9 @@ export class WorkspaceStore {
     return records;
   }
   putInternalRecord(key: string, value: unknown): void {
-    const records = new Map(this.records).set(key, immutable(value)); this.check(this.workspace, this.snapshots, records); this.records = records;
+    const records = new Map(this.records).set(key, immutable(value)); const commitSize = this.check(this.workspace, this.snapshots, records); commitSize(); this.records = records;
   }
-  deleteInternalRecord(key: string): void { const records = new Map(this.records); records.delete(key); this.records = records; }
+  deleteInternalRecord(key: string): void { const records = new Map(this.records); records.delete(key); const commitSize = this.check(this.workspace, this.snapshots, records); commitSize(); this.records = records; }
   job(id: string, jobId: string): JobDTO {
     this.require(id); const job = this.getRecord<JobDTO>('job:' + jobId);
     if (!job || job.workspaceId !== id) throw new ApiError('RESOURCE_NOT_FOUND'); return job;
@@ -99,13 +104,13 @@ export class WorkspaceStore {
     // Account an actual retained reserve so terminal diagnostics fit even when the candidate exhausts the quota.
     records.set('reserve:' + job.jobId, ' '.repeat(4096));
     if (retainedState !== undefined) records.set('operation:' + job.jobId, immutable(retainedState));
-    this.check(w, this.snapshots, records); this.workspace = w; this.records = records;
+    const commitSize = this.check(w, this.snapshots, records); commitSize(); this.workspace = w; this.records = records;
   }
   updateJob(job: JobDTO, additions: readonly StateRecord[] = []): void {
     const prior = this.job(job.workspaceId, job.jobId); if (isTerminalJob(prior.status)) return;
     const records = this.withRecords(additions).set('job:' + job.jobId, immutable(job)); let w = this.require(job.workspaceId);
     if (isTerminalJob(job.status)) { records.delete('reserve:' + job.jobId); records.delete('operation:' + job.jobId); const { activeJobId: _active, ...rest } = w; w = rest; }
-    this.check(w, this.snapshots, records); this.workspace = w; this.records = records;
+    const commitSize = this.check(w, this.snapshots, records); commitSize(); this.workspace = w; this.records = records;
   }
   publishJobResult(job: JobDTO, output: PublicationOutput, assertCommit: () => void = () => undefined): JobDTO {
     this.assertAccepting(job.workspaceId); this.assertBase(job.workspaceId, job.baseVersionId); let w = this.require(job.workspaceId);
@@ -118,10 +123,10 @@ export class WorkspaceStore {
       ...(snapshot ? { newVersionId: snapshot.versionId } : {}), ...(output.resultRef ? { resultRef: output.resultRef } : {}), diagnostics: output.diagnostics ?? [] });
     records.set('job:' + job.jobId, result); records.delete('reserve:' + job.jobId); records.delete('operation:' + job.jobId);
     const { activeJobId: _active, ...next } = w;
-    this.check(next, snapshots, records); assertCommit(); this.workspace = next; this.snapshots = snapshots; this.records = records; return result;
+    const commitSize = this.check(next, snapshots, records); assertCommit(); commitSize(); this.workspace = next; this.snapshots = snapshots; this.records = records; return result;
   }
   close(id: string): void {
-    this.assertIdle(id); const w = this.require(id); this.workspace = { id: w.id, name: w.name, sessionId: w.sessionId, state: 'closed', versionIds: [] };
-    this.snapshots = new Map(); this.records = new Map();
+    this.assertIdle(id); const w = this.require(id); const next: WorkspaceState = { id: w.id, name: w.name, sessionId: w.sessionId, state: 'closed', versionIds: [] };
+    const commitSize = this.check(next, new Map(), new Map()); commitSize(); this.workspace = next; this.snapshots = new Map(); this.records = new Map();
   }
 }

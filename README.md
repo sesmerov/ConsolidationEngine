@@ -9,7 +9,8 @@ descargar la plantilla Excel, importar archivos, analizar reglas con ANTLR y eje
 con cálculo exacto. Incluye explicaciones, resultados históricos y exportación a ZIP.
 También permite configurar destinos y simular propuestas de recálculo con sus dependencias.
 La aceptación expresa publica una nueva versión, revalida y permite comparar y exportar sus datos.
-Quedan las comprobaciones finales de rendimiento, accesibilidad y recorrido del analista.
+El benchmark de 500 reglas/100.000 hechos supera las diez ejecuciones del objetivo SC-006.
+Quedan accesibilidad, recorrido del analista y verificación final.
 Los resultados comprobados se registran en [verificación](docs/verification.md).
 
 ## Ejecutar el incremento actual
@@ -67,6 +68,7 @@ servidor y permanecen las descargas ya guardadas por el usuario.
 
 - [Constitución 1.0.0](.specify/memory/constitution.md): principios y restricciones.
 - [Toolchain y comandos de desarrollo](scripts/README.md): Node/npm aislados y generación ANTLR.
+- [Rendimiento medido](docs/performance.md): protocolo, equipo, diez mediciones y límites de la evidencia.
 - [Especificación 001](specs/001-regulatory-validation/spec.md): historias, requisitos y aceptación.
 - [Plan técnico](specs/001-regulatory-validation/plan.md): arquitectura, versiones y secuencia de construcción.
 - [Tareas de implementación](specs/001-regulatory-validation/tasks.md): siete fases con dependencias,
@@ -114,7 +116,8 @@ Las skills viven en `.agents/skills/` y los recursos compartidos en `.specify/`.
 US1 y US2 forman el MVP validador, incluida la exportación de resultados.
 US3 y US4 están completadas: propuestas con dependencias, aplicación confirmada, revalidación y
 exportación de informes recalculados. El checkpoint reúne 893 pruebas correctas sin omisiones;
-incluye 14 recorridos Chromium. La fase final comprobará recursos, rendimiento y accesibilidad.
+incluye 14 recorridos Chromium. Recursos y rendimiento están comprobados; la fase final completa
+accesibilidad, guía de uso y verificación del conjunto.
 Si cambia el alcance, se actualizarán primero la especificación y el plan afectados.
 Estos nombres se invocan en el chat de Codex; no son comandos de PowerShell.
 

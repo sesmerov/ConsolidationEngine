@@ -6,7 +6,7 @@ description: "Tareas de implementación del motor local de validación y recálc
 
 **Input**: `specs/001-regulatory-validation/`: spec, plan, research, data-model, contracts y quickstart.
 **Prerequisites**: [plan.md](plan.md), [spec.md](spec.md) y constitución 1.0.0.
-**Estado**: implementación en curso. Setup, foundation, US1–US4 y recursos T001–T071 completados y verificados; quedan rendimiento, accesibilidad y cierre T072–T075, con evidencia en cada checkpoint.
+**Estado**: implementación en curso. Setup, foundation, US1–US4, recursos y rendimiento T001–T072 completados y verificados; quedan accesibilidad y cierre T073–T075, con evidencia en cada checkpoint.
 
 **Tests**: Se incluyen pruebas porque spec.md exige escenarios verificables y criterios SC-001–007,
 y la constitución exige evidencia de comportamiento. Las tareas de pruebas preparan casos de negocio
@@ -186,7 +186,7 @@ validación completa; la integridad original, efectos de cancelación y exportac
 **Purpose**: Comprobar los límites del conjunto y dejar una entrega reproducible y utilizable.
 
 - [X] T071 Extender y ejecutar `tests/integration/resource-lifecycle.spec.ts` y `tests/contract/local-surface.spec.ts` para cuotas acumuladas/caché, CPU cancelable, worker terminado, sesión cerrada/reiniciada, original intacto y errores/logs sin secretos ni rutas; verificar POST/GET/DELETE permitidos y limpieza solo de directorio propio, sin introducir revisión por recibos (depende de T070).
-- [ ] T072 Crear `scripts/benchmark.mjs`, `tests/performance/validation-browser.spec.ts` y resumen en `docs/performance.md`: 500 reglas distintas/admitidas y100000 hechos, 10 ejecuciones desde fin de carga hasta resultados visibles en navegador, hardware/versiones/memoria/cuotas/instancias; medir 9/10≤30s y corte60s, no contar deduplicados o fixtures rechazados como éxito y corregir cuellos de botella concretos sin cambiar semántica (depende de T071).
+- [X] T072 Crear `scripts/benchmark.mjs`, `tests/performance/validation-browser.spec.ts` y resumen en `docs/performance.md`: 500 reglas distintas/admitidas y100000 hechos, 10 ejecuciones desde fin de carga hasta resultados visibles en navegador, hardware/versiones/memoria/cuotas/instancias; medir 9/10≤30s y corte60s, no contar deduplicados o fixtures rechazados como éxito y corregir cuellos de botella concretos sin cambiar semántica (depende de T071).
 - [ ] T073 Completar accesibilidad y recorrido en `apps/web/src/app/app.component.ts`, estilos de las cuatro páginas y `tests/e2e/analyst-journey.spec.ts`: teclado/foco/etiquetas, errores junto al campo, tablas legibles/paginadas y entidad/periodo/versión visibles; ejecutar SC-007 y registrar pasos/ayuda necesaria sin sustituirlo por una simulación del usuario (depende de T072).
 - [ ] T074 Actualizar `README.md`, `specs/001-regulatory-validation/quickstart.md` y `docs/verification.md` con comandos realmente existentes, versiones utilizadas, fixtures sintéticos/fuentes reales, política de sesión, perfil/diferencia EBA y resultados/limitaciones observados; no marcar compatibilidad total ni benchmarks no medidos (depende de T073).
 - [ ] T075 Ejecutar el recorrido completo y checks pertinentes de `specs/001-regulatory-validation/quickstart.md`: npm ci, generación reproducible, typecheck, suites de negocio/contrato/integración/E2E y build; contrastar hashes de originales y registrar resultados finales en `docs/verification.md`, corrigiendo fallos dentro de su funcionalidad antes del commit de cierre (depende de T074).

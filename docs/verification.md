@@ -378,3 +378,31 @@ Un JSON superior al bodyLimit de 1 MiB devuelve 413 UPLOAD_LIMIT público; no re
 el handler. El único cambio de producto corrige una descripción de capabilities, que afirmaba
 erróneamente aplicar la estimación XML de 64 MiB a informes: ahora la distingue de sus bytes reales.
 Esa incoherencia falló primero y pasó después del cambio; no cambiaron las cuotas.
+
+## T072 — rendimiento medido y contador incremental
+
+SC-006 verificado en el equipo y carga congelados en [performance.md](performance.md): Ryzen 5
+3600X, 12 hilos, aproximadamente 32 GiB RAM, Node 24.22.2 y Chromium 156.0.8078.4. Diez ejecuciones
+formales seriales sin reintentos ni descartes: todas entre 13,511 y 16,320 segundos desde fin de
+carga a ejecución completa/resumen y primera página visible. Media 14,601 s; mediana 14,162 s.
+La carga real queda fuera de ese cronómetro y está documentada por ejecución.
+
+Cada una contiene 500 reglas distintas y admitidas, con rangos disjuntos de 200 hechos: todas las
+100.000 lecturas y sus valores, unidades, precisión, coordenadas y locadores se auditan después
+del cronómetro. Resultado esperado por ejecución: 250 pasa y 250 falla deliberadamente, sin
+duplicados ni reglas omitidas/no soportadas. Una auditoría fallida habría invalidado el ensayo.
+Los diez resúmenes y tiempos se contrastaron directamente con el summary.json local.
+
+El primer piloto falló a los 75,127 s: recorrer repetidamente el mismo estado consumió 71,169 s.
+El contador incremental mantiene exactamente el conteo de canonicalStateBytes, incluye objetos
+compartidos una vez y confirma sus diferencias sólo después de cuota/guardas. No se omitieron
+mensajes de progreso, lecturas o trazas ni se cambiaron motor, UI o límites. Supera 25 pruebas del
+contador/oráculo y 46 regresiones; build/typecheck API correctos. Incluye cierre en cuota exacta
+con closing:false contabilizado desde crear la sesión.
+
+El segundo piloto fue abortado por coste del mecanismo de auditoría y no dejó T1 recuperable;
+no se cuenta ni se reconstruye. Los siguientes pilotos verificaron la corrección y un mecanismo
+de auditoría equivalente, conservando todos los valores comprobados. Los cuatro pilotos permanecen
+separados de las diez ejecuciones formales. No hubo otros builds/pruebas nuestros durante la serie.
+La memoria observada y sus límites de muestreo están separados de las cuotas JSON/worker en el informe.
+Este resultado no se extrapola a cualquier expresión o equipo ni sustituye SC-007 humano.
