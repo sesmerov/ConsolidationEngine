@@ -11,7 +11,9 @@ usa Angular en `127.0.0.1:4200` con proxy `/api` al backend. Host/Origin se limi
 según el modo. No se permite CORS comodín ni orígenes `null`. El bootstrap comprueba Host y contexto
 de origen; devuelve un token de sesión aleatorio de 256 bits que se mantiene solo en memoria.
 Todas las demás rutas API requieren `X-CE-Session`. El token no aparece en URLs, logs ni exports.
-Esto acota la interacción del navegador local; no es autenticación multiusuario.
+Esto acota la interacción del navegador local; no es autenticación multiusuario. Si existe un
+workspace activo, bootstrap incluye su identificador para recuperar la vista tras refrescar el
+navegador. El token y los datos siguen sin persistirse en el cliente.
 
 Cada snapshot tiene ETag fuerte, por ejemplo `"v-<versionId>"`. Mutaciones sobre un workspace
 requieren `If-Match` del snapshot vigente, o `"empty"` antes de la primera carga. Los trabajos
@@ -29,7 +31,7 @@ Todas las rutas siguientes, salvo bootstrap, requieren token. `{w}` es workspace
 
 | Método y ruta | Petición / respuesta satisfactoria |
 | --- | --- |
-| GET `/bootstrap` | 200 `{sessionToken, apiVersion, sessionPersistence:"ephemeral"}`. |
+| GET `/bootstrap` | 200 `{sessionToken, apiVersion, sessionPersistence:"ephemeral", activeWorkspaceId?}`. |
 | GET `/capabilities` | 200 perfil/gramática, diferencias semánticas conocidas, soporte y cuotas. |
 | GET `/templates/report` | 200 plantilla ce-report-1 con instrucciones y ejemplo sintético. |
 | POST `/workspaces` | `{name}` → 201 workspace empty y ETag `"empty"`; 409 si ya hay uno activo. |

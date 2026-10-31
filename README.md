@@ -4,8 +4,9 @@ Motor de validación y recálculo de informes regulatorios. El analista cargará
 de reglas EBA y sus informes en una plantilla Excel propia, consultará resultados y podrá aceptar
 propuestas de recálculo con sus dependencias.
 
-La implementación está en curso con Spec Kit. La fase de setup T001–T006 está completada:
-hay workspaces compilables, API y frontend iniciales, y generación ANTLR reproducible.
+La implementación está en curso con Spec Kit. Setup y foundation T001–T015 están completados:
+hay generación ANTLR reproducible, sesión local con versiones inmutables, trabajos cancelables
+y una interfaz Angular que recupera el conjunto activo al refrescar.
 La carga de informes, la validación y los recálculos todavía están pendientes.
 Los resultados comprobados se registran en [verificación](docs/verification.md).
 
@@ -16,7 +17,7 @@ Los resultados comprobados se registran en [verificación](docs/verification.md)
 - [Especificación 001](specs/001-regulatory-validation/spec.md): historias, requisitos y aceptación.
 - [Plan técnico](specs/001-regulatory-validation/plan.md): arquitectura, versiones y secuencia de construcción.
 - [Tareas de implementación](specs/001-regulatory-validation/tasks.md): siete fases con dependencias,
-  pruebas previstas y trazabilidad de requisitos; todas pendientes.
+  pruebas y trazabilidad de requisitos; cada checkbox refleja su implementación verificada.
 - [Investigación](specs/001-regulatory-validation/research.md): decisiones, alternativas y fuentes.
 - [Modelo de datos](specs/001-regulatory-validation/data-model.md): identidades, snapshots y estados.
 - Contratos de [HTTP](specs/001-regulatory-validation/contracts/http-api.md),
@@ -56,7 +57,7 @@ documentados y revisables en la especificación.
 Se ha inicializado **Specify CLI 1.1.3**, integración **Codex**, con scripts PowerShell.
 Las skills viven en `.agents/skills/` y los recursos compartidos en `.specify/`.
 
-La siguiente fase es `$speckit-implement`, siguiendo las dependencias de tasks.md.
+`$speckit-implement` está en ejecución, siguiendo las dependencias de tasks.md.
 El primer incremento carga e inspecciona archivos; el MVP validador completa US1 y US2,
 incluida la exportación de resultados. US3 y US4 añaden propuestas y aplicación de recálculos.
 Si cambia el alcance, se actualizarán primero la especificación y el plan afectados.
@@ -76,7 +77,7 @@ specify integration status --json
 Los originales se conservan en `grammar/`, `2. DPM-XL-docs-v0.9/` y en el Excel EBA de la raíz.
 La gramática principal está duplicada en la carpeta documental; ambas copias se conservan.
 Los nombres de los archivos `.g4` incluyen `-v0.9`, mientras sus declaraciones internas no;
-la generación deberá resolver esa diferencia sin editar los originales.
+la generación resuelve esa diferencia mediante copias temporales, sin editar los originales.
 
 Git se ha iniciado localmente en esta misma carpeta, en `main`. Se harán commits acotados a
 medida que se completen funcionalidades y sus comprobaciones. Las cargas, exportaciones y

@@ -6,7 +6,7 @@ description: "Tareas de implementación del motor local de validación y recálc
 
 **Input**: `specs/001-regulatory-validation/`: spec, plan, research, data-model, contracts y quickstart.
 **Prerequisites**: [plan.md](plan.md), [spec.md](spec.md) y constitución 1.0.0.
-**Estado**: tareas generadas el 2026-10-31; ninguna ejecutada. No se ha creado código de producto.
+**Estado**: implementación en curso. Setup y foundation T001–T015 completados y verificados; las tareas restantes se cierran con evidencia en cada checkpoint.
 
 **Tests**: Se incluyen pruebas porque spec.md exige escenarios verificables y criterios SC-001–007,
 y la constitución exige evidencia de comportamiento. Las tareas de pruebas preparan casos de negocio
@@ -53,15 +53,15 @@ Esto aún no demuestra que se ejecute ninguna regla.
 **Purpose**: Contratos comunes, sesión y ejecución aislada que necesitan todas las historias.
 No se implementan aquí el importador, el lenguaje completo ni el grafo.
 
-- [ ] T007 Definir `packages/contracts/src/common.ts`, `packages/contracts/src/errors.ts` y `packages/contracts/src/common.schemas.ts` con DTO JSON/esquemas cerrados, UUID, fechas civiles, locadores y racionales como cadenas; preservar «No se serializa `BigInt` como JSON number» y «displayName nunca es ruta»; campos opcionales permanecen opcionales y los errores no revelan rutas/stack/token (depende de T006).
-- [ ] T008 [P] Preparar `tests/integration/session-jobs.spec.ts` con invariantes de snapshot, cuota, un solo Job, cancelación, timeout y cierre seguro; usar dobles de workers controlados, sin confundirlos con evaluación real del motor (depende de T007).
-- [ ] T009 [P] Preparar `tests/contract/local-session.spec.ts` con Host/Origin/token, 403/409/412/428, esquemas cerrados, replay idempotente antes de If-Match y rechazo de clave reutilizada con otro cuerpo (depende de T007).
-- [ ] T010 Implementar `apps/api/src/app.ts`, `apps/api/src/plugins/local-session.ts` y `apps/api/src/routes/bootstrap.ts`: loopback 127.0.0.1:3000, allowlist Host/Origin por modo, bootstrap/token aleatorio 256 bits en memoria y X-CE-Session en el resto; CORS sin comodín/origen null y logs sin secretos (depende de T008, T009).
-- [ ] T011 Implementar `apps/api/src/session/workspace-store.ts` y `apps/api/src/session/canonical-state.ts` con «Un workspace por proceso; el hilo principal es el único propietario mutable del puntero vigente», snapshots «Inmutable. Versiona cualquier cambio de reglas, datos, contexto o direcciones» y estados `empty → ready → closed`; imponer «hasta 20 snapshots por workspace y hasta 512 MiB de estado contabilizado de sesión», bytes UTF-8 canónicos/objetos compartidos una vez, incluyendo resultados/propuestas/diagnósticos/cache y rechazo sin borrar original (depende de T010).
-- [ ] T012 Implementar `apps/api/src/storage/session-files.ts` y `apps/api/src/routes/workspaces.ts`: nombres UUID/sha256, GET/POST/DELETE workspace, directorio propio con marcador y borrado limitado a su ruta absoluta verificada; respetar «No se borran originales elegidos para carga ni descargas ya guardadas» y cierre que cancela primero los trabajos (depende de T011).
-- [ ] T013 Implementar `apps/api/src/jobs/job-manager.ts`, `apps/api/src/workers/protocol.ts` y `apps/api/src/routes/jobs.ts` con «kind=import/validate/preview/apply/export», transición `queued → running → succeeded | failed | cancelled | timed_out` y «Se admite como máximo un trabajo no terminal total»; worker_threads, deadline CPU 60 s, cancelación cooperativa/terminate, progreso incompleto y limpieza, sin asumir que resourceLimits limita Buffers (depende de T012).
-- [ ] T014 Implementar `apps/api/src/plugins/version-guard.ts` y `apps/api/src/session/idempotency-store.ts`: ETag fuerte/If-Match, caché por sesión/workspace/operación/clave/hash consultada tras autenticación y antes de rechazar versión antigua; replay devuelve Job original, no reaplica; definir entrada del hash multipart por archivos/metadatos, nunca boundary, y excepciones GET/selection/cancelación por jobId (depende de T013).
-- [ ] T015 Crear `apps/web/src/app/core/session.store.ts`, `apps/web/src/app/core/api-client.ts` y `apps/web/src/app/app.component.ts` con bootstrap/token solo en memoria, selección de workspace/contexto/versión, progreso/cancelación y aviso de sesión efímera; ejecutar T008/T009 con API real y workers controlados antes de pasar a US1 (depende de T014).
+- [X] T007 Definir `packages/contracts/src/common.ts`, `packages/contracts/src/errors.ts` y `packages/contracts/src/common.schemas.ts` con DTO JSON/esquemas cerrados, UUID, fechas civiles, locadores y racionales como cadenas; preservar «No se serializa `BigInt` como JSON number» y «displayName nunca es ruta»; campos opcionales permanecen opcionales y los errores no revelan rutas/stack/token (depende de T006).
+- [X] T008 [P] Preparar `tests/integration/session-jobs.spec.ts` con invariantes de snapshot, cuota, un solo Job, cancelación, timeout y cierre seguro; usar dobles de workers controlados, sin confundirlos con evaluación real del motor (depende de T007).
+- [X] T009 [P] Preparar `tests/contract/local-session.spec.ts` con Host/Origin/token, 403/409/412/428, esquemas cerrados, replay idempotente antes de If-Match y rechazo de clave reutilizada con otro cuerpo (depende de T007).
+- [X] T010 Implementar `apps/api/src/app.ts`, `apps/api/src/plugins/local-session.ts` y `apps/api/src/routes/bootstrap.ts`: loopback 127.0.0.1:3000, allowlist Host/Origin por modo, bootstrap/token aleatorio 256 bits en memoria y X-CE-Session en el resto; CORS sin comodín/origen null y logs sin secretos (depende de T008, T009).
+- [X] T011 Implementar `apps/api/src/session/workspace-store.ts` y `apps/api/src/session/canonical-state.ts` con «Un workspace por proceso; el hilo principal es el único propietario mutable del puntero vigente», snapshots «Inmutable. Versiona cualquier cambio de reglas, datos, contexto o direcciones» y estados `empty → ready → closed`; imponer «hasta 20 snapshots por workspace y hasta 512 MiB de estado contabilizado de sesión», bytes UTF-8 canónicos/objetos compartidos una vez, incluyendo resultados/propuestas/diagnósticos/cache y rechazo sin borrar original (depende de T010).
+- [X] T012 Implementar `apps/api/src/storage/session-files.ts` y `apps/api/src/routes/workspaces.ts`: nombres UUID/sha256, GET/POST/DELETE workspace, directorio propio con marcador y borrado limitado a su ruta absoluta verificada; respetar «No se borran originales elegidos para carga ni descargas ya guardadas» y cierre que cancela primero los trabajos (depende de T011).
+- [X] T013 Implementar `apps/api/src/jobs/job-manager.ts`, `apps/api/src/workers/protocol.ts` y `apps/api/src/routes/jobs.ts` con «kind=import/validate/preview/apply/export», transición `queued → running → succeeded | failed | cancelled | timed_out` y «Se admite como máximo un trabajo no terminal total»; worker_threads, deadline CPU 60 s, cancelación cooperativa/terminate, progreso incompleto y limpieza, sin asumir que resourceLimits limita Buffers (depende de T012).
+- [X] T014 Implementar `apps/api/src/plugins/version-guard.ts` y `apps/api/src/session/idempotency-store.ts`: ETag fuerte/If-Match, caché por sesión/workspace/operación/clave/hash consultada tras autenticación y antes de rechazar versión antigua; replay devuelve Job original, no reaplica; definir entrada del hash multipart por archivos/metadatos, nunca boundary, y excepciones GET/selection/cancelación por jobId (depende de T013).
+- [X] T015 Crear `apps/web/src/app/core/session.store.ts`, `apps/web/src/app/core/api-client.ts` y `apps/web/src/app/app.component.ts` con bootstrap/token solo en memoria, selección de workspace/contexto/versión, progreso/cancelación y aviso de sesión efímera; ejecutar T008/T009 con API real y workers controlados antes de pasar a US1 (depende de T014).
 
 **Checkpoint**: `npm run typecheck`, pruebas foundation y contratos locales correctos. La base
 no persiste datos entre reinicios ni expone servidor fuera de loopback.
@@ -265,8 +265,8 @@ limitaciones en el mensaje. No crear un commit por checkbox si rompe una unidad 
 tampoco acumular todo el producto en un único commit. Los checkpoints son verificaciones ordinarias
 del trabajo, no aprobaciones de un sistema de recibos.
 
-Marcar una tarea solo después de implementarla y comprobar su resultado. En esta fase todas
-permanecen pendientes. `$speckit-implement` es la siguiente fase; no se invoca automáticamente
+Marcar una tarea solo después de implementarla y comprobar su resultado. `$speckit-implement`
+está en ejecución; no se invoca automáticamente
 `$speckit-analyze` ni se habilitan revisiones. Desarrollo con recibos: `disabled/unmanaged`.
 
 ## Traceability
@@ -326,5 +326,5 @@ Las tablas indican trabajo que debe producir la evidencia; no afirman que exista
 ## Notes
 
 No hay `.specify/extensions.yml`; no se ejecutan hooks before_tasks/after_tasks.
-La validación de esta entrega comprueba formato, dependencias y cobertura documental.
-No instala dependencias, ejecuta tareas, genera el parser ni demuestra resultados de producto.
+La generación inicial de tareas comprobó formato, dependencias y cobertura documental.
+La evidencia posterior de implementación se registra en `docs/verification.md`.

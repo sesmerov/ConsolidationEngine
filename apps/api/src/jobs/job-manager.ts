@@ -1,0 +1,127 @@
+import { randomUUID } from 'node:crypto';
+import { Worker } from 'node:worker_threads';
+import { ERROR_MESSAGES, JOB_DEADLINE_MS, isTerminalJob } from '@ce/contracts';
+import type { JobDTO, JobKind, JsonValue } from '@ce/contracts';
+import { ApiError } from '../errors.js';
+import type { WorkspaceStore } from '../session/workspace-store.js';
+import type { WorkerMessage, WorkerRequest } from '../workers/protocol.js';
+
+export type WorkerHandle = Pick<Worker, 'on' | 'terminate'>;
+export type WorkerFactory = (request: WorkerRequest) => WorkerHandle;
+export interface JobManagerOptions {
+  workerFactory?: WorkerFactory; workerModules?: Partial<Record<JobKind, URL>>; deadlineMs?: number; workerEntry?: URL;
+}
+export interface StartJob { workspaceId: string; kind: JobKind; baseVersionId?: string; input: JsonValue; jobId?: string }
+interface Running { cancellation: Int32Array; worker?: WorkerHandle; timer?: NodeJS.Timeout; expiresAt: number; stopping: boolean; stopPromise?: Promise<JobDTO> }
+class DeadlineElapsed extends Error {}
+export class JobManager {
+  private readonly running = new Map<string, Running>();
+  private readonly terminations = new Set<Promise<unknown>>();
+  private readonly factory: WorkerFactory;
+  private readonly deadlineMs: number;
+  private readonly modules: Partial<Record<JobKind, URL>>;
+  private disposed = false;
+  constructor(readonly store: WorkspaceStore, options: JobManagerOptions = {}) {
+    this.deadlineMs = options.deadlineMs ?? JOB_DEADLINE_MS;
+    if (this.deadlineMs <= 0 || this.deadlineMs > JOB_DEADLINE_MS) throw new Error('Invalid worker deadline.');
+    this.modules = options.workerModules ?? {};
+    this.factory = options.workerFactory ?? ((request) => {
+      const worker = new Worker(options.workerEntry ?? new URL('../workers/operation-worker.js', import.meta.url), {
+        workerData: request, resourceLimits: { maxOldGenerationSizeMb: 256, stackSizeMb: 4 }, stdout: true, stderr: true,
+      });
+      worker.stdout.resume(); worker.stderr.resume(); return worker;
+    });
+  }
+  start(input: StartJob): JobDTO {
+    if (this.disposed) throw new ApiError('RESOURCE_NOT_FOUND');
+    const job: JobDTO = { jobId: input.jobId ?? randomUUID(), workspaceId: input.workspaceId, kind: input.kind, status: 'queued',
+      ...(input.baseVersionId ? { baseVersionId: input.baseVersionId } : {}), progress: { completed: 0, total: 0, complete: false }, diagnostics: [], pollAfterMs: 1000 };
+    this.store.registerJob(job);
+    const running: Running = { cancellation: new Int32Array(new SharedArrayBuffer(4)), expiresAt: Infinity, stopping: false };
+    this.running.set(job.jobId, running);
+    queueMicrotask(() => this.begin(job, input.input, running)); return this.get(job.workspaceId, job.jobId);
+  }
+  get(workspaceId: string, jobId: string): JobDTO { return this.store.job(workspaceId, jobId); }
+  private begin(queued: JobDTO, input: JsonValue, running: Running): void {
+    if (running.stopping || this.disposed) return;
+    try {
+      const now = Date.now(); running.expiresAt = now + this.deadlineMs;
+      const job: JobDTO = { ...queued, status: 'running', startedAt: new Date(now).toISOString(), deadline: new Date(running.expiresAt).toISOString() };
+      this.store.updateJob(job);
+      const snapshot = job.baseVersionId ? this.store.snapshot(job.workspaceId, job.baseVersionId) : undefined;
+      const moduleUrl = this.modules[job.kind]?.href;
+      const request: WorkerRequest = { job, input, cancellation: running.cancellation.buffer as SharedArrayBuffer,
+        ...(snapshot ? { snapshot } : {}), ...(moduleUrl ? { moduleUrl } : {}) };
+      const worker = this.factory(request); running.worker = worker;
+      running.timer = setTimeout(() => { void this.stop(job, 'timed_out'); }, this.deadlineMs);
+      worker.on('message', (message: unknown) => this.message(job, running, message));
+      worker.on('error', () => { this.fail(job, new ApiError('INTERNAL_ERROR')); });
+      worker.on('exit', () => {
+        if (!running.stopping && !isTerminalJob(this.get(job.workspaceId, job.jobId).status)) this.fail(job, new ApiError('INTERNAL_ERROR'));
+      });
+    } catch (error) { this.fail(queued, error); }
+  }
+  private message(original: JobDTO, running: Running, value: unknown): void {
+    if (running.stopping || Atomics.load(running.cancellation, 0) || isTerminalJob(this.get(original.workspaceId, original.jobId).status)) return;
+    if (Date.now() >= running.expiresAt) { void this.stop(original, 'timed_out'); return; }
+    try {
+      if (!value || typeof value !== 'object' || !('type' in value)) throw new ApiError('INTERNAL_ERROR');
+      const message = value as WorkerMessage; const job = this.get(original.workspaceId, original.jobId);
+      if (message.type === 'progress') {
+        if (!Number.isSafeInteger(message.completed) || !Number.isSafeInteger(message.total) || message.completed < 0 || message.total < message.completed) throw new ApiError('INTERNAL_ERROR');
+        this.store.updateJob({ ...job, progress: { completed: message.completed, total: message.total, complete: false } });
+      } else if (message.type === 'result') {
+        if (!message.output || message.output.complete !== true) throw new ApiError('INTERNAL_ERROR');
+        // All three guards run again immediately before the synchronous main-thread commit.
+        this.store.assertBase(job.workspaceId, job.baseVersionId);
+        if (Atomics.load(running.cancellation, 0)) return;
+        if (Date.now() >= running.expiresAt) { void this.stop(job, 'timed_out'); return; }
+        this.store.publishJobResult(job, message.output, () => {
+          this.store.assertBase(job.workspaceId, job.baseVersionId);
+          if (Date.now() >= running.expiresAt) throw new DeadlineElapsed();
+          if (Atomics.load(running.cancellation, 0)) throw new ApiError('INTERNAL_ERROR');
+        });
+        this.cleanup(job.jobId);
+      } else throw new ApiError('INTERNAL_ERROR');
+    } catch (error) { if (error instanceof DeadlineElapsed) void this.stop(original, 'timed_out'); else this.fail(original, error); }
+  }
+  private fail(original: JobDTO, error: unknown): void {
+    const running = this.running.get(original.jobId); if (!running || running.stopping) return;
+    const current = this.get(original.workspaceId, original.jobId); if (isTerminalJob(current.status)) return;
+    const code = error instanceof ApiError ? error.code : 'INTERNAL_ERROR';
+    this.store.updateJob({ ...current, status: 'failed', endedAt: new Date().toISOString(), progress: { ...current.progress, complete: false }, diagnostics: [{ code, message: ERROR_MESSAGES[code] }] });
+    this.cleanup(original.jobId);
+  }
+  private cleanup(id: string): void {
+    const running = this.running.get(id); if (!running) return;
+    running.stopping = true; Atomics.store(running.cancellation, 0, 1); if (running.timer) clearTimeout(running.timer);
+    if (running.worker) {
+      const termination = running.worker.terminate().catch(() => undefined);
+      this.terminations.add(termination); void termination.finally(() => this.terminations.delete(termination));
+    }
+    this.running.delete(id);
+  }
+  private stop(original: JobDTO, status: 'cancelled' | 'timed_out'): Promise<JobDTO> {
+    const running = this.running.get(original.jobId);
+    if (running?.stopPromise) return running.stopPromise;
+    if (!running || isTerminalJob(this.get(original.workspaceId, original.jobId).status)) return Promise.resolve(this.get(original.workspaceId, original.jobId));
+    running.stopping = true; Atomics.store(running.cancellation, 0, 1); if (running.timer) clearTimeout(running.timer);
+    running.stopPromise = (async () => {
+      if (running.worker) await running.worker.terminate().catch(() => undefined);
+      const current = this.get(original.workspaceId, original.jobId);
+      const result: JobDTO = isTerminalJob(current.status) ? current : { ...current, status, endedAt: new Date().toISOString(), progress: { ...current.progress, complete: false },
+        diagnostics: status === 'timed_out' ? [{ code: 'JOB_TIMEOUT', message: 'El trabajo superó el plazo de ejecución y quedó incompleto.' }] : [] };
+      if (!isTerminalJob(current.status)) this.store.updateJob(result);
+      this.running.delete(original.jobId); return result;
+    })();
+    return running.stopPromise;
+  }
+  async cancel(workspaceId: string, jobId: string): Promise<JobDTO> { return this.stop(this.get(workspaceId, jobId), 'cancelled'); }
+  async cancelActive(workspaceId: string): Promise<void> {
+    const id = this.store.get(workspaceId).activeJobId; if (id) await this.cancel(workspaceId, id);
+    await Promise.all(this.terminations);
+  }
+  async dispose(): Promise<void> {
+    this.disposed = true; const id = this.store.currentWorkspaceId; if (id) await this.cancelActive(id);
+  }
+}

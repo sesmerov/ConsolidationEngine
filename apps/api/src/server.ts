@@ -1,15 +1,10 @@
-import Fastify from 'fastify';
-import { API_VERSION } from '@ce/contracts';
+import { createApp } from './app.js';
 
 const port = Number(process.env['PORT'] ?? 3000);
 if (!Number.isInteger(port) || port < 0 || port > 65535) {
   throw new Error('PORT debe ser un entero entre 0 y 65535.');
 }
-const server = Fastify({ logger: false });
-server.get('/api/v1/health', async () => ({
-  status: 'scaffold',
-  apiVersion: API_VERSION,
-}));
+const server = await createApp({ mode: process.env['NODE_ENV'] === 'production' ? 'production' : 'development', apiPort: port });
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => { void server.close(); });
 }
