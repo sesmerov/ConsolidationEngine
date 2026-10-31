@@ -13,7 +13,7 @@ El visitor construye un AST tipado de la siguiente lista; cualquier otra constru
 
 | Construcción admitida | Condición |
 | --- | --- |
-| Literal numérico, booleano y null | Número racional exacto; nunca código ejecutable. |
+| Literal numérico y booleano | Número racional exacto; nunca código ejecutable. |
 | Paréntesis, signos unarios, `+ - * /` | Operandos compatibles y límites numéricos respetados. |
 | `= != < <= > >=`, `and or not` | Semántica inferior; se conserva la sintaxis que exige la gramática. |
 | Referencia a celda dentro/entre tablas | Resolución inequívoca en el contexto seleccionado. |
@@ -26,6 +26,12 @@ Una regla contiene una sola expresión cuyo resultado final es booleano o null. 
 asignaciones `:=`/`<-`, variables, operaciones referenciadas, grupos de tablas, `where`, `group by`,
 operadores temporales y selecciones dimensionales generales están fuera del perfil. Las direcciones
 de recálculo se configuran aparte; reconocer un token de asignación no habilita escritura.
+
+La gramática suministrada admite `default:null`, pero su regla `literal` no incluye
+`NULL_LITERAL`: `null` como expresión independiente y `isnull(null)` son errores sintácticos.
+No se modifica la gramática ni se elude el parser para admitirlos. Los nulos de datos y los
+resultados nulos sí se conservan; las notaciones con argumentos null en la sección semántica
+describen valores, no expresiones que deban aceptarse literalmente como entrada.
 
 ## Resolución de referencias y ámbito
 

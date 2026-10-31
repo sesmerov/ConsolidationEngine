@@ -4,13 +4,15 @@ Motor de validación y recálculo de informes regulatorios. El analista cargará
 de reglas EBA y sus informes en una plantilla Excel propia, consultará resultados y podrá aceptar
 propuestas de recálculo con sus dependencias.
 
-El proyecto ha completado especificación, planificación y desglose de tareas con Spec Kit.
-Hay constitución, requisitos, diseño técnico y tareas pendientes; todavía no existen una aplicación,
-un parser generado ni resultados de rendimiento. La siguiente fase es implementar por incrementos.
+La implementación está en curso con Spec Kit. La fase de setup T001–T006 está completada:
+hay workspaces compilables, API y frontend iniciales, y generación ANTLR reproducible.
+La carga de informes, la validación y los recálculos todavía están pendientes.
+Los resultados comprobados se registran en [verificación](docs/verification.md).
 
 ## Documentos del proyecto
 
 - [Constitución 1.0.0](.specify/memory/constitution.md): principios y restricciones.
+- [Toolchain y comandos de desarrollo](scripts/README.md): Node/npm aislados y generación ANTLR.
 - [Especificación 001](specs/001-regulatory-validation/spec.md): historias, requisitos y aceptación.
 - [Plan técnico](specs/001-regulatory-validation/plan.md): arquitectura, versiones y secuencia de construcción.
 - [Tareas de implementación](specs/001-regulatory-validation/tasks.md): siete fases con dependencias,

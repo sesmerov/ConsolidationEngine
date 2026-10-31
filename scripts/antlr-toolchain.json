@@ -1,0 +1,10 @@
+{
+  "version": "4.13.2",
+  "runtimeVersion": "4.13.2",
+  "url": "https://www.antlr.org/download/antlr-4.13.2-complete.jar",
+  "sha256": "eae2dfa119a64327444672aff63e9ec35a20180dc5b8090b7a6ab85125df4d76",
+  "grammars": {
+    "dpm_xlLexer-v0.9.g4": "dda7b8de2c8e1430448cad7a342c712d52ba1b5bd533730b4eafede02bb5805a",
+    "dpm_xlParser-v0.9.g4": "30fd37bddfdd356294801e53c7cf4864547a71d0ed13d1b884a3d9c6b6d884b4"
+  }
+}

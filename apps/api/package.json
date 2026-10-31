@@ -1,0 +1,21 @@
+{
+  "name": "@ce/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@ce/contracts": "0.1.0",
+    "@ce/engine": "0.1.0",
+    "@fastify/multipart": "10.1.6",
+    "@fastify/static": "10.1.8",
+    "fastify": "5.12.7",
+    "read-excel-file": "9.3.14",
+    "write-excel-file": "4.1.1",
+    "sax": "1.6.1",
+    "yauzl": "3.4.0"
+  }
+}

@@ -6,6 +6,16 @@ coverage/
 .angular/
 .cache/
 *.tsbuildinfo
+.tools/
+packages/engine/src/generated/
+playwright-report/
+test-results/
+*.jar
+*.class
+*.tmp
+*.swp
+.vscode/
+.idea/
 
 # Local imports, exports and execution data (reference EBA files remain tracked)
 data/uploads/
