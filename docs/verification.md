@@ -465,3 +465,50 @@ las diez mediciones de rendimiento y la aceptación humana pendiente. Conserva V
 a evidencia por incremento, explica la selección de versión vigente al exportar, el perfil local
 y la sesión efímera. No declara conformidad EBA completa, un total global aún sin consolidar ni
 un servidor iniciado por el mero hecho de mostrar comandos.
+
+## T075 — cierre técnico desde instalación limpia (2026-11-01)
+
+Verificación ejecutada sobre el código de `4854a17`, con el árbol inicialmente limpio. Bootstrap
+aislado, npm ci, generación de fixtures, Chromium local, generación ANTLR, typecheck global y
+build de producción completos correctos. Versiones observadas: Node 24.22.2, npm 11.19.1,
+Java 17.0.8 y ANTLR 4.13.2. npm ci instaló 380 paquetes, auditó 385 y notificó 0 vulnerabilidades
+en esa ejecución; lockfile y manifiestos no cambiaron.
+
+| Suite ejecutada completa | Pruebas correctas |
+| --- | ---: |
+| Motor | 505 |
+| Angular | 46 |
+| Integración | 270 |
+| Contratos | 94 |
+| Chromium E2E | 16 |
+| Total único | **931** |
+
+Cero fallos y cero omisiones. Los 16 E2E pasaron en una sola ejecución de aproximadamente
+1,5 minutos, incluidos los ocho pasos guiados y su descarga. Ese tiempo de suite no se presenta
+como benchmark SC-006. No fue necesario corregir producto ni pruebas durante este cierre.
+antlr-generation.spec comparó dos generaciones con hashes idénticos, comprobó sintaxis real/EOF
+y preservó las gramáticas originales.
+
+La regeneración de eba-subset.xlsx, report-40.xlsx y report-42.xlsx cambió sus contenedores ZIP.
+Sus 8/14/14 entradas descomprimidas coincidieron byte por byte con HEAD. Las suites se ejecutaron
+sobre esos archivos recién generados; después se restauraron únicamente los tres contenedores
+versionados de nuestro cambio de verificación para evitar ruido de empaquetado. No se afirma
+reproducibilidad binaria de XLSX ni se restauraron datos del usuario. Git quedó limpio tras esa
+restauración y antes de registrar este cierre.
+
+Los tres originales conservan sus SHA-256:
+
+| Original | SHA-256 |
+| --- | --- |
+| Excel EBA de la raíz | `36636afe42b2ef2247822a31ad710afe1128b5b65a250b657e1f20d5a75bba79` |
+| dpm_xlLexer-v0.9.g4 | `dda7b8de2c8e1430448cad7a342c712d52ba1b5bd533730b4eafede02bb5805a` |
+| dpm_xlParser-v0.9.g4 | `30fd37bddfdd356294801e53c7cf4864547a71d0ed13d1b884a3d9c6b6d884b4` |
+
+Evidencias locales: `.cache/t075-verification.json`, `.cache/t075-fixture-comparison.jsonl` y
+`.cache/t075-baseline.json`. `git diff --check` correcto. Se comprobó el hook posterior de
+speckit-implement: `.specify/extensions.yml` no existe, por lo que no hay after_implement que
+despachar. El desarrollo por recibos permanece `disabled/unmanaged`.
+
+Quedan 74/75 tareas marcadas: T073 conserva pendiente únicamente la aceptación humana SC-007.
+El producto, su recorrido automatizado y los checks técnicos finales están terminados; no se
+inventa participación de una persona ni se presenta ese criterio como aprobado.

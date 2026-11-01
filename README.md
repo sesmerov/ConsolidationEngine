@@ -8,7 +8,9 @@ revisar propuestas y confirmarlos; la aplicación conserva las versiones anterio
 Las funcionalidades US1–US4, recursos y rendimiento tienen evidencia técnica en
 [verificación](docs/verification.md). El ensayo de uso con una persona analista **SC-007 sigue
 pendiente**: los recorridos automáticos y las comprobaciones de accesibilidad no lo sustituyen.
-La verificación final consolidada se registra por separado; aquí no se fija un total global de pruebas.
+La verificación final desde instalación limpia supera **931 pruebas**, sin fallos ni omisiones,
+incluidos 16 recorridos completos de navegador. Build, typecheck y generación ANTLR reproducible
+también pasan; los originales mantienen sus hashes.
 
 ## Instalación y arranque
 
