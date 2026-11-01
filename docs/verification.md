@@ -1,6 +1,8 @@
 # Verificación de implementación
 
-Fecha: 2026-10-31. Este registro distingue comprobaciones realizadas de funcionalidades pendientes.
+Registro iniciado el 2026-10-31; último cierre el 2026-11-01. Los checkpoints conservan el estado
+que tenían al registrarse. El cierre final de SC-007 documenta la aceptación global del usuario
+y las 75/75 tareas completadas; las comprobaciones automatizadas se mantienen como tales.
 
 ## Setup T001–T006
 
@@ -407,7 +409,7 @@ separados de las diez ejecuciones formales. No hubo otros builds/pruebas nuestro
 La memoria observada y sus límites de muestreo están separados de las cuotas JSON/worker en el informe.
 Este resultado no se extrapola a cualquier expresión o equipo ni sustituye SC-007 humano.
 
-## T073 — interfaz y recorrido automatizado; aceptación humana pendiente
+## T073 — checkpoint técnico; aceptación humana pendiente en ese momento
 
 La guía «Empezar con el ejemplo guiado» y los dos Excel descargables contienen los mismos ocho
 pasos. El catálogo y el informe son 100% SYNTHETIC, generados sin leer el Excel EBA original:
@@ -447,8 +449,8 @@ y comparación adaptable mantienen los identificadores técnicos en detalles de 
 Las capturas de guía/comparación desktop y errores/resumen/detalle móvil en `.cache/analyst-*.png`
 se inspeccionaron y resultan legibles. Esto no constituye una certificación general de accesibilidad.
 
-**SC-007 humano: pendiente.** No ha participado una persona analista en esta prueba y no se le
-atribuyen pasos ni ayuda ficticios. Se registrarán su recorrido y cualquier asistencia cuando
+**Estado histórico de SC-007: pendiente en este checkpoint.** No ha participado una persona analista
+en esta prueba y no se le atribuyen pasos ni ayuda ficticios. Se registrarán su recorrido y cualquier asistencia cuando
 pruebe la guía; T073 permanece sin marcar por ese único criterio. La documentación y los checks
 técnicos finales pueden completarse conservando este estado explícito.
 
@@ -461,7 +463,7 @@ se pasan mediante -NpmArguments @(...) y Chromium usa la caché local del proyec
 estática; la ejecución consolidada desde npm ci corresponde a T075.
 
 La documentación distingue el ejemplo totalmente sintético, los extractos EBA con datos sintéticos,
-las diez mediciones de rendimiento y la aceptación humana pendiente. Conserva V01–V16 con enlaces
+las diez mediciones de rendimiento y la aceptación humana entonces pendiente. Conserva V01–V16 con enlaces
 a evidencia por incremento, explica la selección de versión vigente al exportar, el perfil local
 y la sesión efímera. No declara conformidad EBA completa, un total global aún sin consolidar ni
 un servidor iniciado por el mero hecho de mostrar comandos.
@@ -509,6 +511,20 @@ Evidencias locales: `.cache/t075-verification.json`, `.cache/t075-fixture-compar
 speckit-implement: `.specify/extensions.yml` no existe, por lo que no hay after_implement que
 despachar. El desarrollo por recibos permanece `disabled/unmanaged`.
 
-Quedan 74/75 tareas marcadas: T073 conserva pendiente únicamente la aceptación humana SC-007.
-El producto, su recorrido automatizado y los checks técnicos finales están terminados; no se
-inventa participación de una persona ni se presenta ese criterio como aprobado.
+Al cerrar T075, antes de la respuesta del usuario, quedaban 74/75 tareas marcadas: T073 conservaba
+pendiente únicamente la aceptación humana SC-007. El producto, su recorrido automatizado y los
+checks técnicos finales estaban terminados; ese checkpoint no acreditaba aceptación humana.
+
+## Cierre de SC-007 y T073 — confirmación global (2026-11-01)
+
+Ante la solicitud de aceptación del recorrido guiado de ocho pasos —crear y cargar, validar,
+elegir destinos, simular, seleccionar con sus dependencias, confirmar, comparar y guardar—,
+el usuario respondió literalmente: **«todo lo veo ok»**.
+
+Se registra esta respuesta como aceptación global, sin incidencias comunicadas, y se cierran
+SC-007 y T073: **75/75 tareas completadas**. No se dispone de observación directa, confirmaciones
+individuales por paso, tiempos de ejecución ni información sobre la ayuda recibida. Los resultados
+por paso de la tabla anterior pertenecen exclusivamente al recorrido automatizado.
+
+Este cierre sólo incorpora la confirmación del usuario y actualiza la documentación. No se han
+ejecutado nuevas suites ni se modifica la evidencia técnica de T075.

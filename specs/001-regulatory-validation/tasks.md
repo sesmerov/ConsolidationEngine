@@ -6,7 +6,7 @@ description: "Tareas de implementación del motor local de validación y recálc
 
 **Input**: `specs/001-regulatory-validation/`: spec, plan, research, data-model, contracts y quickstart.
 **Prerequisites**: [plan.md](plan.md), [spec.md](spec.md) y constitución 1.0.0.
-**Estado**: implementación y verificación técnicas completadas. T001–T072 y T074–T075 están verificadas (74/75 checks); T073 está implementada y comprobada automáticamente, pero su aceptación con una persona analista (SC-007) permanece pendiente.
+**Estado**: 75/75 tareas completadas. La implementación y la verificación técnicas están cerradas; T073 y SC-007 se cierran el 2026-11-01 con la confirmación global del usuario «todo lo veo ok» al recorrido solicitado de ocho pasos, sin incidencias comunicadas. La evidencia de aceptación y sus límites constan en [verificación](../../docs/verification.md).
 
 **Tests**: Se incluyen pruebas porque spec.md exige escenarios verificables y criterios SC-001–007,
 y la constitución exige evidencia de comportamiento. Las tareas de pruebas preparan casos de negocio
@@ -187,16 +187,17 @@ validación completa; la integridad original, efectos de cancelación y exportac
 
 - [X] T071 Extender y ejecutar `tests/integration/resource-lifecycle.spec.ts` y `tests/contract/local-surface.spec.ts` para cuotas acumuladas/caché, CPU cancelable, worker terminado, sesión cerrada/reiniciada, original intacto y errores/logs sin secretos ni rutas; verificar POST/GET/DELETE permitidos y limpieza solo de directorio propio, sin introducir revisión por recibos (depende de T070).
 - [X] T072 Crear `scripts/benchmark.mjs`, `tests/performance/validation-browser.spec.ts` y resumen en `docs/performance.md`: 500 reglas distintas/admitidas y100000 hechos, 10 ejecuciones desde fin de carga hasta resultados visibles en navegador, hardware/versiones/memoria/cuotas/instancias; medir 9/10≤30s y corte60s, no contar deduplicados o fixtures rechazados como éxito y corregir cuellos de botella concretos sin cambiar semántica (depende de T071).
-- [ ] T073 Completar accesibilidad y recorrido en `apps/web/src/app/app.component.ts`, estilos de las cuatro páginas y `tests/e2e/analyst-journey.spec.ts`: teclado/foco/etiquetas, errores junto al campo, tablas legibles/paginadas y entidad/periodo/versión visibles; ejecutar SC-007 y registrar pasos/ayuda necesaria sin sustituirlo por una simulación del usuario (depende de T072).
-- [X] T074 Actualizar `README.md`, `specs/001-regulatory-validation/quickstart.md` y `docs/verification.md` con comandos realmente existentes, versiones utilizadas, fixtures sintéticos/fuentes reales, política de sesión, perfil/diferencia EBA y resultados/limitaciones observados; no marcar compatibilidad total ni benchmarks no medidos (depende de la parte técnica de T073; registra SC-007 humano pendiente hasta obtener su evidencia).
+- [X] T073 Completar accesibilidad y recorrido en `apps/web/src/app/app.component.ts`, estilos de las cuatro páginas y `tests/e2e/analyst-journey.spec.ts`: teclado/foco/etiquetas, errores junto al campo, tablas legibles/paginadas y entidad/periodo/versión visibles; ejecutar SC-007 y registrar pasos/ayuda necesaria sin sustituirlo por una simulación del usuario (depende de T072).
+- [X] T074 Actualizar `README.md`, `specs/001-regulatory-validation/quickstart.md` y `docs/verification.md` con comandos realmente existentes, versiones utilizadas, fixtures sintéticos/fuentes reales, política de sesión, perfil/diferencia EBA y resultados/limitaciones observados; no marcar compatibilidad total ni benchmarks no medidos (depende de la parte técnica de T073; la aceptación humana se registra por separado).
 - [X] T075 Ejecutar el recorrido completo y checks pertinentes de `specs/001-regulatory-validation/quickstart.md`: npm ci, generación reproducible, typecheck, suites de negocio/contrato/integración/E2E y build; contrastar hashes de originales y registrar resultados finales en `docs/verification.md`, corrigiendo fallos dentro de su funcionalidad antes del commit de cierre (depende de T074).
 
-**Aceptación de T073**: interfaz, guía de ocho pasos y recorrido automatizado están implementados
-y comprobados. Falta que una persona analista siga esa guía y se registren sus pasos/ayuda; el
-checkbox permanece vacío y SC-007 no se atribuye a la automatización. Se permite cerrar la
-documentación y las comprobaciones técnicas T074–T075 mientras esa participación está pendiente:
-no dependen de su respuesta ni sustituyen la aceptación humana. Esta precisión de ejecución no
-elimina el criterio de éxito ni convierte su estado pendiente en aprobado.
+**Aceptación de T073 (2026-11-01)**: a la solicitud de aceptación del recorrido de ocho pasos,
+el usuario respondió «todo lo veo ok». Se registra como confirmación global, sin incidencias
+comunicadas, y se cierran T073 y SC-007. No consta observación directa ni desglose por paso,
+tiempos o información sobre la ayuda recibida. El recorrido automatizado conserva su carácter
+de evidencia técnica.
+T074–T075 se cerraron antes de esta respuesta, dependiendo de la parte técnica de T073;
+ese orden histórico no sustituyó la aceptación del usuario.
 
 ## Dependencies & Execution Order
 
@@ -276,7 +277,7 @@ tampoco acumular todo el producto en un único commit. Los checkpoints son verif
 del trabajo, no aprobaciones de un sistema de recibos.
 
 Marcar una tarea solo después de implementarla y comprobar su resultado. `$speckit-implement`
-está en ejecución; no se invoca automáticamente
+está completado; no se invoca automáticamente
 `$speckit-analyze` ni se habilitan revisiones. Desarrollo con recibos: `disabled/unmanaged`.
 
 ## Traceability

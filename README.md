@@ -6,8 +6,9 @@ ANTLR, aritmética exacta y ordenamiento topológico de Kahn. Los cambios requie
 revisar propuestas y confirmarlos; la aplicación conserva las versiones anteriores y revalida.
 
 Las funcionalidades US1–US4, recursos y rendimiento tienen evidencia técnica en
-[verificación](docs/verification.md). El ensayo de uso con una persona analista **SC-007 sigue
-pendiente**: los recorridos automáticos y las comprobaciones de accesibilidad no lo sustituyen.
+[verificación](docs/verification.md). **SC-007 y T073 se cierran el 2026-11-01** con la respuesta
+global del usuario «todo lo veo ok» al recorrido solicitado de ocho pasos, sin incidencias
+comunicadas. Esta aceptación se registra por separado de las comprobaciones automáticas.
 La verificación final desde instalación limpia supera **931 pruebas**, sin fallos ni omisiones,
 incluidos 16 recorridos completos de navegador. Build, typecheck y generación ANTLR reproducible
 también pasan; los originales mantienen sus hashes.
@@ -95,7 +96,7 @@ auditoría y límites de esa evidencia; no es una garantía para cualquier equip
 
 ## Documentos y desarrollo
 
-- [Guía de uso y verificación](specs/001-regulatory-validation/quickstart.md): comandos, V01–V16 y SC-007 pendiente.
+- [Guía de uso y verificación](specs/001-regulatory-validation/quickstart.md): comandos, V01–V16 y aceptación global de SC-007.
 - [Verificación por incrementos](docs/verification.md) y [rendimiento](docs/performance.md).
 - [Toolchain y scripts](scripts/README.md): versiones aisladas, generación y pruebas.
 - [Especificación](specs/001-regulatory-validation/spec.md), [plan](specs/001-regulatory-validation/plan.md)

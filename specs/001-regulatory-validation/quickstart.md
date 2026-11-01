@@ -3,7 +3,8 @@
 Actualizada el 2026-11-01. El producto implementa carga, validación, propuestas, aplicación
 confirmada, comparación y exportación. Esta guía usa los scripts y recorridos existentes;
 la evidencia por incremento está en [verificación](../../docs/verification.md).
-**SC-007, el ensayo con una persona analista, sigue pendiente.** Los E2E no lo sustituyen.
+**SC-007 se cierra el 2026-11-01** con la confirmación global del usuario «todo lo veo ok»
+al recorrido solicitado de ocho pasos. Los E2E se mantienen como evidencia técnica separada.
 
 ## Preparar el proyecto
 
@@ -139,7 +140,8 @@ qué estaba pendiente en cada incremento. No se suman sus conteos como si fueran
 
 Los casos de cuotas usan tamaños y plazos dirigidos para provocar rechazo; no representan un
 benchmark. Las comprobaciones técnicas de teclado, foco, contraste y recorrido guiado se registran
-en T073. **No acreditan SC-007 humano.**
+en T073. La aceptación global del usuario se registra por separado al final de esta guía;
+no se atribuye a esas comprobaciones automáticas.
 
 ## Repetir el benchmark SC-006
 
@@ -191,9 +193,13 @@ calculados señalan su derivación; un no-op conserva texto y procedencia y se a
 La sesión se recupera al refrescar, pero no tras cerrar el conjunto o reiniciar el servidor.
 Guardar los paquetes conserva los resultados fuera de esa sesión; no hay persistencia multiusuario.
 
-## SC-007: ensayo humano pendiente
+## SC-007: aceptación global del usuario
 
-Una persona analista debe completar los ocho pasos con los archivos descargados y registrar
-los pasos entendidos, bloqueos y ayuda necesaria. Esa observación aún no está registrada.
-Los E2E y las comprobaciones de accesibilidad aportan evidencia técnica, no sustituyen ese ensayo.
-El estado humano debe seguir pendiente hasta contar con su resultado real.
+El 2026-11-01, ante la solicitud de aceptación del recorrido de ocho pasos con los archivos
+descargados, el usuario respondió «todo lo veo ok». Esta confirmación global, sin incidencias
+comunicadas, cierra SC-007 y T073. No consta observación directa, confirmación individual de
+cada paso, tiempo de ejecución ni información sobre la ayuda recibida.
+
+Los E2E y las comprobaciones de accesibilidad siguen siendo evidencia técnica separada.
+El [registro de verificación](../../docs/verification.md) conserva los checkpoints anteriores
+y este cierre final; las tareas quedan completadas (75/75).
