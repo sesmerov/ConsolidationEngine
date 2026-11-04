@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 const root = process.cwd();
 const mode = '--' + (process.argv[2] ?? 'prepare').replace(/^--/, '');
 const location = path.resolve(process.argv[3] ?? '.cache/benchmark/reference');
+const criterionId = '002-SC007';
 
 if (mode === '--server') {
   let phase = 'startup';
@@ -40,7 +41,11 @@ if (mode === '--server') {
       windows: command('powershell.exe', ['-NoProfile', '-Command', 'Get-CimInstance Win32_ComputerSystem | Select-Object Manufacturer,Model,TotalPhysicalMemory | ConvertTo-Json -Compress']), powerPlan: command('powercfg', ['/getactivescheme']) },
     runtime: { node: process.version, v8: process.versions.v8, chromium: chromiumVersion, headless: true, playwright: '1.64.1' },
     limits: { oldGenerationWorkerMiB: 256, sessionStateMiB: 512, jobMilliseconds: 60000, instances: 1000000, reads: 10000000, edges: 1000000 },
-    protocol: { trials: 10, retries: 0, freshApiPerTrial: true, freshBrowserContextPerTrial: true, t0: 'Chromium response event for the first import job succeeded, before UI refresh and validation click', t1: 'completed run, 500 rows/variants/instances, zero duplicates, 50 DOM result rows, and two animation frames', audit: 'all 500 paginated results; 250 pass, 250 fail; 100000 distinct fact reads, 200 per result', criterion: 'at least 9 of 10 at most 30000 ms; any over 60000 ms must expose a diagnostic', loadExcluded: true } };
+    protocol: { criterionId, trials: 10, retries: 0, reportProfile: 'ce-report-1', workload: 'legacy 500 rules / 100000 facts; separate from the 110-position COREP CA1 measurement', freshApiPerTrial: true, freshBrowserContextPerTrial: true,
+      t0: 'Chromium response event for the first import job succeeded, before coverage refresh, stage navigation and validation click',
+      t1: 'completed run, 250 pass/250 fail, open coverage details with 500 rows/variants/instances and zero duplicates, 50 DOM result rows, and two animation frames',
+      audit: 'all 500 paginated results; 250 pass, 250 fail; 100000 distinct fact reads, 200 per result',
+      criterion: 'all 10 trials must pass the complete audit; at least 9 of 10 at most 30000 ms; every trial at most 60000 ms, without diagnostic exceptions', loadExcluded: true } };
   // Freeze the machine and protocol before even generating the workload.
   await fs.writeFile(referencePath, JSON.stringify(reference, null, 2), { flag: 'wx' });
   const { writeIncrementalWorkbook } = await import('../apps/api/dist/export/bounded-files.js');
@@ -69,6 +74,8 @@ if (mode === '--server') {
   console.log(JSON.stringify({ location, reference, catalogFile, reportFile }, null, 2));
 } else if (mode === '--pilot' || mode === '--cohort') {
   await fs.access(path.join(location, 'reference.json')); await fs.access(path.join(location, 'manifest.json'));
+  const reference = JSON.parse(await fs.readFile(path.join(location, 'reference.json'), 'utf8'));
+  if (reference.protocol?.criterionId !== criterionId) throw new Error('Reference does not use the current SC007 protocol. Prepare a new reference directory.');
   const manifest = JSON.parse(await fs.readFile(path.join(location, 'manifest.json'), 'utf8'));
   for (const [name, expected] of [['catalog.xlsx', manifest.catalogFile], ['report.xlsx', manifest.reportFile]]) {
     const buffer = await fs.readFile(path.join(location, name));
@@ -83,8 +90,12 @@ if (mode === '--server') {
     env: { ...process.env, PLAYWRIGHT_BROWSERS_PATH: path.resolve('.cache/playwright'), BENCH_DIR: location, BENCH_OUTPUT: output, BENCH_PILOT: mode === '--pilot' ? '1' : '0' } });
   process.exitCode = await new Promise(resolve => child.on('exit', code => resolve(code ?? 1)));
   const rows = []; for (const name of await fs.readdir(output)) if (/^trial-\d+\.json$/.test(name)) rows.push(JSON.parse(await fs.readFile(path.join(output, name), 'utf8')));
-  rows.sort((a, b) => a.trial - b.trial); const valid = rows.filter(row => row.auditPassed && row.elapsedMs <= 30000);
-  const summary = { mode, rows, atMost30Seconds: valid.length, expectedTrials: mode === '--pilot' ? 1 : 10, passed: mode === '--cohort' && rows.length === 10 && valid.length >= 9 && rows.every(row => row.elapsedMs <= 60000 || row.diagnosticVisible) };
+  rows.sort((a, b) => a.trial - b.trial);
+  const audited = rows.filter(row => row.auditPassed === true), timed = rows.filter(row => Number.isFinite(row.elapsedMs) && row.elapsedMs >= 0);
+  const valid = timed.filter(row => row.auditPassed === true && row.elapsedMs <= 30000), within60 = timed.filter(row => row.elapsedMs <= 60000);
+  const completeCohort = rows.length === 10 && rows.every((row, index) => row.trial === index + 1);
+  const summary = { mode, criterionId, rows, auditedTrials: audited.length, atMost30Seconds: valid.length, atMost60Seconds: within60.length, expectedTrials: mode === '--pilot' ? 1 : 10,
+    passed: mode === '--cohort' && process.exitCode === 0 && completeCohort && audited.length === 10 && valid.length >= 9 && within60.length === 10 };
   await fs.writeFile(path.join(output, 'summary.json'), JSON.stringify(summary, null, 2)); console.log(JSON.stringify({ output, atMost30Seconds: valid.length, passed: summary.passed }));
   if (mode === '--cohort' && !summary.passed) process.exitCode = 1;
 } else throw new Error('Use --prepare, --pilot or --cohort followed by an output directory.');

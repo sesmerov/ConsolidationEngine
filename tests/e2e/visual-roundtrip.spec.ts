@@ -122,6 +122,8 @@ test('COREP exports the receipt and historical version, preserves selection acro
   const typed = await demo(page, 'types'); await upload(page, typed.catalog, typed.report, 'types');
   await navigateStage(page, 'download'); await page.locator('#export-version').selectOption(originalVersion);
   await expect(summary).toContainText('COREP'); await expect(summary).not.toContainText('Demostración de texto y fechas');
+  await summary.getByText('Ver informes y contexto', { exact: true }).click();
+  await summary.scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath('historical-corep-summary.png') });
   await freshWorkspace(page, 'Reimportación COREP SYNTHETIC'); await upload(page, files.catalog, appliedReport, 'reimport-corep'); const checked = await validate(page);
   expect(semantics(checked.items)).toEqual(semantics(comparison.items.map((row: any) => row.after)));
@@ -142,6 +144,12 @@ test('typed visual report and results preserve all six values and never repeat a
   expect(data.slice(3, 9).map(row => row[1] ?? '')).toEqual(['Banco', 'banco', 'Banco ', '', '2024-02-29', '2025-12-31']);
   expect(data.slice(3, 9).map(row => row[2])).toEqual(Array(6).fill('Informado'));
   await page.setViewportSize({ width: 320, height: 900 }); expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await summary.getByText('Ver informes y contexto', { exact: true }).click();
+  await expect(summary.getByText('Desplaza la tabla horizontalmente para ver todas las columnas.', { exact: true })).toBeVisible();
+  const reportTable = summary.getByRole('region', { name: 'Detalle de los informes incluidos', exact: true });
+  await reportTable.focus(); await expect(reportTable).toBeFocused(); await page.keyboard.press('ArrowRight');
+  await expect.poll(() => reportTable.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+  await summary.scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath('typed-export-mobile.png') });
   await navigateStage(page, 'validation'); await expect(page.locator('ce-results-export').getByRole('button', { name: /de nuevo/i })).toHaveCount(0);
   const repeated = await download(page, 'Descargar resultados de esta ejecución', info, 'typed-results-after-report.zip', { versionId: version, kind: 'results', runId: initial.run.id });

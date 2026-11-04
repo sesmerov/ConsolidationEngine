@@ -2,9 +2,10 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fork } from 'node:child_process';
 import { expect, test } from '@playwright/test';
+import type { APIResponse } from '@playwright/test';
 const directory = process.env['BENCH_DIR']!, output = process.env['BENCH_OUTPUT']!;
 const count = process.env['BENCH_PILOT'] === '1' ? 1 : 10;
-for (let trial = 1; trial <= count; trial++) test(`SC006 trial ${trial}`, async ({ page }, testInfo) => {
+for (let trial = 1; trial <= count; trial++) test(`SC007 legacy trial ${trial}`, async ({ page }, testInfo) => {
   const manifest = JSON.parse(await fs.readFile(path.join(directory, 'manifest.json'), 'utf8'));
   const samples: unknown[] = [], errors: string[] = []; let t0: number | undefined, importId = '', elapsedMs: number | undefined, auditPassed = false, diagnosticVisible = false;
   const server = fork(path.resolve('scripts/benchmark.mjs'), ['--server'], { execPath: process.execPath, silent: true, env: { ...process.env, PORT: '3317', NODE_ENV: 'production' } });
@@ -43,20 +44,32 @@ for (let trial = 1; trial <= count; trial++) test(`SC006 trial ${trial}`, async 
   try {
     await ownServerReady;
     await expect.poll(async () => { try { return (await page.request.get('/api/v1/bootstrap')).status(); } catch { return 0; } }, { timeout: 30000 }).toBe(200);
-    await page.goto('/'); await page.getByLabel('Nombre del conjunto').fill('SYNTHETIC SC006 ' + trial); await page.getByRole('button', { name: 'Crear conjunto', exact: true }).click();
+    await page.goto('/'); await page.getByLabel('Nombre del conjunto').fill('SYNTHETIC SC007 legacy ' + trial); await page.getByRole('button', { name: 'Crear conjunto', exact: true }).click();
+    await page.locator('summary').filter({ hasText: /^Formato anterior ce-report-1$/ }).click();
+    await page.getByRole('checkbox', { name: 'Usar formato anterior ce-report-1', exact: true }).check();
     await page.getByLabel('Catálogo de reglas (.xlsx)').setInputFiles(path.join(directory, 'catalog.xlsx'));
     await page.getByLabel('Informes (.xlsx)', { exact: true }).setInputFiles(path.join(directory, 'report.xlsx'));
     const acceptedImport = page.waitForResponse(r => r.url().endsWith('/imports') && r.request().method() === 'POST');
-    const loadStart = performance.now(); await page.getByRole('button', { name: 'Cargar archivos', exact: true }).click(); importId = (await (await acceptedImport).json()).jobId;
+    server.send({ phase: 'import' }); const loadStart = performance.now(); await page.getByRole('button', { name: 'Cargar archivos', exact: true }).click(); importId = (await (await acceptedImport).json()).jobId;
     await expect.poll(() => t0 !== undefined, { timeout: 70000, intervals: [100] }).toBe(true); stages['loadMs'] = t0! - loadStart;
+    await expect(page.getByRole('heading', { name: 'Datos cargados · Versión 1', exact: true })).toBeVisible();
+    await expect(page.locator('.data-summary')).toContainText('100000 coordenadas · 100000 hechos');
+    const importedCoverage = page.locator('[aria-labelledby="coverage-title"]');
+    for (const label of ['Filas del catálogo', 'Variantes']) await expect(importedCoverage.locator('.workspace-meta div').filter({ has: page.getByText(label, { exact: true }) }).locator('dd')).toHaveText('500');
+    stages['coverageReadyMs'] = performance.now() - t0!;
+    await page.getByRole('button', { name: '2. Validar', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Validación y explicación', exact: true })).toBeVisible(); stages['navigationMs'] = performance.now() - t0!;
     const acceptedValidation = page.waitForResponse(r => r.url().endsWith('/validations') && r.request().method() === 'POST');
     await page.getByRole('button', { name: 'Validar informes', exact: true }).click({ timeout: 65000 }); stages['clickedMs'] = performance.now() - t0!;
     const accepted = await (await acceptedValidation).json(); stages['acceptedMs'] = performance.now() - t0!;
     await expect(page.getByRole('heading', { name: 'Ejecución terminada', exact: true })).toBeVisible({ timeout: 65000 });
     await expect(page.locator('#validation-run')).toHaveValue(accepted.resultRef.id);
     const summary = page.locator('.validation-summary');
-    for (const label of ['Filas importadas', 'Variantes', 'Instancias expandidas']) await expect(summary.locator('div').filter({ has: page.getByText(label, { exact: true }) }).locator('dd')).toHaveText('500');
-    await expect(summary.locator('div').filter({ has: page.getByText('Duplicadas', { exact: true }) }).locator('dd')).toHaveText('0');
+    for (const label of ['Pasa', 'Falla']) await expect(summary.locator('div').filter({ has: page.getByText(label, { exact: true }) }).locator('dd')).toHaveText('250');
+    for (const label of ['No aplica', 'No evaluable', 'Error']) await expect(summary.locator('div').filter({ has: page.getByText(label, { exact: true }) }).locator('dd')).toHaveText('0');
+    const coverageDetails = page.locator('details').filter({ has: page.locator('summary').filter({ hasText: /^Cobertura y trazabilidad de la ejecución$/ }) });
+    await coverageDetails.locator('summary').click();
+    await expect(coverageDetails).toContainText('500 filas · 500 variantes · 500 instancias · 0 duplicadas');
     await expect(page.locator('.result-row')).toHaveCount(50);
     await expect(page.getByText('50 de 500 resultados', { exact: true })).toBeVisible();
     await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))); elapsedMs = performance.now() - t0!;
@@ -65,7 +78,7 @@ for (let trial = 1; trial <= count; trial++) test(`SC006 trial ${trial}`, async 
     const workspace = await (await page.request.get(`/api/v1/workspaces/${bootstrap.activeWorkspaceId}`, { headers })).json(); expect(workspace.counts.facts).toBe(100000); expect(workspace.counts.coordinates).toBe(100000);
     const expected = new Map(manifest.rules.map((rule: { code: string; status: string }) => [rule.code, rule])); const keys = new Set<string>(), codes = new Set<string>(); let cursor: string | null = null, reads = 0;
     do {
-      const response = await page.request.get(`/api/v1/workspaces/${bootstrap.activeWorkspaceId}/runs/${accepted.resultRef.id}/results?limit=50${cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`, { headers }); expect(response.status()).toBe(200); const bundle = await response.json();
+      const response: APIResponse = await page.request.get(`/api/v1/workspaces/${bootstrap.activeWorkspaceId}/runs/${accepted.resultRef.id}/results?limit=50${cursor ? '&cursor=' + encodeURIComponent(cursor) : ''}`, { headers }); expect(response.status()).toBe(200); const bundle = await response.json();
       expect(bundle.run.status).toBe('completed'); expect(bundle.run.summary).toMatchObject({ complete: true, rows: 500, variants: 500, instances: 500, duplicateRows: 0, byStatus: { pass: 250, fail: 250, error: 0, not_evaluable: 0, not_applicable: 0 } }); stages['run'] = bundle.run;
       for (const row of bundle.items) { const rule = expected.get(row.code) as { status: string; first: number; last: number; sum: string; expression: string };
         if (!rule || row.status !== rule.status || codes.has(row.code) || row.factReads.length !== 200 || row.readKeys.length !== 200 || row.coverageOnly || !row.instanceId || row.expression !== rule.expression) throw new Error('Unexpected or duplicated rule result: ' + row.code); codes.add(row.code);
