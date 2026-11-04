@@ -1,4 +1,5 @@
 import type { DefaultLiteral } from '../ast/ast.js';
+import { isCivilDateV2, type DataType } from '@ce/contracts';
 import { add, compare, NumericError, parseLanguageNumber, rational } from '../numeric/rational.js';
 import { contextualUnits, formatUnit, unitsEqual } from '../numeric/units.js';
 import type { UnitMap } from '../numeric/units.js';
@@ -17,18 +18,20 @@ function checked(value: ScalarValue): void {
       return;
     }
     case 'boolean': if (typeof value.value !== 'boolean') throw new ValueError('TYPE_MISMATCH'); return;
+    case 'text': if (typeof value.value !== 'string' || value.value.length > 32_767) throw new ValueError('TYPE_MISMATCH'); return;
+    case 'date': if (typeof value.value !== 'string' || !isCivilDateV2(value.value)) throw new ValueError('INVALID_DATE'); return;
     case 'unknown':
-      if (value.dataType !== undefined && value.dataType !== 'number' && value.dataType !== 'boolean') throw new ValueError('TYPE_MISMATCH');
+      if (value.dataType !== undefined && !['number', 'boolean', 'text', 'date'].includes(value.dataType)) throw new ValueError('TYPE_MISMATCH');
       return;
     case 'null':
       if (!['explicit', 'implicit', 'derived'].includes(value.origin)) throw new ValueError('TYPE_MISMATCH');
       if (value.dataType === 'number') formatUnit(value.unit);
-      else if (value.dataType !== 'boolean') throw new ValueError('TYPE_MISMATCH');
+      else if (!['boolean', 'text', 'date'].includes(value.dataType)) throw new ValueError('TYPE_MISMATCH');
       return;
     default: throw new ValueError('TYPE_MISMATCH');
   }
 }
-function typeOf(value: ScalarValue): 'number' | 'boolean' | 'unknown' {
+function typeOf(value: ScalarValue): DataType | 'unknown' {
   return value.kind === 'null' ? value.dataType : value.kind === 'unknown' ? value.dataType ?? 'unknown' : value.kind;
 }
 function clone(value: ScalarValue): ScalarValue {
@@ -40,7 +43,7 @@ const boolean = (value: boolean): BooleanScalar => ({ kind: 'boolean', value });
 const booleanNull = (): NullScalar => ({ kind: 'null', origin: 'derived', dataType: 'boolean' });
 function booleanOperand(value: ScalarValue): void {
   checked(value);
-  if (typeOf(value) === 'number') throw new ValueError('TYPE_MISMATCH');
+  if (typeOf(value) !== 'boolean' && typeOf(value) !== 'unknown') throw new ValueError('TYPE_MISMATCH');
 }
 
 /** The evaluator collects both read traces before using these deterministic reductions. */
@@ -75,7 +78,7 @@ function numericUnit(value: ScalarValue): UnitMap {
 function withUnit(value: ScalarValue, unit: UnitMap, literal: boolean): ScalarValue {
   const copy = clone(value);
   if (copy.kind === 'number') return { ...copy, unit: { ...unit }, literal };
-  if (copy.kind === 'null' && copy.dataType === 'number') return { ...copy, unit: { ...unit } };
+  if (copy.kind === 'null' && copy.dataType === 'number') return { ...copy, unit: { ...unit }, literal };
   throw new ValueError('TYPE_MISMATCH');
 }
 
@@ -87,7 +90,7 @@ export function nvl(first: ScalarValue, second: ScalarValue): ScalarValue {
   if (first.kind === 'unknown') return clone(first);
   if (second.kind === 'unknown') return first.kind === 'null' ? clone(second) : clone(first);
   if (a === 'number' && b === 'number') {
-    const units = contextualUnits('nvl', numericUnit(first), numericUnit(second), first.kind === 'number' && first.literal === true, second.kind === 'number' && second.literal === true);
+    const units = contextualUnits('nvl', numericUnit(first), numericUnit(second), 'literal' in first && first.literal === true, 'literal' in second && second.literal === true);
     return first.kind === 'null' ? withUnit(second, units.right, units.rightLiteral) : withUnit(first, units.left, units.leftLiteral);
   }
   return clone(first.kind === 'null' ? second : first);
@@ -106,6 +109,11 @@ export function applyDefault(value: ScalarValue, replacement?: DefaultLiteral): 
       ...(coordinate ? { coordinate } : {}), ...(sourceLocator ? { sourceLocator } : {}) };
   }
   if (value.kind !== 'null') return clone(value);
+  if (replacement.kind === 'text' || replacement.kind === 'date') {
+    const result: ScalarValue = { kind: replacement.kind, value: replacement.value,
+      ...(value.coordinate ? { coordinate: value.coordinate } : {}), ...(value.sourceLocator ? { sourceLocator: value.sourceLocator } : {}) };
+    checked(result); return result;
+  }
   return { kind: 'boolean', value: replacement.value,
     ...(value.coordinate ? { coordinate: value.coordinate } : {}), ...(value.sourceLocator ? { sourceLocator: value.sourceLocator } : {}) };
 }
@@ -116,7 +124,7 @@ export function sumValues(values: readonly ScalarValue[]): PrimitiveResult {
   let unknown: ScalarValue | undefined;
   for (const value of values) {
     checked(value);
-    if (typeOf(value) === 'boolean') throw new ValueError('TYPE_MISMATCH');
+    if (typeOf(value) !== 'number' && typeOf(value) !== 'unknown') throw new ValueError('TYPE_MISMATCH');
     if (value.kind === 'unknown') { unknown ??= value; continue; }
     const current = numericUnit(value);
     if (unit !== undefined && !unitsEqual(unit, current)) throw new ValueError('UNIT_MISMATCH');

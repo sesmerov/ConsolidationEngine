@@ -19,9 +19,15 @@ const REASONS: Readonly<Record<string, string>> = {
   AMBIGUOUS_COREP_AMOUNT: 'El importe COREP debe ser un número o decimal en texto, sin formato de fecha, hora ni porcentaje.',
   INVALID_CONTEXT_LAYOUT: 'La hoja Contexto no conserva los campos y posiciones de la plantilla.',
   UNEXPECTED_CONTEXT_CONTENT: 'La hoja Contexto contiene datos fuera de los campos definidos por la plantilla.',
+  UNKNOWN_REPORT_PROFILE: 'El libro no coincide con ninguno de los formatos de informe admitidos.',
+  INVALID_TYPED_LAYOUT: 'El ejemplo de texto y fechas no conserva sus hojas, campos y posiciones definidos.',
+  UNEXPECTED_TYPED_CONTENT: 'El ejemplo contiene datos fuera de los campos definidos por su plantilla.',
+  INVALID_TYPED_STATE: 'Indica Informado o Sin dato en la columna Estado de este campo.',
+  NULL_WITH_VALUE: 'Un campo marcado Sin dato debe tener la celda de valor vacía.',
+  INVALID_CIVIL_DATE: 'La fecha debe ser una fecha civil válida, sin hora, entre los años 0001 y 9999.',
   RULE_VALIDATION_ONLY: 'Esta regla contiene condicionales, texto o fechas y solo admite validación.',
 };
-const WORK_DIAGNOSTICS: Readonly<Record<string, string>> = { RESOURCE_LIMIT: 'La ejecución superó una cuota de cálculo y quedó incompleta.', CANCELLED: 'La ejecución fue cancelada.', DEADLINE_EXCEEDED: 'La ejecución superó su plazo.', PROFILE_MISMATCH: 'El perfil del conjunto no coincide con el motor.', RULE_VALIDATION_ONLY: REASONS.RULE_VALIDATION_ONLY! };
+const WORK_DIAGNOSTICS: Readonly<Record<string, string>> = { RESOURCE_LIMIT: 'La ejecución superó una cuota de cálculo y quedó incompleta.', CANCELLED: 'La ejecución fue cancelada.', DEADLINE_EXCEEDED: 'La ejecución superó su plazo.', PROFILE_MISMATCH: 'El perfil del conjunto no coincide con el motor.', RULE_VALIDATION_ONLY: REASONS.RULE_VALIDATION_ONLY!, NOT_EQUALITY: 'Solo una igualdad admite una dirección de recálculo.' };
 /** Only application-owned codes and a bounded locator cross the worker boundary. */
 export function publicDiagnostic(error: unknown): Diagnostic {
   if (!(error instanceof ApiError)) return { code: 'INTERNAL_ERROR', message: ERROR_MESSAGES.INTERNAL_ERROR };

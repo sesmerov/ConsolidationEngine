@@ -27,6 +27,7 @@ readonly choose = this.store.choose.bind(this.store);
 readonly clear = this.store.clear.bind(this.store);
 readonly target = this.store.target.bind(this.store);
 readonly reason = this.store.reason.bind(this.store);
+readonly policyReason = this.store.policyReason.bind(this.store);
 readonly save = this.store.save.bind(this.store);
 constructor() { effect(() => this.store.page.set(this.page())); }
 }

@@ -106,8 +106,12 @@ export class JobManager {
     const running = this.running.get(original.jobId); if (!running || running.stopping) return;
     const current = this.get(original.workspaceId, original.jobId); if (isTerminalJob(current.status)) return;
     const code = error instanceof ApiError ? error.code : 'INTERNAL_ERROR';
+    // Preserve the finite policy explanation at main-thread rejection as well as at worker rejection.
+    const policyDiagnostics = error instanceof ApiError && code === 'INVALID_DIRECTION' && error.details.reason === 'RULE_VALIDATION_ONLY'
+      ? [receivedDiagnostic({ code: 'RULE_VALIDATION_ONLY' })] : [];
     const failed: JobDTO = { ...current, status: 'failed', endedAt: new Date().toISOString(), progress: { ...current.progress, complete: false }, diagnostics: [{ code, message: ERROR_MESSAGES[code] }] };
-    this.store.updateJob(failed, running.onTerminal?.(failed));
+    const explained: JobDTO = policyDiagnostics.length ? { ...failed, diagnostics: [...failed.diagnostics, ...policyDiagnostics] } : failed;
+    this.store.updateJob(explained, running.onTerminal?.(explained));
     this.cleanup(original.jobId);
   }
   private cleanup(id: string): void {

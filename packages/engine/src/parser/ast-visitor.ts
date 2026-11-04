@@ -1,8 +1,9 @@
-import type { Diagnostic } from '@ce/contracts';
+import { isCivilDateV2, LANGUAGE_PROFILE_V1, LANGUAGE_PROFILE_V2, type Diagnostic } from '@ce/contracts';
 import type { Token } from 'antlr4';
 import DpmVisitor from '../generated/dpm_xlParserVisitor.js';
 import { PARSER_LIMITS } from '../ast/ast.js';
-import type { Ast, AxisSelector, BinaryOperator, BooleanLiteral, DefaultLiteral, Expression, NumberLiteral, Selection, SourceSpan } from '../ast/ast.js';
+import type { Ast, AxisSelector, BinaryOperator, BooleanLiteral, DateLiteral, DefaultLiteral, Expression, NumberLiteral, Selection, SourceSpan, TextLiteral } from '../ast/ast.js';
+import { checkExpression } from '../evaluator/type-check.js';
 
 // The generated JavaScript contexts have alternative-specific dynamic accessors.
 // Keep that boundary here; everything emitted from it is a closed, typed JSON AST.
@@ -20,12 +21,11 @@ export function contextSpan(ctx: Context): SourceSpan {
 function fail(span: SourceSpan, code: string, message: string): never {
   throw new AstBuildError({ code, message, severity: 'error', ...span });
 }
-
 /** No inherited generic traversal is allowed: an unhandled alternative always fails. */
 export class AstVisitor extends DpmVisitor {
   private nodes = 0;
   private depth = 0;
-  constructor(private readonly source: string) { super(); }
+  constructor(private readonly source: string, private readonly profileId: string = LANGUAGE_PROFILE_V1) { super(); }
 
   visitChildren(ctx: Context): never {
     return fail(contextSpan(ctx), 'UNSUPPORTED_CONSTRUCT', `Construcción fuera del perfil: ${ctx.constructor.name}.`);
@@ -42,8 +42,8 @@ export class AstVisitor extends DpmVisitor {
   override visitStart(ctx: Context): Ast {
     if (ctx.statements()) this.visitChildren(ctx);
     const body = this.read<Expression>(ctx.statement());
-    const type = inferType(body);
-    if (type === 'number') fail(body.span, 'TYPE_MISMATCH', 'Una regla o precondición debe producir un booleano o null.');
+    const checked = checkExpression(body, { profileId: this.profileId, requireBoolean: true });
+    if (checked.diagnostics[0]) throw new AstBuildError(checked.diagnostics[0]);
     return this.node({ kind: 'rule' as const, source: this.source, body, span: contextSpan(ctx) });
   }
   override visitExprWithoutAssignment(ctx: Context): Expression { return this.read(ctx.expressionWithoutAssignment()); }
@@ -76,11 +76,25 @@ export class AstVisitor extends DpmVisitor {
   override visitLiteralExpr(ctx: Context): Expression {
     return this.expression(ctx, () => this.literal(ctx.literal()));
   }
-  private literal(ctx: Context): NumberLiteral | BooleanLiteral {
+  override visitIfExpr(ctx: Context): Expression {
+    if (this.profileId !== LANGUAGE_PROFILE_V2) this.visitChildren(ctx);
+    return this.expression(ctx, () => ({ kind: 'if', condition: this.read(ctx.conditionalExpr), then: this.read(ctx.thenExpr),
+      ...(ctx.elseExpr ? { else: this.read<Expression>(ctx.elseExpr) } : {}), span: contextSpan(ctx) }));
+  }
+  private literal(ctx: Context): NumberLiteral | BooleanLiteral | TextLiteral | DateLiteral {
     const lexeme = ctx.getText(); const span = contextSpan(ctx);
     if (ctx.BOOLEAN_LITERAL()) return { kind: 'boolean', value: lexeme === 'true', lexeme, span };
     if ((ctx.INTEGER_LITERAL() || ctx.DECIMAL_LITERAL()) && /^(?:[0-9]+(?:\.[0-9]+)?|\(-[0-9]+\))$/.test(lexeme)) {
       return { kind: 'number', lexeme, span };
+    }
+    if (this.profileId === LANGUAGE_PROFILE_V2) {
+      if (ctx.STRING_LITERAL() || ctx.EMPTY_LITERAL()) return { kind: 'text', value: lexeme.slice(1, -1), lexeme, span };
+      if (ctx.DATE_LITERAL()) {
+        const value = lexeme.slice(1, -1);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return fail(span, 'UNSUPPORTED_CONSTRUCT', 'Solo se admiten fechas civiles sin hora.');
+        if (!isCivilDateV2(value)) return fail(span, 'INVALID_DATE', 'La fecha civil no es válida entre 0001 y 9999.');
+        return { kind: 'date', value, lexeme, span };
+      }
     }
     return fail(span, 'UNSUPPORTED_CONSTRUCT', 'Literal fuera del perfil numérico y booleano admitido.');
   }
@@ -148,44 +162,5 @@ export class AstVisitor extends DpmVisitor {
       return this.node({ kind: 'range', from, to, span });
     }
     return this.node({ kind: 'single', code: elem[prefix]().getText().slice(1), span });
-  }
-}
-
-type ValueType = 'number' | 'boolean' | 'unknown';
-function expectType(type: ValueType, expected: 'number' | 'boolean', span: SourceSpan): void {
-  if (type !== 'unknown' && type !== expected) fail(span, 'TYPE_MISMATCH', `El operando debe tener tipo ${expected}.`);
-}
-/** Only reject contradictions known without coordinate metadata; resolution completes typing. */
-function inferType(expression: Expression): ValueType {
-  switch (expression.kind) {
-    case 'number': return 'number';
-    case 'boolean': case 'filing_indicator': return 'boolean';
-    case 'reference': return 'unknown';
-    case 'group': return inferType(expression.expression);
-    case 'with': return inferType(expression.body);
-    case 'unary': {
-      const expected = expression.op === 'not' ? 'boolean' : 'number';
-      expectType(inferType(expression.operand), expected, expression.operand.span); return expected;
-    }
-    case 'binary': {
-      const left = inferType(expression.left); const right = inferType(expression.right);
-      if (expression.op === 'and' || expression.op === 'or') {
-        expectType(left, 'boolean', expression.left.span); expectType(right, 'boolean', expression.right.span); return 'boolean';
-      }
-      if (expression.op === '=' || expression.op === '!=') {
-        if (left !== 'unknown' && right !== 'unknown' && left !== right) fail(expression.span, 'TYPE_MISMATCH', 'No se pueden comparar tipos incompatibles.');
-        return 'boolean';
-      }
-      expectType(left, 'number', expression.left.span); expectType(right, 'number', expression.right.span);
-      return ['+', '-', '*', '/'].includes(expression.op) ? 'number' : 'boolean';
-    }
-    case 'call': {
-      const first = inferType(expression.arguments[0]!);
-      if (expression.name === 'isnull') return 'boolean';
-      if (expression.name === 'sum') { expectType(first, 'number', expression.span); return 'number'; }
-      const second = inferType(expression.arguments[1]!);
-      if (first !== 'unknown' && second !== 'unknown' && first !== second) fail(expression.span, 'TYPE_MISMATCH', 'Los argumentos de nvl deben tener tipos compatibles.');
-      return first === 'unknown' ? second : first;
-    }
   }
 }

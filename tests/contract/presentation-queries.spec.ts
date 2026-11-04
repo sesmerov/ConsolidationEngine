@@ -8,6 +8,7 @@ import { registerPreviews } from '../../apps/api/src/routes/previews.js';
 import { registerApplications } from '../../apps/api/src/routes/applications.js';
 import { WorkspaceStore } from '../../apps/api/src/session/workspace-store.js';
 import { COREP_MAPPING_SHA256, COREP_PROFILE_ID } from '../../apps/api/src/import/profiles/corep-ca1.js';
+import { DEMO_TYPES_MAPPING_SHA256, DEMO_TYPES_PROFILE_ID } from '../../apps/api/src/import/profiles/demo-types.js';
 import { rulePresentation } from '../../apps/api/src/presentation/rule-presentation.js';
 import { content } from '../helpers/foundation.js';
 
@@ -54,6 +55,15 @@ function setup(profileId = 'ce-dpmxl-0.9-closed-v1', extra: Partial<SnapshotCont
 }
 
 describe('presentation and stored calculation details', () => {
+  it('resolves typed field labels only from the trusted profile binding', () => {
+    const binding = { profileId: DEMO_TYPES_PROFILE_ID, mappingSha256: DEMO_TYPES_MAPPING_SHA256, sourceFileId: fileId, contextIds: ['demo_types'], selectedSheets: ['Datos'], excludedSheets: [], contextOrigin: 'workbook' as const };
+    const cell = { ...coordinate, contextId: 'demo_types', tableCode: 'DEMO_TYPES', dataType: 'text' as const, unit: '', decimals: '' };
+    const present = rulePresentation({ ...content(), reportSourceBindings: [binding] });
+    expect(present([], cell)).toEqual({ conceptLabel: 'Categoría' });
+    expect(present([], { ...cell, sourceLocator: { fileId: randomUUID() } })).toBeUndefined();
+    expect(present([], { ...cell, tableCode: 'OTHER' })).toBeUndefined();
+    expect(rulePresentation({ ...content(), reportSourceBindings: [{ ...binding, mappingSha256: '0'.repeat(64) }] })([], cell)).toBeUndefined();
+  });
   it('uses the server COREP mapping only for the exact bound profile, source and context', async () => {
     const binding = { profileId: COREP_PROFILE_ID, mappingSha256: COREP_MAPPING_SHA256, sourceFileId: fileId, contextIds: ['demo'], selectedSheets: ['CA1'], excludedSheets: [], contextOrigin: 'form' as const };
     const f = setup('ce-dpmxl-0.9-closed-v2', { reportSourceBindings: [binding] }), run = f.saveRun([f.result('RULE')]), preview = f.savePreview();

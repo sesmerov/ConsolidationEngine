@@ -16,6 +16,7 @@
     "generate:parser": "node scripts/generate-parser.mjs",
     "fixtures": "node scripts/create-fixtures.mjs",
     "prepare:templates": "node scripts/prepare-visual-templates.mjs",
+    "prepare:demos": "node scripts/create-visual-demos.mjs",
     "build:packages": "npm run build --workspace @ce/contracts && npm run build --workspace @ce/engine",
     "build:api": "npm run build:packages && npm run build --workspace @ce/api",
     "build": "npm run generate:parser && npm run build:api && npm run build --workspace @ce/web",

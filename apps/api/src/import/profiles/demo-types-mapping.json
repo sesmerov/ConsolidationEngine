@@ -1,0 +1,20 @@
+{
+  "profileId": "ce-demo-types-1",
+  "languageProfileId": "ce-dpmxl-0.9-closed-v2",
+  "framework": "DEMO",
+  "moduleVersion": "DEMO_TYPES_1",
+  "tableCode": "DEMO_TYPES",
+  "columnCode": "0010",
+  "sheet": "Datos",
+  "instructionsTitle": "Demostración sintética de texto y fechas",
+  "headers": ["Campo", "Valor", "Estado"],
+  "fields": [
+    {"rowCode":"0010","label":"Categoría","labelCell":"A4","valueCell":"B4","stateCell":"C4","type":"text"},
+    {"rowCode":"0020","label":"Categoría en minúsculas","labelCell":"A5","valueCell":"B5","stateCell":"C5","type":"text"},
+    {"rowCode":"0030","label":"Categoría con espacio final","labelCell":"A6","valueCell":"B6","stateCell":"C6","type":"text"},
+    {"rowCode":"0040","label":"Observación vacía","labelCell":"A7","valueCell":"B7","stateCell":"C7","type":"text"},
+    {"rowCode":"0050","label":"Fecha inicial","labelCell":"A8","valueCell":"B8","stateCell":"C8","type":"date"},
+    {"rowCode":"0060","label":"Fecha final","labelCell":"A9","valueCell":"B9","stateCell":"C9","type":"date"}
+  ],
+  "contextFields": ["Entidad","Fecha de referencia","Fecha de envío","Marco","Módulo","Formato","Tabla declarada"]
+}

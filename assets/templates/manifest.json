@@ -4,7 +4,7 @@
     {
       "profileId": "eba-corep-of-4.0-ca1-v1",
       "languageProfileId": "ce-dpmxl-0.9-closed-v2",
-      "mappingSha256": "3a6ea97bce6bd48e6caa7eb722ef76e30704b51f56993f8718be267d4eefd916",
+      "mappingSha256": "c8dd23660c7a2e31d0e9871dd2198d88cc6fb7dd40bb3be79321a62a0c7cd790",
       "file": "corep-ca1.xlsx",
       "sha256": "7767a6ab34990ff3f954f5acd3348180c7004ca901f8b92b6521940e52ee7e7f",
       "size": 71353,
@@ -29,6 +29,18 @@
           "bytes": 3059614
         }
       ]
+    },
+    {
+      "profileId": "ce-demo-types-1",
+      "languageProfileId": "ce-dpmxl-0.9-closed-v2",
+      "mappingSha256": "c84d1950e9849443cd58ee86908a56147d8de88317808749a9c38f334e4ac5fe",
+      "file": "demo-types.xlsx",
+      "sha256": "20e76957275ccc19913818b39576eb8cf5d8dc4b33bf462b49297c96e9adccf4",
+      "size": 3226,
+      "selectedSheets": [
+        "Datos"
+      ],
+      "sources": []
     }
   ]
 }

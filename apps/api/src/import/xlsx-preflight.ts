@@ -24,8 +24,8 @@ export const PREFLIGHT_LIMITS = { maxCompressedBytes: 10 * 1024 * 1024, maxEntry
 export const COREP_PREFLIGHT_LIMITS = { ...PREFLIGHT_LIMITS, maxSheets: 256, maxRows: 1024, maxColumns: 16384, maxPhysicalCellsPerBook: 500_000, maxPhysicalCellsPerSheet: 100_000 } as const;
 export type PreflightLimits = { [K in keyof typeof PREFLIGHT_LIMITS]: number };
 export interface PreflightOptions { readonly limits?: Partial<PreflightLimits>; readonly budget?: { expandedBytes: number }; readonly retainCells?: boolean; readonly check?: () => void;
-  /** Internal trusted candidate mode. It returns only after exact COREP recognition; never a client-selected exemption. */
-  readonly profile?: 'corep-ca1' }
+  /** Internal registry modes. COREP exceptions require recognition; typed candidates repeat strict scanning. Never client-selected. */
+  readonly profile?: 'corep-ca1' | 'visual-report' | 'demo-types' }
 const MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 const STRICT_MAIN = 'http://purl.oclc.org/ooxml/spreadsheetml/main';
 const REL = 'http://schemas.openxmlformats.org/package/2006/relationships';
@@ -60,7 +60,7 @@ function resolvePart(source: string, target: string): string {
 }
 export async function preflightXlsx(filePath: string, options: PreflightOptions = {}): Promise<PreflightWorkbook> {
   options.check?.();
-  const corep = options.profile === 'corep-ca1', caps = corep ? COREP_PREFLIGHT_LIMITS : PREFLIGHT_LIMITS;
+  const corep = options.profile === 'corep-ca1' || options.profile === 'visual-report', caps = corep ? COREP_PREFLIGHT_LIMITS : PREFLIGHT_LIMITS;
   const limits: PreflightLimits = { ...caps, ...options.limits };
   for (const key of Object.keys(limits) as (keyof PreflightLimits)[]) if (!Number.isSafeInteger(limits[key]) || limits[key] <= 0 || limits[key] > caps[key]) throw new ApiError('INTERNAL_ERROR');
   const compressedBytes = (await stat(filePath)).size; if (compressedBytes > limits.maxCompressedBytes) throw new ApiError('UPLOAD_LIMIT');
@@ -95,6 +95,7 @@ export async function preflightXlsx(filePath: string, options: PreflightOptions 
         const source = relationSource(name);
         if (relationships.some((item) => item.source === source && item.id === id)) invalid();
         const external = attribute(node, 'TargetMode') === 'External';
+        if (external && options.profile === 'demo-types') invalid();
         const inert = type!.endsWith('/hyperlink') || corep && ['http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLinkPath', 'http://schemas.microsoft.com/office/2019/04/relationships/externalLinkLongPath'].includes(type!);
         if ((external && !inert) || /(?:vba|macro|oleObject|activeX|queryTable|connections|dde)/i.test(type!) || !corep && /externalLink/i.test(type!)) invalid();
         if (corep && external && ++externalRelations > limits.maxExternalRelations) expansion();
@@ -229,6 +230,12 @@ export async function preflightXlsx(filePath: string, options: PreflightOptions 
     }
     const workbook: PreflightWorkbook = { date1904, sheets: result, expandedBytes: budget.expandedBytes - initialBytes, compressedBytes, sharedStrings: strings, styleCount,
       numberFormats: styleFormats.map(id => customFormats.get(id) ?? 'builtin:' + id), limits, scan: { physicalCells, externalLinkXmlParts, externalRelations, formulas }, ...(corep ? { profile: 'corep-ca1' as const } : {}) };
+    if (options.profile === 'visual-report' && result.length === 3 && ['Instrucciones', 'Datos', 'Contexto'].every(name => result.some(sheet => sheet.name === name))) {
+      // Candidate bytes are never published. A typed report must pass the complete strict scanner;
+      // both passes consume the same operation quota, including any inert COREP-only content.
+      const strict = await preflightXlsx(filePath, { profile: 'demo-types', budget, ...(options.check ? { check: options.check } : {}) });
+      return { ...strict, expandedBytes: budget.expandedBytes - initialBytes };
+    }
     if (corep) {
       // The first pass verifies every byte but keeps only bounded metadata. The second resolves selected
       // sheets by verified relationships, regardless of ZIP order, and never reads excluded cached values.

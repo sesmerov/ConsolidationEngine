@@ -27,7 +27,7 @@ export function evaluateCandidate(snapshot: Snapshot, direction: DirectionDTO, o
   const resolution = resolveDirection(snapshot, direction, { budget });
   if (!resolution.resolved) return { state: 'blocked', readKeys: [], metadataReads: [], sources: [], diagnostics: resolution.diagnostics };
   const { target, source, precondition, ast, binding, scope } = resolution.resolved;
-  const environment: EvaluationContext = { report: snapshot.content, binding, budget, ...(scope ? { scope } : {}) };
+  const environment: EvaluationContext = { report: snapshot.content, profileId: snapshot.content.profileId, binding, budget, ...(scope ? { scope } : {}) };
   const sourceReads = collectExpressionReads(source, environment), conditionReads = precondition ? collectExpressionReads(precondition.body, environment) : undefined;
   const readKeys = [...new Set([...sourceReads.readKeys, ...(conditionReads?.readKeys ?? [])])].sort(ordinal);
   const metadataReads = [...new Map([...sourceReads.metadataReads, ...(conditionReads?.metadataReads ?? [])].map(read => [JSON.stringify([read.contextId, read.code]), read])).values()]
@@ -89,12 +89,12 @@ export function evaluateCandidate(snapshot: Snapshot, direction: DirectionDTO, o
     if (value.kind !== target.dataType) return blocked(diagnostic('TYPE_MISMATCH', 'El valor calculado no coincide con el tipo del destino.'));
     let after: ProposalAfterDTO;
     if (value.kind === 'boolean') after = { normalizedValue: value.value, originalText: value.value ? 'true' : 'false' };
-    else {
+    else if (value.kind === 'number') {
       contextualUnits('=', parseUnit(target.unit), value.unit, false, value.literal);
       numeric = { exactNominal: rationalToDTO(value.nominal), derivedInterval: { lo: rationalToDTO(value.lo), hi: rationalToDTO(value.hi) } };
       const quantized = quantize(value.nominal, target.decimals);
       after = { normalizedValue: rationalToDTO(quantized.value), originalText: quantized.text, decimals: target.decimals, unit: target.unit };
-    }
+    } else return blocked(diagnostic('RULE_VALIDATION_ONLY', 'El texto y las fechas solo admiten validación.'));
     const { factKey, contextId, tableCode, sheetCode, rowCode, columnCode } = target;
     const fact: ReportedFact = { factKey, contextId, tableCode, sheetCode, rowCode, columnCode, presence: 'value',
       normalizedValue: after.normalizedValue, originalText: after.originalText, sourceLocator: before.sourceLocator };
@@ -102,7 +102,7 @@ export function evaluateCandidate(snapshot: Snapshot, direction: DirectionDTO, o
     // Revalidate the complete original expression, preserving with/default/interval options.
     const candidateEnvironment = { ...environment, report };
     if (precondition && !conditionPasses(evaluate(precondition, candidateEnvironment))) return blocked(diagnostic('CANDIDATE_DOES_NOT_SATISFY_RULE', 'El candidato no conserva la precondición de la regla.'));
-    const validation = evaluate(ast, { report, binding, budget }); diagnostics.push(...validation.diagnostics);
+    const validation = evaluate(ast, { report, profileId: snapshot.content.profileId, binding, budget }); diagnostics.push(...validation.diagnostics);
     if (validation.value?.kind !== 'boolean' || !validation.value.value) return blocked(diagnostic('CANDIDATE_DOES_NOT_SATISFY_RULE', 'El valor exportable no satisface la igualdad original.'));
     budget.check();
     return { ...details, ...numeric, ...calculationEvidence(), state: 'available', after, fact, diagnostics };

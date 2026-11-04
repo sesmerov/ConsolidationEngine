@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { createHash } from 'node:crypto';
-import { RECALCULATION_POLICY_ID, UUID_PATTERN, isRationalValue, type Diagnostic, type PreviewBundle, type PreviewDTO, type ProposalAfterDTO, type ProposalDTO,
+import { LANGUAGE_PROFILE_V2, RECALCULATION_POLICY_ID, UUID_PATTERN, isRationalValue, type Diagnostic, type PreviewBundle, type PreviewDTO, type ProposalAfterDTO, type ProposalDTO,
   type NormalizedValue, type Rational, type ReportedFact, type Snapshot, type ValidationBundle } from '@ce/contracts';
 import { buildDependencyGraph } from '../dependencies/producers.js';
 import { orderDependencies } from '../dependencies/kahn.js';
@@ -10,7 +10,8 @@ import { ordinal, reportIndex } from '../resolver/coordinates.js';
 import { runValidation } from '../validation/run.js';
 import { evaluateCandidate } from './candidate.js';
 import { uuidV5 } from './simulate.js';
-import { assertRecalculationConfiguration } from './configuration.js';
+import { assertRecalculationConfiguration, RecalculationConfigurationError } from './configuration.js';
+import { getRecalculationPolicy } from './policy.js';
 
 export interface ApplyCandidateOptions {
   readonly receiptId: string; readonly newVersionId: string; readonly beforeRunId: string; readonly runId: string; readonly startedAt: string;
@@ -73,8 +74,25 @@ export function applyCandidate(snapshot: Snapshot, bundle: PreviewBundle, option
   if (preview.profileId !== snapshot.content.profileId || preview.policyId !== RECALCULATION_POLICY_ID) throw new ApplicationError('PROFILE_MISMATCH', 'El perfil o la política no coincide.');
   assertRecalculationConfiguration(snapshot, { budget });
   if (preview.state !== 'ready') throw new ApplicationError('PREVIEW_NOT_APPLICABLE', 'La previsualización ya no está disponible.');
+  const directions = new Map(snapshot.content.directions.map(direction => [direction.id, direction]));
   const byId = new Map<string, ProposalDTO>();
-  for (const proposal of bundle.proposals) { budget.check(); if (byId.has(proposal.id)) throw new ApplicationError('PREVIEW_NOT_APPLICABLE', 'La previsualización contiene identidades duplicadas.'); byId.set(proposal.id, proposal); }
+  for (const proposal of bundle.proposals) {
+    budget.check(); if (byId.has(proposal.id)) throw new ApplicationError('PREVIEW_NOT_APPLICABLE', 'La previsualización contiene identidades duplicadas.');
+    if (snapshot.content.profileId === LANGUAGE_PROFILE_V2) {
+      const classified = getRecalculationPolicy(snapshot, proposal, { budget });
+      if (classified.policy.mode !== 'standard') {
+        const limit = classified.diagnostics.find(d => d.code === 'RESOURCE_LIMIT' || d.code === 'CANCELLED' || d.code === 'DEADLINE_EXCEEDED');
+        if (limit) throw new WorkLimitError(limit.code as 'RESOURCE_LIMIT' | 'CANCELLED' | 'DEADLINE_EXCEEDED', limit.message);
+        throw new RecalculationConfigurationError(classified.diagnostics);
+      }
+    }
+    const direction = directions.get(proposal.directionId);
+    const bindingKey = (binding: ProposalDTO['binding']) => JSON.stringify([binding.contextId ?? null, [...(binding.contextIds ?? [])].sort(ordinal), binding.tableCode ?? null, binding.sheetCode ?? null, binding.rowCode ?? null, binding.columnCode ?? null]);
+    const variants = [...proposal.variantIds].sort(ordinal), codes = new Set(variants.map(id => snapshot.content.catalog.variants.find(v => v.variantId === id)?.code));
+    if (!direction || JSON.stringify(variants) !== JSON.stringify([...direction.variantIds].sort(ordinal)) || bindingKey(proposal.binding) !== bindingKey(direction.binding)
+      || proposal.code !== (codes.size === 1 ? [...codes][0] : '')) throw new ApplicationError('PREVIEW_NOT_APPLICABLE', 'La identidad de la propuesta no corresponde a su regla y dirección.');
+    byId.set(proposal.id, proposal);
+  }
   for (const id of selected) {
     budget.consume('instances'); const proposal = byId.get(id);
     if (!proposal) throw new ApplicationError('INVALID_REQUEST', 'La selección contiene una propuesta desconocida.');
@@ -85,7 +103,6 @@ export function applyCandidate(snapshot: Snapshot, bundle: PreviewBundle, option
   // Keep one private snapshot identity for bounded structural caches, replacing content after each actual patch.
   const current = { ...snapshot, content: snapshot.content };
   const graph = buildDependencyGraph(current, snapshot.content.directions, { budget }), schedule = orderDependencies(graph, { budget });
-  const directions = new Map(snapshot.content.directions.map(direction => [direction.id, direction]));
   const byDirection = new Map<string, ProposalDTO>(), targets = new Set<string>();
   for (const id of selected) {
     budget.check(); const proposal = byId.get(id)!, direction = directions.get(proposal.directionId);

@@ -326,3 +326,106 @@ confirmar publica una versión, y repetir la petición recupera el mismo Job.
 **Checkpoint T031–T046 completo.** Las fuentes públicas siguen intactas. Esta
 evidencia cubre importación visual y compatibilidad anterior; semántica nueva,
 demos de 24 reglas y exportación visual se completan en US3/US4.
+
+## US3 — pruebas previas a la semántica y demos
+
+Base: `c8729e1`, importación COREP confirmada en Git.
+
+- T047–T049: tres suites, **82 fallos y 6 casos correctos** antes de implementar.
+  Los fallos identifican nodos text/date/if no soportados, lecturas tipadas y
+  clasificación indeterminada. También reproducen un intento interno que altera
+  `variantIds`/código de una propuesta y conserva una dirección numérica legítima;
+  deberá rechazarse al aplicar, aunque el hash de selección sea coherente.
+- T051: **dos fallos conductuales**. Un libro tipado construido independientemente
+  se rechaza en reconocimiento COREP; DEMO_IF_THEN tiene sintaxis válida pero
+  soporte semántico ausente. No se usaron imports inexistentes como prueba roja.
+- T061 UI: **siete fallos y siete regresiones correctas**, compilados. Faltan
+  selector/descargas, versión de cobertura y contexto tipado; los selectores
+  deshabilitados para políticas excluidas aún existen y deben retirarse.
+- T052 E2E: recorrido completo escrito en `tests/e2e/visual-demos.spec.ts` para
+  COREP/tipos a 320/390/1440 px. Baseline focal COREP 1440 falla en 5,4 s tras crear
+  el conjunto por ausencia de «Demostraciones guiadas». Comando:
+  `run-with-toolchain.ps1 -NpmArguments @('run','test:e2e','--',
+  'tests/e2e/visual-demos.spec.ts','--grep','COREP demo 1440')`.
+  Log local `.cache/us3-demo-red.log`. El oráculo congelado se consulta solo desde
+  pruebas; no debe convertirse en el evaluador ni en una dependencia runtime.
+- T050: **11/11 fallos conductuales** ante construcciones no soportadas/tipado,
+  5,60 s, tras corregir la sintaxis de los fixtures antes de tomar la línea base.
+  T060: **cuatro fallos 404 y un caso correcto** de rutas no expuestas, antes del
+  nuevo cargador de descargas. No se han anunciado capacidades tipadas por estos
+  fallos ni se considera una respuesta simulada como una validación real.
+
+### Semántica, guardias y primera integración US3
+
+- Motor: **617/617**, catorce archivos, 1,21 s de ejecución final y build correcto.
+  Incluye los 88 casos iniciales nuevos y seis pruebas añadidas del motivo
+  `NOT_EQUALITY` en v2; v1 mantiene su diagnóstico anterior. La expectativa antigua
+  «condicional pendiente» se sustituyó por una construcción que continúa fuera del
+  perfil (`abs`) para conservar la prueba de rechazo cerrado.
+- T050: **13/13**. Aplicación/jobs/atomicidad y guardias anteriores **63/63**;
+  descargas/presentación **20/20**. Se verifican validaciones y workers reales;
+  las inyecciones privadas de fallo para carreras/manipulación se distinguen de
+  esos recorridos. La aplicación ahora comprueba también identidad/política de las
+  propuestas seleccionadas; el Job conserva los diagnósticos públicos finitos.
+- Contratos HTTP **148/148**, dieciséis archivos, 90,23 s, ejecutados con
+  `--maxWorkers=1 --no-file-parallelism`. Una ejecución concurrente previa produjo
+  un timeout de 5 s en `validations.spec.ts`; desapareció al aislarla, sin ampliar
+  plazos ni cambiar el test. No se omite ese intento previo.
+- Angular final **112/112**, catorce archivos, 6,91 s; typecheck web correcto.
+  Build web **659,36 kB iniciales**, 150,01 kB estimados transferidos, sin avisos.
+  Guías y descargas no alteran archivos/contexto ni configuran destinos. La versión
+  ya publicada se distingue de la revisión candidata, y los diez casos excluidos
+  no presentan selectores de recálculo.
+- Sumas independientes ejecutadas en PowerShell con BigInteger, sin motor/parser:
+  **6000, 18500, 5000, 10000 y 28500 céntimos** para v0174_m, v0173_m, v0176_m,
+  v0175_m y v0172_m. Evidencia local `.cache/us3-independent-arithmetic.json`.
+- Primer E2E de ambas demos a 1440 px: **2/2**, 29,5 s. Descargas reales, inspección,
+  24 resultados individuales, cinco direcciones elegidas por UI y sus cinco cambios,
+  rechazo HTTP directo de recálculos prohibidos, COREP 7/8/1 → 14/1/1 y tipos 6/2
+  sin propuestas. Capturas bajo `.cache/verification-002/demo-*-1440.png`.
+
+La inspección visual detectó nombres internos de familias en Description de las
+19 reglas sintéticas; se reemplazaron por frases en español y se regeneraron las
+descargas. Las quince columnas de cada una de las cinco reglas oficiales no cambian.
+El corpus también detectó `INVALID_DIRECTION` demasiado genérico para desigualdades;
+se añadió el motivo previsto `NOT_EQUALITY`, sin cambiar el envelope HTTP ni v1.
+
+Se corrigió una diferencia de reproducibilidad: el mapping COREP del árbol de trabajo
+tenía CRLF mientras Git y `.gitattributes` fijaban LF. Se normalizó el archivo de
+producto a LF y se regeneró su huella en el manifiesto. Su JSON/estructura y el SHA
+de la plantilla COREP no cambian; la huella anterior de mapping documenta los bytes
+usados en US2, no la huella del checkout limpio. Los nuevos mappings/manifiestos
+se comprueban con sus bytes LF versionados. Gramática y oráculo permanecen intactos.
+
+T051 final: **95/95** (51 importación tipada, siete corpus y 37 COREP), 31,07 s,
+después de normalizar la huella. Regresión previa de importación v1/COREP/tipos:
+**228/228**, nueve archivos, 28,81 s. Se contrastan las 30 expresiones/precondiciones
+con ANTLR, los 24 resultados antes/después, lecturas efectivas, elegibilidad, cinco
+importes, cuatro aristas y procedencia de las cinco filas oficiales.
+
+La regresión E2E obtuvo **27/28**, 3,9 minutos: pasaron las seis demos a 320/390/1440
+px y todos los recorridos salvo uno que aún buscaba el encabezado/texto anteriores
+«Carga y cobertura». Se actualizaron ambas aserciones al texto de datos publicados
+y su versión, conservando comprobaciones de cifras, nulos, fuentes y recarga. El
+recorrido focal final pasa **1/1**, 6,3 s total. No se cambió producto para ese ajuste.
+Se conservan los logs de la ejecución completa y de ambos intentos focales.
+
+Capturas finales de propuestas/comparación COREP y resultados tipados guardadas en
+`.cache/verification-002/demo-*.png`; inspeccionados escritorio y móvil. No desborda
+la página; las tablas anchas se desplazan dentro de su región. Se anotó para T073
+añadir una pista visible de desplazamiento móvil, porque los importes quedan a la
+derecha de la primera vista. Resultados y severidad permanecen separados.
+
+Huella COREP de mapping LF:
+`c8dd23660c7a2e31d0e9871dd2198d88cc6fb7dd40bb3be79321a62a0c7cd790`.
+Mapping tipado: `c84d1950e9849443cd58ee86908a56147d8de88317808749a9c38f334e4ac5fe`.
+Los cuatro activos coinciden con su manifest; los tres XLSX originales y grammar
+siguen intactos. El exportador visual y la aceptación humana siguen pendientes.
+
+Antes del commit se detectó que la ruta de descarga COREP compilada aún buscaba
+assets en la raíz del checkout. Un backend compilado reubicado en una carpeta
+aislada devolvió 500; tras seleccionar los assets empaquetados desde `.js`, la
+misma prueba pasa **1/1**, 3,46 s, respuesta 200 y bytes idénticos a su plantilla.
+Build API final correcto. La copia temporal se limpia; no se movieron originales.
+**Checkpoint T047–T062 completo**, con los 28 escenarios E2E verificados entre la
+ejecución conjunta y la repetición focal del selector corregido.

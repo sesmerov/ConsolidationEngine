@@ -1,5 +1,6 @@
 import type { Coordinate, PresentationDTO, RawRuleRecord, SnapshotContent } from '@ce/contracts';
 import { COREP_MAPPING, COREP_MAPPING_SHA256, COREP_PROFILE_ID } from '../import/profiles/corep-ca1.js';
+import { DEMO_TYPES_MAPPING, DEMO_TYPES_MAPPING_SHA256, DEMO_TYPES_PROFILE_ID } from '../import/profiles/demo-types.js';
 
 const ordinal = (left: string, right: string) => left < right ? -1 : left > right ? 1 : 0;
 function description(record: RawRuleRecord): string | undefined {
@@ -22,9 +23,12 @@ export function rulePresentation(content: SnapshotContent): (variantIds: readonl
   return (variantIds, coordinate) => {
     const first = variantIds.flatMap(id => descriptions.get(id) ?? []).sort(sourceOrder)[0];
     const text = first ? description(first) : undefined;
-    const bound = coordinate && content.reportSourceBindings?.some(binding => binding.profileId === COREP_PROFILE_ID && binding.mappingSha256 === COREP_MAPPING_SHA256
+    const bound = (profileId: string, mappingSha256: string) => coordinate && content.reportSourceBindings?.some(binding => binding.profileId === profileId && binding.mappingSha256 === mappingSha256
       && binding.sourceFileId === coordinate.sourceLocator.fileId && binding.contextIds.includes(coordinate.contextId));
-    const conceptLabel = bound && coordinate ? COREP_MAPPING.mapping.find(cell => cell.tableCode === coordinate.tableCode && cell.sheetCode === coordinate.sheetCode && cell.rowCode === coordinate.rowCode && cell.columnCode === coordinate.columnCode)?.label : undefined;
+    const conceptLabel = coordinate && bound(COREP_PROFILE_ID, COREP_MAPPING_SHA256)
+      ? COREP_MAPPING.mapping.find(cell => cell.tableCode === coordinate.tableCode && cell.sheetCode === coordinate.sheetCode && cell.rowCode === coordinate.rowCode && cell.columnCode === coordinate.columnCode)?.label
+      : coordinate && bound(DEMO_TYPES_PROFILE_ID, DEMO_TYPES_MAPPING_SHA256) && coordinate.tableCode === DEMO_TYPES_MAPPING.tableCode && coordinate.columnCode === DEMO_TYPES_MAPPING.columnCode && coordinate.sheetCode === ''
+        ? DEMO_TYPES_MAPPING.fields.find(cell => cell.rowCode === coordinate.rowCode)?.label : undefined;
     return text === undefined && conceptLabel === undefined ? undefined : { ...(text === undefined ? {} : { description: text }), ...(conceptLabel === undefined ? {} : { conceptLabel }) };
   };
 }

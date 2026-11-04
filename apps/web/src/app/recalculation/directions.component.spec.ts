@@ -26,7 +26,7 @@ describe('explicit direction configuration', () => {
   it.each(['absent', 'undetermined', 'validation_only'] as const)('does not authorize a destination under %s policy, even if its structural side is eligible', async (mode) => {
     const { policy: _policy, ...sides } = result.recalculation!;
     const fixture = render({ ...page, items: [{ ...result, recalculation: mode === 'absent' ? sides : { ...sides, policy: { mode, profileId: result.profileId, reasons: mode === 'validation_only' ? ['TEXT'] : [] } } }] });
-    expect((fixture.nativeElement as HTMLElement).querySelector('select')!.disabled).toBe(true);
+    expect((fixture.nativeElement as HTMLElement).querySelector('select')).toBeNull();
     fixture.componentInstance.choose(fixture.componentInstance.page().items[0]!, 'left'); await fixture.componentInstance.save(); expect(fixture.componentInstance.draft()).toEqual({}); http.expectNone(request => request.method === 'PUT');
   });
   it('starts with no inferred target, allows a structurally eligible false-precondition side and explains the rejected side', () => {
@@ -35,6 +35,16 @@ describe('explicit direction configuration', () => {
     expect(element.textContent).toContain('una única celda declarada'); expect(element.textContent).toContain('no modifica los valores');
     const save = Array.from(element.querySelectorAll('button')).find(button => button.textContent?.includes('Guardar configuración'))!; expect(save.disabled).toBe(true);
     choose(fixture, 'left'); expect(save.disabled).toBe(false); http.expectNone(request => request.method !== 'GET');
+  });
+  it.each([['CONDITIONAL', 'condicionales'], ['TEXT', 'texto'], ['DATE', 'fechas']] as const)('explains %s validation-only policy without offering a destination', (reason, readable) => {
+    const fixture = render({ ...page, items: [{ ...result, recalculation: { ...result.recalculation!, policy: { mode: 'validation_only', profileId: result.profileId, reasons: [reason] } } }] });
+    const element = fixture.nativeElement as HTMLElement; expect(element.textContent).toContain('Solo validación'); expect(element.textContent).toContain(`La regla usa ${readable}`); expect(element.textContent).toContain('Se valida sin modificar datos'); expect(element.querySelector('select')).toBeNull();
+  });
+  it('retains the server explanation for a numerical inequality that has no eligible side', () => {
+    const side = { eligible: false, diagnostics: [{ code: 'INVALID_DIRECTION' as const, message: 'Sólo una igualdad numérica puede configurar un destino.' }] };
+    const fixture = render({ ...page, items: [{ ...result, expression: '{tC_01.00,r0230,c0010}>1', recalculation: { policy: { mode: 'standard', profileId: result.profileId, reasons: [] }, left: side, right: side } }] });
+    const element = fixture.nativeElement as HTMLElement; expect(element.textContent).toContain('Sólo una igualdad numérica'); expect(element.querySelector<HTMLOptionElement>('option[value="left"]')!.disabled).toBe(true);
+    fixture.componentInstance.choose(fixture.componentInstance.page().items[0]!, 'left'); expect(fixture.componentInstance.draft()).toEqual({});
   });
   it('sends the complete explicit selection including configured directions outside the page, then retains the old run as historical', async () => {
     const fixture = render({ ...page, configuredDirections: [{ instanceId: b, targetSide: 'right' }] } as ValidationResultsPageDTO);

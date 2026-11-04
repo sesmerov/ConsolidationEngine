@@ -1,4 +1,4 @@
-import type { Coordinate, Diagnostic, SourceLocator } from '@ce/contracts';
+import type { Coordinate, DataType, Diagnostic, SourceLocator } from '@ce/contracts';
 import type { ExactRational } from '../numeric/rational.js';
 import type { UnitMap } from '../numeric/units.js';
 
@@ -10,14 +10,16 @@ export type NumericScalar = Provenance & {
   readonly literal?: boolean;
 };
 export type BooleanScalar = Provenance & { readonly kind: 'boolean'; readonly value: boolean };
+export type TextScalar = Provenance & { readonly kind: 'text'; readonly value: string };
+export type DateScalar = Provenance & { readonly kind: 'date'; readonly value: string };
 export type NullScalar = Provenance & { readonly kind: 'null'; readonly origin: 'explicit' | 'implicit' | 'derived' } & (
-  | { readonly dataType: 'number'; readonly unit: UnitMap }
-  | { readonly dataType: 'boolean' }
+  | { readonly dataType: 'number'; readonly unit: UnitMap; readonly literal?: boolean }
+  | { readonly dataType: 'boolean' | 'text' | 'date' }
 );
 /** Missing metadata is not a missing fact. Its trace is collected independently by the evaluator. */
-export type UnknownScalar = { readonly kind: 'unknown'; readonly dataType?: 'number' | 'boolean' };
-export type ScalarValue = NumericScalar | BooleanScalar | NullScalar | UnknownScalar;
-export type ValueErrorCode = 'TYPE_MISMATCH' | 'UNIT_MISMATCH' | 'INVALID_UNIT';
+export type UnknownScalar = { readonly kind: 'unknown'; readonly dataType?: DataType };
+export type ScalarValue = NumericScalar | BooleanScalar | TextScalar | DateScalar | NullScalar | UnknownScalar;
+export type ValueErrorCode = 'TYPE_MISMATCH' | 'UNIT_MISMATCH' | 'INVALID_UNIT' | 'INVALID_DATE' | 'UNSUPPORTED_CONSTRUCT';
 export class ValueError extends Error {
   constructor(readonly code: ValueErrorCode, message: string = code) { super(message); }
 }

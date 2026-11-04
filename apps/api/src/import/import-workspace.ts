@@ -9,8 +9,7 @@ import { preflightXlsx } from './xlsx-preflight.js';
 import { readWorkbook } from './xlsx-reader.js';
 import { importReportStream } from './ce-report.js';
 import { conflictingVariants, importCatalog, variantApplicability } from './eba-catalog.js';
-import { inspectReportWorkbook } from './profiles/registry.js';
-import { normalizeCorepCa1 } from './profiles/corep-ca1.js';
+import { inspectReportWorkbook, normalizeInspectedReport } from './profiles/registry.js';
 
 export const GRAMMAR_VERSION = 'dpm-xl-0.9-antlr-4.13.2';
 /** Fully builds a candidate. Only JobManager on the main thread can publish it. */
@@ -30,15 +29,15 @@ async function buildWorkspace(files: readonly StagedFile[], operation: Operation
     const preflight = inspected?.preflight ?? await preflightXlsx(file.path, { budget, retainCells: file.kind === 'catalog', check }); expansionBySource.set(file.id, preflight.expandedBytes); check();
     if (file.kind === 'catalog') { const workbook = await readWorkbook(file.path, preflight); check(); importedCatalog = importCatalog(workbook, file); }
     else {
-      if (inspected && (inspected.profileId !== 'eba-corep-of-4.0-ca1-v1' || inspected.languageProfileId !== profileId)) throw new ApiError('INVALID_WORKBOOK');
-      const normalized = inspected ? normalizeCorepCa1(preflight, file, declaration?.source === 'form' ? declaration.declaration : undefined, { check }) : undefined;
+      if (inspected && inspected.languageProfileId !== profileId) throw new ApiError('INVALID_WORKBOOK');
+      const normalized = inspected ? normalizeInspectedReport(inspected, file, declaration?.source === 'form' ? declaration.declaration : undefined, { check }) : undefined;
       const report = normalized?.report ?? await importReportStream(file.path, preflight, file, { check });
       if (normalized && inspected) {
         reportSourceBindings.push(normalized.binding);
         inspectionContexts.push({ sourceFileId: file.id, origin: normalized.binding.contextOrigin, declaration: normalized.declaration,
           ...(normalized.contextLocators ? { locators: normalized.contextLocators } : {}) });
         reports.push({ sourceFileId: file.id, displayName: file.displayName, sha256: file.sha256, profileId: inspected.profileId,
-          tables: ['C_01.00'], selectedSheets: inspected.selectedSheets, excludedSheets: inspected.excludedSheets, coordinates: report.coordinates.length, values: report.facts.filter(fact => fact.presence === 'value').length });
+          tables: [...new Set(report.coordinates.map(coordinate => coordinate.tableCode))].sort(), selectedSheets: inspected.selectedSheets, excludedSheets: inspected.excludedSheets, coordinates: report.coordinates.length, values: report.facts.filter(fact => fact.presence === 'value').length });
         if (!profiles.length) profiles.push({ profileId: inspected.profileId, languageProfileId: inspected.languageProfileId, mappingSha256: inspected.mappingSha256 });
         else if (profiles[0]!.profileId !== inspected.profileId || profiles[0]!.mappingSha256 !== inspected.mappingSha256) throw new ApiError('INVALID_WORKBOOK');
       }

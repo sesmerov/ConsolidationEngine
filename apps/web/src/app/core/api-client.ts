@@ -37,6 +37,7 @@ export class ApiClient {
   capabilities(): Promise<CapabilitiesDTO> { return firstValueFrom(this.http.get<CapabilitiesDTO>('/api/v1/capabilities', { headers: this.headers() })); }
   reportTemplate(): Promise<Blob> { return firstValueFrom(this.http.get('/api/v1/templates/report', { headers: this.headers(), responseType: 'blob' })); }
   corepTemplate(): Promise<Blob> { return firstValueFrom(this.http.get('/api/v1/templates/corep-ca1', { headers: this.headers(), responseType: 'blob' })); }
+  visualDemo(kind: 'corep' | 'types', artifact: 'catalog' | 'report'): Promise<Blob> { return firstValueFrom(this.http.get(`/api/v1/templates/demos/${kind}/${artifact}`, { headers: this.headers(), responseType: 'blob' })); }
   activeImportInspection(workspaceId: string): Promise<ActiveImportInspectionDTO> { return firstValueFrom(this.http.get<ActiveImportInspectionDTO>(this.inspectionsUrl(workspaceId), { headers: this.headers() })); }
   importInspection(workspaceId: string, id: string): Promise<ImportInspectionDTO> { return firstValueFrom(this.http.get<ImportInspectionDTO>(this.inspectionsUrl(workspaceId) + '/' + encodeURIComponent(id), { headers: this.headers() })); }
   inspectImport(workspaceId: string, etag: string, catalog: File, reports: readonly File[], context: ImportContextInputDTO, key: string, signal: AbortSignal): Promise<JobDTO> {

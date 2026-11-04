@@ -10,7 +10,7 @@ export interface LanguageProfile {
 }
 const profiles: Readonly<Record<string, LanguageProfile>> = Object.freeze({
   [LANGUAGE_PROFILE_V1]: Object.freeze({ id: LANGUAGE_PROFILE_V1, booleanRecalculation: true, constructs: Object.freeze(['number', 'boolean', 'reference', 'arithmetic', 'comparison', 'isnull', 'nvl', 'sum']) }),
-  [LANGUAGE_PROFILE_V2]: Object.freeze({ id: LANGUAGE_PROFILE_V2, booleanRecalculation: false, constructs: Object.freeze(['number', 'boolean', 'reference', 'arithmetic', 'comparison', 'isnull', 'nvl', 'sum']) }),
+  [LANGUAGE_PROFILE_V2]: Object.freeze({ id: LANGUAGE_PROFILE_V2, booleanRecalculation: false, constructs: Object.freeze(['number', 'boolean', 'text', 'date', 'if', 'reference', 'arithmetic', 'comparison', 'isnull', 'nvl', 'sum']) }),
 });
 export function languageProfile(profileId: string): LanguageProfile | undefined { return Object.hasOwn(profiles, profileId) ? profiles[profileId] : undefined; }
 export class ProfileError extends Error {

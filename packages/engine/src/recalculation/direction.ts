@@ -80,7 +80,10 @@ export function resolveDirection(snapshot: Snapshot, input: DirectionInput, opti
   }
   if (!instances.some(instance => instance.instanceId === input.instanceId && sameBinding(instance.binding, input.binding))) return invalid('La identidad de instancia no corresponde al snapshot.');
   const equality = unwrap(parsed.ast.body, undefined, input.binding);
-  if (equality.node.kind !== 'binary' || equality.node.op !== '=') return invalid('Solo una igualdad admite una dirección de recálculo.');
+  if (equality.node.kind !== 'binary' || equality.node.op !== '=') {
+    const message = 'Solo una igualdad admite una dirección de recálculo.';
+    return invalid(message, snapshot.content.profileId === LANGUAGE_PROFILE_V2 ? [{ code: 'NOT_EQUALITY', message, severity: 'error' }] : []);
+  }
   const targetNode = unwrap(input.targetSide === 'left' ? equality.node.left : equality.node.right, equality.scope, input.binding);
   if (targetNode.node.kind !== 'reference') return invalid('El lado elegido debe ser una única celda declarada.');
   const selected = resolveSelection(targetNode.node.selection, targetNode.scope, snapshot.content, input.binding, options.budget);

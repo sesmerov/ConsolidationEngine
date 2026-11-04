@@ -33,13 +33,13 @@ test('V01/V14: real template download, exact import, null/zero summary and brows
   const template = path.resolve('.cache/e2e-ce-report-1.xlsx'); await download.saveAs(template);
   await page.getByLabel('Catálogo de reglas (.xlsx)').setInputFiles(catalogPath); await page.getByLabel('Informes (.xlsx)', { exact: true }).setInputFiles(template);
   await page.getByRole('button', { name: 'Cargar archivos', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Carga y cobertura' })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('heading', { name: 'Datos cargados · Versión 1', exact: true })).toBeVisible({ timeout: 15000 });
   await expect(page.locator('.data-summary')).toHaveText('6 coordenadas · 5 hechos · 1 ceros · 1 nulos explícitos · 1 nulos implícitos');
   await expect(page.getByText('3 de 3 registros', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Contexto', { exact: true })).toHaveText(/SYNTHETIC.*30\/06\/2026.*COREP_OF_4.2/);
   await page.locator('summary').filter({ hasText: /^v0190_m · Aplicable$/ }).click();
   await expect(page.locator('.rule-row[open] pre').filter({ hasText: '{v_C_01.00} and {v_C_05.01}' })).toBeVisible();
-  await expect(page.getByText('Este panel describe la carga y el soporte de las reglas. El cumplimiento se consulta en Validación y explicación.')).toBeVisible();
+  await expect(page.getByText('Este panel describe los datos publicados y el soporte de sus reglas. El cumplimiento se consulta en Validación y explicación.')).toBeVisible();
   await page.screenshot({ path: path.resolve('.cache/import-ui.png'), fullPage: true });
   expect(await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length }))).toEqual({ local: 0, session: 0 });
   await page.reload(); await enableLegacyFormat(page); await expect(page.getByText('3 de 3 registros', { exact: true })).toBeVisible();

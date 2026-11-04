@@ -1,4 +1,4 @@
-import { isRationalValue, type Coordinate, type Diagnostic, type SourceLocator } from '@ce/contracts';
+import { isCivilDateV2, isRationalValue, LANGUAGE_PROFILE_V1, LANGUAGE_PROFILE_V2, type Coordinate, type Diagnostic, type SourceLocator } from '@ce/contracts';
 import { PARSER_LIMITS, type Ast, type BinaryOperator, type Expression, type Selection } from '../ast/ast.js';
 import { WorkBudget, WorkLimitError } from '../execution/budget.js';
 import { fromPrecision, intervalAdd, intervalSubtract, intervalMultiply, intervalDivide, intervalNegate, intervalCompare } from '../numeric/interval.js';
@@ -8,9 +8,10 @@ import { ordinal, reportIndex, resolveSelection, type ResolverReport } from '../
 import { bindScope, mergeScope, type Binding } from '../resolver/scope.js';
 import { applyDefault, isNull, logicalAnd, logicalOr, logicalNot, nvl, sumValues } from './nulls.js';
 import { ValueError, type NumericScalar, type NullScalar, type ScalarValue } from './value.js';
+import { checkExpression } from './type-check.js';
 
 export interface MetadataRead { readonly contextId: string; readonly code: string; readonly presence: 'declared' | 'missing'; readonly value?: boolean; readonly sourceLocator?: SourceLocator }
-export interface EvaluationContext { readonly report: ResolverReport; readonly binding: Binding; readonly scope?: Selection; readonly budget?: WorkBudget }
+export interface EvaluationContext { readonly report: ResolverReport; readonly binding: Binding; readonly scope?: Selection; readonly budget?: WorkBudget; readonly profileId?: string }
 export interface EvaluationResult {
   readonly value?: ScalarValue; readonly readKeys: readonly string[]; readonly metadataReads: readonly MetadataRead[];
   readonly diagnostics: readonly Diagnostic[]; readonly operands?: { readonly left?: ScalarValue; readonly right?: ScalarValue };
@@ -22,16 +23,18 @@ function numeric(value: ScalarValue): asserts value is NumericOperand {
 }
 function binary(op: Exclude<BinaryOperator, 'and' | 'or'>, left: ScalarValue, right: ScalarValue): ScalarValue {
   const type = (value: ScalarValue) => value.kind === 'null' || value.kind === 'unknown' ? value.dataType : value.kind;
-  if (type(left) === 'boolean' || type(right) === 'boolean') {
-    if (type(left) !== 'boolean' || type(right) !== 'boolean' || (op !== '=' && op !== '!=')) throw new ValueError('TYPE_MISMATCH');
+  if (['boolean', 'text', 'date'].some(kind => type(left) === kind || type(right) === kind)) {
+    if (type(left) !== type(right) || !comparisons.has(op) || (type(left) !== 'date' && op !== '=' && op !== '!=')) throw new ValueError('TYPE_MISMATCH');
     if (left.kind === 'unknown' || right.kind === 'unknown') return { kind: 'unknown', dataType: 'boolean' };
     if (left.kind === 'null' || right.kind === 'null') return { kind: 'null', origin: 'derived', dataType: 'boolean' };
-    if (left.kind !== 'boolean' || right.kind !== 'boolean') throw new ValueError('TYPE_MISMATCH');
-    return { kind: 'boolean', value: op === '=' ? left.value === right.value : left.value !== right.value };
+    if (left.kind === 'number' || right.kind === 'number') throw new ValueError('TYPE_MISMATCH');
+    if (op === '=' || op === '!=') return { kind: 'boolean', value: op === '=' ? left.value === right.value : left.value !== right.value };
+    if (left.kind !== 'date' || right.kind !== 'date') throw new ValueError('TYPE_MISMATCH');
+    return { kind: 'boolean', value: op === '<' ? left.value < right.value : op === '<=' ? left.value <= right.value : op === '>' ? left.value > right.value : left.value >= right.value };
   }
   if (left.kind === 'unknown' || right.kind === 'unknown') return { kind: 'unknown', dataType: comparisons.has(op) ? 'boolean' : 'number' };
   numeric(left); numeric(right);
-  const unit = contextualUnits(op, left.unit, right.unit, left.kind === 'number' && left.literal, right.kind === 'number' && right.literal);
+  const unit = contextualUnits(op, left.unit, right.unit, left.literal, right.literal);
   if (left.kind === 'null' || right.kind === 'null') return comparisons.has(op)
     ? { kind: 'null', origin: 'derived', dataType: 'boolean' }
     : { kind: 'null', origin: 'derived', dataType: 'number', unit: unit.result };
@@ -45,6 +48,10 @@ export function evaluate(ast: Ast | Expression, context: EvaluationContext): Eva
   const index = reportIndex(context.report, budget), readKeys = new Set<string>(), metadata = new Map<string, MetadataRead>(), diagnostics: Diagnostic[] = [];
   let operands: EvaluationResult['operands'];
   const root = ast.kind === 'rule' ? ast.body : ast;
+  const profileId = context.profileId ?? LANGUAGE_PROFILE_V1;
+  const typing = checkExpression(root, { profileId, binding: context.binding, ...(context.scope ? { scope: context.scope } : {}), budget,
+    ...(profileId === LANGUAGE_PROFILE_V2 ? { report: context.report, allowEmptyAggregation: true } : {}), requireBoolean: ast.kind === 'rule' });
+  if (typing.diagnostics.length) return { readKeys: [], metadataReads: [], diagnostics: typing.diagnostics };
   let comparisonRoot = root;
   while (comparisonRoot.kind === 'with' || comparisonRoot.kind === 'group') comparisonRoot = comparisonRoot.kind === 'with' ? comparisonRoot.body : comparisonRoot.expression;
   function scalar(value: ScalarValue | readonly ScalarValue[] | undefined): ScalarValue | undefined {
@@ -55,7 +62,7 @@ export function evaluate(ast: Ast | Expression, context: EvaluationContext): Eva
     return value as ScalarValue | undefined;
   }
   function read(cell: Coordinate, selection: Selection): ScalarValue {
-    if (cell.dataType === 'text' || cell.dataType === 'date') throw new ValueError('TYPE_MISMATCH', 'Este tipo todavía no está disponible en el evaluador del perfil.');
+    if ((cell.dataType === 'text' || cell.dataType === 'date') && profileId !== LANGUAGE_PROFILE_V2) throw new ValueError('UNSUPPORTED_CONSTRUCT', 'El perfil v1 no admite valores de texto ni fecha.');
     budget.consume('reads'); readKeys.add(cell.factKey);
     const facts = index.facts.get(cell.factKey) ?? [];
     if (facts.length > 1) throw new ValueError('TYPE_MISMATCH', 'Several facts have the same canonical identity');
@@ -63,10 +70,15 @@ export function evaluate(ast: Ast | Expression, context: EvaluationContext): Eva
     let value: ScalarValue;
     if (!fact || fact.presence === 'null') {
       const base = { kind: 'null' as const, origin: fact ? 'explicit' as const : 'implicit' as const, ...provenance };
-      value = cell.dataType === 'boolean' ? { ...base, dataType: 'boolean' } : { ...base, dataType: 'number', unit: parseUnit(cell.unit) };
+      value = cell.dataType !== 'number' ? { ...base, dataType: cell.dataType } : { ...base, dataType: 'number', unit: parseUnit(cell.unit) };
     } else if (cell.dataType === 'boolean') {
       if (typeof fact.normalizedValue !== 'boolean') throw new ValueError('TYPE_MISMATCH');
       value = { kind: 'boolean', value: fact.normalizedValue, ...provenance };
+    } else if (cell.dataType === 'text' || cell.dataType === 'date') {
+      const normalized = fact.normalizedValue;
+      if (!normalized || typeof normalized !== 'object' || !('kind' in normalized) || normalized.kind !== cell.dataType || typeof normalized.value !== 'string') throw new ValueError('TYPE_MISMATCH');
+      if (cell.dataType === 'date' && !isCivilDateV2(normalized.value)) throw new ValueError('INVALID_DATE');
+      value = { kind: cell.dataType, value: normalized.value, ...provenance };
     } else {
       if (!isRationalValue(fact.normalizedValue)) throw new ValueError('TYPE_MISMATCH');
       const nominal = rational(BigInt(fact.normalizedValue.numerator), BigInt(fact.normalizedValue.denominator));
@@ -80,6 +92,7 @@ export function evaluate(ast: Ast | Expression, context: EvaluationContext): Eva
       switch (node.kind) {
         case 'number': { const value = parseLanguageNumber(node.lexeme); return { kind: 'number', nominal: value, lo: value, hi: value, unit: {}, literal: true }; }
         case 'boolean': return { kind: 'boolean', value: node.value };
+        case 'text': case 'date': return { kind: node.kind, value: node.value };
         case 'group': return visit(node.expression, scope, depth + 1);
         case 'with': return visit(node.body, bindScope(mergeScope(node.scope, scope), context.binding), depth + 1);
         case 'reference': {
@@ -118,6 +131,20 @@ export function evaluate(ast: Ast | Expression, context: EvaluationContext): Eva
           }
           const values = args.map(scalar); if (values.some(value => !value)) return undefined;
           return node.name === 'isnull' ? isNull(values[0]!) : nvl(values[0]!, values[1]!);
+        }
+        case 'if': {
+          const condition = scalar(visit(node.condition, scope, depth + 1)); if (!condition) return undefined;
+          const type = typing.nodeTypes.get(node);
+          if (!type?.dataType) throw new ValueError('TYPE_MISMATCH', 'No se resolvió el tipo de las ramas.');
+          if (condition.kind === 'null' || condition.kind === 'unknown') {
+            diagnostics.push({ code: 'CONDITIONAL_NOT_EVALUABLE', message: 'La condición es nula o desconocida; no se ejecuta ninguna rama.', severity: 'warning', ...node.condition.span });
+            return { kind: 'unknown', dataType: type.dataType };
+          }
+          if (condition.kind !== 'boolean') throw new ValueError('TYPE_MISMATCH', 'La condición debe ser booleana.');
+          if (condition.value) return visit(node.then, scope, depth + 1);
+          if (node.else) return visit(node.else, scope, depth + 1);
+          return type.dataType === 'number' ? { kind: 'null', origin: 'derived', dataType: 'number', unit: type.unit ?? {}, ...(type.literal ? { literal: true } : {}) }
+            : { kind: 'null', origin: 'derived', dataType: type.dataType };
         }
       }
     } catch (error) {

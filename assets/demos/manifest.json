@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "files": [
+    {
+      "demo": "corep",
+      "kind": "catalog",
+      "file": "demo-corep-catalog.xlsx",
+      "sha256": "2a82a8ffa8d31b545d364b2832cc36b8bae19a6c9522257e9d9af6068c1a8753",
+      "size": 5457
+    },
+    {
+      "demo": "types",
+      "kind": "catalog",
+      "file": "demo-types-catalog.xlsx",
+      "sha256": "5ea0cf35ddd06f7da5b2fc6d2f009e111f0454217778702e0b5f834ded3afd9d",
+      "size": 4165
+    },
+    {
+      "demo": "corep",
+      "kind": "report",
+      "file": "demo-corep-report.xlsx",
+      "sha256": "f4b8a6ae0cd0bd93078682d6c58820f04c517a9a0ee236c4804f3f9ba48461ab",
+      "size": 71618
+    },
+    {
+      "demo": "types",
+      "kind": "report",
+      "file": "demo-types-report.xlsx",
+      "sha256": "7b7fcdc4a3e73b94facd18910b9d55bccf5ba6273b036ab5e0d8596b2f09bb82",
+      "size": 3274
+    }
+  ]
+}

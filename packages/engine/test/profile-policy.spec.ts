@@ -104,9 +104,9 @@ describe('versioned language profiles and closed recalculation policy', () => {
     expect(engine.resolveDirection(inequality, inequality.content.directions[0]!).resolved).toBeUndefined();
   });
 
-  it('fails closed for unresolved references, pending conditional syntax and exhausted policy budgets', () => {
+  it('fails closed for unresolved references, unsupported functions and exhausted policy budgets', () => {
     const base = profile(configured()), variant = base.content.catalog.variants[0]!;
-    for (const expression of ['{tT,r9999,c0010}=1', 'if true then true else false endif']) {
+    for (const expression of ['{tT,r9999,c0010}=1', 'abs(1)=1']) {
       const unsupported = { ...base, content: { ...base.content, catalog: { ...base.content.catalog, variants: [{ ...variant, expression }] } } };
       expect(policy(unsupported).policy.mode).toBe('undetermined');
       expect(() => engine.simulate(unsupported, { previewId, now: () => 0 })).toThrow(expect.objectContaining({ code: 'INVALID_DIRECTION' }));

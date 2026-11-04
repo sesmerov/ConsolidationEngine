@@ -30,6 +30,7 @@ export function valueToDTO(value: ScalarValue): ValidationValueDTO {
   switch (value.kind) {
     case 'number': return { kind: 'number', nominal: rationalToDTO(value.nominal), interval: { lo: rationalToDTO(value.lo), hi: rationalToDTO(value.hi) }, unit: formatUnit(value.unit), ...provenance };
     case 'boolean': return { kind: 'boolean', value: value.value, ...provenance };
+    case 'text': case 'date': return { kind: value.kind, value: value.value, ...provenance };
     case 'null': return { kind: 'null', presence: value.origin === 'explicit' ? 'explicit_null' : value.origin === 'implicit' ? 'implicit_null' : 'derived_null', dataType: value.dataType,
       ...(value.dataType === 'number' ? { unit: formatUnit(value.unit) } : {}), ...provenance };
     case 'unknown': return { kind: 'unknown', presence: 'unknown' };
@@ -47,7 +48,8 @@ function hasReference(node: Expression): boolean {
     case 'unary': return hasReference(node.operand);
     case 'binary': return hasReference(node.left) || hasReference(node.right);
     case 'call': return node.arguments.some(hasReference);
-    default: return false;
+    case 'if': return hasReference(node.condition) || hasReference(node.then) || !!node.else && hasReference(node.else);
+    case 'number': case 'boolean': case 'text': case 'date': case 'filing_indicator': return false;
   }
 }
 function rawText(record: RawRuleRecord, field: string): string {
@@ -65,6 +67,7 @@ export function runValidation(snapshot: Snapshot, options: RunValidationOptions)
   const parseProblem = (result: ParseRuleResult): ValidationStatus | undefined => result.syntaxStatus === 'error' ? 'error' : result.supportStatus === 'unsupported' || !result.ast ? 'not_evaluable' : undefined;
   const counts: Record<ValidationStatus, number> = { pass: 0, fail: 0, not_applicable: 0, not_evaluable: 0, error: 0 };
   const valueStatus = (evaluation: EvaluationResult, precondition: boolean): ValidationStatus | undefined => {
+    if (evaluation.diagnostics.some(issue => issue.code === 'CONDITIONAL_NOT_EVALUABLE')) return 'not_evaluable';
     if (!evaluation.value) return 'error';
     if (evaluation.value.kind === 'null' || evaluation.value.kind === 'unknown') return 'not_evaluable';
     if (evaluation.value.kind !== 'boolean') return 'error';
@@ -92,7 +95,7 @@ export function runValidation(snapshot: Snapshot, options: RunValidationOptions)
       const facts = index.facts.get(key); return [...(coordinateByKey.has(key) ? [coordinateByKey.get(key)!.sourceLocator] : []), ...(facts ?? []).map(fact => fact.sourceLocator)];
     }), ...metadataReads.flatMap(item => item.sourceLocator ? [item.sourceLocator] : [])]);
     const issues = [...(extra.diagnostics ?? []), ...evaluations.flatMap(item => item.diagnostics)];
-    if (evaluations.some(item => item.value?.kind === 'number')) issues.push({ code: 'TYPE_MISMATCH', message: 'Validation and precondition results must be boolean or null', severity: 'error' });
+    if (evaluations.some(item => item.value && ['number', 'text', 'date'].includes(item.value.kind))) issues.push({ code: 'TYPE_MISMATCH', message: 'Validation and precondition results must be boolean or null', severity: 'error' });
     const variantIds = [...new Set(variants.map(item => item.variantId))].sort(ordinal);
     const body = extra.body;
     results.push({ id: stableId([options.runId, extra.instance?.instanceId ?? ['coverage', variantIds, context?.canonicalContextKey ?? null, extra.coverageKey ?? status]]),
@@ -161,7 +164,7 @@ export function runValidation(snapshot: Snapshot, options: RunValidationOptions)
       const multiple = scope && [scope.row, scope.column, scope.sheet].some(axis => axis && axis.kind !== 'single');
       let early: EvaluationResult | undefined; let earlyStatus: ValidationStatus | undefined;
       if (condition?.ast && (!hasReference(condition.ast.body) || !multiple)) {
-        early = evaluate(condition.ast, { report: content, binding, budget, ...(scope ? { scope } : {}) });
+        early = evaluate(condition.ast, { report: content, profileId: content.profileId, binding, budget, ...(scope ? { scope } : {}) });
         earlyStatus = valueStatus(early, true);
         // Keep finite structural identities for later snapshots where the condition can change.
         // A failed condition still precedes body syntax/support and never executes the body.
@@ -172,10 +175,10 @@ export function runValidation(snapshot: Snapshot, options: RunValidationOptions)
       const expanded = expandRuleInstances(body.ast!, content, { contextId: context.contextId, ruleKey: key, budget, ...(variant.crossModule ? { contextIds: compatibleIds } : {}) });
       if (!expanded.instances.length) append(variants, context, earlyStatus ?? 'not_evaluable', { diagnostics: expanded.diagnostics, ...(early ? { precondition: early } : {}) });
       for (const instance of expanded.instances) {
-        budget.check(); const precondition = early ?? (condition?.ast ? evaluate(condition.ast, { report: content, binding: instance.binding, budget, ...(scope ? { scope } : {}) }) : undefined);
+        budget.check(); const precondition = early ?? (condition?.ast ? evaluate(condition.ast, { report: content, profileId: content.profileId, binding: instance.binding, budget, ...(scope ? { scope } : {}) }) : undefined);
         const status = precondition ? valueStatus(precondition, true) : undefined;
         if (status && precondition) { append(variants, context, status, { instance, precondition }); continue; }
-        const evaluation = evaluate(body.ast!, { report: content, binding: instance.binding, budget });
+        const evaluation = evaluate(body.ast!, { report: content, profileId: content.profileId, binding: instance.binding, budget });
         append(variants, context, valueStatus(evaluation, false)!, { instance, body: evaluation, ...(precondition ? { precondition } : {}) });
       }
       options.progress?.(++completed, groups.size);

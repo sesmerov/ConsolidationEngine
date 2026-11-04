@@ -47,6 +47,13 @@ export class DirectionsStore {
   }
   clear(): void { if (this.editable()) { this.draft.set({}); this.error.set(null); } }
   target(cell: Coordinate | undefined): string { return cell ? `${cell.tableCode} · r${cell.rowCode} · c${cell.columnCode}${cell.sheetCode ? ' · s' + cell.sheetCode : ''}` : ''; }
+  policyReason(row: RuleResultDTO): string {
+    const policy = row.recalculation?.policy;
+    if (policy?.mode !== 'validation_only') return 'No se ha completado la clasificación de la regla. No se ofrece ningún destino.';
+    const labels = { CONDITIONAL: 'condicionales', TEXT: 'texto', DATE: 'fechas' } as const;
+    const reasons = policy.reasons.map(reason => labels[reason]);
+    return reasons.length ? `La regla usa ${reasons.join(', ')}. Se valida sin modificar datos.` : 'Esta regla sólo permite validaciones.';
+  }
   reason(row: RuleResultDTO, side: TargetSide): string {
     const eligibility = row.recalculation?.[side]; if (!eligibility) return 'No se recibió la comprobación de este lado.';
     const messages: Readonly<Record<string, string>> = { UNKNOWN_COORDINATE: 'La referencia no pertenece al catálogo de coordenadas.', AMBIGUOUS_REFERENCE: 'La referencia corresponde a más de una celda o contexto.',

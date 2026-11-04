@@ -15,6 +15,8 @@ export class ImportStore {
   readonly uploading = signal(false); readonly loading = signal(false); readonly error = signal<string | null>(null);
   readonly page = signal<RulesPageDTO | null>(null); readonly capabilities = signal<CapabilitiesDTO | null>(null);
   readonly code = signal(''); readonly status = signal('');
+  readonly selectedDemo = signal<'corep' | 'types'>('corep'); readonly demoDownloading = signal(false); readonly demoError = signal<string | null>(null);
+  private downloadGeneration = 0; private demoWorkspaceId: string | undefined;
   readonly legacy = signal(false); readonly contextSource = signal<'workbook' | 'form'>('workbook'); readonly contextForm = signal<ContextForm>(emptyContext());
   readonly inspection = signal<ImportInspectionDTO | null>(null); readonly inspectionPending = signal(false); readonly acceptedExcludedSheets = signal(false);
   readonly reviewDirty = signal(false); readonly locallyExpired = signal(false); readonly uncertainCommit = signal(false);
@@ -27,6 +29,7 @@ export class ImportStore {
   private commitJobId: string | undefined; private expiryTimer: ReturnType<typeof setTimeout> | undefined; private inputRevision = 0; private preparingRevision: number | undefined;
   private lastInput: { catalog: File | null; reports: readonly File[]; context: string; legacy: boolean } | undefined;
   constructor() {
+    effect(() => { const id = this.session.workspace()?.id; if (id !== this.demoWorkspaceId) { this.demoWorkspaceId = id; untracked(() => { this.downloadGeneration++; this.selectedDemo.set('corep'); this.demoDownloading.set(false); this.demoError.set(null); }); } });
     effect(() => { const version = this.session.versionId(); if (version) untracked(() => { void this.load(version); }); else { this.pageGeneration++; this.page.set(null); } });
     effect(() => { const id = this.session.workspace()?.id; if (id !== this.workspaceId) { const previous = this.workspaceId; this.workspaceId = id; untracked(() => { this.inspectionGeneration++; this.inspection.set(null); this.acceptedExcludedSheets.set(false); this.reviewDirty.set(false); this.locallyExpired.set(false); this.commitAttempt = undefined; this.commitJobId = undefined; this.uncertainCommit.set(false); this.observedJob = ''; this.preparingRevision = undefined; if (this.expiryTimer) clearTimeout(this.expiryTimer); if (previous) { this.controller?.abort(); this.catalog.set(null); this.reports.set([]); this.contextSource.set('workbook'); this.contextForm.set(emptyContext()); this.legacy.set(false); this.inspectionPending.set(false); this.uploading.set(false); this.inputRevision++; this.lastInput = this.captureInput(); } if (id) void this.recoverInspection(); }); } });
     effect(() => { const input = this.captureInput(); untracked(() => { const previous = this.lastInput; this.lastInput = input; if (previous && (previous.catalog !== input.catalog || previous.reports !== input.reports || previous.context !== input.context || previous.legacy !== input.legacy)) { this.inputRevision++; this.acceptedExcludedSheets.set(false); if (this.liveInspection()) this.reviewDirty.set(true); } }); });
@@ -38,6 +41,17 @@ export class ImportStore {
     void this.api.capabilities().then((value) => this.capabilities.set(value)).catch((error: unknown) => this.report(error));
   }
   setContextSource(source: 'workbook' | 'form'): void { this.contextSource.set(source); }
+  selectDemo(kind: string): void { if (kind === 'corep' || kind === 'types') this.selectedDemo.set(kind); }
+  async downloadVisualDemo(artifact: 'catalog' | 'report'): Promise<void> {
+    const workspaceId = this.session.workspace()?.id, kind = this.selectedDemo(); if (!workspaceId || this.demoDownloading()) return;
+    const generation = ++this.downloadGeneration; this.demoDownloading.set(true); this.demoError.set(null);
+    try {
+      const blob = await this.api.visualDemo(kind, artifact); if (!this.alive || generation !== this.downloadGeneration || workspaceId !== this.session.workspace()?.id) return;
+      const url = URL.createObjectURL(blob), anchor = document.createElement('a'); anchor.href = url; anchor.download = `demo-${kind}-${artifact}.xlsx`;
+      try { anchor.click(); } finally { setTimeout(() => URL.revokeObjectURL(url), 0); }
+    } catch { if (this.alive && generation === this.downloadGeneration && workspaceId === this.session.workspace()?.id) this.demoError.set('No se pudo descargar el archivo de la demostración. Puedes volver a intentarlo.'); }
+    finally { if (this.alive && generation === this.downloadGeneration) this.demoDownloading.set(false); }
+  }
   updateContext(field: keyof ContextForm, value: string): void { this.contextForm.update(form => ({ ...form, [field]: value })); }
   private captureInput() { return { catalog: this.catalog(), reports: this.reports(), context: JSON.stringify([this.contextSource(), this.contextForm()]), legacy: this.legacy() }; }
   private validateContext(): string | null {

@@ -1,8 +1,9 @@
-import type { DirectionChoiceDTO, DirectionDTO, DirectionEligibilityDTO, RuleResultDTO, Snapshot, ValidationBundle } from '@ce/contracts';
-import { assertRecalculationConfiguration, ProfileError, RecalculationConfigurationError, resolveDirection, WorkBudget, WorkLimitError } from '@ce/engine';
+import { LANGUAGE_PROFILE_V2 } from '@ce/contracts';
+import type { DirectionChoiceDTO, DirectionDTO, DirectionEligibilityDTO, ProposalDTO, RuleResultDTO, Snapshot, ValidationBundle } from '@ce/contracts';
+import { assertRecalculationConfiguration, getRecalculationPolicy, ProfileError, RecalculationConfigurationError, resolveDirection, WorkBudget, WorkLimitError } from '@ce/engine';
 import type { WorkLimits } from '@ce/engine';
 import { ApiError } from '../errors.js';
-import { canonicalHash } from '../session/canonical-state.js';
+import { canonicalHash, canonicalStringify } from '../session/canonical-state.js';
 import type { WorkspaceStore } from '../session/workspace-store.js';
 
 /** Public and final-publication guard; the worker repeats this against its private input. */
@@ -15,6 +16,26 @@ export function assertDirectionsAllowed(snapshot: Snapshot, limits?: Partial<Wor
     if (error instanceof WorkLimitError) throw new ApiError('INVALID_DIRECTION', { reason: error.code });
     throw error;
   }
+}
+
+/** Stored proposal metadata is checked independently of the configured direction it claims to represent. */
+export function assertSelectedProposalsAllowed(snapshot: Snapshot, proposals: readonly ProposalDTO[], limits?: Partial<WorkLimits>): void {
+  const budget = new WorkBudget({ ...(limits ? { limits } : {}) }), directions = new Map(snapshot.content.directions.map(direction => [direction.id, direction]));
+  const variants = new Map(snapshot.content.catalog.variants.map(variant => [variant.variantId, variant]));
+  try {
+    for (const proposal of proposals) {
+      budget.check();
+      if (snapshot.content.profileId === LANGUAGE_PROFILE_V2) {
+        const result = getRecalculationPolicy(snapshot, proposal, { budget });
+        if (result.policy.mode !== 'standard') throw new ApiError('INVALID_DIRECTION', { reason: result.diagnostics[0]?.code ?? 'INVALID_DIRECTION', diagnostics: result.diagnostics.map(issue => ({ code: issue.code, message: issue.message })) });
+      }
+      const direction = directions.get(proposal.directionId), codes = new Set(direction?.variantIds.map(id => variants.get(id)?.code));
+      if (!direction || proposal.instanceId !== direction.instanceId || proposal.targetKey !== direction.targetKey
+        || canonicalStringify([...proposal.variantIds].sort()) !== canonicalStringify([...direction.variantIds].sort())
+        || canonicalStringify(proposal.binding) !== canonicalStringify(direction.binding)
+        || proposal.code !== (codes.size === 1 ? [...codes][0] : '')) throw new ApiError('PREVIEW_NOT_APPLICABLE');
+    }
+  } catch (error) { if (error instanceof WorkLimitError) throw new ApiError('INVALID_DIRECTION', { reason: error.code }); throw error; }
 }
 
 export function directionEligibility(snapshot: Snapshot, result: RuleResultDTO, targetSide: 'left' | 'right', budget: WorkBudget): DirectionEligibilityDTO {

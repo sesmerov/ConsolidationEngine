@@ -10,12 +10,13 @@ export function collectExpressionReads(expression: Expression, context: { report
   function visit(node: Expression, scope: Selection | undefined, depth: number): void {
     context.budget?.check(); if (depth > PARSER_LIMITS.depth) throw new WorkLimitError('RESOURCE_LIMIT', 'AST dependency depth exceeded');
     switch (node.kind) {
-      case 'number': case 'boolean': return;
+      case 'number': case 'boolean': case 'text': case 'date': return;
       case 'group': visit(node.expression, scope, depth + 1); return;
       case 'with': visit(node.body, bindScope(mergeScope(node.scope, scope), context.binding), depth + 1); return;
       case 'unary': visit(node.operand, scope, depth + 1); return;
       case 'binary': visit(node.left, scope, depth + 1); visit(node.right, scope, depth + 1); return;
       case 'call': for (const argument of node.arguments) visit(argument, scope, depth + 1); return;
+      case 'if': visit(node.condition, scope, depth + 1); visit(node.then, scope, depth + 1); if (node.else) visit(node.else, scope, depth + 1); return;
       case 'reference': {
         const selected = resolveSelection(node.selection, scope, context.report, context.binding, context.budget); diagnostics.push(...selected.diagnostics);
         for (const cell of selected.coordinates) { context.budget?.consume('reads'); readKeys.add(cell.factKey); } return;

@@ -113,7 +113,7 @@ export function parseRule(text: string, options: { readonly profileId?: string }
     const tree = parser.start();
     if (diagnostics.length) return { syntaxStatus: 'error', supportStatus: 'unsupported', diagnostics };
     syntaxValidated = true;
-    const ast = new AstVisitor(text).visitStart(tree as unknown as AntlrContext);
+    const ast = new AstVisitor(text, options.profileId ?? LANGUAGE_PROFILE_V1).visitStart(tree as unknown as AntlrContext);
     return { syntaxStatus: 'valid', supportStatus: 'supported', diagnostics: [], ast };
   } catch (error) {
     if (!(error instanceof AstBuildError)) throw error;

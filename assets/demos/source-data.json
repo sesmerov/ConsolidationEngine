@@ -1,0 +1,935 @@
+{
+  "version": 1,
+  "sourceSha256": "36636afe42b2ef2247822a31ad710afe1128b5b65a250b657e1f20d5a75bba79",
+  "sourceName": "(from 4.0) EBA_Validation_rules_2025-12-12.xlsx",
+  "corep": {
+    "context": {
+      "contextId": "demo",
+      "entityId": "SYNTHETIC",
+      "referenceDate": "2025-12-31",
+      "submissionDate": "2025-12-31",
+      "framework": "COREP",
+      "moduleVersion": "COREP_OF_4.0",
+      "filingIndicators": {
+        "C_01.00": true
+      },
+      "unit": "EUR",
+      "decimals": "2",
+      "scale": 0
+    },
+    "inputs": [
+      {
+        "rowCode": "0010",
+        "valueCell": "E5",
+        "value": null
+      },
+      {
+        "rowCode": "0015",
+        "valueCell": "E6",
+        "value": null
+      },
+      {
+        "rowCode": "0020",
+        "valueCell": "E7",
+        "value": "1000"
+      },
+      {
+        "rowCode": "0030",
+        "valueCell": "E8",
+        "value": "100"
+      },
+      {
+        "rowCode": "0040",
+        "valueCell": "E9",
+        "value": "100"
+      },
+      {
+        "rowCode": "0045",
+        "valueCell": "E10",
+        "value": null
+      },
+      {
+        "rowCode": "0050",
+        "valueCell": "E11",
+        "value": null
+      },
+      {
+        "rowCode": "0060",
+        "valueCell": "E12",
+        "value": "20"
+      },
+      {
+        "rowCode": "0070",
+        "valueCell": "E13",
+        "value": "5"
+      },
+      {
+        "rowCode": "0080",
+        "valueCell": "E14",
+        "value": "10"
+      },
+      {
+        "rowCode": "0090",
+        "valueCell": "E15",
+        "value": "20"
+      },
+      {
+        "rowCode": "0091",
+        "valueCell": "E16",
+        "value": "30"
+      },
+      {
+        "rowCode": "0092",
+        "valueCell": "E17",
+        "value": "5"
+      },
+      {
+        "rowCode": "0130",
+        "valueCell": "E18",
+        "value": "20"
+      },
+      {
+        "rowCode": "0140",
+        "valueCell": "E19",
+        "value": "50"
+      },
+      {
+        "rowCode": "0150",
+        "valueCell": "E20",
+        "value": "10"
+      },
+      {
+        "rowCode": "0160",
+        "valueCell": "E21",
+        "value": "20"
+      },
+      {
+        "rowCode": "0170",
+        "valueCell": "E22",
+        "value": "30"
+      },
+      {
+        "rowCode": "0180",
+        "valueCell": "E23",
+        "value": null
+      },
+      {
+        "rowCode": "0200",
+        "valueCell": "E24",
+        "value": "0"
+      },
+      {
+        "rowCode": "0210",
+        "valueCell": "E25",
+        "value": null
+      },
+      {
+        "rowCode": "0220",
+        "valueCell": "E26",
+        "value": null
+      },
+      {
+        "rowCode": "0230",
+        "valueCell": "E27",
+        "value": null
+      },
+      {
+        "rowCode": "0240",
+        "valueCell": "E28",
+        "value": null
+      },
+      {
+        "rowCode": "0250",
+        "valueCell": "E29",
+        "value": null
+      },
+      {
+        "rowCode": "0260",
+        "valueCell": "E30",
+        "value": null
+      },
+      {
+        "rowCode": "0270",
+        "valueCell": "E31",
+        "value": null
+      },
+      {
+        "rowCode": "0280",
+        "valueCell": "E32",
+        "value": null
+      },
+      {
+        "rowCode": "0285",
+        "valueCell": "E33",
+        "value": null
+      },
+      {
+        "rowCode": "0290",
+        "valueCell": "E34",
+        "value": null
+      },
+      {
+        "rowCode": "0300",
+        "valueCell": "E35",
+        "value": null
+      },
+      {
+        "rowCode": "0310",
+        "valueCell": "E36",
+        "value": null
+      },
+      {
+        "rowCode": "0320",
+        "valueCell": "E37",
+        "value": null
+      },
+      {
+        "rowCode": "0330",
+        "valueCell": "E38",
+        "value": null
+      },
+      {
+        "rowCode": "0335",
+        "valueCell": "E39",
+        "value": null
+      },
+      {
+        "rowCode": "0340",
+        "valueCell": "E40",
+        "value": null
+      },
+      {
+        "rowCode": "0350",
+        "valueCell": "E41",
+        "value": null
+      },
+      {
+        "rowCode": "0352",
+        "valueCell": "E42",
+        "value": null
+      },
+      {
+        "rowCode": "0360",
+        "valueCell": "E43",
+        "value": null
+      },
+      {
+        "rowCode": "0362",
+        "valueCell": "E44",
+        "value": null
+      },
+      {
+        "rowCode": "0365",
+        "valueCell": "E45",
+        "value": null
+      },
+      {
+        "rowCode": "0370",
+        "valueCell": "E46",
+        "value": null
+      },
+      {
+        "rowCode": "0380",
+        "valueCell": "E47",
+        "value": null
+      },
+      {
+        "rowCode": "0390",
+        "valueCell": "E48",
+        "value": null
+      },
+      {
+        "rowCode": "0400",
+        "valueCell": "E49",
+        "value": null
+      },
+      {
+        "rowCode": "0410",
+        "valueCell": "E50",
+        "value": null
+      },
+      {
+        "rowCode": "0420",
+        "valueCell": "E51",
+        "value": null
+      },
+      {
+        "rowCode": "0430",
+        "valueCell": "E52",
+        "value": null
+      },
+      {
+        "rowCode": "0440",
+        "valueCell": "E53",
+        "value": null
+      },
+      {
+        "rowCode": "0450",
+        "valueCell": "E54",
+        "value": null
+      },
+      {
+        "rowCode": "0460",
+        "valueCell": "E55",
+        "value": null
+      },
+      {
+        "rowCode": "0470",
+        "valueCell": "E56",
+        "value": null
+      },
+      {
+        "rowCode": "0471",
+        "valueCell": "E57",
+        "value": null
+      },
+      {
+        "rowCode": "0472",
+        "valueCell": "E58",
+        "value": null
+      },
+      {
+        "rowCode": "0480",
+        "valueCell": "E59",
+        "value": null
+      },
+      {
+        "rowCode": "0490",
+        "valueCell": "E60",
+        "value": null
+      },
+      {
+        "rowCode": "0500",
+        "valueCell": "E61",
+        "value": null
+      },
+      {
+        "rowCode": "0510",
+        "valueCell": "E62",
+        "value": null
+      },
+      {
+        "rowCode": "0511",
+        "valueCell": "E63",
+        "value": null
+      },
+      {
+        "rowCode": "0512",
+        "valueCell": "E64",
+        "value": null
+      },
+      {
+        "rowCode": "0513",
+        "valueCell": "E65",
+        "value": null
+      },
+      {
+        "rowCode": "0514",
+        "valueCell": "E66",
+        "value": null
+      },
+      {
+        "rowCode": "0515",
+        "valueCell": "E67",
+        "value": null
+      },
+      {
+        "rowCode": "0520",
+        "valueCell": "E68",
+        "value": null
+      },
+      {
+        "rowCode": "0524",
+        "valueCell": "E69",
+        "value": null
+      },
+      {
+        "rowCode": "0529",
+        "valueCell": "E70",
+        "value": null
+      },
+      {
+        "rowCode": "0530",
+        "valueCell": "E71",
+        "value": null
+      },
+      {
+        "rowCode": "0540",
+        "valueCell": "E72",
+        "value": null
+      },
+      {
+        "rowCode": "0551",
+        "valueCell": "E73",
+        "value": null
+      },
+      {
+        "rowCode": "0560",
+        "valueCell": "E74",
+        "value": null
+      },
+      {
+        "rowCode": "0571",
+        "valueCell": "E75",
+        "value": null
+      },
+      {
+        "rowCode": "0580",
+        "valueCell": "E76",
+        "value": null
+      },
+      {
+        "rowCode": "0590",
+        "valueCell": "E77",
+        "value": null
+      },
+      {
+        "rowCode": "0620",
+        "valueCell": "E78",
+        "value": null
+      },
+      {
+        "rowCode": "0621",
+        "valueCell": "E79",
+        "value": null
+      },
+      {
+        "rowCode": "0622",
+        "valueCell": "E80",
+        "value": null
+      },
+      {
+        "rowCode": "0660",
+        "valueCell": "E81",
+        "value": null
+      },
+      {
+        "rowCode": "0670",
+        "valueCell": "E82",
+        "value": null
+      },
+      {
+        "rowCode": "0680",
+        "valueCell": "E83",
+        "value": null
+      },
+      {
+        "rowCode": "0690",
+        "valueCell": "E84",
+        "value": null
+      },
+      {
+        "rowCode": "0700",
+        "valueCell": "E85",
+        "value": null
+      },
+      {
+        "rowCode": "0710",
+        "valueCell": "E86",
+        "value": null
+      },
+      {
+        "rowCode": "0720",
+        "valueCell": "E87",
+        "value": null
+      },
+      {
+        "rowCode": "0730",
+        "valueCell": "E88",
+        "value": null
+      },
+      {
+        "rowCode": "0740",
+        "valueCell": "E89",
+        "value": null
+      },
+      {
+        "rowCode": "0744",
+        "valueCell": "E90",
+        "value": null
+      },
+      {
+        "rowCode": "0748",
+        "valueCell": "E91",
+        "value": null
+      },
+      {
+        "rowCode": "0750",
+        "valueCell": "E92",
+        "value": null
+      },
+      {
+        "rowCode": "0760",
+        "valueCell": "E93",
+        "value": null
+      },
+      {
+        "rowCode": "0771",
+        "valueCell": "E94",
+        "value": null
+      },
+      {
+        "rowCode": "0780",
+        "valueCell": "E95",
+        "value": null
+      },
+      {
+        "rowCode": "0791",
+        "valueCell": "E96",
+        "value": null
+      },
+      {
+        "rowCode": "0800",
+        "valueCell": "E97",
+        "value": null
+      },
+      {
+        "rowCode": "0810",
+        "valueCell": "E98",
+        "value": null
+      },
+      {
+        "rowCode": "0840",
+        "valueCell": "E99",
+        "value": null
+      },
+      {
+        "rowCode": "0841",
+        "valueCell": "E100",
+        "value": null
+      },
+      {
+        "rowCode": "0842",
+        "valueCell": "E101",
+        "value": null
+      },
+      {
+        "rowCode": "0880",
+        "valueCell": "E102",
+        "value": null
+      },
+      {
+        "rowCode": "0890",
+        "valueCell": "E103",
+        "value": null
+      },
+      {
+        "rowCode": "0900",
+        "valueCell": "E104",
+        "value": null
+      },
+      {
+        "rowCode": "0910",
+        "valueCell": "E105",
+        "value": null
+      },
+      {
+        "rowCode": "0920",
+        "valueCell": "E106",
+        "value": null
+      },
+      {
+        "rowCode": "0930",
+        "valueCell": "E107",
+        "value": null
+      },
+      {
+        "rowCode": "0940",
+        "valueCell": "E108",
+        "value": null
+      },
+      {
+        "rowCode": "0950",
+        "valueCell": "E109",
+        "value": null
+      },
+      {
+        "rowCode": "0955",
+        "valueCell": "E110",
+        "value": null
+      },
+      {
+        "rowCode": "0960",
+        "valueCell": "E111",
+        "value": null
+      },
+      {
+        "rowCode": "0970",
+        "valueCell": "E112",
+        "value": null
+      },
+      {
+        "rowCode": "0974",
+        "valueCell": "E113",
+        "value": null
+      },
+      {
+        "rowCode": "0978",
+        "valueCell": "E114",
+        "value": null
+      }
+    ],
+    "rules": [
+      {
+        "code": "v0172_m",
+        "origin": "official_catalog",
+        "family": "numeric_equality_interval_default",
+        "expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0020} = {r0030} + {r0130} + {r0180} + {r0200} + {r0210} + {r0220} + {r0230} + {r0240} + {r0250} + {r0300} + {r0340} + {r0370} + {r0380} + {r0390} + {r0430} + {r0440} + {r0450} + {r0460} + {r0470} + {r0471} + {r0472} + {r0480} + {r0490} + {r0500} + {r0510} + {r0513} + {r0514} + {r0515} + {r0520} + {r0524} + {r0529}",
+        "precondition": "{v_C_01.00} ",
+        "source": {
+          "sourceName": "(from 4.0) EBA_Validation_rules_2025-12-12.xlsx",
+          "sourceSha256": "36636afe42b2ef2247822a31ad710afe1128b5b65a250b657e1f20d5a75bba79",
+          "sourceSheet": "EBA_Validation_rules_2025-12-12",
+          "row": 135,
+          "fields": {
+            "VR Code": "v0172_m",
+            "Source": "user_defined",
+            "Framework": "COREP",
+            "Modules": "COREP_OF_4.0",
+            "Cross module": "No",
+            "Tables": "C_01.00",
+            "Expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0020} = {r0030} + {r0130} + {r0180} + {r0200} + {r0210} + {r0220} + {r0230} + {r0240} + {r0250} + {r0300} + {r0340} + {r0370} + {r0380} + {r0390} + {r0430} + {r0440} + {r0450} + {r0460} + {r0470} + {r0471} + {r0472} + {r0480} + {r0490} + {r0500} + {r0510} + {r0513} + {r0514} + {r0515} + {r0520} + {r0524} + {r0529}",
+            "Precondtion": "{v_C_01.00} ",
+            "Description": "{r0020} = {r0030} + {r0130} + {r0180} + {r0200} + {r0210} + {r0220} + {r0230} + {r0240} + {r0250} + {r0300} + {r0340} + {r0370} + {r0380} + {r0390} + {r0430} + {r0440} + {r0450} + {r0460} + {r0470} + {r0471} + {r0472} + {r0480} + {r0490} + {r0500} + {r0510} + {r0513} + {r0514} + {r0515} + {r0520} + {r0524} + {r0529}",
+            "IsActive": "Active",
+            "FromReferenceDate": "2025-03-31",
+            "ToReferenceDate": "2026-03-30",
+            "Severity": "warning",
+            "FromSubmissionDate": "2025-03-31",
+            "Implemented in XBRL": "Yes"
+          }
+        }
+      },
+      {
+        "code": "v0173_m",
+        "origin": "official_catalog",
+        "family": "numeric_equality_interval_default",
+        "expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0030} = {r0040} + {r0060} + {r0070} + {r0092}",
+        "precondition": "{v_C_01.00} ",
+        "source": {
+          "sourceName": "(from 4.0) EBA_Validation_rules_2025-12-12.xlsx",
+          "sourceSha256": "36636afe42b2ef2247822a31ad710afe1128b5b65a250b657e1f20d5a75bba79",
+          "sourceSheet": "EBA_Validation_rules_2025-12-12",
+          "row": 138,
+          "fields": {
+            "VR Code": "v0173_m",
+            "Source": "user_defined",
+            "Framework": "COREP",
+            "Modules": "COREP_OF_4.0",
+            "Cross module": "No",
+            "Tables": "C_01.00",
+            "Expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0030} = {r0040} + {r0060} + {r0070} + {r0092}",
+            "Precondtion": "{v_C_01.00} ",
+            "Description": "{r0030, c0010} = {r0040, c0010} + {r0060, c0010} + {r0070, c0010} + {r0092, c0010}",
+            "IsActive": "Active",
+            "FromReferenceDate": "2025-03-31",
+            "ToReferenceDate": "2026-03-30",
+            "Severity": "Error",
+            "FromSubmissionDate": "2025-03-31",
+            "Implemented in XBRL": "Yes"
+          }
+        }
+      },
+      {
+        "code": "v0174_m",
+        "origin": "official_catalog",
+        "family": "numeric_equality_interval_default",
+        "expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0070} = {r0080} + {r0090} + {r0091}",
+        "precondition": "{v_C_01.00} ",
+        "source": {
+          "sourceName": "(from 4.0) EBA_Validation_rules_2025-12-12.xlsx",
+          "sourceSha256": "36636afe42b2ef2247822a31ad710afe1128b5b65a250b657e1f20d5a75bba79",
+          "sourceSheet": "EBA_Validation_rules_2025-12-12",
+          "row": 139,
+          "fields": {
+            "VR Code": "v0174_m",
+            "Source": "user_defined",
+            "Framework": "COREP",
+            "Modules": "COREP_OF_4.0",
+            "Cross module": "No",
+            "Tables": "C_01.00",
+            "Expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0070} = {r0080} + {r0090} + {r0091}",
+            "Precondtion": "{v_C_01.00} ",
+            "Description": "{r0070, c0010} = {r0080, c0010} + {r0090, c0010} + {r0091, c0010}",
+            "IsActive": "Active",
+            "FromReferenceDate": "2025-03-31",
+            "ToReferenceDate": "2026-03-30",
+            "Severity": "Error",
+            "FromSubmissionDate": "2025-03-31",
+            "Implemented in XBRL": "Yes"
+          }
+        }
+      },
+      {
+        "code": "v0175_m",
+        "origin": "official_catalog",
+        "family": "numeric_equality_interval_default",
+        "expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0130} = {r0140} + {r0150}",
+        "precondition": "{v_C_01.00} ",
+        "source": {
+          "sourceName": "(from 4.0) EBA_Validation_rules_2025-12-12.xlsx",
+          "sourceSha256": "36636afe42b2ef2247822a31ad710afe1128b5b65a250b657e1f20d5a75bba79",
+          "sourceSheet": "EBA_Validation_rules_2025-12-12",
+          "row": 142,
+          "fields": {
+            "VR Code": "v0175_m",
+            "Source": "user_defined",
+            "Framework": "COREP",
+            "Modules": "COREP_OF_4.0",
+            "Cross module": "No",
+            "Tables": "C_01.00",
+            "Expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0130} = {r0140} + {r0150}",
+            "Precondtion": "{v_C_01.00} ",
+            "Description": "{r0130, c0010} = {r0140, c0010} + {r0150, c0010}",
+            "IsActive": "Active",
+            "FromReferenceDate": "2025-03-31",
+            "ToReferenceDate": "2026-03-30",
+            "Severity": "Error",
+            "FromSubmissionDate": "2025-03-31",
+            "Implemented in XBRL": "Yes"
+          }
+        }
+      },
+      {
+        "code": "v0176_m",
+        "origin": "official_catalog",
+        "family": "numeric_equality_interval_default",
+        "expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0150} = {r0160} + {r0170}",
+        "precondition": "{v_C_01.00} ",
+        "source": {
+          "sourceName": "(from 4.0) EBA_Validation_rules_2025-12-12.xlsx",
+          "sourceSha256": "36636afe42b2ef2247822a31ad710afe1128b5b65a250b657e1f20d5a75bba79",
+          "sourceSheet": "EBA_Validation_rules_2025-12-12",
+          "row": 143,
+          "fields": {
+            "VR Code": "v0176_m",
+            "Source": "user_defined",
+            "Framework": "COREP",
+            "Modules": "COREP_OF_4.0",
+            "Cross module": "No",
+            "Tables": "C_01.00",
+            "Expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0150} = {r0160} + {r0170}",
+            "Precondtion": "{v_C_01.00} ",
+            "Description": "{r0150, c0010} = {r0160, c0010} + {r0170, c0010}",
+            "IsActive": "Active",
+            "FromReferenceDate": "2025-03-31",
+            "ToReferenceDate": "2026-03-30",
+            "Severity": "Error",
+            "FromSubmissionDate": "2025-03-31",
+            "Implemented in XBRL": "Yes"
+          }
+        }
+      },
+      {
+        "code": "DEMO_GT",
+        "origin": "synthetic",
+        "family": "strict_inequality",
+        "expression": "with {tC_01.00,c0010,interval:false}: {r0040}>0",
+        "precondition": null,
+        "source": null,
+        "description": "El capital desembolsado es mayor que cero"
+      },
+      {
+        "code": "DEMO_LT_FAIL",
+        "origin": "synthetic",
+        "family": "strict_inequality",
+        "expression": "with {tC_01.00,c0010,interval:false}: {r0040}<0",
+        "precondition": null,
+        "source": null,
+        "description": "El capital desembolsado debe ser negativo: fallo intencionado de la demo"
+      },
+      {
+        "code": "DEMO_LE",
+        "origin": "synthetic",
+        "family": "inclusive_inequality",
+        "expression": "with {tC_01.00,c0010,interval:false}: {r0030}<=200",
+        "precondition": null,
+        "source": null,
+        "description": "El capital admisible no supera 200 EUR"
+      },
+      {
+        "code": "DEMO_NE",
+        "origin": "synthetic",
+        "family": "inequality",
+        "expression": "with {tC_01.00,c0010,interval:false}: {r0140}!=0",
+        "precondition": null,
+        "source": null,
+        "description": "Las reservas por primas de emisión son distintas de cero"
+      },
+      {
+        "code": "DEMO_NULL",
+        "origin": "synthetic",
+        "family": "implicit_null",
+        "expression": "with {tC_01.00,c0010,interval:false}: isnull({r0180})",
+        "precondition": null,
+        "source": null,
+        "description": "La posición de la fila 0180 no contiene un dato informado"
+      },
+      {
+        "code": "DEMO_ZERO",
+        "origin": "synthetic",
+        "family": "reported_zero",
+        "expression": "with {tC_01.00,c0010,interval:false}: {r0200}=0",
+        "precondition": null,
+        "source": null,
+        "description": "La fila 0200 contiene un cero informado"
+      },
+      {
+        "code": "DEMO_RANGE",
+        "origin": "synthetic",
+        "family": "aggregate_range",
+        "expression": "with {tC_01.00,c0010,interval:false}: sum({r0080-0091})={r0070}",
+        "precondition": null,
+        "source": null,
+        "description": "La suma de las filas 0080 a 0091 coincide con el total de la fila 0070"
+      },
+      {
+        "code": "DEMO_PRECONDITION",
+        "origin": "synthetic",
+        "family": "numeric_precondition_false",
+        "expression": "with {tC_01.00,c0010,interval:false}: {r0070}=999",
+        "precondition": "with {tC_01.00,c0010,interval:false}: {r0040}<0",
+        "source": null,
+        "description": "La comprobación no se aplica porque no se cumple la condición previa"
+      },
+      {
+        "code": "DEMO_IF_THEN",
+        "origin": "synthetic",
+        "family": "conditional_true_branch",
+        "expression": "with {tC_01.00,c0010,interval:false}: if {r0040}>0 then {r0070}={r0080}+{r0090}+{r0091} else false endif",
+        "precondition": null,
+        "source": null,
+        "description": "Si el capital desembolsado es positivo, el total coincide con la suma de sus tres componentes"
+      },
+      {
+        "code": "DEMO_IF_ELSE",
+        "origin": "synthetic",
+        "family": "conditional_false_branch_lazy",
+        "expression": "with {tC_01.00,c0010,interval:false}: if {r0040}<0 then 1/0=0 else {r0040}>=0 endif",
+        "precondition": null,
+        "source": null,
+        "description": "Con capital no negativo se comprueba la rama alternativa; la división por cero no se ejecuta"
+      },
+      {
+        "code": "DEMO_INTERVAL",
+        "origin": "synthetic",
+        "family": "point_vs_precision_interval",
+        "expression": "with {tC_01.00,c0010,interval:true}: {r0200}=0.004",
+        "precondition": null,
+        "source": null,
+        "description": "El cero informado con dos decimales es compatible con 0,004 al considerar su precisión"
+      }
+    ]
+  },
+  "typed": {
+    "context": {
+      "contextId": "demo_types",
+      "entityId": "SYNTHETIC",
+      "referenceDate": "2025-12-31",
+      "submissionDate": "2025-12-31",
+      "framework": "DEMO",
+      "moduleVersion": "DEMO_TYPES_1",
+      "filingIndicators": {
+        "DEMO_TYPES": true
+      }
+    },
+    "fields": [
+      {
+        "rowCode": "0010",
+        "value": "Banco",
+        "state": "Informado"
+      },
+      {
+        "rowCode": "0020",
+        "value": "banco",
+        "state": "Informado"
+      },
+      {
+        "rowCode": "0030",
+        "value": "Banco ",
+        "state": "Informado"
+      },
+      {
+        "rowCode": "0040",
+        "value": "",
+        "state": "Informado"
+      },
+      {
+        "rowCode": "0050",
+        "value": "2024-02-29",
+        "state": "Informado"
+      },
+      {
+        "rowCode": "0060",
+        "value": "2025-12-31",
+        "state": "Informado"
+      }
+    ],
+    "rules": [
+      {
+        "code": "DEMO_TEXT_EQ",
+        "origin": "synthetic",
+        "family": "text_equality",
+        "expression": "with {tDEMO_TYPES,c0010}: {r0010}=\"Banco\"",
+        "precondition": null,
+        "description": "La categoría coincide exactamente con Banco"
+      },
+      {
+        "code": "DEMO_TEXT_CASE",
+        "origin": "synthetic",
+        "family": "text_case_sensitive",
+        "expression": "with {tDEMO_TYPES,c0010}: {r0010}={r0020}",
+        "precondition": null,
+        "description": "La comparación distingue mayúsculas y minúsculas: Banco y banco son diferentes"
+      },
+      {
+        "code": "DEMO_TEXT_SPACE",
+        "origin": "synthetic",
+        "family": "text_space_sensitive",
+        "expression": "with {tDEMO_TYPES,c0010}: {r0010}={r0030}",
+        "precondition": null,
+        "description": "La comparación conserva los espacios: Banco y Banco con un espacio final son diferentes"
+      },
+      {
+        "code": "DEMO_TEXT_EMPTY",
+        "origin": "synthetic",
+        "family": "empty_not_null",
+        "expression": "with {tDEMO_TYPES,c0010}: {r0040}=\"\"",
+        "precondition": null,
+        "description": "La observación es un texto vacío informado, distinto de un dato ausente"
+      },
+      {
+        "code": "DEMO_DATE_EQUAL",
+        "origin": "synthetic",
+        "family": "civil_date_leap_day",
+        "expression": "with {tDEMO_TYPES,c0010}: {r0050}=#2024-02-29#",
+        "precondition": null,
+        "description": "La fecha inicial coincide con el día bisiesto 29/02/2024"
+      },
+      {
+        "code": "DEMO_DATE_ORDER",
+        "origin": "synthetic",
+        "family": "civil_date_order",
+        "expression": "with {tDEMO_TYPES,c0010}: {r0050}<{r0060}",
+        "precondition": null,
+        "description": "La fecha inicial es anterior a la fecha final"
+      },
+      {
+        "code": "DEMO_IF_TEXT",
+        "origin": "synthetic",
+        "family": "text_condition_true",
+        "expression": "with {tDEMO_TYPES,c0010}: if {r0010}=\"Banco\" then {r0050}<={r0060} else false endif",
+        "precondition": null,
+        "description": "Si la categoría es Banco, la fecha inicial no puede ser posterior a la final"
+      },
+      {
+        "code": "DEMO_IF_DATE",
+        "origin": "synthetic",
+        "family": "date_condition_false_lazy",
+        "expression": "with {tDEMO_TYPES,c0010}: if {r0060}<#2025-01-01# then 1/0=0 else {r0010}!=\"Aseguradora\" endif",
+        "precondition": null,
+        "description": "Con fecha final de 2025, la categoría debe ser distinta de Aseguradora; la división por cero no se ejecuta"
+      }
+    ]
+  }
+}

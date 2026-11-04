@@ -5,10 +5,12 @@ import { fileURLToPath } from 'node:url';
 import { crc32, deflateRawSync } from 'node:zlib';
 import yauzl from 'yauzl';
 import sax from 'sax';
+import { typedWorkbook } from './lib/visual-xlsx.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const sourceManifest = JSON.parse(await readFile(path.join(root, 'tests/fixtures/eba/source-manifest.json'), 'utf8'));
 const mappingBytes = await readFile(path.join(root, 'apps/api/src/import/profiles/corep-ca1-mapping.json'));
+if (mappingBytes.includes(13) || mappingBytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))) throw new Error('Trusted mapping must use repository UTF-8/LF bytes without BOM');
 const mapping = JSON.parse(mappingBytes.toString('utf8'));
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main', REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
@@ -102,10 +104,16 @@ const parts = new Map([
 const output = deterministicZip(parts), directory = path.join(root, 'assets/templates'); await mkdir(directory, { recursive: true });
 await writeFile(path.join(directory, 'corep-ca1.xlsx'), output);
 const manifest = { version: 1, profiles: [{ profileId: mapping.profileId, languageProfileId: 'ce-dpmxl-0.9-closed-v2', mappingSha256: digest(mappingBytes), file: 'corep-ca1.xlsx', sha256: digest(output), size: output.length, selectedSheets: ['CA1'], sources: sourceManifest.sources }] };
+const typedMappingBytes = await readFile(path.join(root, 'apps/api/src/import/profiles/demo-types-mapping.json'));
+if (typedMappingBytes.includes(13) || typedMappingBytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))) throw new Error('Trusted mapping must use repository UTF-8/LF bytes without BOM');
+const typedMapping = JSON.parse(typedMappingBytes.toString('utf8')), typed = typedWorkbook(typedMapping);
+await writeFile(path.join(directory, 'demo-types.xlsx'), typed);
+manifest.profiles.push({ profileId: typedMapping.profileId, languageProfileId: typedMapping.languageProfileId, mappingSha256: digest(typedMappingBytes), file: 'demo-types.xlsx', sha256: digest(typed), size: typed.length, selectedSheets: ['Datos'], sources: [] });
 await writeFile(path.join(directory, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 if (process.argv.includes('--package')) {
   const profileDirectory = path.join(root, 'apps/api/dist/import/profiles'); await mkdir(profileDirectory, { recursive: true }); await copyFile(path.join(root, 'apps/api/src/import/profiles/corep-ca1-mapping.json'), path.join(profileDirectory, 'corep-ca1-mapping.json'));
+  await copyFile(path.join(root, 'apps/api/src/import/profiles/demo-types-mapping.json'), path.join(profileDirectory, 'demo-types-mapping.json'));
   const assetsDirectory = path.join(root, 'apps/api/dist/assets/templates'); await mkdir(assetsDirectory, { recursive: true });
-  for (const name of ['corep-ca1.xlsx', 'manifest.json']) await copyFile(path.join(directory, name), path.join(assetsDirectory, name));
+  for (const name of ['corep-ca1.xlsx', 'demo-types.xlsx', 'manifest.json']) await copyFile(path.join(directory, name), path.join(assetsDirectory, name));
 }
 process.stdout.write(`COREP CA1: ${output.length} bytes, SHA-256 ${digest(output)}\n`);

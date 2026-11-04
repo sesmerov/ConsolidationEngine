@@ -72,3 +72,4 @@ await writeFile(path.join(output, 'import-cases.json'), JSON.stringify({ synthet
 }, null, 2) + '\n');
 if (hash(await readFile(path.join(root, sourceName))) !== expected) throw new Error('Original changed during fixture creation.');
 console.log('Fixtures generated from 3 verified source rows; original SHA-256 unchanged.');
+await import('./create-visual-demos.mjs');
