@@ -1,17 +1,17 @@
 # ConsolidationEngine
 
-Aplicación local para validar informes regulatorios Excel con reglas EBA, explicar los resultados
-y proponer recálculos con dependencias. Angular presenta los datos; Node.js ejecuta el motor con
-ANTLR, aritmética exacta y ordenamiento topológico de Kahn. Los cambios requieren elegir destinos,
-revisar propuestas y confirmarlos; la aplicación conserva las versiones anteriores y revalida.
+Aplicación local para validar informes Excel con reglas EBA, explicar los resultados y proponer
+recálculos con dependencias. Angular Material presenta los datos; Node.js ejecuta el motor con
+ANTLR JavaScript, aritmética exacta y ordenamiento topológico de Kahn. Cada cambio requiere
+seleccionar un destino, revisar una propuesta y confirmarla. La aplicación conserva versiones
+anteriores y vuelve a validar después de aplicar.
 
-Las funcionalidades US1–US4, recursos y rendimiento tienen evidencia técnica en
-[verificación](docs/verification.md). **SC-007 y T073 se cierran el 2026-11-01** con la respuesta
-global del usuario «todo lo veo ok» al recorrido solicitado de ocho pasos, sin incidencias
-comunicadas. Esta aceptación se registra por separado de las comprobaciones automáticas.
-La verificación final desde instalación limpia supera **931 pruebas**, sin fallos ni omisiones,
-incluidos 16 recorridos completos de navegador. Build, typecheck y generación ANTLR reproducible
-también pasan; los originales mantienen sus hashes.
+Las funcionalidades US1–US4 de la iteración 002 están implementadas y tienen evidencia por
+incrementos en [verificación 002](docs/verification-002.md). Pasan **1.430 pruebas**, incluidos
+33 recorridos de navegador, además de typecheck, build y generación ANTLR reproducible. La nueva
+medición de rendimiento cumple SC-007; la aceptación humana SC-008 sigue pendiente. Los resultados y la
+aceptación global de la iteración 001 se conservan como [evidencia histórica](docs/verification.md);
+no acreditan por sí solos la interfaz ni los perfiles nuevos.
 
 ## Instalación y arranque
 
@@ -21,93 +21,115 @@ mediante `java` (la generación registrada usa Java 17):
 ```powershell
 .\scripts\bootstrap-toolchain.ps1
 .\scripts\run-with-toolchain.ps1 -NpmArguments @('ci')
-.\scripts\run-with-toolchain.ps1 -NpmArguments @('run', 'build')
+.\scripts\run-with-toolchain.ps1 -NpmArguments @('run','prepare:templates')
+.\scripts\run-with-toolchain.ps1 -NpmArguments @('run','fixtures')
+.\scripts\run-with-toolchain.ps1 -NpmArguments @('run','build')
 .\scripts\run-with-toolchain.ps1 -NpmArguments @('start')
 ```
 
-El bootstrap prepara Node 24.22.2/npm 11.19.1 en `.tools/`, sin cambiar las instalaciones globales.
-La primera preparación descarga dependencias y el JAR ANTLR verificado. Build genera el parser,
-compila API y Angular. Después de iniciar, abrir `http://127.0.0.1:3000`; ese proceso sirve web y
-API. Para detenerlo, usar Ctrl+C en su terminal.
+El bootstrap prepara Node **24.22.2** y npm **11.19.1** en `.tools/`, sin cambiar instalaciones
+globales. Material/CDK **22.2.4** están fijados en los manifests y el lockfile. La primera preparación
+requiere descargar dependencias y el JAR ANTLR verificado. `prepare:templates` reproduce las
+plantillas saneadas a partir de las fuentes versionadas; debe preceder a `fixtures`, que genera
+los ejemplos. Build genera el parser, compila API y Angular y empaqueta plantillas, demos y mappings.
+Las descargas del producto no consultan la web ni necesitan los libros originales en runtime.
 
-Para desarrollo, detener antes el servidor anterior y ejecutar:
+Abrir `http://127.0.0.1:3000`; ese proceso sirve web y API. Para detenerlo, usar Ctrl+C en su terminal.
+Para desarrollo, una vez detenido el servidor propio anterior, ejecutar:
 
 ```powershell
-.\scripts\run-with-toolchain.ps1 -NpmArguments @('run', 'dev')
+.\scripts\run-with-toolchain.ps1 -NpmArguments @('run','dev')
 ```
 
-Abrir `http://127.0.0.1:4200`. Angular recarga los cambios del frontend; los cambios del backend
-requieren reiniciar el comando. Los detalles del toolchain y las pruebas están en
-[scripts/README.md](scripts/README.md) y [quickstart](specs/001-regulatory-validation/quickstart.md).
+Abrir `http://127.0.0.1:4200`. Angular recarga el frontend; los cambios del backend requieren
+reiniciar el comando. No detener un proceso con datos de otra sesión para ejecutar pruebas.
 
-## Ejemplo guiado en ocho pasos
+## Cuatro etapas de trabajo
 
-Los dos archivos del ejemplo contienen reglas y datos **100 % sintéticos**. Se usan tal como se
-descargan, sin editar Excel. Ambos incluyen una hoja Instructions. Desplegar la guía o descargar
-los archivos no importa datos ni aplica cambios.
+1. **Cargar**: seleccionar catálogo e informes, declarar el contexto o usar el del libro,
+   inspeccionar los archivos y confirmar la carga revisada. Inspeccionar todavía no cambia datos.
+2. **Validar**: consultar tablas paginadas con estados, descripciones y motivos. Abrir
+   **Ver cálculo y origen** para revisar operandos, lecturas y procedencia. Elegir expresamente
+   los destinos de las reglas que admiten recálculo.
+3. **Recalcular**: simular, revisar **Anterior → Propuesto**, consultar dependencias y seleccionar
+   cada propuesta. Ningún antecedente se acepta automáticamente. Confirmar publica una nueva
+   versión y muestra la comparación con la validación anterior.
+4. **Descargar**: elegir una versión y guardar sus informes o una ejecución de validación.
+   **Descargar esta versión** desde una aplicación usa la versión de ese recibo, aunque el
+   selector histórico apunte a otra; el selector conserva su elección.
 
-1. Introducir un **Nombre del conjunto** y pulsar **Crear conjunto**. En Cargar, desplegar
-   **Empezar con el ejemplo guiado** y descargar el catálogo y el informe. Seleccionar
-   `ejemplo-catalogo.xlsx` como catálogo y `ejemplo-informe.xlsx` como informe y cargarlos manualmente.
-   Una carga válida sustituye los archivos del conjunto si ya contenía otros datos.
-2. Pulsar **Validar informes**: `SYNTHETIC_A` falla y `SYNTHETIC_D` pasa. Los valores son
-   A=11, B=5, C=7 y D=22; las reglas son A=B+C y D=A×2.
-3. En **Configurar destinos de recálculo**, elegir **Izquierda** en ambas reglas y pulsar
-   **Guardar configuración**. Los valores todavía no cambian.
-4. Pulsar **Simular recálculos**: las propuestas son A=12.00 y D=24.00; D utiliza el A propuesto.
-5. Seleccionar primero `SYNTHETIC_D` para ver que requiere `SYNTHETIC_A`. Seleccionar también A
-   expresamente; el sistema informa la dependencia y espera esa selección.
-6. Revisar ambos cambios, marcar la confirmación **He revisado cada propuesta…** y pulsar
-   **Aplicar cambios seleccionados**. Se publica una nueva versión después de revalidarla.
-7. Comprobar la comparación: antes, una regla pasa y otra falla; después, **dos pasan y ninguna
-   falla**. A cambia de 11 a 12.00 y D de 22 a 24.00; B y C permanecen en 5 y 7.
-8. En **Guardar informes y resultados**, elegir explícitamente la versión marcada **vigente**,
-   el contenido **Informes y registro de cambios** y pulsar **Preparar y descargar ZIP**.
-   El panel conserva su selección histórica hasta que se cambie.
+La cobertura regulatoria visual es **COREP de fondos propios 4.0, C_01.00 / CA1**: 110 posiciones.
+Se admite el extracto saneado o el libro oficial completo reconocido. En este último se incluye
+CA1 y se muestran **190 hojas excluidas**, cuya cobertura parcial hay que aceptar. No se importan
+las otras tablas. FINREP, tablas abiertas y cobertura general de COREP/DPM-XL quedan fuera del alcance.
 
-`report.zip` contiene un ce-report-1 por informe original y `changes.json`/`changes.xlsx` con la
-auditoría acumulada de esa versión. Para reimportar, extraer los informes y cargarlos con el
-catálogo original por separado. **Resultados de validación** exporta `results.json` y `results.xlsx`
-de la ejecución elegida. Las descargas ya guardadas permanecen al cerrar el conjunto.
+## Demostraciones
 
-## Datos, límites y sesión
+En **Cargar → Demostraciones guiadas**, descargar catálogo e informe del mismo ejemplo. Todos los
+datos son sintéticos. Descargar una guía o cambiar de ejemplo no importa datos ni configura reglas.
 
-- Una entidad/fecha por conjunto; hasta 500 filas de catálogo, 20 informes y 100.000 hechos y
-  coordenadas. Máximo 10 MiB por archivo, 50 MiB comprimidos por lote y 100 MiB descomprimidos.
-- Plantilla ce-report-1 con Instructions, Contexts, Coordinates y Facts. Códigos e importes se
-  guardan como texto; cero, null explícito y ausencia se distinguen. Los indicadores de presentación
-  se declaran expresamente. Los errores explican archivo, hoja y celda sin revelar rutas internas.
-- Perfil `ce-dpmxl-0.9-closed-v1`: subconjunto explícito de DPM-XL, con precisión e intervalos
-  cuando se solicitan. Las construcciones no soportadas son no evaluables. El perfil documenta
-  una diferencia frente a las fórmulas inconsistentes de multiplicación/división de intervalos
-  observadas en el PDF EBA v0.9; no afirma conformidad literal completa.
-- Una tarea activa, cancelación y plazo de 60 segundos de trabajo; recepción de archivos hasta
-  120 segundos. Las cuotas adicionales se muestran en capacidades y están en los contratos.
-  Un fallo o cancelación anterior a publicar conserva la versión vigente; cancelar después no deshace
-  una aplicación ya publicada. Una aceptación sin cambio de valor queda auditada con `changed:false`.
-- Sesión local y efímera: se recupera al refrescar el navegador, pero termina al cerrar el conjunto
-  o reiniciar el servidor. Se conservan hasta 20 snapshots, con cuotas separadas de 512 MiB para
-  estado canónico y archivos propios. Las exportaciones guardadas por el usuario sobreviven al cierre.
+| Ejemplo | Reglas | Resultado inicial | Recálculo |
+|---|---:|---|---|
+| COREP CA1 | 16: cinco procedentes del catálogo EBA y once sintéticas | 7 pasan, 8 fallan y 1 no aplica | Cinco destinos explícitos; después 14 pasan, 1 falla y 1 no aplica. |
+| Texto y fechas | 8 sintéticas | 6 pasan y 2 fallan | Sólo validación, sin destinos ni propuestas. |
 
-El benchmark sintético de 500 reglas distintas y 100.000 hechos produjo **10/10 ejecuciones ≤30 s**,
-con máximo **16,320 s**, en Ryzen 5 3600X/32 GiB y Windows 11. Mide desde fin de carga hasta resultados
-visibles; la carga está excluida. El [informe de rendimiento](docs/performance.md) conserva protocolo,
-auditoría y límites de esa evidencia; no es una garantía para cualquier equipo o conjunto de reglas.
+Son **24 reglas: cinco de origen EBA y diecinueve sintéticas**. El ejemplo COREP muestra dos ramas
+de dependencias con tres niveles. Los fallos deliberados se explican en la
+[guía de demos](docs/visual-demos.md), que contiene los pasos, cinco cambios y resultados por regla.
+
+En el perfil nuevo, las reglas que contienen condicionales, texto o fechas son **sólo de validación**,
+incluso si su resultado es numérico o el tipo aparece en una rama no ejecutada. Las desigualdades
+tampoco ofrecen destino porque no son igualdades. Las comprobaciones se repiten en API y motor.
+
+El formato anterior `ce-report-1` y el ejemplo de dos reglas permanecen en
+**Formato anterior ce-report-1**, como opción avanzada de carga directa. Sus hojas
+Instructions/Contexts/Coordinates/Facts y el perfil v1 conservan sus reglas de compatibilidad.
+
+## Exportación, límites y sesión
+
+`report.zip` contiene un libro por informe de la versión elegida y `changes.json`/`changes.xlsx`.
+Los perfiles visuales usan plantillas saneadas: CA1 para COREP y Datos para el ejemplo tipado.
+Los importes conservan su valor exacto y escala; una cifra que no pueda representarse con seguridad
+como número Excel se escribe como texto decimal exacto. Texto, fechas civiles, vacío informado y
+sin dato permanecen diferenciados. La salida anterior sigue usando `ce-report-1`.
+
+Las hojas excluidas no se reconstruyen. Son extractos de trabajo local reimportables, no ficheros
+oficiales de remisión. Para reimportarlos, extraer los informes y cargarlos con su catálogo;
+se crean nuevas fuentes y localizadores, sin restaurar recibos históricos. `results.zip` contiene
+los resultados de la ejecución elegida en JSON y XLSX, incluido su estado si quedó incompleta.
+
+- Una entidad/fecha y un conjunto activo; hasta 500 filas de catálogo, 20 informes y
+  100.000 coordenadas/hechos. Máximo 10 MiB por archivo, 50 MiB comprimidos por lote y
+  100 MiB descomprimidos. Los perfiles visuales tienen además su estructura cerrada.
+- Una inspección viva por conjunto, con 15 minutos desde que queda lista. Confirmarla exige
+  la misma base y aceptar sus exclusiones. Una tarea activa, hasta 60 segundos de trabajo y
+  120 segundos para recibir archivos. Los límites completos están en capacidades y contratos.
+- La sesión local se recupera al refrescar el navegador, pero termina al cerrar el conjunto o
+  reiniciar el servidor. Hasta 20 snapshots y cuotas separadas de 512 MiB de estado y de archivos.
+  Las descargas guardadas por el usuario sobreviven al cierre.
+- Un fallo o cancelación anterior a publicar conserva la versión vigente. Cancelar después no
+  deshace una aplicación publicada. Una aceptación sin cambio se audita con `changed:false`.
+
+La medición nueva de 500 reglas y 100.000 datos pasa **10/10 ejecuciones ≤30 s**, con máximo
+**15,78 s** desde fin de carga hasta resultados visibles; las diez auditorías completas pasan. La carga se mide
+aparte: media **30,20 s**. Equipo Ryzen 5 3600X/32 GB, Windows 11. CA1, con 110 posiciones,
+se mide por API de forma independiente: **0,84 s** para el extracto y **2,47 s** para el libro
+completo hasta publicar. [Protocolo y límites](docs/verification-002.md) explican ambas medidas;
+el [rendimiento de 001](docs/performance.md) se conserva como evidencia histórica.
 
 ## Documentos y desarrollo
 
-- [Guía de uso y verificación](specs/001-regulatory-validation/quickstart.md): comandos, V01–V16 y aceptación global de SC-007.
-- [Verificación por incrementos](docs/verification.md) y [rendimiento](docs/performance.md).
-- [Toolchain y scripts](scripts/README.md): versiones aisladas, generación y pruebas.
-- [Especificación](specs/001-regulatory-validation/spec.md), [plan](specs/001-regulatory-validation/plan.md)
-  y [tareas](specs/001-regulatory-validation/tasks.md).
-- [Investigación](specs/001-regulatory-validation/research.md) y [modelo de datos](specs/001-regulatory-validation/data-model.md).
-- Contratos de [HTTP](specs/001-regulatory-validation/contracts/http-api.md),
-  [Excel](specs/001-regulatory-validation/contracts/workbook.md) y
-  [lenguaje/cálculo](specs/001-regulatory-validation/contracts/language-profile.md).
-- [Constitución](.specify/memory/constitution.md) y [fuentes originales](specs/001-regulatory-validation/source-notes.md).
+- [Inicio y comprobaciones 002](specs/002-ui-eba-demo/quickstart.md), [demos](docs/visual-demos.md)
+  y [evidencia ejecutada](docs/verification-002.md).
+- [Especificación 002](specs/002-ui-eba-demo/spec.md), [plan](specs/002-ui-eba-demo/plan.md),
+  [tareas](specs/002-ui-eba-demo/tasks.md) y [modelo](specs/002-ui-eba-demo/data-model.md).
+- Contratos de [HTTP](specs/002-ui-eba-demo/contracts/http-api.md),
+  [libros y perfiles](specs/002-ui-eba-demo/contracts/workbook-profiles.md) y
+  [lenguaje](specs/002-ui-eba-demo/contracts/language-profile.md).
+- [Toolchain y scripts](scripts/README.md), [constitución](.specify/memory/constitution.md)
+  y [guía histórica 001](specs/001-regulatory-validation/quickstart.md).
 
-Spec Kit organiza el trabajo y Git conserva commits por funcionalidades verificadas. Los originales
-EBA, gramáticas y PDF permanecen intactos; la generación usa copias con nombres compatibles y hashes
-comprobados. Las cargas, temporales, descargas y credenciales locales no se incorporan al repositorio.
+Spec Kit organiza el trabajo y Git conserva commits por funcionalidades verificadas. Los
+originales EBA y las gramáticas permanecen intactos; la generación comprueba sus hashes.
+Cargas, temporales, descargas y credenciales locales no se incorporan al repositorio.
 La revisión por recibos permanece `disabled/unmanaged`; los checklists de Spec Kit son documentales.

@@ -2,7 +2,8 @@
 
 Este registro separa preparación, implementación, pruebas y aceptación humana de
 `specs/002-ui-eba-demo/`. No reemplaza la evidencia histórica de la iteración 001.
-La aceptación humana SC-008 y las comprobaciones finales de esta iteración siguen pendientes.
+La automatización final pasa 1.430 pruebas y la medición nueva SC-007 cumple el
+criterio en las diez ejecuciones. La aceptación humana SC-008 sigue pendiente.
 
 ## Setup — T001, T002 y T003
 
@@ -495,3 +496,213 @@ Los tres XLSX mantienen su SHA tras renderizar. Evidencia:
 esto no acredita apertura nativa en Excel ni aceptación humana.
 **Checkpoint T063–T071 completo**. La revisión conjunta posterior detectó una carrera
 de foco al recargar/navegar con teclado; su corrección y regresión pertenecen a T073.
+
+## Cierre conjunto — T072–T076
+
+Base funcional: `b469275`. La primera regresión conjunta de navegador obtuvo
+**29/30**, 4,5 min (`.cache/final-002-e2e.log`). El caso Material de 320 px detectó
+que un encabezado de etapa diferida podía robar el foco del botón de navegación
+tras recargar. Los casos de 390/1440 px y ambos roundtrips pasaron. El fallo se
+conserva como evidencia y no se sustituye por un aumento del timeout.
+
+Instalación final reproducible **sin red** en `.cache/final-002-ci`, creada con los
+manifests de los cuatro workspaces, raíz, `.npmrc` y lockfile:
+
+```powershell
+.\scripts\run-with-toolchain.ps1 -NpmArguments @('--prefix','.cache/final-002-ci','ci','--offline','--no-audit','--no-fund')
+```
+
+Código 0, **382 paquetes**, aproximadamente un minuto. Lock de raíz y copia antes
+y después: `757243bd642c152d2ec25f73d00ae51a50fdacb7a3a2d7b7b43c76afcd95fa94`.
+La instalación activa y el servidor del usuario no se reemplazaron. Las suites se
+ejecutan con el toolchain fijado del checkout; la copia limpia acredita instalación,
+no una segunda ejecución de toda la batería dentro de esa copia.
+
+`prepare:templates` y `fixtures` pasan. Motor completo: **617/617**, catorce archivos,
+1,45 s. El test de paquete compilado se amplió para dos plantillas, cuatro descargas
+de demo y cuatro exportaciones reales (informes/resultados de COREP y tipos), con
+cuatro workers y reimportación de negocio. El proceso hijo y sus workers bloquean
+red y accesos a fuentes externas al paquete. Los únicos bloqueos registrados son
+las dos autocomprobaciones deliberadas de la guardia. Resultado focal: **1/1**, 4,79 s;
+seis casos excluidos por el filtro `-t`, pendientes de la suite completa. Dos fallos
+iniciales del harness se corrigieron: URL file:// para --import en Windows y cierre
+del primer workspace antes de crear el segundo. No fueron defectos del producto.
+
+La carrera de foco se reprodujo con una prueba Angular determinista. La etapa
+diferida ya no interpreta su montaje como una orden de enfocar: un coordinador del
+workspace cumple únicamente la navegación solicitada y cancela la petición si el
+usuario mueve el foco. Se eliminó el temporizador duplicado del shell. Las cinco
+pruebas nuevas y siete de shell pasan **12/12**; E2E sigue exigiendo activación con
+teclado y foco en el título, sin suavizar sus aserciones.
+
+La revisión móvil añadió una indicación visible del desplazamiento horizontal y
+su asociación accesible a las tablas. Las capturas de exportación se centran ahora
+en el resumen/contexto expandido; el recorrido tipado verifica desplazamiento de
+esa región con teclado y ausencia de desbordamiento de página a 320 px.
+
+Verificación final ejecutada con `scripts/run-with-toolchain.ps1`:
+
+| Comando npm | Resultado |
+|---|---|
+| `run prepare:templates` y `run fixtures` | Correctos; plantillas y demos visuales sin diferencias versionadas. |
+| `exec -- vitest run --project engine` | 617/617, 14 archivos, 1,45 s. |
+| `run test:integration -- --maxWorkers=1 --no-file-parallelism` | 489/489, 30 archivos, 144,38 s; incluye dos generaciones ANTLR y comparación reproducible. |
+| `run typecheck` | Correcto para contratos, motor, API y Angular. |
+| `run build` | Correcto; ANTLR 4.13.2 y huellas originales comprobadas, API/activos/web empaquetados. |
+| `run test --workspace @ce/web -- --watch=false` | 130/130, 16 archivos, 7,25 s. |
+| `run test:contract -- --maxWorkers=1 --no-file-parallelism` | 158/158, 17 archivos, 98,91 s; incluye la prueba completa del paquete reubicado. |
+
+Motor y Angular se ejecutaron por separado, cubriendo ambos componentes de
+`test:unit`. Sin skips en estas suites completas. Bundle final **662,14 kB** iniciales
+(149,75 kB estimados transferidos), por debajo de 700 kB de aviso y 1 MB de error.
+Tres fixtures antiguos regenerados solo variaron en metadatos de contenedor ZIP:
+se comprobó igualdad de todos sus nombres/bytes internos frente a Git antes de
+conservar los archivos versionados, evitando un cambio binario ajeno al producto.
+
+La segunda ejecución E2E obtuvo **27/30**, 4,2 min. La entrada inicial con teclado
+ya funciona, pero los tres anchos detectan otra competencia de foco al regresar de
+Descargar a Recalcular: el detalle retenido se recrea y enfoca su encabezado sin
+una nueva apertura del usuario. Se conserva el estado del detalle y se corrige la
+autoridad de foco, en vez de borrar la selección o cambiar la expectativa del test.
+Log `.cache/final-002-e2e-fixed.log`, capturas/trazas en
+`.cache/verification-002/final-second/`. Los otros 27 escenarios, incluidos los
+resúmenes/contextos expandidos y el desplazamiento de exportación por teclado, pasan.
+
+La segunda causa se reprodujo en Angular (10 pasan y una falla antes del arreglo).
+Etapas y detalles comparten ahora solicitudes explícitas de foco. Los tres padres
+solicitan el encabezado identificado al abrir el detalle; un detalle retenido no
+genera otra solicitud, y mover el foco cancela una respuesta tardía. Los resultados
+Antes/Después usan IDs que incluyen el runId. Focal: **52/52**; batería Angular
+final: **133/133**, 16 archivos, 6,84 s. Typecheck web y nuevo build correctos,
+**662,29 kB** iniciales, 150,05 kB estimados transferidos.
+
+Se añadieron tres E2E de legibilidad con 31 dígitos enteros y nueve decimales exactos,
+precisión INF y descripción larga literal. La primera comprobación independiente
+pasó **3/3**, 19,8 s: validación, detalle, propuesta antes/después, teclado y
+320/390/1440 px. Seis capturas en `.cache/verification-002/t073-long-values/`.
+Los ajustes de la prueba conservaron el resultado booleano como tercer operando y
+solo exigen desplazamiento en la tabla secundaria cuando realmente desborda.
+La inspección visual detectó la etiqueta técnica `pure` y poca separación antes de
+EUR: ahora se presenta «sin unidad» conservando el DTO original, y la unidad tiene
+separación visual. El recorrido final comprueba texto y geometría de los caracteres.
+
+E2E final conjunto: **33/33**, 4,3 minutos, sin skips, log
+`.cache/final-002-e2e-complete.log`. Pasan los tres recorridos de foco corregidos,
+las cifras largas, las seis demos por anchura y ambos roundtrips. Total de las
+últimas suites completas: **1 430 pruebas** (617 motor + 133 Angular + 489 integración
++ 158 contratos + 33 E2E). Los intentos fallidos anteriores permanecen documentados;
+no cuentan como aprobados por una repetición sin cambio.
+
+Capturas finales en `.cache/verification-002/final-complete/`, sin datos privados.
+El contraste de texto secundario muestreado se comprueba contra 4,5:1; se revisan
+foco visible, estados acompañados de texto y tablas contenidas. Esto no pretende
+ser una certificación integral de accesibilidad. Los tres XLSX originales y las dos
+gramáticas vuelven a coincidir con sus SHA fijados, registrados en
+`.cache/final-002-source-hashes.json`. **T073 y T074 completos**.
+
+### Rendimiento nuevo — SC-007
+
+Referencia `.cache/benchmark/002-reference/reference.json`, congelada antes del piloto
+el 2026-11-04 a las 21:52:40 UTC. Código funcional `ff825cd`; los cambios pendientes
+eran documentales y el protocolo conserva sus hashes/diff en `code.json`. Equipo:
+AMD Ryzen 5 3600X, 12 procesadores lógicos, 34.277.588.992 bytes de RAM, Windows 11 Pro
+x64 10.0.26200, plan Alto rendimiento. Node 24.22.2, V8 13.6.233.17-node.63,
+Chromium 156.0.8078.4 headless y Playwright 1.64.1.
+
+```powershell
+.\scripts\run-with-toolchain.ps1 -NpmArguments @('run','bench','--','prepare','.cache/benchmark/002-reference')
+.\scripts\run-with-toolchain.ps1 -NpmArguments @('run','bench','--','pilot','.cache/benchmark/002-reference')
+.\scripts\run-with-toolchain.ps1 -NpmArguments @('run','bench','--','cohort','.cache/benchmark/002-reference')
+```
+
+El conjunto sintético ce-report-1 tiene 500 sumas diferentes, 200 lecturas por regla
+y 100.000 hechos distintos. Cada ensayo usa API propia y contexto de navegador nuevo.
+Desde la primera respuesta de carga terminada hasta los resultados visibles se
+incluyen refresco de cobertura, navegación a Validar, ejecución, resumen y dos frames.
+Se comprueban 250 pasan/250 fallan, 500 filas/variantes/instancias, cero duplicadas y
+50 filas en DOM. Después se auditan las 500 respuestas y las 100.000 lecturas exactas;
+el tiempo de esa auditoría está fuera del cronómetro de presentación.
+
+El criterio nuevo exige diez ensayos auditados, al menos nueve ≤30 s y **todos ≤60 s**,
+sin excepciones por diagnóstico, reintentos ni descartes. No se ejecutan otras suites,
+builds ni pruebas humanas durante la cohorte. La carga queda registrada por separado.
+Piloto independiente: pasa auditoría, **15,549 s** de validación/presentación y
+**29,541 s** de carga; duración total del ensayo 54,6 s. El campo `passed:false` del
+resumen del piloto significa que solo la cohorte puede acreditar el criterio, no
+que hubiera fallado el piloto. Su carpeta es `pilot-2026-11-04T21-52-43-739Z`.
+
+Cohorte `cohort-2026-11-04T21-53-59-624Z`: **10/10 auditadas y ≤30 s**, ninguna >60 s,
+sin reintentos ni descartes. Duración conjunta 9,2 minutos. El resumen registra
+`passed:true`; promedio de validación/presentación **14,868 s**, mínimo **14,450 s**
+y máximo **15,778 s**. Carga media **30,204 s**, rango **29,299–31,576 s**.
+
+| Ensayo | Validación y presentación (s) | Carga separada (s) | Auditoría |
+|---|---:|---:|---|
+| 1 | 14,865 | 29,524 | Pasa |
+| 2 | 14,456 | 29,450 | Pasa |
+| 3 | 15,778 | 29,299 | Pasa |
+| 4 | 14,862 | 31,576 | Pasa |
+| 5 | 14,453 | 30,254 | Pasa |
+| 6 | 15,363 | 30,145 | Pasa |
+| 7 | 14,450 | 30,159 | Pasa |
+| 8 | 14,807 | 30,301 | Pasa |
+| 9 | 14,815 | 30,611 | Pasa |
+| 10 | 14,834 | 30,724 | Pasa |
+
+Medición CA1 independiente, posterior a la cohorte y sin otra batería concurrente:
+
+```powershell
+.\.tools\node\node-v24.22.2-win-x64\node.exe scripts/benchmark-corep.mjs .cache/benchmark/002-corep-load
+```
+
+| Caso | Recepción hasta 202 (s) | Desde 202 hasta revisión lista (s) | Confirmación hasta publicación (s) | Total de carga/publicación (s) |
+|---|---:|---:|---:|---:|
+| Extracto, contexto del libro | 0,029 | 0,593 | 0,215 | 0,838 |
+| Libro completo, contexto declarado | 0,019 | 2,149 | 0,298 | 2,468 |
+
+Ambos pasan: 16 reglas, **110 posiciones, 15 valores, 95 blancos**, una hoja incluida;
+cero exclusiones en el extracto y 190 en el libro completo. HTTP real contra una
+aplicación propia con puerto efímero por caso. La revisión entre etapas es automatizada
+(~1 ms), no tiempo humano; la medida no incluye render del navegador. Los originales
+permanecen intactos y no se atribuyen 100.000 celdas al perfil CA1. Protocolos, entradas,
+tiempos y huellas están en `.cache/benchmark/002-corep-load/`. Son medidas de este equipo
+y corpus, no una garantía para cualquier conjunto. **T072 / SC-007 completos**.
+
+### Trazabilidad de cierre
+
+| Criterio | Estado y evidencia de esta iteración |
+|---|---|
+| SC-001 / FR-001–006,012 | Tablas Material, antes/después exactos y detalle secundario; T030/T073, capturas y E2E a tres anchos. |
+| SC-002 / FR-007–011 | Etapas, paginación, selección fuera de página, estados conservados y teclado; stores, harnesses y recorridos completos. |
+| SC-003 / FR-013–019,037 | COREP 4.0 CA1: 110 posiciones/335 anclas, contexto explícito, completo/extracto e inspección atómica; T031–046. |
+| SC-004 / FR-030–035 | 24 reglas, cinco recálculos y diez reglas solo validación; oráculo independiente, ANTLR, integración y seis recorridos demo. |
+| SC-005 / FR-020–023 | Versiones/bindings y roundtrip del 100 % de ambos corpus; T063–071 y descargas reales de navegador. |
+| SC-006 / FR-024–029,036,038 | Tipos, ramas, exclusión en todas las entradas, Kahn, conflictos, cuotas, cancelación, atomicidad y regresión v1; motor/integración/HTTP/E2E. |
+| SC-007 / FR-037–038 | Cohorte nueva 10/10 ≤30 s, máximo 15,778 s, todas auditadas; carga y CA1 medidas aparte. T072 completo. |
+| SC-008 / FR-038 | Pendiente T075: todavía no se ha recibido una prueba humana de la interfaz nueva con los datos requeridos. |
+
+La cobertura operativa es COREP CA1 y el perfil didáctico propio de texto/fechas.
+No se declara soporte general FINREP/COREP, conformidad completa DPM-XL ni fichero
+oficial de remisión. La evidencia de 001 y su aceptación global no se reinterpretan
+como aceptación de esta iteración. Recibos de desarrollo: `disabled/unmanaged`.
+
+### Aceptación humana pendiente — SC-008
+
+Se inició una sesión propia de la versión verificada en `http://127.0.0.1:3320`
+(HTTP 200), sin detener ni reutilizar el servidor/conjunto anterior del usuario.
+Se solicitó completar la demo COREP, identificar dos cambios antes/después,
+indicar la versión descargada y comunicar ayuda e incidencias. La solicitud está
+pendiente de respuesta: no se atribuyen pasos, tiempos ni observaciones al analista.
+T075 permanece sin marcar. La aceptación global de 001 no cubre esta ampliación.
+
+### Entrega documental — T076
+
+README, guía de demos, quickstart, plan y tareas describen las capacidades entregadas,
+los límites de cobertura y la evidencia final. Estado: **75/76 tareas**, pendiente
+únicamente T075. Los commits funcionales finales son `b469275` (exportación visual),
+`989c328` (navegación y verificaciones de paquete/rendimiento) y `ff825cd` (apertura
+explícita de detalles y legibilidad). Se conservan los incrementos anteriores de
+US1–US3. No se publica remoto ni se modifica la evidencia histórica de 001.
+La comprobación posterior de Spec Kit no encuentra `.specify/extensions.yml`, por
+lo que no hay hooks registrados que despachar. El cierre documental conserva
+explícitamente la aceptación humana pendiente.
