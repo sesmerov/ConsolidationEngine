@@ -9,6 +9,7 @@ import { canonicalHash, canonicalStringify, immutable } from '../session/canonic
 import type { WorkspaceStore } from '../session/workspace-store.js';
 import { validationKey } from '../validation/validation-service.js';
 import { getPreview, markPreviewApplied, previewKey, selectPreview } from './preview-store.js';
+import { assertDirectionsAllowed } from './directions-service.js';
 export const applicationKey = (workspaceId: string, receiptId: string) => 'application:' + workspaceId + ':' + receiptId;
 export function getApplication(store: WorkspaceStore, workspaceId: string, receiptId: string): ApplicationBundle {
   store.get(workspaceId); const bundle = store.getRecord<ApplicationBundle>(applicationKey(workspaceId, receiptId)); if (!bundle) throw new ApiError('RESOURCE_NOT_FOUND'); return bundle;
@@ -41,12 +42,15 @@ export function prepareApplication(store: WorkspaceStore, workspaceId: string, b
   store.assertAccepting(workspaceId); store.assertIdle(workspaceId); store.assertBase(workspaceId, body.baseVersionId);
   const snapshot = store.snapshot(workspaceId, body.baseVersionId), preview = getPreview(store, workspaceId, body.previewId), proposals = selectedProposals(preview, body);
   if (preview.preview.profileId !== snapshot.content.profileId || preview.preview.policyId !== RECALCULATION_POLICY_ID) throw new ApiError('PREVIEW_NOT_APPLICABLE');
+  assertDirectionsAllowed(snapshot, limits);
   const before = existingValidation(store, workspaceId, snapshot);
   const intent = immutable({ receiptId: randomUUID(), newVersionId: randomUUID(), beforeRunId: before?.run.id ?? randomUUID(), runId: randomUUID(), startedAt: new Date().toISOString(),
     previewId: body.previewId, baseVersionId: body.baseVersionId, selectedIds: [...body.selectedIds].sort(), closureHash: body.closureHash });
   const assertPreview = () => {
     store.assertBase(workspaceId, intent.baseVersionId); const current = getPreview(store, workspaceId, intent.previewId);
     if (current !== preview || current.preview.state !== 'ready') throw new ApiError('PREVIEW_NOT_APPLICABLE');
+    if (current.preview.profileId !== snapshot.content.profileId || current.preview.policyId !== RECALCULATION_POLICY_ID) throw new ApiError('PREVIEW_NOT_APPLICABLE');
+    assertDirectionsAllowed(store.snapshot(workspaceId, intent.baseVersionId), limits);
   };
   return { retainedState: intent, input: { ...intent, preview: preview as unknown as JsonValue, ...(before ? { beforeValidation: before as unknown as JsonValue } : {}), ...(limits ? { limits: limits as unknown as JsonValue } : {}) },
     preparePublication: (_job, output) => {

@@ -129,6 +129,16 @@ para lectura, no autoridad de cálculo. La descripción procede de registros fue
 variante; si hay varias distintas se muestran en detalle y se usa un resumen estable,
 sin modificar la identidad semántica de la regla. Todo se renderiza como texto.
 
+`ProposalDTO.calculation?` conserva la explicación capturada al simular:
+`{expression, precondition?, sourceValue?, preconditionValue?, reads}`; cada lectura
+es `{fact: FactReadDTO, fromProposalId?:string}`. Son entradas del estado simulado
+efectivamente utilizado antes del parche, incluidos valores de antecesores. No se
+reconstruyen leyendo el snapshot original ni se inventa una derivación aplicada para
+un cambio aún propuesto. `fromProposalId` identifica al productor simulado cuando lo
+hay. Expresión y valores son datos, nunca AST. Esta explicación se contabiliza junto
+al bundle; se entrega en el detalle de propuesta y se omite en la lista paginada.
+La ausencia en una propuesta anterior no autoriza a inventar lecturas.
+
 ### DemoCase
 
 Cada caso contiene identidad, origen oficial/sintético, expresión y precondición completas,

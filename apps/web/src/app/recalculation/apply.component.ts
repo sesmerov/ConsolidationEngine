@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import { isTerminalJob } from '@ce/contracts';
+import { isRationalValue, isTerminalJob } from '@ce/contracts';
 import type { ApplicationRequestDTO, PreviewDTO, PreviewSelectionDTO, ProposalDTO, Rational, SourceFile, SourceLocator } from '@ce/contracts';
 import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
@@ -43,6 +43,6 @@ export class ApplyComponent {
   source(locator: SourceLocator): string { return [this.sources().find(file => file.id === locator.fileId)?.displayName, locator.sheet, locator.column ? locator.column + (locator.row ?? '') : locator.row ? 'fila ' + locator.row : ''].filter(Boolean).join(' · '); }
   noChange(row: ProposalDTO): boolean {
     if (row.before?.presence !== 'value' || !row.after) return false; const a = row.before.normalizedValue, b = row.after.normalizedValue;
-    return typeof a === 'boolean' || typeof b === 'boolean' ? a === b : !!a && a.numerator === b.numerator && a.denominator === b.denominator;
+    return typeof a === 'boolean' || typeof b === 'boolean' ? a === b : isRationalValue(a) && a.numerator === b.numerator && a.denominator === b.denominator;
   }
 }

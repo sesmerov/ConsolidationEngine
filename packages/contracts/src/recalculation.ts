@@ -1,6 +1,6 @@
 import type { Diagnostic, Rational, SourceFile, SourceLocator } from './common.js';
 import type { FactReadDTO, MetadataReadDTO, ValidationBinding } from './validation.js';
-import { rationalSchema, sourceLocatorSchema, uuidSchema } from './common.schemas.js';
+import { normalizedValueSchema, rationalSchema, sourceLocatorSchema, uuidSchema } from './common.schemas.js';
 import { coordinateSchema, factDerivationSchema } from './report.js';
 import { diagnosticSchema } from './catalog.js';
 
@@ -64,7 +64,7 @@ export const metadataReadsSchema = { type: 'array', items: { type: 'object', add
 } } } as const;
 export const factReadSchema = { type: 'object', additionalProperties: false, required: ['factKey', 'coordinate', 'presence', 'sourceLocator'], properties: {
   factKey: text, coordinate: coordinateSchema, presence: { enum: ['value', 'explicit_null', 'implicit_null'] },
-  normalizedValue: { anyOf: [rationalSchema, { type: 'boolean' }] }, originalText: text, sourceLocator: sourceLocatorSchema, derivation: factDerivationSchema,
+  normalizedValue: normalizedValueSchema, originalText: text, sourceLocator: sourceLocatorSchema, derivation: factDerivationSchema,
 }, allOf: [{ if: { type: 'object', properties: { presence: { const: 'value' } } }, then: { type: 'object', required: ['normalizedValue', 'originalText'] }, else: { not: { anyOf: [{ type: 'object', required: ['normalizedValue'] }, { type: 'object', required: ['originalText'] }] } } },
   { if: { type: 'object', required: ['derivation'] }, then: { type: 'object', properties: { presence: { const: 'value' } } } }] } as const;
 export const directionChoiceSchema = { type: 'object', additionalProperties: false, required: ['instanceId', 'targetSide'], properties: {

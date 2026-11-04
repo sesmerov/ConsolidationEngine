@@ -78,3 +78,63 @@ Este baseline no acredita todavía la UI Material, importación COREP, semántic
 exportadores nuevos, rendimiento ni aceptación humana. Solo completa la preparación
 T001–T003 y demuestra que la regresión v1 seleccionada sigue pasando tras instalar las
 dependencias.
+
+## Foundation — evidencia inicial de pruebas
+
+Base de ejecución: `f1e1c2c`. Antes de implementar la ampliación de contratos y
+guardias se ejecutaron las pruebas nuevas con Vitest sobre el código existente:
+
+- T004, `tests/contract/typed-profile-schemas.spec.ts`: 11 casos, 9 fallidos y 2
+  aprobados. Los fallos de comportamiento incluyen texto/fecha rechazados y valor
+  numérico indebidamente aceptado con presencia nula; también faltan exports nuevos.
+  Las comprobaciones genéricas de hash/cuota existentes ya pasan.
+- T005, `packages/engine/test/profile-policy.spec.ts` y
+  `tests/integration/profile-guards.spec.ts`: 12 casos, 10 fallidos y 2 aprobados.
+  V2 numérico queda incompleto, v2 booleano ofrece destino, v1 acepta un texto no leído,
+  una configuración mixta publica y una preview acepta trabajo en lugar de rechazar.
+  Las comprobaciones de v1 y asociación de perfiles ya cubiertas siguen pasando.
+
+Estos resultados demuestran las carencias iniciales, no una funcionalidad terminada.
+Los comandos usan `run-with-toolchain.ps1 -NpmArguments @('exec','--','vitest','run',...)`
+con los proyectos contract, engine e integration correspondientes y los tres archivos
+indicados. El intento inicial de Vitest en sandbox produjo `spawn EPERM`; el mismo
+comando con escalación local ejecutó las pruebas. La verificación verde conjunta de
+Foundation se registrará tras T006–T011.
+
+T006–T007: build de contratos y los 11 casos de T004 pasan tras ampliar las uniones,
+fechas civiles, presencia y bindings. No fue necesario cambiar los algoritmos genéricos
+de hash ni contabilidad. Los consumidores existentes de Angular y exportación distinguen
+ahora racionales de los objetos de texto/fecha sin coerción. Tras los ajustes mínimos
+de Angular, `typecheck --workspace @ce/web` pasa y
+`run-with-toolchain.ps1 -NpmArguments @('run','test','--workspace','@ce/web','--','--watch=false')`
+aprueba **46 pruebas en ocho archivos** (19,26 s). Esto verifica compatibilidad de las
+vistas existentes; el rediseño Material sigue pendiente de US1.
+
+### Foundation — cierre T008–T012
+
+- Contratos: **109/109 pruebas en 13 archivos**, incluida la ampliación T004 a
+  15 casos con HTTP, proyección cerrada y agotamiento de presupuesto.
+- Motor/API: regresión ampliada de **606 pruebas en 18 archivos** correcta;
+  después, focal de política **10/10** con los casos adicionales de fecha y
+  precondición formal. T005 contiene ahora diez casos de motor y seis de API.
+- `run-with-toolchain.ps1 -NpmArguments @('run','build:api')`: correcto.
+- `run-with-toolchain.ps1 -NpmArguments @('run','typecheck')`: correcto en todos
+  los workspaces. Angular conserva las 46 pruebas aprobadas registradas arriba.
+- `git diff --check`: sin errores de espacios.
+
+El perfil y dominio de valores se comprueban antes del grafo y se vuelven a
+comprobar en worker y publicación. Una configuración mixta prohibida no produce
+una preview parcial. V1 conserva recálculos booleanos, exactitud y comportamiento
+ante cuotas; v2 admite por ahora el subconjunto numérico protegido. Texto, fecha e
+if todavía no tienen semántica nueva: permanecen cerrados hasta US3. La prueba de
+publicación final introduce un fallo interno controlado; no implica snapshots
+mutables en producción. Los cambios genéricos de hash/cuota no fueron necesarios:
+las pruebas verifican que ya incluyen los nuevos valores y bindings.
+
+Se precisó el contrato de US1 para conservar en la propuesta la expresión y las
+lecturas reales del overlay de simulación, incluyendo el productor precedente.
+El listado omitirá esta evidencia; el detalle por ID la devolverá. Reconstruirla
+con el snapshot original habría mostrado importes incorrectos en cadenas Kahn.
+También se fijaron alias estables `corep` y `demo_types` para contextos generados;
+la identidad de negocio sigue basándose en entidad, periodo, framework y módulo.
+Estos ajustes están documentados, pero su implementación pertenece a US1/US2.

@@ -1,4 +1,5 @@
 import type { CatalogData, JsonValue, ReportContext, SourceFile, ValidationBundle, ValidationValueDTO } from '@ce/contracts';
+import { isRationalValue } from '@ce/contracts';
 import { ApiError } from '../errors.js';
 import { jsonBytes } from './bounded-json.js';
 import { jsonBuffers, writeChunks, writeStoredZip, writeIncrementalWorkbook } from './bounded-files.js';
@@ -14,7 +15,7 @@ export function exportLimits(overrides: Partial<ExportLimits> = {}): ExportLimit
 type SheetRow = { sheet: string; values: readonly string[] };
 function numberText(value: ValidationValueDTO | undefined): string {
   if (!value) return ''; if (value.kind === 'number') return value.nominal.numerator + '/' + value.nominal.denominator + ' [' + value.interval.lo.numerator + '/' + value.interval.lo.denominator + ', ' + value.interval.hi.numerator + '/' + value.interval.hi.denominator + '] ' + value.unit;
-  return value.kind === 'boolean' ? String(value.value) : value.presence;
+  return value.kind === 'boolean' ? String(value.value) : value.kind === 'text' || value.kind === 'date' ? value.value : value.presence;
 }
 function* spreadsheetRows(data: ResultsExportData): Generator<SheetRow> {
   const row = (sheet: string, ...values: string[]): SheetRow => ({ sheet, values });
@@ -35,7 +36,7 @@ function* spreadsheetRows(data: ResultsExportData): Generator<SheetRow> {
     for (const id of result.variantIds) yield row('Provenance', result.id, 'variant', id); for (const id of result.sourceRecordIds) yield row('Provenance', result.id, 'sourceRecord', id);
     for (const read of result.factReads) { const value = read.normalizedValue, coordinate = read.coordinate, source = read.sourceLocator;
       yield row('Facts', result.id, coordinate.contextId, coordinate.tableCode, coordinate.sheetCode, coordinate.rowCode, coordinate.columnCode, read.presence, read.originalText ?? '',
-        typeof value === 'object' ? value.numerator : '', typeof value === 'object' ? value.denominator : '', typeof value === 'boolean' ? String(value) : '', coordinate.unit, coordinate.decimals,
+        isRationalValue(value) ? value.numerator : '', isRationalValue(value) ? value.denominator : '', typeof value === 'boolean' ? String(value) : '', coordinate.unit, coordinate.decimals,
         source.fileId ?? '', source.sheet ?? '', String(source.row ?? ''), source.column ?? ''); }
     for (const read of result.metadataReads) yield row('Metadata', result.id, read.contextId, read.code, read.presence, read.value === undefined ? '' : String(read.value), read.sourceLocator?.fileId ?? '', read.sourceLocator?.sheet ?? '', String(read.sourceLocator?.row ?? ''), read.sourceLocator?.column ?? '');
     for (const diagnostic of result.diagnostics) yield row('Diagnostics', result.id, diagnostic.code, diagnostic.message, diagnostic.locator?.fileId ?? '', diagnostic.locator?.sheet ?? '', String(diagnostic.locator?.row ?? ''), diagnostic.locator?.column ?? '');

@@ -15,8 +15,9 @@ const REASONS: Readonly<Record<string, string>> = {
   DUPLICATE_COORDINATE: 'La coordenada está declarada más de una vez.', DUPLICATE_FACT: 'El hecho está declarado más de una vez.',
   INVALID_UNIT: 'La unidad no tiene la forma canónica admitida.', INVALID_PRECISION: 'La precisión debe estar entre -18 y 18, o ser INF.',
   UNKNOWN_CONTEXT: 'El contexto de la celda no está declarado.', UNKNOWN_COORDINATE: 'El hecho no tiene una coordenada declarada.',
+  RULE_VALIDATION_ONLY: 'Esta regla contiene condicionales, texto o fechas y solo admite validación.',
 };
-const WORK_DIAGNOSTICS: Readonly<Record<string, string>> = { RESOURCE_LIMIT: 'La ejecución superó una cuota de cálculo y quedó incompleta.', CANCELLED: 'La ejecución fue cancelada.', DEADLINE_EXCEEDED: 'La ejecución superó su plazo.', PROFILE_MISMATCH: 'El perfil del conjunto no coincide con el motor.' };
+const WORK_DIAGNOSTICS: Readonly<Record<string, string>> = { RESOURCE_LIMIT: 'La ejecución superó una cuota de cálculo y quedó incompleta.', CANCELLED: 'La ejecución fue cancelada.', DEADLINE_EXCEEDED: 'La ejecución superó su plazo.', PROFILE_MISMATCH: 'El perfil del conjunto no coincide con el motor.', RULE_VALIDATION_ONLY: REASONS.RULE_VALIDATION_ONLY! };
 /** Only application-owned codes and a bounded locator cross the worker boundary. */
 export function publicDiagnostic(error: unknown): Diagnostic {
   if (!(error instanceof ApiError)) return { code: 'INTERNAL_ERROR', message: ERROR_MESSAGES.INTERNAL_ERROR };

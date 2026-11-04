@@ -4,6 +4,7 @@ import { isTerminalJob } from '@ce/contracts';
 import type { Diagnostic, Rational, RunSummaryDTO, SourceLocator, ValidationResultsPageDTO, ValidationStatus, ValidationValueDTO } from '@ce/contracts';
 import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
+import { civilDate } from '../core/display';
 @Injectable()
 export class ResultsStore {
   private readonly api = inject(ApiClient); readonly session = inject(SessionStore);
@@ -49,6 +50,8 @@ export class ResultsStore {
   fraction(value: Rational): string { return value.denominator === '1' ? value.numerator : value.numerator + '/' + value.denominator; }
   value(value: ValidationValueDTO | undefined): string {
     if (!value) return 'Sin valor calculado'; if (value.kind === 'boolean') return value.value ? 'true' : 'false';
+    if (value.kind === 'text') return value.value === '' ? 'Texto vacío' : value.value;
+    if (value.kind === 'date') return civilDate(value.value);
     if (value.kind === 'unknown') return 'Metadato desconocido'; if (value.kind === 'null') return value.presence === 'explicit_null' ? 'Nulo explícito' : value.presence === 'implicit_null' ? 'Nulo implícito' : 'Nulo derivado';
     return this.fraction(value.nominal) + ' ' + value.unit + ' · intervalo [' + this.fraction(value.interval.lo) + ', ' + this.fraction(value.interval.hi) + ']';
   }

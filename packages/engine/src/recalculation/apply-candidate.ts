@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { createHash } from 'node:crypto';
-import { RECALCULATION_POLICY_ID, UUID_PATTERN, type Diagnostic, type PreviewBundle, type PreviewDTO, type ProposalAfterDTO, type ProposalDTO,
-  type Rational, type ReportedFact, type Snapshot, type ValidationBundle } from '@ce/contracts';
+import { RECALCULATION_POLICY_ID, UUID_PATTERN, isRationalValue, type Diagnostic, type PreviewBundle, type PreviewDTO, type ProposalAfterDTO, type ProposalDTO,
+  type NormalizedValue, type Rational, type ReportedFact, type Snapshot, type ValidationBundle } from '@ce/contracts';
 import { buildDependencyGraph } from '../dependencies/producers.js';
 import { orderDependencies } from '../dependencies/kahn.js';
 import { WorkBudget, WorkLimitError, type WorkLimits } from '../execution/budget.js';
@@ -10,6 +10,7 @@ import { ordinal, reportIndex } from '../resolver/coordinates.js';
 import { runValidation } from '../validation/run.js';
 import { evaluateCandidate } from './candidate.js';
 import { uuidV5 } from './simulate.js';
+import { assertRecalculationConfiguration } from './configuration.js';
 
 export interface ApplyCandidateOptions {
   readonly receiptId: string; readonly newVersionId: string; readonly beforeRunId: string; readonly runId: string; readonly startedAt: string;
@@ -36,9 +37,10 @@ function exact(value: Rational) {
   if (!/^-?(0|[1-9][0-9]*)$/.test(value.numerator) || !/^[1-9][0-9]*$/.test(value.denominator)) throw new ApplicationError('PREVIEW_NOT_APPLICABLE', 'El valor propuesto no es un racional válido.');
   return rational(BigInt(value.numerator), BigInt(value.denominator));
 }
-export function sameReportedValue(left: Rational | boolean | undefined, right: Rational | boolean | undefined): boolean {
+export function sameReportedValue(left: NormalizedValue | undefined, right: NormalizedValue | undefined): boolean {
   if (left === undefined || right === undefined) return false;
   if (typeof left === 'boolean' || typeof right === 'boolean') return left === right;
+  if (!isRationalValue(left) || !isRationalValue(right)) return !isRationalValue(left) && !isRationalValue(right) && left.kind === right.kind && left.value === right.value;
   return compare(exact(left), exact(right)) === 0;
 }
 function sameAfter(left: ProposalAfterDTO, right: ProposalAfterDTO): boolean {
@@ -68,7 +70,8 @@ export function applyCandidate(snapshot: Snapshot, bundle: PreviewBundle, option
     || [options.receiptId, options.newVersionId, options.beforeRunId, options.runId].some(id => !UUID_PATTERN.test(id))
     || options.newVersionId === snapshot.versionId || options.beforeRunId === options.runId || !Number.isFinite(Date.parse(options.startedAt))) throw new ApplicationError('INVALID_REQUEST', 'La solicitud de aplicación no es válida.');
   if (preview.baseVersionId !== snapshot.versionId) throw new ApplicationError('STALE_VERSION', 'La previsualización pertenece a otra versión.');
-  if (snapshot.content.profileId !== 'ce-dpmxl-0.9-closed-v1' || preview.profileId !== snapshot.content.profileId || preview.policyId !== RECALCULATION_POLICY_ID) throw new ApplicationError('PROFILE_MISMATCH', 'El perfil o la política no coincide.');
+  if (preview.profileId !== snapshot.content.profileId || preview.policyId !== RECALCULATION_POLICY_ID) throw new ApplicationError('PROFILE_MISMATCH', 'El perfil o la política no coincide.');
+  assertRecalculationConfiguration(snapshot, { budget });
   if (preview.state !== 'ready') throw new ApplicationError('PREVIEW_NOT_APPLICABLE', 'La previsualización ya no está disponible.');
   const byId = new Map<string, ProposalDTO>();
   for (const proposal of bundle.proposals) { budget.check(); if (byId.has(proposal.id)) throw new ApplicationError('PREVIEW_NOT_APPLICABLE', 'La previsualización contiene identidades duplicadas.'); byId.set(proposal.id, proposal); }

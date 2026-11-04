@@ -145,6 +145,11 @@ avisa si cambian la interpretación. No imprimir claves JSON ni hashes como expl
 Los valores recalculados se identifican como calculados: su celda de origen no implica que
 el archivo original ya contuviera el valor nuevo. La trazabilidad completa sigue accesible.
 
+El detalle de una propuesta consulta `calculation` por su ID. Sus lecturas proceden
+de la simulación y distinguen los valores aportados por propuestas antecesoras. No se
+sustituyen por los valores del snapshot original; si una propuesta antigua carece de
+esa evidencia, se indica su ausencia y se conserva la trazabilidad disponible.
+
 ## 8. Aplicación, descarga y estados
 
 Antes de aplicar: resumen completo de propuestas elegidas, dependencias satisfechas, base vigente

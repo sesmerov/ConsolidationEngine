@@ -17,6 +17,11 @@ tipos, AST ni identificadores de perfil semántico suministrados para eludir sus
 No se mezcla el perfil anterior con perfiles visuales en un lote. Una tabla y contexto
 de negocio no pueden repetirse en archivos diferentes aunque cambie su alias.
 
+Los perfiles generan alias internos estables: `corep` y `demo_types`; no se derivan
+del UUID aleatorio del archivo ni se solicitan al usuario. El alias lógico `demo` del
+oráculo COREP se asocia al contexto importado por sus campos de negocio, conservando
+sus expectativas y sin incorporar ese alias a la identidad canónica de una celda.
+
 ## 2. Fuente y manifiesto COREP
 
 Fuente de presentación: [ITS on supervisory reporting](https://www.eba.europa.eu/sites/default/files/2025-02/1b4c4008-4224-450f-aa7b-c6fe5284872a/ITS%20on%20supervisory%20reporting.zip),
@@ -128,6 +133,10 @@ de celdas ni la carga del archivo lo convierten automáticamente en verdadero.
 
 Escala `s`: `0` unidades, `3` miles o `6` millones. Precisión escrita `p`: entero de
 −18 a 18 o `INF`, declarado por el usuario. Para el importe decimal `v`:
+
+En los DTO, `scaleExponent` es un número entero y `displayDecimals` es un número
+entero o la cadena `"INF"`; `Coordinate.decimals` conserva la representación textual
+existente. El Excel de Contexto mantiene su representación textual definida más abajo.
 
 - `normalizedValue = v × 10^s`, racional exacto en divisa base.
 - `Coordinate.decimals = p − s`, o `INF`; el resultado debe estar en [−18,18] o `INF`.

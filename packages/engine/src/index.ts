@@ -42,3 +42,8 @@ export { simulate, uuidV5, SimulationError } from './recalculation/simulate.js';
 export type { SimulateOptions } from './recalculation/simulate.js';
 export { applyCandidate, ApplicationError, selectionClosureHash, sameReportedValue } from './recalculation/apply-candidate.js';
 export type { ApplicationCandidate, ApplyCandidateOptions, ApplicationErrorCode } from './recalculation/apply-candidate.js';
+export { languageProfile, assertSnapshotProfile, snapshotProfileDiagnostics, ProfileError } from './profiles/registry.js';
+export type { LanguageProfile } from './profiles/registry.js';
+export { getRecalculationPolicy } from './recalculation/policy.js';
+export type { PolicyInput, PolicyResult } from './recalculation/policy.js';
+export { assertRecalculationConfiguration, RecalculationConfigurationError } from './recalculation/configuration.js';

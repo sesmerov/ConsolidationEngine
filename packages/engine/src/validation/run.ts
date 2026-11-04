@@ -9,6 +9,7 @@ import { parseRule, type ParseRuleResult } from '../parser/parse-rule.js';
 import { ordinal, reportIndex } from '../resolver/coordinates.js';
 import { expandRuleInstances, outerScope, stableId, type RuleInstance } from '../resolver/instances.js';
 import type { Binding } from '../resolver/scope.js';
+import { assertSnapshotProfile, ProfileError } from '../profiles/registry.js';
 
 export interface RunValidationOptions {
   readonly runId: string; readonly startedAt: string; readonly cancelled?: () => boolean;
@@ -16,7 +17,6 @@ export interface RunValidationOptions {
   /** When supplied, this operation-wide budget owns limits, cancellation and the deadline. */
   readonly budget?: WorkBudget;
 }
-class ProfileError extends Error { readonly code = 'PROFILE_MISMATCH'; }
 /** Stable within a snapshot, including coverage rows with no instance or binding. */
 export function resultOrderKey(result: RuleResultDTO): string {
   const binding = result.binding;
@@ -61,7 +61,7 @@ export function runValidation(snapshot: Snapshot, options: RunValidationOptions)
   const { content } = snapshot; const results: RuleResultDTO[] = [], diagnostics: Diagnostic[] = [], applicable = new Set<string>();
   const parsed = new Map<string, ParseRuleResult>(); let complete = true; let budget: WorkBudget | undefined;
   const coordinateByKey = new Map<string, (typeof content.coordinates)[number]>();
-  const parse = (source: string): ParseRuleResult => { let result = parsed.get(source); if (!result) { result = parseRule(source); parsed.set(source, result); } return result; };
+  const parse = (source: string): ParseRuleResult => { const key = JSON.stringify([content.profileId, source]); let result = parsed.get(key); if (!result) { result = parseRule(source, { profileId: content.profileId }); parsed.set(key, result); } return result; };
   const parseProblem = (result: ParseRuleResult): ValidationStatus | undefined => result.syntaxStatus === 'error' ? 'error' : result.supportStatus === 'unsupported' || !result.ast ? 'not_evaluable' : undefined;
   const counts: Record<ValidationStatus, number> = { pass: 0, fail: 0, not_applicable: 0, not_evaluable: 0, error: 0 };
   const valueStatus = (evaluation: EvaluationResult, precondition: boolean): ValidationStatus | undefined => {
@@ -107,7 +107,7 @@ export function runValidation(snapshot: Snapshot, options: RunValidationOptions)
   try {
     budget = options.budget ?? new WorkBudget({ ...(options.limits ? { limits: options.limits } : {}), ...(options.cancelled ? { cancelled: options.cancelled } : {}), ...(options.now ? { now: options.now } : {}) });
     budget.check();
-    if (content.profileId !== 'ce-dpmxl-0.9-closed-v1') throw new ProfileError('Snapshot profile does not match this engine');
+    assertSnapshotProfile(snapshot, budget);
     for (const cell of content.coordinates) { budget.check(); coordinateByKey.set(cell.factKey, cell); }
     reportIndex(content, budget);
     for (const record of content.catalog.records) if (!record.variantId || !content.catalog.variants.some(variant => variant.variantId === record.variantId)) {
@@ -183,7 +183,7 @@ export function runValidation(snapshot: Snapshot, options: RunValidationOptions)
     budget.check();
   } catch (error) {
     complete = false;
-    if (error instanceof WorkLimitError || error instanceof NumericError || error instanceof ProfileError) diagnostics.push({ code: error.code, message: error.message, severity: 'error' });
+    if (error instanceof WorkLimitError || error instanceof NumericError || error instanceof ProfileError) diagnostics.push({ code: error.code, message: error.message, severity: 'error' }, ...(error instanceof ProfileError ? error.diagnostics : []));
     else throw error;
   }
   const orderKeys = new Map(results.map(result => [result, resultOrderKey(result)]));

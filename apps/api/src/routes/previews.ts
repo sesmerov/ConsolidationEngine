@@ -9,13 +9,19 @@ import { discardPreview, getPreview, selectPreview } from '../recalculation/prev
 import { canonicalHash } from '../session/canonical-state.js';
 import { registerJobRoute } from './jobs.js';
 import { createPager, paginationProperties } from './pagination.js';
+import { assertDirectionsAllowed } from '../recalculation/directions-service.js';
 type Params = { workspaceId: string; previewId: string };
 const params = { type: 'object', additionalProperties: false, required: ['workspaceId', 'previewId'], properties: { workspaceId: uuidSchema, previewId: uuidSchema } } as const;
 export function registerPreviews(app: FastifyInstance, limits?: Partial<WorkLimits>): void {
   const page = createPager();
   registerJobRoute(app, { path: '/workspaces/:workspaceId/previews', kind: 'preview', bodySchema: { type: 'object', additionalProperties: false, required: ['baseVersionId'], properties: { baseVersionId: uuidSchema } },
     prepare: request => { const body = request.body as { baseVersionId: string }; return { input: body, baseVersionId: body.baseVersionId }; },
-    accept: () => ({ input: { previewId: randomUUID(), ...(limits ? { limits: limits as unknown as JsonValue } : {}) } }) });
+    accept: ({ workspaceId, baseVersionId }) => {
+      if (!baseVersionId) throw new ApiError('INVALID_REQUEST');
+      const snapshot = app.ce.store.snapshot(workspaceId, baseVersionId); assertDirectionsAllowed(snapshot, limits);
+      return { input: { previewId: randomUUID(), ...(limits ? { limits: limits as unknown as JsonValue } : {}) },
+        preparePublication: (_job, output) => ({ output, assertCommit: () => assertDirectionsAllowed(app.ce.store.snapshot(workspaceId, baseVersionId), limits) }) };
+    } });
   app.get<{ Params: Params }>('/api/v1/workspaces/:workspaceId/previews/:previewId', { schema: { params, querystring: emptyQuerySchema } }, async request => getPreview(app.ce.store, request.params.workspaceId, request.params.previewId).preview);
   app.get<{ Params: Params; Querystring: { limit?: string; cursor?: string; status?: string; code?: string; table?: string } }>('/api/v1/workspaces/:workspaceId/previews/:previewId/proposals', {
     schema: { params, querystring: { type: 'object', additionalProperties: false, properties: { ...paginationProperties,

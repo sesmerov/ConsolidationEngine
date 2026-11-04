@@ -1,4 +1,4 @@
-import type { Coordinate, Diagnostic, SourceLocator } from '@ce/contracts';
+import { isRationalValue, type Coordinate, type Diagnostic, type SourceLocator } from '@ce/contracts';
 import { PARSER_LIMITS, type Ast, type BinaryOperator, type Expression, type Selection } from '../ast/ast.js';
 import { WorkBudget, WorkLimitError } from '../execution/budget.js';
 import { fromPrecision, intervalAdd, intervalSubtract, intervalMultiply, intervalDivide, intervalNegate, intervalCompare } from '../numeric/interval.js';
@@ -55,6 +55,7 @@ export function evaluate(ast: Ast | Expression, context: EvaluationContext): Eva
     return value as ScalarValue | undefined;
   }
   function read(cell: Coordinate, selection: Selection): ScalarValue {
+    if (cell.dataType === 'text' || cell.dataType === 'date') throw new ValueError('TYPE_MISMATCH', 'Este tipo todavía no está disponible en el evaluador del perfil.');
     budget.consume('reads'); readKeys.add(cell.factKey);
     const facts = index.facts.get(cell.factKey) ?? [];
     if (facts.length > 1) throw new ValueError('TYPE_MISMATCH', 'Several facts have the same canonical identity');
@@ -67,7 +68,7 @@ export function evaluate(ast: Ast | Expression, context: EvaluationContext): Eva
       if (typeof fact.normalizedValue !== 'boolean') throw new ValueError('TYPE_MISMATCH');
       value = { kind: 'boolean', value: fact.normalizedValue, ...provenance };
     } else {
-      if (!fact.normalizedValue || typeof fact.normalizedValue === 'boolean') throw new ValueError('TYPE_MISMATCH');
+      if (!isRationalValue(fact.normalizedValue)) throw new ValueError('TYPE_MISMATCH');
       const nominal = rational(BigInt(fact.normalizedValue.numerator), BigInt(fact.normalizedValue.denominator));
       value = { kind: 'number', ...fromPrecision(nominal, cell.decimals || undefined, selection.interval ?? false), unit: parseUnit(cell.unit), literal: false, ...provenance };
     }

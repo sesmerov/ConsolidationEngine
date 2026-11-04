@@ -6,6 +6,7 @@ import { orderDependencies, type DependencyBlockReason } from '../dependencies/k
 import { WorkBudget, type WorkLimits } from '../execution/budget.js';
 import { ordinal, reportIndex } from '../resolver/coordinates.js';
 import { evaluateCandidate } from './candidate.js';
+import { assertRecalculationConfiguration } from './configuration.js';
 
 export interface SimulateOptions {
   readonly previewId: string; readonly now?: () => number; readonly limits?: Partial<WorkLimits>;
@@ -35,7 +36,7 @@ export function simulate(snapshot: Snapshot, options: SimulateOptions): PreviewB
   const createdAt = new Date((options.now ?? Date.now)()).toISOString();
   const budget = new WorkBudget({ ...(options.now ? { now: options.now } : {}), ...(options.limits ? { limits: options.limits } : {}), ...(options.cancelled ? { cancelled: options.cancelled } : {}) });
   budget.check(); uuidV5(options.previewId, '');
-  if (snapshot.content.profileId !== 'ce-dpmxl-0.9-closed-v1') throw new SimulationError('PROFILE_MISMATCH', 'Snapshot profile does not match this engine');
+  assertRecalculationConfiguration(snapshot, { budget });
   // All graph and candidate resolution shares one private snapshot identity. Only its facts
   // change; the operation's cached structural expansions must not be charged repeatedly.
   const current = { ...snapshot, content: { ...snapshot.content, facts: [...snapshot.content.facts] } };

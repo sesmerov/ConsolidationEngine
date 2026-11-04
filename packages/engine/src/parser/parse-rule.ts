@@ -1,11 +1,12 @@
 import { CharStream, CommonTokenStream, Token } from 'antlr4';
-import type { Diagnostic } from '@ce/contracts';
+import { LANGUAGE_PROFILE_V1, type Diagnostic } from '@ce/contracts';
 import DpmLexer from '../generated/dpm_xlLexer.js';
 import DpmParser from '../generated/dpm_xlParser.js';
 import { PARSER_LIMITS } from '../ast/ast.js';
 import type { Ast, SourceSpan } from '../ast/ast.js';
 import { AstBuildError, AstVisitor } from './ast-visitor.js';
 import type { AntlrContext } from './ast-visitor.js';
+import { languageProfile } from '../profiles/registry.js';
 
 export type ParseRuleResult = { readonly syntaxStatus: 'valid' | 'error'; readonly supportStatus: 'supported' | 'unsupported';
   readonly diagnostics: readonly Diagnostic[]; readonly ast?: Ast };
@@ -74,7 +75,7 @@ function guardNesting(tokens: readonly Token[]): void {
 }
 
 /** Parse the original input completely; a recovered tree is never executable. */
-export function parseRule(text: string): ParseRuleResult {
+export function parseRule(text: string, options: { readonly profileId?: string } = {}): ParseRuleResult {
   const diagnostics: Diagnostic[] = [];
   let syntaxValidated = false;
   const position = (offset: number): SourceSpan => {
@@ -83,6 +84,7 @@ export function parseRule(text: string): ParseRuleResult {
     return { start, end: Math.min(text.length, start + 1), line: before.split('\n').length, column: start - lastNewline - 1 };
   };
   try {
+    if (!languageProfile(options.profileId ?? LANGUAGE_PROFILE_V1)) return { syntaxStatus: 'error', supportStatus: 'unsupported', diagnostics: [{ code: 'PROFILE_MISMATCH', message: 'El perfil del lenguaje no está admitido.', severity: 'error' }] };
     if (text.length > PARSER_LIMITS.characters) resource(position(PARSER_LIMITS.characters), 'La expresión supera 32768 caracteres.');
     // false keeps token offsets in the same UTF-16 units as JavaScript slice and source spans.
     const lexer = new DpmLexer(new CharStream(text, false)) as DpmLexer & ErrorSource;

@@ -4,6 +4,16 @@ export type JsonObject = { readonly [key: string]: JsonValue };
 export type UUID = string;
 export type CivilDate = string;
 export interface Rational { readonly numerator: string; readonly denominator: string }
+export type DataType = 'number' | 'boolean' | 'text' | 'date';
+export interface TextValue { readonly kind: 'text'; readonly value: string }
+export interface DateValue { readonly kind: 'date'; readonly value: CivilDate }
+export type NormalizedValue = Rational | boolean | TextValue | DateValue;
+/** Distinguishes an exact rational DTO from tagged text/date; never coerces a value. */
+export function isRationalValue(value: unknown): value is Rational {
+  return typeof value === 'object' && value !== null && !('kind' in value)
+    && 'numerator' in value && typeof value.numerator === 'string'
+    && 'denominator' in value && typeof value.denominator === 'string';
+}
 export interface SourceLocator {
   readonly fileId?: UUID; readonly sheet?: string; readonly row?: number;
   readonly column?: string; readonly ruleCode?: string;
@@ -16,6 +26,8 @@ export interface SnapshotContent {
   readonly catalog: CatalogData; readonly coordinates: readonly Coordinate[];
   readonly facts: readonly ReportedFact[]; readonly directions: readonly DirectionDTO[];
   readonly sources: readonly SourceFile[];
+  /** Absent for legacy ce-report-1. Trusted adapters bind visual reports to their actual source. */
+  readonly reportSourceBindings?: readonly ReportSourceBinding[];
 }
 export interface Snapshot {
   readonly versionId: UUID; readonly parentVersionId?: UUID; readonly contentHash: string;
@@ -54,6 +66,6 @@ export function safeDisplayName(value: string): string {
   return (value.split(/[\\/]/).at(-1) ?? '').replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 200) || 'archivo.xlsx';
 }
 import type { CatalogData } from './catalog.js';
-import type { Coordinate, ReportedFact, ReportContext, SourceFile } from './report.js';
+import type { Coordinate, ReportedFact, ReportContext, ReportSourceBinding, SourceFile } from './report.js';
 import type { DirectionDTO } from './recalculation.js';
 export type { ReportContext, SourceFile } from './report.js';

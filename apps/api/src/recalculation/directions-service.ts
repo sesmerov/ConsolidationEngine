@@ -1,8 +1,21 @@
 import type { DirectionChoiceDTO, DirectionDTO, DirectionEligibilityDTO, RuleResultDTO, Snapshot, ValidationBundle } from '@ce/contracts';
-import { resolveDirection, WorkBudget, WorkLimitError } from '@ce/engine';
+import { assertRecalculationConfiguration, ProfileError, RecalculationConfigurationError, resolveDirection, WorkBudget, WorkLimitError } from '@ce/engine';
+import type { WorkLimits } from '@ce/engine';
 import { ApiError } from '../errors.js';
 import { canonicalHash } from '../session/canonical-state.js';
 import type { WorkspaceStore } from '../session/workspace-store.js';
+
+/** Public and final-publication guard; the worker repeats this against its private input. */
+export function assertDirectionsAllowed(snapshot: Snapshot, limits?: Partial<WorkLimits>): void {
+  try { assertRecalculationConfiguration(snapshot, { budget: new WorkBudget({ ...(limits ? { limits } : {}) }) }); }
+  catch (error) {
+    if (error instanceof RecalculationConfigurationError || error instanceof ProfileError) throw new ApiError('INVALID_DIRECTION', {
+      reason: error.diagnostics[0]?.code ?? error.code, diagnostics: error.diagnostics.map(issue => ({ code: issue.code, message: issue.message })),
+    });
+    if (error instanceof WorkLimitError) throw new ApiError('INVALID_DIRECTION', { reason: error.code });
+    throw error;
+  }
+}
 
 export function directionEligibility(snapshot: Snapshot, result: RuleResultDTO, targetSide: 'left' | 'right', budget: WorkBudget): DirectionEligibilityDTO {
   if (!result.instanceId || !result.binding || result.coverageOnly) return { eligible: false, diagnostics: [{ code: 'INVALID_DIRECTION', message: 'Este resultado no tiene una instancia estructural admitida.', severity: 'info' }] };

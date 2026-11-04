@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { SessionStore } from '../core/session.store';
-import { versionLabel } from '../core/display';
+import { civilDate, versionLabel } from '../core/display';
 import type { ApplicationDetailDTO, ComparisonPageDTO, ComparisonRowDTO, Rational, SourceLocator, ValidationStatus, ValidationValueDTO } from '@ce/contracts';
 @Component({ selector: 'ce-comparison', standalone: true, changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './comparison.component.html' })
 export class ComparisonComponent {
@@ -12,6 +12,8 @@ export class ComparisonComponent {
   fraction(value: Rational): string { return value.denominator === '1' ? value.numerator : value.numerator + '/' + value.denominator; }
   value(value: ValidationValueDTO | undefined): string {
     if (!value) return 'Sin valor calculado'; if (value.kind === 'boolean') return value.value ? 'true' : 'false'; if (value.kind === 'unknown') return 'Metadato desconocido';
+    if (value.kind === 'text') return value.value === '' ? 'Texto vacío' : value.value;
+    if (value.kind === 'date') return civilDate(value.value);
     if (value.kind === 'null') return value.presence === 'explicit_null' ? 'Nulo explícito' : value.presence === 'implicit_null' ? 'Nulo implícito' : 'Nulo derivado';
     return this.fraction(value.nominal) + ' ' + value.unit + ' · intervalo [' + this.fraction(value.interval.lo) + ', ' + this.fraction(value.interval.hi) + ']';
   }

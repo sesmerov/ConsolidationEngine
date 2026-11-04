@@ -1,6 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { uuidSchema, workspaceParamsSchema } from '@ce/contracts';
+import { isRationalValue, uuidSchema, workspaceParamsSchema } from '@ce/contracts';
 import type { RuleRowDTO } from '@ce/contracts';
 import { ApiError } from '../errors.js';
 import { canonicalHash } from '../session/canonical-state.js';
@@ -42,6 +42,6 @@ export function registerRules(app: FastifyInstance): void {
     return { items, total: rows.length, nextCursor, versionId: query.versionId, coverage: catalog.coverage, sources: snapshot.content.sources,
       dataSummary: { explicitNulls: snapshot.content.facts.filter((fact) => fact.presence === 'null').length,
         implicitNulls: snapshot.content.coordinates.length - snapshot.content.facts.length,
-        zeroValues: snapshot.content.facts.filter((fact) => typeof fact.normalizedValue === 'object' && fact.normalizedValue.numerator === '0').length } };
+        zeroValues: snapshot.content.facts.filter((fact) => isRationalValue(fact.normalizedValue) && fact.normalizedValue.numerator === '0').length } };
   });
 }

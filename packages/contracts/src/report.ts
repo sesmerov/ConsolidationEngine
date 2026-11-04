@@ -1,5 +1,6 @@
-import type { CivilDate, Diagnostic, Rational, SourceLocator } from './common.js';
-import { civilDateSchema, rationalSchema, sourceLocatorSchema, uuidSchema } from './common.schemas.js';
+import type { CivilDate, DataType, Diagnostic, NormalizedValue, SourceLocator } from './common.js';
+import { civilDateSchema, normalizedValueSchema, sourceLocatorSchema, uuidSchema } from './common.schemas.js';
+import type { ReportProfileId } from './profiles.js';
 export const REPORT_TEMPLATE_VERSION = 'ce-report-1' as const;
 export const REPORT_SHEETS = ['Instructions', 'Contexts', 'Coordinates', 'Facts'] as const;
 export const CONTEXT_HEADERS = ['templateVersion', 'contextId', 'entityId', 'referenceDate', 'submissionDate', 'framework', 'moduleVersion', 'filingIndicators'] as const;
@@ -24,12 +25,21 @@ export interface FactIdentity {
 /** A computed value retains its original input locator and identifies the application that produced it. */
 export interface FactDerivation { readonly receiptId: string; readonly previewId: string; readonly proposalId: string; readonly baseVersionId: string }
 export interface Coordinate extends FactIdentity {
-  readonly dataType: 'number' | 'boolean'; readonly unit: string; readonly decimals: string;
+  readonly dataType: DataType; readonly unit: string; readonly decimals: string;
   readonly axes: Readonly<Record<string, string>>; readonly sourceLocator: SourceLocator;
 }
 export interface ReportedFact extends FactIdentity {
   readonly presence: 'value' | 'null'; readonly originalText?: string;
-  readonly normalizedValue?: Rational | boolean; readonly sourceLocator: SourceLocator; readonly derivation?: FactDerivation;
+  readonly normalizedValue?: NormalizedValue; readonly sourceLocator: SourceLocator; readonly derivation?: FactDerivation;
+}
+/** Layout ownership comes from the actual uploaded file, including context supplied in the UI. */
+export interface ReportSourceBinding {
+  readonly sourceFileId: string; readonly contextIds: readonly string[]; readonly profileId: ReportProfileId;
+  readonly mappingSha256: string; readonly selectedSheets: readonly string[]; readonly excludedSheets: readonly string[];
+  readonly scaleExponent?: 0 | 3 | 6;
+  /** Written precision p, an integer -18..18 or INF. Coordinate.decimals remains the base precision string p-s. */
+  readonly displayDecimals?: number | 'INF';
+  readonly contextOrigin: 'form' | 'workbook';
 }
 export interface ImportedReport {
   readonly contexts: readonly ReportContext[]; readonly coordinates: readonly Coordinate[];
@@ -52,8 +62,18 @@ export const reportContextSchema = { type: 'object', additionalProperties: false
   framework: text, moduleVersion: text, filingIndicators: { type: 'object', propertyNames: { pattern: '^(?!v_)[A-Za-z](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?$' }, additionalProperties: { type: 'boolean' } }, filingIndicatorsLocator: sourceLocatorSchema,
 } } as const;
 export const coordinateSchema = { type: 'object', additionalProperties: false, required: [...Object.keys(identity), 'dataType', 'unit', 'decimals', 'axes', 'sourceLocator'], properties: {
-  ...identity, dataType: { enum: ['number', 'boolean'] }, unit: text, decimals: text, axes: { type: 'object', additionalProperties: { type: 'string' } }, sourceLocator: sourceLocatorSchema,
-} } as const;
+  ...identity, dataType: { enum: ['number', 'boolean', 'text', 'date'] }, unit: text, decimals: text, axes: { type: 'object', additionalProperties: { type: 'string' } }, sourceLocator: sourceLocatorSchema,
+}, allOf: [{ if: { type: 'object', properties: { dataType: { enum: ['text', 'date'] } } }, then: { type: 'object', properties: { unit: { const: '' }, decimals: { const: '' } } } }] } as const;
 export const reportedFactSchema = { type: 'object', additionalProperties: false, required: [...Object.keys(identity), 'presence', 'sourceLocator'], properties: {
-  ...identity, presence: { enum: ['value', 'null'] }, originalText: text, normalizedValue: { anyOf: [rationalSchema, { type: 'boolean' }] }, sourceLocator: sourceLocatorSchema, derivation: factDerivationSchema,
-}, allOf: [{ if: { type: 'object', required: ['derivation'] }, then: { type: 'object', required: ['originalText', 'normalizedValue'], properties: { presence: { const: 'value' } } } }] } as const;
+  ...identity, presence: { enum: ['value', 'null'] }, originalText: text, normalizedValue: normalizedValueSchema, sourceLocator: sourceLocatorSchema, derivation: factDerivationSchema,
+}, allOf: [{ if: { type: 'object', properties: { presence: { const: 'value' } } }, then: { type: 'object', required: ['normalizedValue'] }, else: { not: { type: 'object', required: ['normalizedValue'] } } },
+  { if: { type: 'object', required: ['derivation'] }, then: { type: 'object', required: ['originalText', 'normalizedValue'], properties: { presence: { const: 'value' } } } }] } as const;
+export const reportSourceBindingSchema = { type: 'object', additionalProperties: false,
+  required: ['sourceFileId', 'contextIds', 'profileId', 'mappingSha256', 'selectedSheets', 'excludedSheets', 'contextOrigin'], properties: {
+    sourceFileId: uuidSchema, contextIds: { type: 'array', minItems: 1, maxItems: 100_000, uniqueItems: true, items: contextId },
+    profileId: { enum: ['ce-report-1', 'eba-corep-of-4.0-ca1-v1', 'ce-demo-types-1'] }, mappingSha256: { type: 'string', pattern: '^[0-9a-f]{64}$' },
+    selectedSheets: { type: 'array', minItems: 1, maxItems: 256, uniqueItems: true, items: { type: 'string', minLength: 1, maxLength: 31 } },
+    excludedSheets: { type: 'array', maxItems: 256, uniqueItems: true, items: { type: 'string', minLength: 1, maxLength: 31 } },
+    scaleExponent: { enum: [0, 3, 6] }, displayDecimals: { anyOf: [{ type: 'integer', minimum: -18, maximum: 18 }, { const: 'INF' }] },
+    contextOrigin: { enum: ['form', 'workbook'] },
+  } } as const;

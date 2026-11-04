@@ -1,4 +1,4 @@
-import { ApplicationError, NumericError, WorkLimitError, applyCandidate } from '@ce/engine';
+import { ApplicationError, NumericError, ProfileError, RecalculationConfigurationError, WorkLimitError, applyCandidate } from '@ce/engine';
 import type { ApplyCandidateOptions, WorkLimits } from '@ce/engine';
 import type { JsonValue, PreviewBundle, ValidationBundle } from '@ce/contracts';
 import { ApiError } from '../errors.js';
@@ -18,6 +18,7 @@ export function execute(input: JsonValue, context: OperationContext): WorkerOutp
     const applicationCandidate = applyCandidate(context.snapshot, data.preview as unknown as PreviewBundle, options);
     return { complete: true, applicationCandidate, resultRef: { type: 'application', id: options.receiptId } };
   } catch (error) {
+    if (error instanceof RecalculationConfigurationError || error instanceof ProfileError) return { complete: false, diagnostics: [{ code: error.code, message: error.message }, ...error.diagnostics] };
     if (error instanceof WorkLimitError || error instanceof NumericError && error.code === 'RESOURCE_LIMIT' || error instanceof ApplicationError)
       return { complete: false, diagnostics: [{ code: error.code, message: 'No se completó la aplicación.' }] };
     throw error;

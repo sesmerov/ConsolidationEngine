@@ -194,6 +194,12 @@ GET `/workspaces/{w}/previews/{previewId}/proposals/{proposalId}` → `ProposalD
 fuentes y etiquetas de presentación. Solo devuelve una propuesta de esa preview;
 404 para asociación incorrecta. Es consulta, no aceptación ni selección de antecesores.
 
+El detalle incluye `calculation?` según el modelo: expresión/precondición, valores
+efectivos de fuente/precondición y lecturas capturadas del estado simulado real, con
+identificación del productor previo cuando corresponda. Las páginas omiten este campo;
+no se derivan entradas de una propuesta consultando los valores originales del informe.
+La evidencia se conserva en el bundle contabilizado, no en un caché fuera de cuota.
+
 La comparación mantiene el emparejado semántico de resultados e incluye un filtro nuevo
 `changedOnly:boolean` (por defecto false por compatibilidad). Cambiado significa distinto
 estado, operandos efectivos, diagnósticos o datos leídos; incluye «Pasa → Pasa» con distinto

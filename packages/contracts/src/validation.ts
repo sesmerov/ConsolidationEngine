@@ -1,21 +1,26 @@
-import type { Diagnostic, Rational, SourceLocator } from './common.js';
+import type { DataType, Diagnostic, NormalizedValue, Rational, SourceLocator } from './common.js';
+import type { RecalculationPolicyDTO } from './profiles.js';
 import type { Coordinate, FactDerivation } from './report.js';
 import type { SourceFile } from './report.js';
 import type { Severity } from './catalog.js';
 import type { DirectionChoiceDTO } from './recalculation.js';
+import { uuidSchema } from './common.schemas.js';
+import { diagnosticSchema } from './catalog.js';
 export type ValidationStatus = 'pass' | 'fail' | 'not_applicable' | 'not_evaluable' | 'error';
 export interface ValidationBinding { readonly contextId?: string; readonly contextIds?: readonly string[]; readonly tableCode?: string; readonly sheetCode?: string; readonly rowCode?: string; readonly columnCode?: string }
 export type ValidationValueDTO = (
   | { readonly kind: 'number'; readonly nominal: Rational; readonly interval: { readonly lo: Rational; readonly hi: Rational }; readonly unit: string }
   | { readonly kind: 'boolean'; readonly value: boolean }
-  | { readonly kind: 'null'; readonly presence: 'explicit_null' | 'implicit_null' | 'derived_null'; readonly dataType: 'number' | 'boolean'; readonly unit?: string }
+  | { readonly kind: 'text'; readonly value: string }
+  | { readonly kind: 'date'; readonly value: string }
+  | { readonly kind: 'null'; readonly presence: 'explicit_null' | 'implicit_null' | 'derived_null'; readonly dataType: DataType; readonly unit?: string }
   | { readonly kind: 'unknown'; readonly presence: 'unknown' }
 ) & { readonly coordinate?: Coordinate; readonly sourceLocator?: SourceLocator };
 export interface MetadataReadDTO { readonly contextId: string; readonly code: string; readonly presence: 'declared' | 'missing'; readonly value?: boolean; readonly sourceLocator?: SourceLocator }
 /** Original snapshot input, before selection-specific default and interval options. */
 export interface FactReadDTO {
   readonly factKey: string; readonly coordinate: Coordinate; readonly presence: 'value' | 'explicit_null' | 'implicit_null';
-  readonly normalizedValue?: Rational | boolean; readonly originalText?: string; readonly sourceLocator: SourceLocator; readonly derivation?: FactDerivation;
+  readonly normalizedValue?: NormalizedValue; readonly originalText?: string; readonly sourceLocator: SourceLocator; readonly derivation?: FactDerivation;
 }
 export interface RuleResultDTO {
   readonly id: string; readonly runId: string; readonly versionId: string; readonly profileId: string;
@@ -26,7 +31,7 @@ export interface RuleResultDTO {
   readonly values: { readonly left?: ValidationValueDTO; readonly right?: ValidationValueDTO; readonly result?: ValidationValueDTO };
   readonly readKeys: readonly string[]; readonly factReads: readonly FactReadDTO[]; readonly metadataReads: readonly MetadataReadDTO[];
   readonly sources: readonly SourceLocator[]; readonly diagnostics: readonly Diagnostic[];
-  readonly recalculation?: { readonly left: DirectionEligibilityDTO; readonly right: DirectionEligibilityDTO };
+  readonly recalculation?: { readonly left: DirectionEligibilityDTO; readonly right: DirectionEligibilityDTO; readonly policy?: RecalculationPolicyDTO };
 }
 /** Optional, request-scoped eligibility metadata; it never changes the validation result. */
 export interface DirectionEligibilityDTO { readonly eligible: boolean; readonly target?: Coordinate; readonly diagnostics: readonly Diagnostic[] }
@@ -41,3 +46,17 @@ export interface ValidationRunDTO {
 }
 export interface ValidationBundle { readonly run: ValidationRunDTO; readonly results: readonly RuleResultDTO[] }
 export interface ValidationResultsPageDTO { readonly items: readonly RuleResultDTO[]; readonly total: number; readonly nextCursor: string | null; readonly versionId: string; readonly run: ValidationRunDTO; readonly sourceFiles?: readonly SourceFile[]; readonly configuredDirections?: readonly DirectionChoiceDTO[] }
+const count = { type: 'integer', minimum: 0 } as const;
+export const validationSummarySchema = { type: 'object', additionalProperties: false,
+  required: ['complete', 'rows', 'variants', 'applicableVariants', 'instances', 'duplicateRows', 'byStatus'], properties: {
+    complete: { type: 'boolean' }, rows: count, variants: count, applicableVariants: count, instances: count, duplicateRows: count,
+    byStatus: { type: 'object', additionalProperties: false, required: ['pass', 'fail', 'not_applicable', 'not_evaluable', 'error'], properties: {
+      pass: count, fail: count, not_applicable: count, not_evaluable: count, error: count,
+    } },
+  } } as const;
+export const validationRunSchema = { type: 'object', additionalProperties: false,
+  required: ['id', 'versionId', 'profileId', 'status', 'startedAt', 'summary', 'resultIds', 'diagnostics'], properties: {
+    id: uuidSchema, versionId: uuidSchema, profileId: { type: 'string' }, status: { enum: ['running', 'completed', 'incomplete'] },
+    startedAt: { type: 'string', format: 'date-time' }, endedAt: { type: 'string', format: 'date-time' }, summary: validationSummarySchema,
+    resultIds: { type: 'array', items: { type: 'string' } }, diagnostics: { type: 'array', items: diagnosticSchema },
+  } } as const;
