@@ -4,7 +4,7 @@
 
 **Input**: especificación 002 y aclaración del usuario: condicionales, texto y fechas exclusivamente de validación.
 
-**Estado**: fases 0 y 1 completadas; [tareas generadas](tasks.md). Implementación, instalación de dependencias y aceptación de esta iteración pendientes.
+**Estado**: fases 0 y 1 completadas; [implementación en curso](tasks.md). Material/CDK instalados; capacidades nuevas y aceptación pendientes de sus comprobaciones. La evidencia de ejecución se registra en `docs/verification-002.md`.
 
 ## Summary
 
@@ -73,7 +73,7 @@ specs/002-ui-eba-demo/
     └── demo-corpus.json
 ~~~
 
-tasks.md se generó con speckit-tasks después de esta planificación: 76 tareas agrupadas por historia, con dependencias, pruebas y criterios de cierre. Ninguna se ha implementado en esta fase.
+tasks.md se generó con speckit-tasks después de esta planificación: 76 tareas agrupadas por historia, con dependencias, pruebas y criterios de cierre. Su checklist registra el progreso de implementación posterior.
 
 ### Source Code (repository root)
 
@@ -138,7 +138,7 @@ Commits acotados con validación y límites. Sin push ni despliegue remoto. Prue
 | FR-030–035, SC-004 | 24 expectativas y cinco recálculos; negativos separados; unsupported no cuenta como éxito. |
 | FR-036–038, SC-006/007/008 | Regresión, cuotas/atomicidad/cancelación, medición nueva y aceptación humana. |
 
-Evidencia de planificación: 30 análisis sintácticos ANTLR y cinco sumas independientes; 110 correspondencias y huellas verificadas. No son pruebas de capacidades aún no implementadas. No se ha instalado Material ni modificado el producto.
+Evidencia de planificación: 30 análisis sintácticos ANTLR y cinco sumas independientes; 110 correspondencias y huellas verificadas. No son pruebas de capacidades aún no implementadas. Al cerrar la planificación no se había instalado Material ni modificado el producto; la ejecución posterior se registra por separado.
 
 ## Complexity Tracking
 

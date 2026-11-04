@@ -1,0 +1,30 @@
+{
+  "manifestVersion": 1,
+  "incorporatedOn": "2026-11-04",
+  "profileId": "eba-corep-of-4.0-ca1-v1",
+  "release": "4.0",
+  "sources": [
+    {
+      "file": "official-annexes-4.0.xlsx",
+      "purpose": "presentation",
+      "url": "https://www.eba.europa.eu/sites/default/files/2025-02/1b4c4008-4224-450f-aa7b-c6fe5284872a/ITS%20on%20supervisory%20reporting.zip",
+      "originalWorkbookEntry": "C_2024_8389_1_ANNEX_EN_V3_P1_3682615.XLSX",
+      "sha256": "f3c4aad1a313e3568ba56d62124c554300c94caee444e837531725b543f4cfa7",
+      "bytes": 1335372
+    },
+    {
+      "file": "annotated-corep-of-4.0.xlsx",
+      "purpose": "metadata",
+      "url": "https://www.eba.europa.eu/sites/default/files/2024-12/7ae0363a-ad3d-42d9-a192-34711416c039/annotated_templates.zip",
+      "originalWorkbookEntry": "20241217 Annotated Table Layout  COREP_OFCOREP 4.0.xlsx",
+      "sha256": "610d72d283dd74a6d572c49e1959fba43a662548df4e5399dca2f4b3523c7e5f",
+      "bytes": 3059614
+    }
+  ],
+  "notes": [
+    "Public original workbooks preserved byte for byte; no report data added.",
+    "The annotated workbook supplies mapping metadata, not reported monetary facts.",
+    "These source fixtures are inputs to reproducible local template preparation; runtime does not download them or depend on the planning cache.",
+    "Release 4.0 is the pinned project baseline, not a claim about the latest regulatory release."
+  ]
+}

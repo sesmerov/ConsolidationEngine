@@ -2,7 +2,7 @@
 
 **Input**: documentos de `specs/002-ui-eba-demo/`.
 **Prerequisites**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md` y `.specify/memory/constitution.md`.
-**Estado**: tareas generadas; implementación y verificaciones de esta iteración pendientes.
+**Estado**: implementación en curso; solo se marcan tareas completadas con evidencia de esta iteración.
 **Tests**: obligatorios por FR-038 y SC-001–008. Los casos nuevos se escriben antes de implementar y deben evidenciar el comportamiento ausente; un error de compilación por un archivo inexistente no sustituye esa evidencia.
 **Organization**: cuatro historias con entregas verificables; base compartida mínima y cierre transversal. La aceptación de 001 no acredita 002.
 
@@ -20,9 +20,9 @@
 
 **Propósito**: preparar la ampliación sobre el monorepo actual. T002 y T003 pueden avanzar juntos después de T001; no comparten archivos.
 
-- [ ] T001 Fijar `@angular/material` y `@angular/cdk` en **22.2.4** en `apps/web/package.json` y `package-lock.json`, usando `scripts/run-with-toolchain.ps1`; conservar Angular 22.2.4, CLI/build 22.2.5 y las restantes versiones del plan, verificar instalación reproducible sin añadir otro motor XLSX ni elevar presupuestos de bundle.
-- [ ] T002 [P] Incorporar intactos los dos XLSX públicos del contrato en `tests/fixtures/eba/official-annexes-4.0.xlsx` y `tests/fixtures/eba/annotated-corep-of-4.0.xlsx` (nuevos), con `tests/fixtures/eba/source-manifest.json` (nuevo): URL, nombre original, finalidad y SHA-256. Verificar hashes ITS `f3c4aad1a313e3568ba56d62124c554300c94caee444e837531725b543f4cfa7` y anotado `610d72d283dd74a6d572c49e1959fba43a662548df4e5399dca2f4b3523c7e5f`; usar la caché solo para adquirirlos, nunca como dependencia de build/runtime.
-- [ ] T003 [P] Comprobar el aislamiento de `playwright.config.ts` y `tests/performance/playwright.config.ts` y adaptar únicamente lo necesario para puertos/procesos propios, sin reutilizar el servidor del usuario; ejecutar typecheck y regresión representativa v1 con `scripts/run-with-toolchain.ps1` y abrir `docs/verification-002.md` (nuevo) con commit, toolchain, comandos, resultados y limitaciones reales.
+- [X] T001 Fijar `@angular/material` y `@angular/cdk` en **22.2.4** en `apps/web/package.json` y `package-lock.json`, usando `scripts/run-with-toolchain.ps1`; conservar Angular 22.2.4, CLI/build 22.2.5 y las restantes versiones del plan, verificar instalación reproducible sin añadir otro motor XLSX ni elevar presupuestos de bundle.
+- [X] T002 [P] Incorporar intactos los dos XLSX públicos del contrato en `tests/fixtures/eba/official-annexes-4.0.xlsx` y `tests/fixtures/eba/annotated-corep-of-4.0.xlsx` (nuevos), con `tests/fixtures/eba/source-manifest.json` (nuevo): URL, nombre original, finalidad y SHA-256. Verificar hashes ITS `f3c4aad1a313e3568ba56d62124c554300c94caee444e837531725b543f4cfa7` y anotado `610d72d283dd74a6d572c49e1959fba43a662548df4e5399dca2f4b3523c7e5f`; usar la caché solo para adquirirlos, nunca como dependencia de build/runtime.
+- [X] T003 [P] Comprobar el aislamiento de `playwright.config.ts` y `tests/performance/playwright.config.ts` y adaptar únicamente lo necesario para puertos/procesos propios, sin reutilizar el servidor del usuario; ejecutar typecheck y regresión representativa v1 con `scripts/run-with-toolchain.ps1` y abrir `docs/verification-002.md` (nuevo) con commit, toolchain, comandos, resultados y limitaciones reales.
 
 ## Phase 2: Foundational — contratos y barrera común de recálculo
 

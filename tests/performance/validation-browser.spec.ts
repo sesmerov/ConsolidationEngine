@@ -8,6 +8,28 @@ for (let trial = 1; trial <= count; trial++) test(`SC006 trial ${trial}`, async 
   const manifest = JSON.parse(await fs.readFile(path.join(directory, 'manifest.json'), 'utf8'));
   const samples: unknown[] = [], errors: string[] = []; let t0: number | undefined, importId = '', elapsedMs: number | undefined, auditPassed = false, diagnosticVisible = false;
   const server = fork(path.resolve('scripts/benchmark.mjs'), ['--server'], { execPath: process.execPath, silent: true, env: { ...process.env, PORT: '3317', NODE_ENV: 'production' } });
+  // An HTTP response alone could come from another process already occupying 3317.
+  // Wait for this child's successful listen before sending any request to that port.
+  const ownServerReady = new Promise<void>((resolve, reject) => {
+    let startupOutput = '';
+    const complete = (error?: Error) => {
+      clearTimeout(timer);
+      server.stdout?.off('data', onData);
+      server.off('error', onError);
+      server.off('exit', onExit);
+      if (error) reject(error); else resolve();
+    };
+    const onData = (chunk: Buffer) => {
+      startupOutput = (startupOutput + String(chunk)).slice(-4096);
+      if (startupOutput.includes('ConsolidationEngine API: http://127.0.0.1:3317')) complete();
+    };
+    const onError = (error: Error) => complete(error);
+    const onExit = (code: number | null) => complete(new Error(`Benchmark server exited before listening (${code}); no existing server will be reused.`));
+    const timer = setTimeout(() => complete(new Error('Benchmark-owned server did not start within 30 seconds.')), 30000);
+    server.stdout?.on('data', onData);
+    server.once('error', onError);
+    server.once('exit', onExit);
+  });
   server.stdout?.resume(); server.stderr?.on('data', chunk => errors.push(String(chunk))); server.on('message', message => samples.push(message));
   const stages: Record<string, unknown> = {};
   page.on('pageerror', error => errors.push(error.message));
@@ -19,6 +41,7 @@ for (let trial = 1; trial <= count; trial++) test(`SC006 trial ${trial}`, async 
     }
   });
   try {
+    await ownServerReady;
     await expect.poll(async () => { try { return (await page.request.get('/api/v1/bootstrap')).status(); } catch { return 0; } }, { timeout: 30000 }).toBe(200);
     await page.goto('/'); await page.getByLabel('Nombre del conjunto').fill('SYNTHETIC SC006 ' + trial); await page.getByRole('button', { name: 'Crear conjunto', exact: true }).click();
     await page.getByLabel('Catálogo de reglas (.xlsx)').setInputFiles(path.join(directory, 'catalog.xlsx'));
@@ -68,6 +91,8 @@ for (let trial = 1; trial <= count; trial++) test(`SC006 trial ${trial}`, async 
     errors.push(String(error)); throw error;
   } finally {
     await fs.writeFile(path.join(output, `trial-${trial}.json`), JSON.stringify({ trial, elapsedMs, auditPassed, diagnosticVisible, stages, errors, samples, testStatus: testInfo.status }, null, 2));
-    server.kill('SIGTERM'); await new Promise(resolve => { server.once('exit', resolve); setTimeout(() => { server.kill('SIGKILL'); resolve(null); }, 5000).unref(); });
+    if (server.exitCode === null && server.signalCode === null) {
+      server.kill('SIGTERM'); await new Promise(resolve => { server.once('exit', resolve); setTimeout(() => { server.kill('SIGKILL'); resolve(null); }, 5000).unref(); });
+    }
   }
 });
