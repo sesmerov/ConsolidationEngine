@@ -7,6 +7,8 @@ import { registerResults } from '../../apps/api/src/routes/results.js';
 import { registerPreviews } from '../../apps/api/src/routes/previews.js';
 import { registerApplications } from '../../apps/api/src/routes/applications.js';
 import { WorkspaceStore } from '../../apps/api/src/session/workspace-store.js';
+import { COREP_MAPPING_SHA256, COREP_PROFILE_ID } from '../../apps/api/src/import/profiles/corep-ca1.js';
+import { rulePresentation } from '../../apps/api/src/presentation/rule-presentation.js';
 import { content } from '../helpers/foundation.js';
 
 const apps: ReturnType<typeof Fastify>[] = [];
@@ -18,7 +20,7 @@ const fact = (value: string): FactReadDTO => ({ factKey: 'cell', coordinate, pre
 const effective = (value: string) => ({ kind: 'number' as const, nominal: r(value), interval: { lo: r(value), hi: r(value) }, unit: 'EUR' });
 const summary = { complete: true, rows: 0, variants: 0, applicableVariants: 0, instances: 0, duplicateRows: 0, byStatus: { pass: 0, fail: 0, not_applicable: 0, not_evaluable: 0, error: 0 } };
 
-function setup(profileId = 'ce-dpmxl-0.9-closed-v1') {
+function setup(profileId = 'ce-dpmxl-0.9-closed-v1', extra: Partial<SnapshotContent> = {}) {
   const app = Fastify({ ajv: { customOptions: { removeAdditional: false, coerceTypes: false } } }); apps.push(app);
   const store = new WorkspaceStore(), workspace = store.create('Presentation tests'); app.decorate('ce', { store });
   registerResults(app); registerPreviews(app); registerApplications(app);
@@ -27,7 +29,7 @@ function setup(profileId = 'ce-dpmxl-0.9-closed-v1') {
     records: recordIds.map((id, index) => ({ id, code: 'RULE', variantId: hash, sourceLocator: { fileId, sheet: 'Rules', row: index ? 2 : 3 }, originalFields: { Description: index ? { value: 'Capital disponible <b>texto</b>', xmlType: 'inlineStr', lexeme: 'Capital disponible <b>texto</b>', column: 'I' } : 'Descripción alternativa' }, diagnostics: [] })),
     variants: [{ variantId: hash, code: 'RULE', expression: '1=1', framework: 'COREP', modules: ['COREP_OF_4.0'], tables: [], crossModule: false, active: true, referenceWindow: {}, severity: 'error', severityOriginal: 'Error', sourceRecords: recordIds, sourceLocators: [] }],
   };
-  const snapshot = store.publish(workspace.id, undefined, { ...content(), profileId, facts: [], coordinates: [], catalog });
+  const snapshot = store.publish(workspace.id, undefined, { ...content(), profileId, facts: [], coordinates: [], catalog, ...extra });
   const base = `/api/v1/workspaces/${workspace.id}`;
   const result = (code: string, value = '1'): RuleResultDTO => ({ id: randomUUID(), runId: randomUUID(), versionId: snapshot.versionId, profileId, code, variantIds: [hash], sourceRecordIds: recordIds, coverageOnly: true, tables: [], status: 'pass', severity: 'error', severityOriginal: 'Error', expression: '1=1', values: { left: effective(value), right: effective(value), result: { kind: 'boolean', value: true } }, readKeys: ['cell'], factReads: [fact(value)], metadataReads: [], sources: [], diagnostics: [] });
   const saveRun = (rows: readonly RuleResultDTO[], versionId = snapshot.versionId) => {
@@ -52,6 +54,18 @@ function setup(profileId = 'ce-dpmxl-0.9-closed-v1') {
 }
 
 describe('presentation and stored calculation details', () => {
+  it('uses the server COREP mapping only for the exact bound profile, source and context', async () => {
+    const binding = { profileId: COREP_PROFILE_ID, mappingSha256: COREP_MAPPING_SHA256, sourceFileId: fileId, contextIds: ['demo'], selectedSheets: ['CA1'], excludedSheets: [], contextOrigin: 'form' as const };
+    const f = setup('ce-dpmxl-0.9-closed-v2', { reportSourceBindings: [binding] }), run = f.saveRun([f.result('RULE')]), preview = f.savePreview();
+    const result = await f.app.inject({ url: `${f.base}/runs/${run.run.id}/results` }); expect(result.statusCode, result.body).toBe(200);
+    expect(result.json().items[0].presentation).toEqual({ description: 'Capital disponible <b>texto</b>', conceptLabel: 'OWN FUNDS' });
+    const proposal = await f.app.inject({ url: `${f.base}/previews/${preview.id}/proposals/${preview.proposalId}` }); expect(proposal.statusCode, proposal.body).toBe(200);
+    expect(proposal.json().presentation.conceptLabel).toBe('OWN FUNDS');
+    for (const altered of [{ ...binding, mappingSha256: 'f'.repeat(64) }, { ...binding, profileId: 'ce-report-1' as const }, { ...binding, sourceFileId: randomUUID() }, { ...binding, contextIds: ['other'] }]) {
+      expect(rulePresentation({ ...f.snapshot.content, reportSourceBindings: [altered] })([hash], coordinate)?.conceptLabel).toBeUndefined();
+    }
+    expect(rulePresentation(f.snapshot.content)([hash], { ...coordinate, rowCode: '9999' })?.conceptLabel).toBeUndefined();
+  });
   it.each(['ce-dpmxl-0.9-closed-v1', 'ce-dpmxl-0.9-closed-v2'])('adds trusted stable descriptions without changing %s policy', async profile => {
     const f = setup(profile), run = f.saveRun([f.result('RULE')]);
     const response = await f.app.inject({ url: `${f.base}/runs/${run.run.id}/results` }); expect(response.statusCode, response.body).toBe(200);

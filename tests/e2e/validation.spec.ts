@@ -4,7 +4,7 @@ import type { Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
 import { readZipParts } from '../helpers/xlsx-fixtures.js';
-import { navigateStage, openCalculation, openTechnical } from './workflow-helpers.js';
+import { enableLegacyFormat, navigateStage, openCalculation, openTechnical } from './workflow-helpers.js';
 const root = path.resolve('tests/fixtures/generated'), catalogPath = path.join(root, 'eba-subset.xlsx');
 async function session(page: Page) { const bootstrap = await (await page.request.get('/api/v1/bootstrap')).json(); return { id: bootstrap.activeWorkspaceId as string, headers: { 'X-CE-Session': bootstrap.sessionToken as string } }; }
 async function editedWorkbook(name: string, change: (sheets: { sheet: string; data: (string | null)[][] }[]) => void): Promise<Buffer> {
@@ -13,6 +13,7 @@ async function editedWorkbook(name: string, change: (sheets: { sheet: string; da
 }
 async function upload(page: Page, report: string | Buffer, catalog?: Buffer) {
   await navigateStage(page, 'import');
+  await enableLegacyFormat(page);
   await page.getByLabel('Catálogo de reglas (.xlsx)').setInputFiles(catalog ? { name: 'synthetic-catalog.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: catalog } : catalogPath);
   await page.getByLabel('Informes (.xlsx)', { exact: true }).setInputFiles(typeof report === 'string' ? path.join(root, report) : { name: 'synthetic-report.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: report });
   const response = page.waitForResponse((response) => response.url().endsWith('/imports') && response.request().method() === 'POST'); await page.getByRole('button', { name: 'Cargar archivos', exact: true }).click();

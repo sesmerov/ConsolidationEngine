@@ -1,4 +1,5 @@
-import type { PresentationDTO, RawRuleRecord, SnapshotContent } from '@ce/contracts';
+import type { Coordinate, PresentationDTO, RawRuleRecord, SnapshotContent } from '@ce/contracts';
+import { COREP_MAPPING, COREP_MAPPING_SHA256, COREP_PROFILE_ID } from '../import/profiles/corep-ca1.js';
 
 const ordinal = (left: string, right: string) => left < right ? -1 : left > right ? 1 : 0;
 function description(record: RawRuleRecord): string | undefined {
@@ -7,7 +8,7 @@ function description(record: RawRuleRecord): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;
 }
 /** Index once per query. Descriptions remain plain source text and never affect identity or permission. */
-export function rulePresentation(content: SnapshotContent): (variantIds: readonly string[]) => PresentationDTO | undefined {
+export function rulePresentation(content: SnapshotContent): (variantIds: readonly string[], coordinate?: Coordinate) => PresentationDTO | undefined {
   const fileOrder = new Map(content.sources.map((file, index) => [file.id, index]));
   const sourceOrder = (left: RawRuleRecord, right: RawRuleRecord): number => {
     const a = left.sourceLocator, b = right.sourceLocator;
@@ -18,9 +19,12 @@ export function rulePresentation(content: SnapshotContent): (variantIds: readonl
   const byId = new Map(content.catalog.records.map(record => [record.id, record]));
   const descriptions = new Map(content.catalog.variants.map(variant => [variant.variantId,
     variant.sourceRecords.flatMap(id => { const record = byId.get(id); return record && description(record) !== undefined ? [record] : []; }).sort(sourceOrder)]));
-  return variantIds => {
+  return (variantIds, coordinate) => {
     const first = variantIds.flatMap(id => descriptions.get(id) ?? []).sort(sourceOrder)[0];
     const text = first ? description(first) : undefined;
-    return text === undefined ? undefined : { description: text };
+    const bound = coordinate && content.reportSourceBindings?.some(binding => binding.profileId === COREP_PROFILE_ID && binding.mappingSha256 === COREP_MAPPING_SHA256
+      && binding.sourceFileId === coordinate.sourceLocator.fileId && binding.contextIds.includes(coordinate.contextId));
+    const conceptLabel = bound && coordinate ? COREP_MAPPING.mapping.find(cell => cell.tableCode === coordinate.tableCode && cell.sheetCode === coordinate.sheetCode && cell.rowCode === coordinate.rowCode && cell.columnCode === coordinate.columnCode)?.label : undefined;
+    return text === undefined && conceptLabel === undefined ? undefined : { ...(text === undefined ? {} : { description: text }), ...(conceptLabel === undefined ? {} : { conceptLabel }) };
   };
 }

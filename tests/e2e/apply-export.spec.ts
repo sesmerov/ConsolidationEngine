@@ -6,7 +6,7 @@ import type { Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
 import { readZipParts } from '../helpers/xlsx-fixtures.js';
-import { navigateStage, openCalculation } from './workflow-helpers.js';
+import { enableLegacyFormat, navigateStage, openCalculation } from './workflow-helpers.js';
 const root = path.resolve('tests/fixtures/generated'), mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const exact = '123456789012345678901234567890.123456789';
 const hashes = new Map<string, string>();
@@ -37,6 +37,7 @@ async function fixtures() {
 }
 async function upload(page: Page, catalog: Buffer, reports: { name: string; buffer: Buffer }[]) {
   await navigateStage(page, 'import');
+  await enableLegacyFormat(page);
   await page.getByLabel('Catálogo de reglas (.xlsx)').setInputFiles({ name: 'synthetic-apply-catalog.xlsx', mimeType, buffer: catalog });
   await page.getByLabel('Informes (.xlsx)', { exact: true }).setInputFiles(reports.map(report => ({ ...report, mimeType })));
   const response = page.waitForResponse(response => response.url().endsWith('/imports') && response.request().method() === 'POST'); await page.getByRole('button', { name: 'Cargar archivos', exact: true }).click();

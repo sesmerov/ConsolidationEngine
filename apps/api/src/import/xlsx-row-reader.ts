@@ -10,7 +10,9 @@ export interface RawSheetRow { readonly row: number; readonly cells: readonly Ra
 /** Second pass over an already CRC/relationship-verified sheet. Buffers at most one decoded chunk plus fragmented rows. */
 export async function* readSheetRows(filePath: string, preflight: PreflightWorkbook, name: string, options: { check?: () => void } = {}): AsyncGenerator<RawSheetRow> {
   const invalid = (): never => { throw new ApiError('INVALID_WORKBOOK'); };
+  const limits = preflight.limits ?? PREFLIGHT_LIMITS;
   const sheet = preflight.sheets.find(item => item.name === name); if (!sheet?.part) invalid();
+  if (preflight.profile === 'corep-ca1' && !['CA1', 'Contexto', 'Instrucciones'].includes(name)) invalid();
   options.check?.();
   const zip = await new Promise<yauzl.ZipFile>((resolve, reject) => yauzl.open(filePath, { lazyEntries: true, strictFileNames: true, validateEntrySizes: true, autoClose: false }, (error, file) => error ? reject(error) : resolve(file)));
   let active: Readable | undefined;
@@ -30,12 +32,12 @@ export async function* readSheetRows(filePath: string, preflight: PreflightWorkb
     parser.onerror = invalid; parser.ondoctype = invalid; parser.onsgmldeclaration = invalid;
     parser.onprocessinginstruction = instruction => { if (instruction.name.toLowerCase() !== 'xml') invalid(); };
     parser.onopentag = element => {
-      const node = element as QualifiedTag; stack.push(node); if (stack.length > PREFLIGHT_LIMITS.maxXmlDepth || node.local === 'f') invalid();
-      if (node.local === 'row') { row = Number(attribute(node, 'r')); if (!Number.isSafeInteger(row) || row < 1 || row > PREFLIGHT_LIMITS.maxRows) invalid(); cells = []; }
+      const node = element as QualifiedTag; stack.push(node); if (stack.length > limits.maxXmlDepth || node.local === 'f') invalid();
+      if (node.local === 'row') { row = Number(attribute(node, 'r')); if (!Number.isSafeInteger(row) || row < 1 || row > limits.maxRows) invalid(); cells = []; }
       if (node.local === 'c') {
         const address = attribute(node, 'r') ?? '', match = /^([A-Z]{1,3})([1-9][0-9]{0,6})$/.exec(address); if (!match || cell) invalid();
         let column = 0; for (const letter of match![1]!) column = column * 26 + letter.charCodeAt(0) - 64;
-        const position = Number(match![2]); if (position !== row || column > PREFLIGHT_LIMITS.maxColumns) invalid();
+        const position = Number(match![2]); if (position !== row || column > limits.maxColumns) invalid();
         const xmlType = attribute(node, 't') ?? 'n', style = attribute(node, 's');
         if (!['n', 'b', 's', 'inlineStr', 'str', 'e', 'd'].includes(xmlType) || style !== undefined && (!/^(0|[1-9][0-9]*)$/.test(style) || Number(style) >= (preflight.styleCount ?? 0))) invalid();
         cell = { address, row, column, xmlType, lexeme: '', text: '', ...(style !== undefined ? { style } : {}) };
@@ -45,7 +47,7 @@ export async function* readSheetRows(filePath: string, preflight: PreflightWorkb
       if (!cell) return;
       if (stack.at(-1)?.local === 'v') cell.lexeme += value;
       if (stack.at(-1)?.local === 't' && !stack.some(tag => tag.local === 'rPh')) cell.text += value;
-      if (cell.lexeme.length > PREFLIGHT_LIMITS.maxCellChars * 7 || cell.text.length > PREFLIGHT_LIMITS.maxCellChars * 7) throw new ApiError('EXPANSION_LIMIT');
+      if (cell.lexeme.length > limits.maxCellChars * 7 || cell.text.length > limits.maxCellChars * 7) throw new ApiError('EXPANSION_LIMIT');
     };
     parser.ontext = text; parser.oncdata = text;
     parser.onclosetag = () => {
@@ -55,7 +57,7 @@ export async function* readSheetRows(filePath: string, preflight: PreflightWorkb
         if (current.xmlType !== 'inlineStr') current.text = current.lexeme; else current.lexeme = current.text;
         if (current.xmlType === 'inlineStr' || current.xmlType === 'str') current.text = decodeSpreadsheetText(current.text);
         if (current.xmlType === 's') { if (!/^(0|[1-9][0-9]{0,8})$/.test(current.lexeme)) invalid(); const value = preflight.sharedStrings?.[Number(current.lexeme)]; if (value === undefined) invalid(); current.text = value!; }
-        if (current.text.length > PREFLIGHT_LIMITS.maxCellChars) throw new ApiError('EXPANSION_LIMIT');
+        if (current.text.length > limits.maxCellChars) throw new ApiError('EXPANSION_LIMIT');
         cells.push(current); cell = undefined;
       }
       if (node?.local === 'row') {

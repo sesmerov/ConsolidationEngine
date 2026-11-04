@@ -35,7 +35,7 @@ export function registerResults(app: FastifyInstance): void {
     if (remaining.length > entries.length) { const payload = Buffer.from(JSON.stringify({ fingerprint, after: entries.at(-1)!.key })).toString('base64url'); nextCursor = payload + '.' + sign(payload); }
     const snapshot = app.ce.store.snapshot(workspaceId, bundle.run.versionId), budget = new WorkBudget(), present = rulePresentation(snapshot.content);
     const items = entries.map(entry => {
-      const { presentation: _storedPresentation, ...result } = publicResult(entry.row), presentation = present(result.variantIds);
+      const { presentation: _storedPresentation, ...result } = publicResult(entry.row), presentation = present(result.variantIds, result.values.left?.coordinate ?? result.values.right?.coordinate ?? result.factReads[0]?.coordinate);
       const row = { ...result, ...(presentation ? { presentation } : {}) };
       const classified = getRecalculationPolicy(snapshot, { variantIds: row.variantIds,
         ...(row.binding ? { binding: row.binding } : {}), ...(row.instanceId ? { instanceId: row.instanceId } : {}),

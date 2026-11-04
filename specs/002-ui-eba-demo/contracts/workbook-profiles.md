@@ -110,6 +110,11 @@ del perfil; las protecciones ZIP/XML se aplican desde el primer byte. No hace fa
 interpretar fórmulas o destinos externos para reconocer las anclas.
 
 - Fuera de CA1, las fórmulas se leen como XML inerte: ni ejecución ni uso de su caché.
+- El original verificado incluye la instrucción de procesamiento vacía
+  `<?mso-contentType?>` en `customXml/item2.xml`. Se admite únicamente esa PI sin
+  contenido, en esa parte del candidato COREP y condicionada al reconocimiento
+  final; no se procesa ni ejecuta. Otras PI, la misma con contenido y cualquier
+  DTD siguen rechazadas. Esta excepción no se aplica a v1, catálogos ni hojas propias.
   El original tiene 68 en CA4, 2 en IRRBB.8 y 2 en IRRBB.9.
 - Se admiten como metadatos aislados `externalBook` y relaciones `externalLinkPath` y
   `externalLinkLongPath`, e hipervínculos, dentro de las cotas. No se abren destinos ni

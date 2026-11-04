@@ -14,7 +14,7 @@ describe('ImportStore preserves the accepted version', () => {
     http = TestBed.inject(HttpTestingController); session = TestBed.inject(SessionStore); TestBed.inject(ApiClient).setSessionToken('memory-only');
     session.workspace.set({ id: workspaceId, name: 'Cierre', state: 'ready', currentVersionId: version, versionIds: [version], contexts: [], counts: { snapshots: 1, facts: 5, coordinates: 6, sources: 2 }, sessionBytes: 100 });
     session.etag.set('"v-' + version + '"'); store = TestBed.inject(ImportStore);
-    http.expectOne('/api/v1/capabilities').flush({ profileId: 'local', grammarVersion: '0.9', support: [], knownDifferences: [], limits: {} }); TestBed.tick();
+    http.expectOne('/api/v1/capabilities').flush({ profileId: 'local', grammarVersion: '0.9', support: [], knownDifferences: [], limits: {} }); TestBed.tick(); http.expectOne(request => request.url.endsWith('/import-inspections')).flush({ active: null });
   });
   afterEach(() => { http.verify(); TestBed.resetTestingModule(); });
   it('keeps coverage and context after a rejected multipart upload, with auth and version headers', async () => {

@@ -36,7 +36,11 @@ export interface RuleRowDTO extends RawRuleRecord {
 export interface RulesPageDTO { readonly items: readonly RuleRowDTO[]; readonly total: number; readonly nextCursor: string | null; readonly versionId: string;
   readonly coverage: CatalogData['coverage']; readonly sources: readonly SourceFile[];
   readonly dataSummary: { readonly explicitNulls: number; readonly implicitNulls: number; readonly zeroValues: number } }
-export interface CapabilitiesDTO { readonly profileId: string; readonly grammarVersion: string; readonly support: readonly string[]; readonly knownDifferences: readonly string[]; readonly limits: Readonly<Record<string, number>> }
+export interface CapabilitiesDTO { readonly profileId: string; readonly grammarVersion: string; readonly support: readonly string[]; readonly knownDifferences: readonly string[]; readonly limits: Readonly<Record<string, number>>;
+  readonly languageProfiles?: readonly { readonly id: string; readonly support: readonly string[]; readonly recalculationPolicy: string }[];
+  readonly reportProfiles?: readonly { readonly id: string; readonly name: string; readonly moduleVersion: string; readonly supportedTables: readonly string[]; readonly languageProfileId: string; readonly forms: readonly string[]; readonly contextFields: readonly string[] }[];
+  readonly importInspection?: { readonly ttlSeconds: number; readonly maxActive: number };
+}
 const text = { type: 'string' } as const;
 const sha256 = { type: 'string', pattern: '^[0-9a-f]{64}$' } as const;
 export const diagnosticSchema = { type: 'object', additionalProperties: false, required: ['code', 'message'], properties: {

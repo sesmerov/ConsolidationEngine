@@ -4,7 +4,7 @@ import type { JobDTO, JsonValue, PreviewBundle, Snapshot, SnapshotContent, Works
 import { ApiError } from '../errors.js';
 import { canonicalHash, immutable } from './canonical-state.js';
 import { RetainedSize } from './retained-size.js';
-import type { StateRecord, WorkerOutput } from '../workers/protocol.js';
+import type { InspectionRecord, StateRecord, WorkerOutput } from '../workers/protocol.js';
 /** Reserved version identifiers are supplied only by main-thread publication preparation. */
 export interface PublicationOutput extends WorkerOutput { readonly snapshotVersionId?: string }
 
@@ -19,6 +19,8 @@ export class WorkspaceStore {
   private readonly retained = new RetainedSize();
   private recordRoots = new Map<string, Readonly<{ key: string; value: unknown }>>();
   private readonly maxBytes: number;
+  private inspectionInvalidated: ((workspaceId: string) => void) | undefined;
+  onInspectionInvalidated(callback: (workspaceId: string) => void): void { this.inspectionInvalidated = callback; }
   private readonly maxSnapshots: number;
   constructor(options: StoreOptions = {}) {
     this.sessionId = options.sessionId ?? randomUUID(); this.maxBytes = options.maxBytes ?? SESSION_LIMIT_BYTES;
@@ -68,8 +70,8 @@ export class WorkspaceStore {
   publish(id: string, base: string | undefined, content: SnapshotContent, additions: readonly StateRecord[] = []): Snapshot {
     this.assertBase(id, base); const w = this.require(id); const snapshot = this.candidate(w, content);
     const next = { ...w, state: 'ready' as const, currentVersionId: snapshot.versionId, versionIds: [...w.versionIds, snapshot.versionId] };
-    const snapshots = new Map(this.snapshots).set(snapshot.versionId, snapshot); const records = this.obsoletePreviews(this.withRecords(additions), snapshot.versionId);
-    const commitSize = this.check(next, snapshots, records); commitSize(); this.workspace = next; this.snapshots = snapshots; this.records = records; return snapshot;
+    const snapshots = new Map(this.snapshots).set(snapshot.versionId, snapshot); const records = this.invalidateInspections(this.obsoletePreviews(this.withRecords(additions), snapshot.versionId), snapshot.versionId);
+    const commitSize = this.check(next, snapshots, records); commitSize(); this.workspace = next; this.snapshots = snapshots; this.records = records; this.inspectionInvalidated?.(id); return snapshot;
   }
   private withRecords(additions: readonly StateRecord[]): Map<string, unknown> {
     const records = new Map(this.records);
@@ -87,6 +89,16 @@ export class WorkspaceStore {
       const bundle = value as PreviewBundle;
       if (bundle.preview?.state === 'ready' && bundle.preview.baseVersionId !== versionId) records.set(key, immutable({ ...bundle,
         preview: { ...bundle.preview, state: 'obsolete' }, proposals: bundle.proposals.map(proposal => proposal.state === 'available' ? { ...proposal, state: 'obsolete' } : proposal) }));
+    }
+    return records;
+  }
+  private invalidateInspections(records: Map<string, unknown>, versionId: string): Map<string, unknown> {
+    for (const [key, value] of records) if (key.startsWith('inspection:')) {
+      const record = value as InspectionRecord;
+      if (record.inspection?.state === 'ready' && record.inspection.baseVersionId !== versionId) records.set(key, immutable({
+        inspection: { ...record.inspection, state: 'invalidated', profiles: [], context: [], reports: [], diagnostics: [] },
+        ...(record.files?.length ? { cleanupFileIds: record.files.map(file => file.id) } : {}),
+      }));
     }
     return records;
   }
@@ -118,12 +130,18 @@ export class WorkspaceStore {
     if (job.kind === 'apply' ? !output.applicationCandidate || !output.snapshotContent || !output.snapshotVersionId : output.snapshotVersionId !== undefined || output.applicationCandidate !== undefined) throw new ApiError('INTERNAL_ERROR');
     let records = this.withRecords(output.records ?? []); const snapshots = new Map(this.snapshots);
     const snapshot = output.snapshotContent ? this.candidate(w, output.snapshotContent, output.snapshotVersionId) : undefined;
-    if (snapshot) { snapshots.set(snapshot.versionId, snapshot); records = this.obsoletePreviews(records, snapshot.versionId); w = { ...w, state: 'ready', currentVersionId: snapshot.versionId, versionIds: [...w.versionIds, snapshot.versionId] }; }
+    if (snapshot) { snapshots.set(snapshot.versionId, snapshot); records = this.invalidateInspections(this.obsoletePreviews(records, snapshot.versionId), snapshot.versionId); w = { ...w, state: 'ready', currentVersionId: snapshot.versionId, versionIds: [...w.versionIds, snapshot.versionId] }; }
+    if (snapshot && job.kind === 'import') for (const [key, value] of records) if (key.startsWith(`inspection:${job.workspaceId}:`)) {
+      const record = value as InspectionRecord;
+      if (record.inspection.state === 'committed' && record.inspection.commitJobId === job.jobId && !record.inspection.committedVersionId)
+        records.set(key, immutable({ ...record, inspection: { ...record.inspection, committedVersionId: snapshot.versionId } }));
+    }
     const result: JobDTO = immutable({ ...job, status: 'succeeded', endedAt: new Date().toISOString(), progress: { ...job.progress, complete: true },
       ...(snapshot ? { newVersionId: snapshot.versionId } : {}), ...(output.resultRef ? { resultRef: output.resultRef } : {}), diagnostics: output.diagnostics ?? [] });
     records.set('job:' + job.jobId, result); records.delete('reserve:' + job.jobId); records.delete('operation:' + job.jobId);
     const { activeJobId: _active, ...next } = w;
-    const commitSize = this.check(next, snapshots, records); assertCommit(); commitSize(); this.workspace = next; this.snapshots = snapshots; this.records = records; return result;
+    const commitSize = this.check(next, snapshots, records); assertCommit(); commitSize(); this.workspace = next; this.snapshots = snapshots; this.records = records;
+    if (snapshot) this.inspectionInvalidated?.(job.workspaceId); return result;
   }
   close(id: string): void {
     this.assertIdle(id); const w = this.require(id); const next: WorkspaceState = { id: w.id, name: w.name, sessionId: w.sessionId, state: 'closed', versionIds: [] };

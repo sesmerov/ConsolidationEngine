@@ -41,7 +41,7 @@ export function registerApplications(app: FastifyInstance, limits?: Partial<Work
     const result = page(ordered, row => row.key, canonicalHash({ resource: 'comparison', workspaceId, receiptId, beforeRunId: before.run.id, runId: after.run.id, changedOnly }), Number(request.query.limit ?? 50), request.query.cursor);
     const presentBefore = rulePresentation(app.ce.store.snapshot(workspaceId, bundle.receipt.baseVersionId).content), presentAfter = rulePresentation(app.ce.store.snapshot(workspaceId, bundle.receipt.newVersionId).content);
     const project = (value: import('@ce/contracts').RuleResultDTO, present: typeof presentBefore) => {
-      const { presentation: _storedPresentation, ...row } = publicResult(value), presentation = present(row.variantIds);
+      const { presentation: _storedPresentation, ...row } = publicResult(value), presentation = present(row.variantIds, row.values.left?.coordinate ?? row.values.right?.coordinate ?? row.factReads[0]?.coordinate);
       return { ...row, ...(presentation ? { presentation } : {}) };
     };
     return { ...result, items: result.items.map(row => ({ key: row.key, ...(row.before ? { before: project(row.before, presentBefore) } : {}), ...(row.after ? { after: project(row.after, presentAfter) } : {}) })),

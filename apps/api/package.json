@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node ../../scripts/prepare-visual-templates.mjs --package",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

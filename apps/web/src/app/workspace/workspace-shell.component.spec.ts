@@ -24,6 +24,7 @@ describe('workspace navigation keeps one active stage', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({ deferBlockBehavior: DeferBlockBehavior.Playthrough, imports: [AppComponent], providers: [{ provide: ApiClient, useValue: {
       capabilities: vi.fn().mockResolvedValue({ knownDifferences: [] }),
+      activeImportInspection: vi.fn().mockResolvedValue({ active: null }),
       rules: vi.fn().mockResolvedValue({ items: [], total: 0, nextCursor: null, sources: [], coverage: {}, dataSummary: {} }),
       runs: vi.fn().mockResolvedValue({ items: [], total: 0, nextCursor: null }),
       previews: vi.fn().mockResolvedValue({ items: [], total: 0, nextCursor: null }),

@@ -5,6 +5,7 @@ import { test, expect } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
 import { changeXml, readZipParts, replaceCell, zipBytes } from '../helpers/xlsx-fixtures.js';
+import { enableLegacyFormat } from './workflow-helpers.js';
 const catalogPath = path.resolve('tests/fixtures/generated/eba-subset.xlsx'), reportPath = path.resolve('tests/fixtures/generated/report-42.xlsx');
 const sourceHashes = new Map<string, string>();
 test.beforeAll(async () => {
@@ -24,9 +25,10 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Cargar catálogo e informes' })).toBeVisible();
   await expect(page.getByRole('button', { name: '1. Cargar', exact: true })).toBeVisible();
   await expect(page.locator('ce-validation-page, ce-preview-page, ce-exports')).toHaveCount(0);
+  await enableLegacyFormat(page);
 });
 test('V01/V14: real template download, exact import, null/zero summary and browser refresh', async ({ page }) => {
-  const downloadPromise = page.waitForEvent('download'); await page.getByRole('button', { name: 'Descargar plantilla Excel' }).click();
+  const downloadPromise = page.waitForEvent('download'); await page.getByRole('button', { name: 'Descargar plantilla Excel anterior', exact: true }).click();
   const download = await downloadPromise; expect(download.suggestedFilename()).toBe('ce-report-1.xlsx');
   const template = path.resolve('.cache/e2e-ce-report-1.xlsx'); await download.saveAs(template);
   await page.getByLabel('Catálogo de reglas (.xlsx)').setInputFiles(catalogPath); await page.getByLabel('Informes (.xlsx)', { exact: true }).setInputFiles(template);
@@ -40,7 +42,7 @@ test('V01/V14: real template download, exact import, null/zero summary and brows
   await expect(page.getByText('Este panel describe la carga y el soporte de las reglas. El cumplimiento se consulta en Validación y explicación.')).toBeVisible();
   await page.screenshot({ path: path.resolve('.cache/import-ui.png'), fullPage: true });
   expect(await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length }))).toEqual({ local: 0, session: 0 });
-  await page.reload(); await expect(page.getByText('3 de 3 registros', { exact: true })).toBeVisible();
+  await page.reload(); await enableLegacyFormat(page); await expect(page.getByText('3 de 3 registros', { exact: true })).toBeVisible();
 });
 test('V04/V13: invalid and duplicate rules remain visible; a rejected replacement preserves the version', async ({ page }) => {
   const sheet = (await readXlsxFile(catalogPath, { parseNumber: (text) => text, trim: false }))[0]!;

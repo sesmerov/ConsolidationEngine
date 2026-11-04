@@ -5,6 +5,7 @@ import type { Locator, Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
 import { readZipParts } from '../helpers/xlsx-fixtures.js';
+import { enableLegacyFormat } from './workflow-helpers.js';
 
 const fixturesRoot = path.resolve('tests/fixtures/generated');
 const mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -70,6 +71,7 @@ for (const width of [320, 390, 1440]) {
     // The baseline renders all stages together and has anchor links; the new shell has an active stage.
     await expect(page.getByRole('button', { name: '2. Validar', exact: true })).toBeVisible();
     await expect(page.locator('ce-import-page')).toBeVisible(); await expect(page.locator('ce-validation-page')).toHaveCount(0);
+    await enableLegacyFormat(page);
     await assertNoPageOverflow(page);
     const files = await chainFiles();
     await page.getByLabel('Catálogo de reglas (.xlsx)').setInputFiles({ name: 'material-catalog.xlsx', mimeType, buffer: files.catalog });

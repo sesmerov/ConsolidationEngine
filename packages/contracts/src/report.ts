@@ -18,6 +18,15 @@ export interface ReportContext {
   readonly moduleVersion: string; readonly filingIndicators: Readonly<Record<string, boolean>>;
   readonly filingIndicatorsLocator?: SourceLocator;
 }
+/** Business fields accepted by the form; profile identity is always resolved by the server. */
+export interface ImportContextFormDTO {
+  readonly entityId: string; readonly referenceDate: CivilDate; readonly submissionDate?: CivilDate;
+  readonly filingIndicators: Readonly<Record<string, boolean>>; readonly currency?: string;
+  readonly scaleExponent?: 0 | 3 | 6; readonly displayDecimals?: number | 'INF';
+}
+export interface ImportContextDeclaration extends ImportContextFormDTO {
+  readonly contextId: string; readonly framework: string; readonly moduleVersion: string;
+}
 export interface FactIdentity {
   readonly factKey: string; readonly contextId: string; readonly tableCode: string;
   readonly sheetCode: string; readonly rowCode: string; readonly columnCode: string;

@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
-import { navigateStage, openCalculation, openTechnical } from './workflow-helpers.js';
+import { enableLegacyFormat, navigateStage, openCalculation, openTechnical } from './workflow-helpers.js';
 const root = path.resolve('tests/fixtures/generated');
 async function session(page: Page) { const bootstrap = await (await page.request.get('/api/v1/bootstrap')).json(); return { id: bootstrap.activeWorkspaceId as string, headers: { 'X-CE-Session': bootstrap.sessionToken as string } }; }
 async function catalog(expressions: readonly (readonly [string, string, string?])[]) {
@@ -20,6 +20,7 @@ async function validate(page: Page) {
 }
 async function configure(page: Page, expressions: readonly (readonly [string, string, string?])[], facts?: Readonly<Record<string, string>>) {
   await navigateStage(page, 'import');
+  await enableLegacyFormat(page);
   await page.getByLabel('Catálogo de reglas (.xlsx)').setInputFiles({ name: 'synthetic-preview.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: await catalog(expressions) });
   if (facts) {
     const sheets = (await readXlsxFile(path.join(root, 'report-42.xlsx'), { parseNumber: text => text, trim: false })).map(sheet => ({ sheet: sheet.sheet, data: sheet.data.map(row => row.map(value => value === null ? null : String(value))) }));

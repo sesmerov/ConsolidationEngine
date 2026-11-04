@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import { readZipParts } from '../helpers/xlsx-fixtures.js';
+import { enableLegacyFormat } from './workflow-helpers.js';
 async function tabTo(page: Page, target: Locator) {
   for (let step = 0; step < 160; step++) { if (await target.evaluate(element => element === document.activeElement)) return; await page.keyboard.press('Tab'); }
   throw new Error('Keyboard focus could not reach ' + await target.textContent());
@@ -22,6 +23,7 @@ test('automated analyst journey: provided workbooks, keyboard confirmation, resp
   test.setTimeout(120_000); await page.setViewportSize({ width: 1440, height: 1000 });
   await page.keyboard.press('Tab'); await expect(page.getByRole('link', { name: 'Saltar al contenido principal' })).toBeFocused(); await page.keyboard.press('Enter'); await expect(page.locator('#main-content')).toBeFocused();
   await tabTo(page, page.getByLabel('Nombre del conjunto')); await page.keyboard.type('Ejemplo guiado SYNTHETIC'); await activate(page, page.getByRole('button', { name: 'Crear conjunto', exact: true }));
+  await enableLegacyFormat(page, { keyboard: true });
   await expect(page.locator('.guided-example')).toBeVisible(); await activate(page, page.locator('.guided-example > summary')); await expect(page.getByRole('button', { name: 'Descargar catálogo del ejemplo', exact: true })).toBeVisible();
   await page.locator('ce-import-page > section').first().screenshot({ path: path.resolve('.cache/analyst-guide-desktop.png') });
   const locations: string[] = [];
@@ -55,6 +57,7 @@ test('automated analyst journey: provided workbooks, keyboard confirmation, resp
   await detail.screenshot({ path: path.resolve('.cache/analyst-comparison-detail-mobile.png') });
   await activate(page, detail.getByRole('button', { name: 'Cerrar detalle', exact: true })); await expect(detailButton).toBeFocused(); await comparison.screenshot({ path: path.resolve('.cache/analyst-comparison-mobile.png') });
   await activate(page, page.getByRole('button', { name: '1. Cargar', exact: true })); await expect(page.locator('ce-import-page')).toBeVisible();
+  await enableLegacyFormat(page, { keyboard: true });
   await page.locator('.guided-example').screenshot({ path: path.resolve('.cache/analyst-guide-mobile.png') });
   await activate(page, page.getByRole('button', { name: '4. Descargar', exact: true })); await expect(page.locator('#exports-title')).toBeFocused();
   await tabTo(page, page.locator('#export-version')); await page.keyboard.press('End'); await page.keyboard.press('Enter'); await expect(page.locator('#export-version')).toHaveValue(application.newVersionId); await expect(page.locator('#export-kind')).toHaveValue('report');
@@ -68,6 +71,7 @@ test('automated analyst journey: provided workbooks, keyboard confirmation, resp
 });
 test('file errors are next to their fields and the compact layout remains usable at 320px', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 }); await page.getByLabel('Nombre del conjunto').fill('Errores SYNTHETIC'); await page.getByRole('button', { name: 'Crear conjunto', exact: true }).click();
+  await enableLegacyFormat(page);
   await page.getByLabel('Catálogo de reglas (.xlsx)').setInputFiles({ name: 'catalog.txt', mimeType: 'text/plain', buffer: Buffer.from('invalid') }); await expect(page.getByLabel('Catálogo de reglas (.xlsx)')).toHaveAttribute('aria-invalid', 'true'); await expect(page.locator('#catalog-error')).toHaveText('El catálogo debe ser un archivo .xlsx.'); await expect(page.getByRole('button', { name: 'Cargar archivos', exact: true })).toBeDisabled();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true); await page.locator('ce-import-page').screenshot({ path: path.resolve('.cache/analyst-errors-mobile.png') });
 });

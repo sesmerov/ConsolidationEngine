@@ -256,3 +256,73 @@ AST ni claves serializadas; su detalle conserva entradas reales y origen.
 Este checkpoint acredita US1 sobre `ce-report-1`, incluida compatibilidad v1 de
 importación, validación, recálculo y exportación. **No acredita todavía COREP visual,
 las demos tipadas, exportación visual, benchmark nuevo ni aceptación humana SC-008.**
+
+## US2 — pruebas previas y reconocimiento del original
+
+Base: `074f174`, incremento US1 confirmado en Git.
+
+- T031: el preflight existente rechaza el libro oficial con `INVALID_WORKBOOK` por
+  externalLink. Es un fallo conductual real antes de los adaptadores nuevos.
+- T032: **28 casos de lifecycle fallidos por HTTP 404**, 12,32 s; archivo
+  `tests/integration/import-inspection-lifecycle.spec.ts` y helper propio. Pruebas
+  de reloj/fallos controlados separadas del caso con worker real.
+- T033: tres fallos conductuales HTTP iniciales por ausencia del recurso.
+- T034 Angular: tres fallos compilados por ausencia de acción de inspección,
+  selector de contexto/compatibilidad y recuperación active.
+- T034 E2E: `run-with-toolchain.ps1 -NpmArguments @('run','test:e2e','--',
+  'tests/e2e/corep-import.spec.ts','--grep','full COREP')` ejecuta un caso y falla
+  tras crear conjunto por ausencia de «Inspeccionar archivos» (5,5 s). El recorrido
+  completo/extracto/rechazo de fórmula está escrito, todavía no validado.
+
+La lectura del ZIP original verificó una PI inerte adicional:
+`<?mso-contentType?>` en `customXml/item2.xml`. Se precisó el contrato de libro para
+permitir exclusivamente esa PI vacía en esa parte del candidato COREP reconocido,
+sin ejecución; otras PI/DTD siguen rechazadas y v1/catálogos/hojas propias conservan
+la restricción. Se añadirán negativos de PI distinta y con contenido. El original
+no se modifica; sus huellas se comprueban antes y después en E2E.
+
+### Evidencia integrada US2
+
+- T031: **37/37** casos focales, 27,80 s. La regresión anterior de ocho archivos
+  de COREP/XLSX/importación/v1 pasó **175/175**, 46,28 s. El original tiene
+  191 hojas, 335 anclas CA1, 110 posiciones, 166 645 celdas físicas y extremos XFD;
+  72 fórmulas fuera de CA1 y 22 XML de vínculos externos se tratan como inertes.
+  Se verifican límites, CRC, orden de ZIP/hojas, PI, contenido activo y ausencia
+  de llamadas fetch/http/https. Completo y extracto preservan importes exactos.
+- T032: **28/28**, 36,92 s, frente a los 28 fallos iniciales. Incluye worker real,
+  TTL fijo, cuotas, CAS/replay, lease, cancelación/cierre y publicación atómica.
+  Tras commit se liberan las copias privadas de la inspección; permanecen datos
+  normalizados, bindings, huellas y localizadores, además de archivos anteriores
+  ajenos a esa inspección. Se corrigió una prueba que suponía retención indefinida.
+- T033: **19/19**, 12,37 s, con Host, token, If-Match, 20/21 informes, DTO cerrado,
+  conflicto de inspección activa y rechazo del bypass por `/imports` con worker
+  real. Regresión anterior: **137/137** contratos y **55/55** casos de importación,
+  jobs y cuotas. Presentación **13/13**: etiqueta OWN FUNDS solo con binding/mapping
+  confiables; una etiqueta no cambia identidad de celda ni datos.
+- Angular: **96/96**, trece archivos, 6,57 s; después de diferir Cargar, sus tres
+  suites afectadas pasan **26/26**, 3,52 s. Typecheck global y build API correctos.
+  Build web final: **657,75 kB iniciales**, 148,99 kB estimados transferidos, sin
+  aviso y sin elevar presupuestos. Logs locales `.cache/us2-*.log`.
+- Plantilla saneada reproducible: 71 353 bytes, SHA-256
+  `7767a6ab34990ff3f954f5acd3348180c7004ca901f8b92b6521940e52ee7e7f`;
+  mapping `3a6ea97bce6bd48e6caa7eb722ef76e30704b51f56993f8718be267d4eefd916`.
+  Verificadas nuevamente ambas huellas públicas de T002, sin cambios.
+
+La primera ejecución de los tres E2E COREP pasó el libro oficial completo y falló
+en los dos archivos alterados por el test. El helper `patchCell` consumía la celda
+siguiente al reemplazar una celda autocerrada. Se corrigió el helper y se añadieron
+comprobaciones de XML válido, unicidad y conservación exacta del resto del documento;
+no se relajó el importador. La captura `.cache/verification-002/corep-full-review.png`
+muestra contexto, 110 posiciones y aceptación explícita de las 190 exclusiones.
+Regresión E2E final: **22/22**, 2,9 minutos, sin skips, mediante
+`run-with-toolchain.ps1 -NpmArguments @('run','test:e2e')`, servidor propio 3318.
+Incluye los tres casos COREP, dieciséis recorridos anteriores y tres anchos Material.
+El extracto descargado, modificado por la prueba con 12,34 a escala 3/precisión 2,
+se normaliza exactamente a 12 340, precisión base -1, y valida la igualdad esperada.
+El error de fórmula señala CA1/E5 y mantiene versión/ETag previos. La inspección
+recuperada conserva plazo y no descarta silenciosamente al editar el formulario;
+confirmar publica una versión, y repetir la petición recupera el mismo Job.
+
+**Checkpoint T031–T046 completo.** Las fuentes públicas siguen intactas. Esta
+evidencia cubre importación visual y compatibilidad anterior; semántica nueva,
+demos de 24 reglas y exportación visual se completan en US3/US4.

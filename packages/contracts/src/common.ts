@@ -35,7 +35,7 @@ export interface Snapshot {
   readonly versionId: UUID; readonly parentVersionId?: UUID; readonly contentHash: string;
   readonly createdAt: string; readonly content: SnapshotContent;
 }
-export type JobKind = 'import' | 'validate' | 'preview' | 'apply' | 'export';
+export type JobKind = 'import' | 'inspect-import' | 'validate' | 'preview' | 'apply' | 'export';
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'timed_out';
 export interface ResultRef { readonly type: string; readonly id: string }
 export interface JobProgress { readonly completed: number; readonly total: number; readonly complete: boolean }

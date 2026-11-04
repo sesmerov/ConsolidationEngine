@@ -5,6 +5,7 @@ import { firstValueFrom, fromEvent, takeUntil } from 'rxjs';
 import type { BootstrapDTO, CapabilitiesDTO, DirectionChoiceDTO, DirectionsResponseDTO, JobDTO, RulesPageDTO, WorkspaceDTO, ValidationResultsPageDTO } from '@ce/contracts';
 import type { HistoryPageDTO, PreviewDTO, PreviewSelectionDTO, PreviewSummaryDTO, ProposalDTO, ProposalsPageDTO, RunSummaryDTO } from '@ce/contracts';
 import type { ApplicationDetailDTO, ApplicationRequestDTO, ComparisonPageDTO } from '@ce/contracts';
+import type { ActiveImportInspectionDTO, ImportContextInputDTO, ImportInspectionCommitDTO, ImportInspectionDTO } from '@ce/contracts';
 @Injectable({ providedIn: 'root' })
 export class ApiClient {
   private readonly http = inject(HttpClient);
@@ -35,6 +36,16 @@ export class ApiClient {
   }
   capabilities(): Promise<CapabilitiesDTO> { return firstValueFrom(this.http.get<CapabilitiesDTO>('/api/v1/capabilities', { headers: this.headers() })); }
   reportTemplate(): Promise<Blob> { return firstValueFrom(this.http.get('/api/v1/templates/report', { headers: this.headers(), responseType: 'blob' })); }
+  corepTemplate(): Promise<Blob> { return firstValueFrom(this.http.get('/api/v1/templates/corep-ca1', { headers: this.headers(), responseType: 'blob' })); }
+  activeImportInspection(workspaceId: string): Promise<ActiveImportInspectionDTO> { return firstValueFrom(this.http.get<ActiveImportInspectionDTO>(this.inspectionsUrl(workspaceId), { headers: this.headers() })); }
+  importInspection(workspaceId: string, id: string): Promise<ImportInspectionDTO> { return firstValueFrom(this.http.get<ImportInspectionDTO>(this.inspectionsUrl(workspaceId) + '/' + encodeURIComponent(id), { headers: this.headers() })); }
+  inspectImport(workspaceId: string, etag: string, catalog: File, reports: readonly File[], context: ImportContextInputDTO, key: string, signal: AbortSignal): Promise<JobDTO> {
+    const body = new FormData(); body.append('catalog', catalog, catalog.name); for (const report of reports) body.append('reports', report, report.name); body.append('context', JSON.stringify(context));
+    return firstValueFrom(this.http.post<JobDTO>(this.inspectionsUrl(workspaceId), body, { headers: this.headers(etag).set('Idempotency-Key', key) }).pipe(takeUntil(fromEvent(signal, 'abort'))));
+  }
+  commitImportInspection(workspaceId: string, id: string, body: ImportInspectionCommitDTO, etag: string, key: string): Promise<JobDTO> { return firstValueFrom(this.http.post<JobDTO>(this.inspectionsUrl(workspaceId) + '/' + encodeURIComponent(id) + '/commit', body, { headers: this.headers(etag).set('Idempotency-Key', key) })); }
+  discardImportInspection(workspaceId: string, id: string, etag: string): Promise<ImportInspectionDTO> { return firstValueFrom(this.http.delete<ImportInspectionDTO>(this.inspectionsUrl(workspaceId) + '/' + encodeURIComponent(id), { headers: this.headers(etag) })); }
+  private inspectionsUrl(workspaceId: string): string { return '/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/import-inspections'; }
   guidedExample(kind: 'catalog' | 'report'): Promise<Blob> { return firstValueFrom(this.http.get('/api/v1/templates/guided-' + kind, { headers: this.headers(), responseType: 'blob' })); }
   importFiles(workspaceId: string, etag: string, catalog: File, reports: readonly File[], key: string, signal: AbortSignal): Promise<JobDTO> {
     const body = new FormData(); body.append('catalog', catalog, catalog.name); for (const report of reports) body.append('reports', report, report.name);

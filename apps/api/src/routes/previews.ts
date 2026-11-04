@@ -36,7 +36,7 @@ export function registerPreviews(app: FastifyInstance, limits?: Partial<WorkLimi
     const snapshot = app.ce.store.snapshot(workspaceId, bundle.preview.baseVersionId), present = rulePresentation(snapshot.content);
     const result = page(rows, key, canonicalHash({ resource: 'proposals', workspaceId, previewId, baseVersionId: bundle.preview.baseVersionId, state: bundle.preview.state, status: query.status ?? '', code: query.code ?? '', table: query.table ?? '' }), Number(query.limit ?? 50), query.cursor);
     return { ...result, items: result.items.map(item => {
-      const { presentation: _storedPresentation, ...proposal } = publicProposal(item), presentation = present(proposal.variantIds);
+      const { presentation: _storedPresentation, ...proposal } = publicProposal(item), presentation = present(proposal.variantIds, proposal.before?.coordinate);
       return { ...proposal, ...(presentation ? { presentation } : {}) };
     }), versionId: bundle.preview.baseVersionId, sourceFiles: snapshot.content.sources };
   });
@@ -47,7 +47,7 @@ export function registerPreviews(app: FastifyInstance, limits?: Partial<WorkLimi
     const stored = bundle.proposals.find(proposal => proposal.id === proposalId && proposal.previewId === previewId);
     if (!stored) throw new ApiError('RESOURCE_NOT_FOUND');
     const { presentation: _storedPresentation, ...proposal } = publicProposal(stored, true);
-    const presentation = rulePresentation(app.ce.store.snapshot(workspaceId, bundle.preview.baseVersionId).content)(proposal.variantIds);
+    const presentation = rulePresentation(app.ce.store.snapshot(workspaceId, bundle.preview.baseVersionId).content)(proposal.variantIds, proposal.before?.coordinate);
     return { ...proposal, ...(presentation ? { presentation } : {}) };
   });
   app.post<{ Params: Params; Body: { selectedIds: string[] } }>('/api/v1/workspaces/:workspaceId/previews/:previewId/selection', { schema: { params, querystring: emptyQuerySchema, body: previewSelectionRequestSchema } }, async request => selectPreview(getPreview(app.ce.store, request.params.workspaceId, request.params.previewId), request.body.selectedIds));
