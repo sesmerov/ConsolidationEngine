@@ -8,6 +8,12 @@
 
 **Input**: Solicitud del usuario: mejorar la estética y la experiencia con Angular Material; presentar recálculos como «antes → después» y reducir el ruido de procedencia; cargar informes con el formato visual de las plantillas EBA; ampliar y comprobar la demo con condicionales, fechas, textos y desigualdades; revisar otras mejoras de legibilidad.
 
+## Clarifications
+
+### Session 2026-11-04
+
+- El usuario aclara que las reglas con condicionales, texto o fechas son **solo de validación**. No se ofrecerán ni aceptarán recálculos para ellas, incluso si contienen una igualdad o devuelven un número. La restricción incluye la expresión y su precondición formal; no afecta a las fechas administrativas de vigencia de una regla numérica ni a su descripción textual.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Revisar resultados y cambios sin ruido técnico (Priority: P1)
@@ -62,6 +68,7 @@ Como analista, quiero descargar ejemplos coherentes, entender por qué pasa o fa
 3. **Given** un condicional, **When** se prueba con condición verdadera y falsa, **Then** se obtiene el resultado previsto de cada rama y no se evalúa la rama no seleccionada; una división por cero en esa rama no causa un error de ejecución.
 4. **Given** fechas límite, textos distintos y desigualdades, **When** se ejecutan sus casos, **Then** los resultados respetan las políticas declaradas y un caso inválido se identifica como tal, sin presentarlo como una validación aprobada.
 5. **Given** una cadena de tres recálculos, **When** se simula y aplica una selección completa, **Then** cada consumidor usa el valor calculado y redondeado de su antecedente, y la revalidación coincide con las expectativas publicadas.
+6. **Given** una regla con condicional, texto o fecha en la expresión o precondición, incluso en una rama no ejecutada, **When** se valida o se intenta configurar un recálculo, **Then** puede producir un resultado de validación, pero se identifica como «Solo validación» y no admite destinos, propuestas ni aplicación, tampoco mediante una petición directa al servicio.
 
 ---
 
@@ -89,7 +96,8 @@ Como analista, quiero obtener el informe corregido en el mismo formato visual qu
 - Fechas inválidas, años bisiestos y sistemas de fechas Excel 1900/1904: diagnóstico explícito; el día ficticio 1900-02-29 no es una fecha válida.
 - Texto con mayúsculas, espacios, acentos, saltos de línea o apariencia de fórmula: comparación declarada y exportación como dato, sin ejecución.
 - Condición nula, condición de tipo incorrecto o ramas de tipos incompatibles: resultado explicado, nunca selección arbitraria de una rama.
-- Dependencias que cambian según una condición, ciclos, productores en conflicto y ramas independientes: conservar los bloqueos y el orden verificable del motor.
+- Un condicional anidado con resultado numérico, una rama inactiva con texto o fecha, o una precondición formal con esos tipos: toda la regla es solo de validación, independientemente de los datos de esa ejecución.
+- Ciclos, productores en conflicto y ramas independientes entre reglas numéricas admitidas para recálculo: conservar los bloqueos y el orden verificable del motor.
 - Propuesta obsoleta, aplicada, descartada o sin cambio de valor: estado y acciones coherentes; no permitir reutilizar una confirmación antigua.
 - Filtros que ocultan propuestas seleccionadas, ausencia de resultados y fallos de carga: resumen claro, selección visible y recuperación sin perder el conjunto válido.
 - Números largos, precisión elevada, textos extensos y pantallas estrechas: acceso al valor completo sin truncamiento engañoso ni pérdida de controles.
@@ -133,8 +141,8 @@ Como analista, quiero obtener el informe corregido en el mismo formato visual qu
 - **FR-025**: El sistema DEBE admitir datos y literales de texto en el perfil ampliado, con igualdad y desigualdad exactas, sensibles a mayúsculas y espacios, sin normalización oculta. Cadena vacía y nulo son distintos. No se promete ordenación lingüística, concatenación ni expresiones regulares.
 - **FR-026**: El sistema DEBE admitir datos y literales de fecha civil válida, sin hora ni conversión de zona horaria, y comparaciones `=`, `!=`, `<`, `<=`, `>` y `>=`. La representación de intercambio será inequívoca y las fechas inválidas tendrán diagnóstico localizable.
 - **FR-027**: Los nuevos tipos y condicionales DEBEN mantener ausencia, errores de tipo y construcciones no soportadas diferenciados. La ampliación tendrá un perfil semántico identificable; aceptar la sintaxis nunca equivaldrá a aprobar una regla.
-- **FR-028**: El análisis de dependencias DEBE considerar las lecturas posibles de ambas ramas de un condicional, aunque solo una se evalúe; conservará la detección de conflictos, ciclos y descendientes bloqueados, y permitirá continuar a las ramas independientes válidas.
-- **FR-029**: Los recálculos de esta entrega DEBEN limitarse a igualdades con destino numérico único elegido expresamente y resultado numérico compatible. Desigualdades y reglas sobre texto o fecha se validan, pero no prometen una corrección automática ni un solucionador general.
+- **FR-028**: El grafo de recálculo DEBE incluir exclusivamente operaciones elegibles y conservar la detección de conflictos, ciclos y descendientes bloqueados, permitiendo continuar a las ramas independientes válidas. Las reglas solo de validación no crean productores ni propuestas; sus lecturas efectivamente evaluadas conservan trazabilidad y sus resultados se actualizan en la revalidación tras cambios numéricos.
+- **FR-029**: Los recálculos DEBEN limitarse a igualdades numéricas con destino único elegido expresamente y resultado numérico compatible. Toda regla que contenga condicionales, valores u operaciones de texto o fecha en su expresión o precondición formal DEBE ser solo de validación, aunque el destino o el resultado sean numéricos o la construcción esté en una rama no ejecutada. La interfaz DEBE indicar «Solo validación» y el servicio DEBE rechazar configuración, simulación o aplicación de recálculos de esas reglas. Las desigualdades tampoco ofrecen una corrección automática. Descripciones y fechas administrativas de vigencia no activan esta exclusión.
 - **FR-030**: La demo principal DEBE incluir al menos 16 reglas distintas sobre un informe COREP C_01.00 visual, con igualdades, sumas o rangos, desigualdades, nulos y ceros, precondiciones, condicionales y un caso de precisión o intervalos. DEBE incluir una cadena de al menos tres propuestas dependientes.
 - **FR-031**: La demo de tipos DEBE aportar al menos ocho reglas adicionales sobre datos importados de texto y fecha, incluidos condicionales. Será un conjunto sintético separado, con plantilla propia versionada de campos legibles, sin pedir al usuario editar `row`/`column` ni atribuir esos campos a celdas oficiales COREP.
 - **FR-032**: Las demos DEBEN distinguir origen oficial y sintético por regla y por conjunto. La demo COREP incluirá al menos cuatro reglas del catálogo EBA suministrado, conservando expresión, precondición, estado, severidad y procedencia y comprobando tabla, módulo y vigencia para el periodo elegido. Los datos serán sintéticos y las reglas adicionales inventadas estarán identificadas; reutilizar códigos COREP no convierte una ecuación inventada en regla EBA.
@@ -165,7 +173,7 @@ Como analista, quiero obtener el informe corregido en el mismo formato visual qu
 - **SC-003**: En los libros de aceptación del perfil C_01.00, el 100 % de las celdas reportables coincide con una expectativa independiente de concepto, coordenada, valor, tipo, unidad y localizador; modificaciones incompatibles y fórmulas en datos producen los diagnósticos previstos sin sustituir el conjunto.
 - **SC-004**: Las al menos 24 reglas de las dos demos coinciden al 100 % con su matriz de expectativas, tanto inicialmente como después de los recálculos previstos. «Coincidir» incluye fallos intencionados; no exige que todas las reglas aprueben ni admite reglas sin soporte como evidencia positiva.
 - **SC-005**: El 100 % de los datos de negocio exportados y reimportados del corpus coincide con la versión elegida, incluidos blancos, ceros, textos, fechas y decimales; los archivos originales conservan su contenido.
-- **SC-006**: Los casos de selección entre páginas, dependencias faltantes, conflicto, ciclo, obsolescencia, cancelación y exportación histórica conservan las decisiones y datos esperados, sin aplicaciones parciales ni selecciones automáticas.
+- **SC-006**: Los casos de selección entre páginas, dependencias faltantes, conflicto, ciclo, obsolescencia, cancelación y exportación histórica conservan las decisiones y datos esperados, sin aplicaciones parciales ni selecciones automáticas. El 100 % de los casos con condicionales, texto o fecha carece de destinos y propuestas, y los intentos directos o con configuración obsoleta se rechazan sin modificar el informe.
 - **SC-007**: La verificación de esta iteración conserva los límites de 500 reglas y 100 000 datos del alcance existente y registra una nueva medición reproducible del recorrido representativo; no reutiliza un resultado antiguo como medición de la interfaz o el importador nuevos. El objetivo de validación sigue siendo al menos 9 de 10 ejecuciones en 30 segundos o menos y ninguna superior a 60 segundos, con carga medida por separado.
 - **SC-008**: Al menos un analista identifica los valores anterior y posterior de dos cambios, completa una demo y descarga la versión esperada. La aceptación humana registra esos resultados, la ayuda que necesitó y los problemas encontrados; una confirmación global solo acredita aceptación global, nunca tiempos ni observaciones de pasos no comunicados.
 

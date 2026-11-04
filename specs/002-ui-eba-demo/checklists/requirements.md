@@ -35,6 +35,8 @@
 
 ## Notes
 
+- Aclaración del usuario incorporada el 2026-11-04: condicionales, texto y fechas son exclusivamente de validación, también si producen números o aparecen en precondiciones formales. FR-028/029, US3 y SC-006 cubren presentación, rechazo en el servicio y ausencia de propuestas; no se confunden con metadatos administrativos.
+
 - Angular Material, ANTLR, Node.js, Angular y Kahn son restricciones solicitadas o ya establecidas, no decisiones nuevas inferidas por esta especificación. Se aíslan de los criterios de éxito.
 - La cobertura de plantillas se limita a CA1/C_01.00 de la fuente identificada. La planificación concretará el manifiesto de reconocimiento, tipos y correspondencias y la política para las hojas, fórmulas y referencias externas fuera de cobertura.
 - La matriz de las al menos 24 reglas será un requisito previo a implementar la demo. No se presenta como un resultado ya obtenido; «funcionan» significa que coinciden con expectativas conocidas, incluidos fallos intencionados.
