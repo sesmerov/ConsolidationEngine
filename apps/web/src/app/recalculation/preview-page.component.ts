@@ -1,4 +1,4 @@
-import { StageTitleDirective } from '../core/stage-title.directive';
+import { calculationHeadingId, StageFocus, StageTitleDirective } from '../core/stage-title.directive';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
@@ -23,7 +23,8 @@ readonly showApplied = signal(false); readonly invert = (value: boolean) => !val
 readonly proposalColumns = ['select','rule','target','change','dependencies','detail'];
 columns(): string[] { return this.store.preview()?.state === 'applied' || this.store.preview()?.state === 'discarded' ? this.proposalColumns.slice(1) : this.proposalColumns; }
 private detailTrigger?: HTMLElement;
+private readonly focus = inject(StageFocus, { optional: true });
 statusLabel(row: ProposalDTO): string { return this.store.labels[row.state]; }
-openDetail(id: string, event: Event): void { this.detailTrigger = event.currentTarget as HTMLElement; void this.store.openDetail(id); }
+openDetail(id: string, event: Event): void { this.detailTrigger = event.currentTarget as HTMLElement; this.focus?.request(calculationHeadingId(id)); void this.store.openDetail(id); }
 closeDetail(): void { this.store.closeDetail(); this.detailTrigger?.focus(); }
 }

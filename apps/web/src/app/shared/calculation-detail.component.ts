@@ -4,6 +4,7 @@ import { MatTableModule } from '@angular/material/table';
 import type { FactReadDTO, ProposalDTO, RuleResultDTO, SourceFile, SourceLocator, ValidationValueDTO } from '@ce/contracts';
 import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
+import { calculationHeadingId, StageFocus } from '../core/stage-title.directive';
 import { coordinateText, decimalText, factText, hasInterval, normalizedText, roundedProposal, sourceText, validationText } from '../core/exact-value';
 
 interface ReadRow { readonly fact: FactReadDTO; readonly fromProposalId?: string }
@@ -14,7 +15,7 @@ export class CalculationDetailComponent {
   private readonly api = inject(ApiClient);
   private readonly session = inject(SessionStore);
   private generation = 0;
-  private focused: unknown;
+  private readonly focus = inject(StageFocus, { optional: true });
   private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
   readonly result = input<RuleResultDTO>();
   readonly proposal = input<ProposalDTO>();
@@ -22,6 +23,7 @@ export class CalculationDetailComponent {
   readonly closed = output<void>();
   readonly row = computed(() => this.proposal() ?? this.result());
   readonly title = computed(() => `Cálculo y origen de ${this.row()?.code ?? ''}`);
+  readonly headingId = computed(() => calculationHeadingId(this.row()?.id ?? ''));
   readonly expression = computed(() => this.proposal() ? this.proposal()?.calculation?.expression : this.result()?.expression);
   readonly precondition = computed(() => this.proposal() ? this.proposal()?.calculation?.precondition : this.result()?.precondition);
   readonly preconditionValue = computed(() => this.proposal() ? this.proposal()?.calculation?.preconditionValue : this.result()?.preconditionResult);
@@ -64,8 +66,8 @@ export class CalculationDetailComponent {
       this.generation++; this.alternatives.set([]); this.alternativesLoaded.set(false); this.loading.set(false); this.error.set(null); this.technicalOpen.set(false);
     });
     afterEveryRender(() => {
-      const row = this.row(), heading = this.heading();
-      if (row && heading && this.focused !== row) { heading.nativeElement.focus(); this.focused = row; }
+      const heading = this.heading();
+      if (this.row() && heading) this.focus?.fulfill(heading.nativeElement);
     });
     inject(DestroyRef).onDestroy(() => { this.generation++; });
   }

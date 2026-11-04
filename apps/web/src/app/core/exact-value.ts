@@ -30,7 +30,7 @@ export function normalizedText(value: NormalizedValue | undefined, decimals = ''
 export function validationText(value: ValidationValueDTO | undefined): string {
   if (!value) return 'Sin valor calculado';
   switch (value.kind) {
-    case 'number': return [decimalText(value.nominal), value.unit].filter(Boolean).join(' ');
+    case 'number': return [decimalText(value.nominal), value.unit === 'pure' ? 'sin unidad' : value.unit].filter(Boolean).join(' ');
     case 'text': case 'date': return normalizedText(value);
     case 'boolean': return normalizedText(value.value);
     case 'null': return 'Sin dato';

@@ -1,10 +1,11 @@
 import { TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FactReadDTO, ProposalDTO, RuleResultDTO, RulesPageDTO, SourceFile } from '@ce/contracts';
 import { CalculationDetailComponent } from './calculation-detail.component';
 import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
+import { calculationHeadingId, StageFocus, StageTitleDirective } from '../core/stage-title.directive';
 
 const id = 'a4a99ec0-bb65-41f5-90d1-b857f4ebefb2', versionId = 'bfda41bd-2a55-4a80-9f22-2fc1aa89894c', producerId = '5976e981-9b8d-4e80-af2a-b1ffeced4b55', hash = 'b'.repeat(64);
 const rational = (value: string, denominator = '1') => ({ numerator: value, denominator });
@@ -16,12 +17,17 @@ const result = (): RuleResultDTO => ({ id: 'result-one', runId: id, versionId, p
 const proposal = (): ProposalDTO => ({ id, previewId: versionId, directionId: hash, instanceId: hash, variantIds: [hash], binding: {}, code: 'RULE', targetKey: coordinate.factKey, before: fact('1'), after: { normalizedValue: rational('3'), originalText: '3.00', decimals: '2', unit: 'EUR' }, exactNominal: rational('3'), derivedInterval: { lo: rational('3'), hi: rational('3') }, readKeys: [coordinate.factKey], predecessorIds: [producerId], metadataReads: [], sources: [coordinate.sourceLocator], state: 'available', diagnostics: [], calculation: { expression: 'source + 1', sourceValue: numeric('3'), reads: [{ fact: fact('2'), fromProposalId: producerId }] } });
 const page = (items: unknown[], nextCursor: string | null = null) => ({ items, total: items.length, nextCursor, versionId }) as unknown as RulesPageDTO;
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done; }); return { promise, resolve }; }
+@Component({ standalone: true, imports: [CalculationDetailComponent, StageTitleDirective], providers: [StageFocus],
+  template: `<button id="return-stage">Recalcular</button>@if (visible()) { <h2 id="preview-title" tabindex="-1" ceStageTitle>Previsualización</h2><ce-calculation-detail [result]="retained"/> }` })
+class RetainedDetailHost { readonly visible = signal(false); readonly focus = inject(StageFocus); readonly retained = result(); }
 
 describe('calculation and source detail', () => {
   const workspace = signal<{ id: string } | null>({ id });
+  const triggers: HTMLElement[] = [];
   let api: { rules: ReturnType<typeof vi.fn>; preview: ReturnType<typeof vi.fn> };
-  beforeEach(() => { workspace.set({ id }); api = { rules: vi.fn().mockResolvedValue(page([])), preview: vi.fn().mockResolvedValue({ baseVersionId: versionId }) }; TestBed.configureTestingModule({ imports: [CalculationDetailComponent], providers: [{ provide: ApiClient, useValue: api }, { provide: SessionStore, useValue: { workspace } }] }); });
-  afterEach(() => TestBed.resetTestingModule());
+  beforeEach(() => { workspace.set({ id }); api = { rules: vi.fn().mockResolvedValue(page([])), preview: vi.fn().mockResolvedValue({ baseVersionId: versionId }) }; TestBed.configureTestingModule({ imports: [CalculationDetailComponent], providers: [StageFocus, { provide: ApiClient, useValue: api }, { provide: SessionStore, useValue: { workspace } }] }); });
+  afterEach(() => { TestBed.resetTestingModule(); for (const trigger of triggers.splice(0)) trigger.remove(); });
+  function requestDetail(rowId: string) { const trigger = document.createElement('button'); trigger.textContent = 'Consultar'; document.body.append(trigger); triggers.push(trigger); trigger.focus(); TestBed.inject(StageFocus).request(calculationHeadingId(rowId)); return trigger; }
   function render(value: RuleResultDTO | ProposalDTO, kind: 'result' | 'proposal' = 'result') {
     const fixture = TestBed.createComponent(CalculationDetailComponent); fixture.componentRef.setInput(kind, value); fixture.componentRef.setInput('files', files); fixture.detectChanges();
     const root = fixture.nativeElement as HTMLElement;
@@ -29,11 +35,27 @@ describe('calculation and source detail', () => {
     return { fixture, root, button };
   }
   function mainText(root: HTMLElement) { const clone = root.cloneNode(true) as HTMLElement; clone.querySelectorAll('details').forEach(node => node.remove()); return clone.textContent ?? ''; }
+  it('prioritizes explicit stage navigation when its retained detail is recreated in the same render', async () => {
+    TestBed.configureTestingModule({ imports: [RetainedDetailHost] }); const fixture = TestBed.createComponent(RetainedDetailHost); fixture.detectChanges(); await fixture.whenStable();
+    const trigger = fixture.nativeElement.querySelector('button') as HTMLButtonElement; trigger.focus(); fixture.componentInstance.focus.request('preview-title');
+    fixture.componentInstance.visible.set(true); fixture.detectChanges(); await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('ce-calculation-detail')).not.toBeNull(); expect(document.activeElement).toBe(fixture.nativeElement.querySelector('#preview-title'));
+  });
   it('labels and focuses the region and emits close without changing selection', async () => {
-    const { fixture, root, button } = render(result()); await fixture.whenStable();
+    const row = result(); requestDetail(row.id); const { fixture, root, button } = render(row); await fixture.whenStable();
     expect(root.querySelector('[role="region"]')?.getAttribute('aria-label')).toBe('Cálculo y origen de RULE');
     expect(document.activeElement?.textContent).toContain('Cálculo y origen de RULE');
     const close = vi.fn(); fixture.componentInstance.closed.subscribe(close); button('Cerrar detalle').click(); expect(close).toHaveBeenCalledOnce();
+  });
+  it('does not steal focus when an asynchronous detail arrives after the user moved to another control', async () => {
+    const row = result(), trigger = requestDetail(row.id), other = document.createElement('input'); document.body.append(other); triggers.push(other); other.focus();
+    const { fixture, root } = render(row); await fixture.whenStable(); expect(root.textContent).toContain('Cálculo y origen de RULE'); expect(document.activeElement).toBe(other);
+    trigger.focus(); fixture.detectChanges(); await fixture.whenStable(); expect(document.activeElement).toBe(trigger);
+  });
+  it('waits for the requested identity instead of focusing another retained row', async () => {
+    const trigger = requestDetail('requested-result'), { fixture, root } = render(result()); await fixture.whenStable(); expect(document.activeElement).toBe(trigger);
+    fixture.componentRef.setInput('result', { ...result(), id: 'requested-result', code: 'Requested' }); fixture.detectChanges(); await fixture.whenStable();
+    expect(document.activeElement).toBe(root.querySelector('h3')); expect(document.activeElement?.textContent).toContain('Requested');
   });
   it('groups repeated physical sources and keeps identifiers out of the main explanation', () => {
     const { root } = render(result()), text = mainText(root);

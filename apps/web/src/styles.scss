@@ -53,6 +53,7 @@ main { max-width:1480px; margin:auto; padding:24px; min-width:0; }
 .value-label { font-size:12px; color:#526379; display:block; margin-bottom:3px; } .exact-value { font-variant-numeric:tabular-nums; white-space:pre-wrap; overflow-wrap:anywhere; user-select:text; }
 .value-change ce-exact-value { font-weight:650; } .amount-cell { text-align:right; }
 .unit-label { font-size:12px; color:#526379; } .value-marker { font-size:12px; color:#795710; margin-top:5px; }
+.data-table .exact-value + .unit-label { margin-inline-start:.35em; }
 .error,.notice,.confirmation,.success-notice { padding:14px 16px; border-radius:9px; margin:14px 0; overflow-wrap:anywhere; }
 .error { color:#9b2824; background:#fff0ee; border-left:3px solid #b6342d; } .notice { color:#735613; background:#fff7e3; }
 .success-notice { color:#17633b; background:#eaf6ee; } .confirmation { background:#eff5ff; border:1px solid #bfd2ef; }

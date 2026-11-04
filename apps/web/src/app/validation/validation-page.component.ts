@@ -1,4 +1,4 @@
-import { StageTitleDirective } from '../core/stage-title.directive';
+import { calculationHeadingId, StageFocus, StageTitleDirective } from '../core/stage-title.directive';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
@@ -18,7 +18,8 @@ import { CalculationDetailComponent } from '../shared/calculation-detail.compone
 export class ValidationPageComponent {
 readonly store = inject(ResultsStore); readonly session = this.store.session; readonly versionLabel = versionLabel; readonly policyLabel = policyLabel; readonly resultLocation = resultLocation;
 readonly detail = signal<RuleResultDTO | undefined>(undefined); private detailTrigger?: HTMLElement;
+private readonly focus = inject(StageFocus, { optional: true });
 statusLabel(row: RuleResultDTO): string { return this.store.labels[row.status]; }
-openDetail(row: RuleResultDTO, event: Event): void { this.detailTrigger = event.currentTarget as HTMLElement; this.detail.set(row); }
+openDetail(row: RuleResultDTO, event: Event): void { this.detailTrigger = event.currentTarget as HTMLElement; this.focus?.request(calculationHeadingId(row.id)); this.detail.set(row); }
 closeDetail(): void { this.detail.set(undefined); this.detailTrigger?.focus(); }
 }

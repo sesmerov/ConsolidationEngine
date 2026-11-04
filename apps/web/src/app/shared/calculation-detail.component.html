@@ -1,7 +1,7 @@
 @if (row(); as entry) {
   <section class="calculation-detail" role="region" [attr.aria-label]="title()">
     <div class="section-heading">
-      <h3 #heading tabindex="-1">{{ title() }}</h3>
+      <h3 #heading [id]="headingId()" tabindex="-1">{{ title() }}</h3>
       <button mat-button type="button" (click)="close()">Cerrar detalle</button>
     </div>
     <ng-content />

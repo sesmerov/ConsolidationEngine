@@ -1,5 +1,6 @@
 import { DOCUMENT } from '@angular/common';
 import { DestroyRef, Directive, ElementRef, Injectable, afterNextRender, inject } from '@angular/core';
+export const calculationHeadingId = (id: string): string => 'calculation-heading-' + id;
 /** Scoped to the workspace: loading a chunk alone is never an instruction to move focus. */
 @Injectable()
 export class StageFocus {
