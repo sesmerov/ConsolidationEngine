@@ -4,6 +4,7 @@ import type { Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
 import { readZipParts } from '../helpers/xlsx-fixtures.js';
+import { navigateStage, openCalculation, openTechnical } from './workflow-helpers.js';
 const root = path.resolve('tests/fixtures/generated'), catalogPath = path.join(root, 'eba-subset.xlsx');
 async function session(page: Page) { const bootstrap = await (await page.request.get('/api/v1/bootstrap')).json(); return { id: bootstrap.activeWorkspaceId as string, headers: { 'X-CE-Session': bootstrap.sessionToken as string } }; }
 async function editedWorkbook(name: string, change: (sheets: { sheet: string; data: (string | null)[][] }[]) => void): Promise<Buffer> {
@@ -11,6 +12,7 @@ async function editedWorkbook(name: string, change: (sheets: { sheet: string; da
   change(sheets); return writeXlsxFile(sheets.map((sheet) => ({ ...sheet, data: sheet.data.map((row) => row.map((value) => value === null ? null : { type: String, value })) }))).toBuffer();
 }
 async function upload(page: Page, report: string | Buffer, catalog?: Buffer) {
+  await navigateStage(page, 'import');
   await page.getByLabel('Catálogo de reglas (.xlsx)').setInputFiles(catalog ? { name: 'synthetic-catalog.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: catalog } : catalogPath);
   await page.getByLabel('Informes (.xlsx)', { exact: true }).setInputFiles(typeof report === 'string' ? path.join(root, report) : { name: 'synthetic-report.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: report });
   const response = page.waitForResponse((response) => response.url().endsWith('/imports') && response.request().method() === 'POST'); await page.getByRole('button', { name: 'Cargar archivos', exact: true }).click();
@@ -19,6 +21,7 @@ async function upload(page: Page, report: string | Buffer, catalog?: Buffer) {
   await expect(page.getByTestId('current-version-id')).toHaveText(version!); return version!;
 }
 async function validate(page: Page) {
+  await navigateStage(page, 'validation');
   const response = page.waitForResponse((response) => response.url().endsWith('/validations') && response.request().method() === 'POST'); await page.getByRole('button', { name: 'Validar informes', exact: true }).click();
   const accepted = await (await response).json(); expect(accepted.resultRef.type).toBe('validation'); await expect(page.locator('#validation-run')).toHaveValue(accepted.resultRef.id, { timeout: 15000 });
   const connection = await session(page); return (await page.request.get(`/api/v1/workspaces/${connection.id}/runs/${accepted.resultRef.id}/results?limit=200`, { headers: connection.headers })).json();
@@ -32,11 +35,15 @@ test('V02/V04/V15: G169 passes at the interval boundary, fails beyond it, and pr
   await upload(page, 'report-42.xlsx'); const original = await validate(page); const applicable = original.items.find((row: { code: string; status: string }) => row.code === 'v0190_m' && row.status === 'pass');
   expect(applicable.severity).toBe('warning'); expect(applicable.factReads).toHaveLength(2); expect(original.run.summary.byStatus).toMatchObject({ pass: 1, not_applicable: 2 });
   const boundary = await editedWorkbook('report-42.xlsx', (sheets) => { sheets.find((sheet) => sheet.sheet === 'Facts')!.data[2]![6] = '10.01'; });
-  await upload(page, boundary); await expect(page.getByText(/Resultado histórico:/)).toBeVisible(); const touching = await validate(page); expect(touching.items.find((row: { status: string }) => row.status === 'pass').values.right.nominal).toEqual({ numerator: '1001', denominator: '100' });
+  await upload(page, boundary); await navigateStage(page, 'validation'); await expect(page.getByText(/Resultado histórico:/)).toBeVisible(); const touching = await validate(page); expect(touching.items.find((row: { status: string }) => row.status === 'pass').values.right.nominal).toEqual({ numerator: '1001', denominator: '100' });
   const outside = await editedWorkbook('report-42.xlsx', (sheets) => { sheets.find((sheet) => sheet.sheet === 'Facts')!.data[2]![6] = '10.02'; });
   await upload(page, outside); const failed = await validate(page); expect(failed.run.summary.byStatus.fail).toBe(1);
-  const result = page.locator('.result-row').filter({ hasText: 'v0190_m · Falla · Advertencia' }); await result.locator('summary').click();
-  await expect(result).toContainText('10.02'); await expect(result).toContainText('precisión 2'); await expect(result).toContainText('Facts · G3');
+  const result = page.locator('.result-row').filter({ hasText: 'v0190_m' }).filter({ has: page.getByText('Falla', { exact: true }) });
+  await expect(result.getByText('Advertencia', { exact: true })).toBeVisible();
+  const detail = await openCalculation(page, result, 'v0190_m');
+  await expect(detail).toContainText('10,02'); await expect(detail).toContainText('Facts · G3');
+  const technical = JSON.parse(await (await openTechnical(detail)).textContent() ?? '{}');
+  expect(technical.factReads.find((read: { sourceLocator: { row: number; column: string } }) => read.sourceLocator.row === 3 && read.sourceLocator.column === 'G').coordinate.decimals).toBe('2');
   await page.locator('ce-validation-page').screenshot({ path: path.resolve('.cache/validation-ui.png') });
   await page.locator('#validation-run').selectOption(original.run.id); await expect(page.getByText(/Resultado histórico:/)).toBeVisible();
   const downloadPromise = page.waitForEvent('download'); await page.getByRole('button', { name: 'Exportar resultados (ZIP)' }).click(); const download = await downloadPromise;
@@ -50,7 +57,9 @@ test('V03: G113 creates two finite-sheet instances and explains all three inputs
   expect(instances.every((row: { factReads: unknown[] }) => row.factReads.length === 3)).toBe(true);
   const changed = await editedWorkbook('report-40.xlsx', (sheets) => { sheets.find((sheet) => sheet.sheet === 'Facts')!.data[1]![6] = '11'; });
   await upload(page, changed); const next = await validate(page); expect(next.items.filter((row: { code: string; status: string }) => row.code === 'v0002_h' && row.status === 'fail')).toHaveLength(1); expect(next.items.filter((row: { code: string; status: string }) => row.code === 'v0002_h' && row.status === 'pass')).toHaveLength(1);
-  const row = page.locator('.result-row').filter({ hasText: 'v0002_h · Falla' }); await row.locator('summary').click(); await expect(row.locator('.fact-read')).toHaveCount(3); await expect(row).toContainText('5 · EUR'); await expect(row).toContainText('7 · EUR');
+  const row = page.locator('.result-row').filter({ hasText: 'v0002_h' }).filter({ has: page.getByText('Falla', { exact: true }) });
+  const detail = await openCalculation(page, row, 'v0002_h'); const reads = detail.getByRole('table', { name: 'Entradas utilizadas', exact: true });
+  await expect(reads.getByRole('row')).toHaveCount(4); await expect(reads.getByRole('cell', { name: /^5,00\s*EUR$/ })).toBeVisible(); await expect(reads.getByRole('cell', { name: /^7,00\s*EUR$/ })).toBeVisible();
 });
 test('V05/V12/V15: null provenance, unsupported syntax and arithmetic errors stay distinct and export exact fractions', async ({ page }) => {
   const catalog = await editedWorkbook('eba-subset.xlsx', (sheets) => {
@@ -67,7 +76,9 @@ test('V05/V12/V15: null provenance, unsupported syntax and arithmetic errors sta
   for (const code of ['synthetic_zero', 'synthetic_nvl', 'synthetic_sum_null', 'synthetic_fraction', 'synthetic_negative']) expect(result(code).status).toBe('pass');
   expect(result('synthetic_sum_null').diagnostics).toContainEqual(expect.objectContaining({ code: 'EMPTY_AGGREGATION' })); expect(result('synthetic_fraction').values.left.nominal).toEqual({ numerator: '1', denominator: '3' });
   expect(result('synthetic_divide').status).toBe('error'); expect(result('synthetic_syntax').status).toBe('error'); expect(result('synthetic_group').status).toBe('not_evaluable'); expect(result('synthetic_time').status).toBe('not_evaluable');
-  await page.getByLabel('Código del resultado').fill('synthetic_nulls'); await page.getByRole('button', { name: 'Filtrar resultados' }).click(); await expect(page.getByText('1 de 1 resultados', { exact: true })).toBeVisible(); await page.locator('.result-row summary').click(); await expect(page.locator('.result-row')).toContainText('Nulo explícito'); await expect(page.locator('.result-row')).toContainText('Nulo implícito');
+  await page.getByLabel('Código del resultado').fill('synthetic_nulls'); await page.getByRole('button', { name: 'Filtrar resultados' }).click(); await expect(page.getByText('1 de 1 resultados', { exact: true })).toBeVisible();
+  const detail = await openCalculation(page, page.locator('.result-row'), 'synthetic_nulls'); await expect(detail.getByRole('table', { name: 'Entradas utilizadas', exact: true }).getByText('Sin dato', { exact: true })).toHaveCount(2);
+  const technical = JSON.parse(await (await openTechnical(detail)).textContent() ?? '{}'); expect(technical.factReads.map((read: { presence: string }) => read.presence).sort()).toEqual(['explicit_null', 'implicit_null']);
   const downloadPromise = page.waitForEvent('download'); await page.getByRole('button', { name: 'Exportar resultados (ZIP)' }).click(); const downloaded = await downloadPromise; const location = path.resolve('.cache/validation-exact.zip'); await downloaded.saveAs(location);
   const entries = await readZipParts(location), json = JSON.parse(entries[0]!.data.toString('utf8')); expect(json.results).toHaveLength(pageData.total); expect(json.results.find((row: { code: string }) => row.code === 'synthetic_fraction').values.left.nominal).toEqual({ numerator: '1', denominator: '3' });
 });

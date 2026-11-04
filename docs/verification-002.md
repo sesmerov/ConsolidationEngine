@@ -138,3 +138,121 @@ con el snapshot original habría mostrado importes incorrectos en cadenas Kahn.
 También se fijaron alias estables `corep` y `demo_types` para contextos generados;
 la identidad de negocio sigue basándose en entidad, periodo, framework y módulo.
 Estos ajustes están documentados, pero su implementación pertenece a US1/US2.
+
+## US1 — pruebas antes del rediseño
+
+Base `eb5420e`. La compilación web previa al rediseño pasa con **343,22 kB**
+iniciales (86,91 kB estimados transferidos). Este tamaño no incluye Material en uso.
+
+- T013–T014: cinco fallos conductuales en tres archivos Angular: etapas simultáneas,
+  navegación sin estado activo, presentación de 1/8 y acumulación de 51 filas al
+  avanzar la página. La compilación de estas pruebas sí completó.
+- T015 API: siete casos iniciales, seis fallidos y uno aprobado: etiquetas ausentes,
+  evidencia/AST indebidamente retenidos en lista, detalle inexistente y rechazo de
+  `changedOnly`. El fallback sin etiqueta ya funciona.
+- T015 motor: ocho casos iniciales, seis fallidos y dos aprobados. Falta evidencia
+  de cálculo; el caso encadenado exige que el consumidor lea 0,33 del overlay,
+  no el cero original ni el nominal 1/3. Bloqueo de grafo y aborto por cuota ya pasan.
+- T016: `run-with-toolchain.ps1 -NpmArguments @('run','test:e2e','--',
+  'tests/e2e/material-workflow.spec.ts','--grep','1440px')`: una prueba ejecutada y
+  fallida tras crear el conjunto, por ausencia del botón de etapa «2. Validar».
+  El servidor propio de Playwright usó 3318. No se ejecutó todavía el resto del
+  recorrido de 51 reglas ni los anchos móviles sobre el código nuevo.
+
+Comando de regresión Foundation de 606 pruebas:
+`run-with-toolchain.ps1 -NpmArguments @('exec','--','vitest','run','--project',
+'engine','--project','integration','--project','contract','packages/engine/test',
+ 'tests/integration/profile-guards.spec.ts',
+ 'tests/integration/application-atomicity.spec.ts',
+ 'tests/integration/apply-worker.spec.ts',
+ 'tests/integration/static-dependencies.spec.ts',
+ 'tests/integration/revalidation-comparison.spec.ts',
+ 'tests/contract/previews.spec.ts','tests/contract/applications-exports.spec.ts',
+ 'tests/contract/typed-profile-schemas.spec.ts')`.
+
+T015 motor/T021 captura: ocho casos nuevos aprobados tras la implementación;
+`run-with-toolchain.ps1 -NpmArguments @('exec','--','vitest','run','--project',
+'engine','--reporter=dot')` aprueba **523 pruebas en once archivos**. El build del
+motor también pasa. La evidencia incluye fuente y precondición efectivas sobre el
+overlay, defaults con presencia nula intacta, bloqueo sin lecturas inventadas y
+aborto completo por presupuesto. La UI y la consulta HTTP se verifican por separado.
+
+T015 API/T021–T022: **121/121 pruebas de contratos en catorce archivos**, incluidas
+12 nuevas de presentación, detalle y comparación. Build de contratos y typecheck
+API correctos; `run-with-toolchain.ps1 -NpmArguments @('run','build:api')` también
+pasa al integrar contratos, motor y API. `changedOnly` se aplica globalmente antes
+del cursor, incluye diferencias reales Pasa→Pasa y excluye cosmética/IDs/tiempos;
+las interrupciones no publican una página parcial. Las pruebas de retención verifican
+bytes adicionales de calculation, inmutabilidad y rechazo por cuota conservando
+registro/snapshot/bytes previos. Los casos HTTP usan bundles controlados; la captura
+real está comprobada por separado en las ocho pruebas de motor anteriores.
+`conceptLabel` sigue siendo opcional hasta disponer del mapping confiable de US2.
+
+Hallazgo durante la integración T026: `importCatalog` guarda `originalFields.Description`
+como celda `{value, xmlType, lexeme, column}`. El fixture HTTP inicial usaba un string;
+por ello las 121 pruebas anteriores no demostraban todavía la descripción del Excel
+real. Se reabre T021 para corregir esa lectura, conservar compatibilidad con strings
+y añadir un caso con la forma real antes de considerar completa la proyección.
+
+Corrección de T021: la lectura admite la celda real `Description.value` y el string
+heredado. El fixture incorpora esa forma, texto con apariencia HTML y descripciones
+alternativas ordenadas por fuente. `presentation-queries` vuelve a pasar **12/12**.
+El E2E de Material también comprobará la descripción de un Excel subido y su
+representación literal, sin crear nodos HTML.
+
+### Primera integración visual US1
+
+`run-with-toolchain.ps1 -NpmArguments @('run','build','--workspace','@ce/web')`
+compila Material: **783,29 kB iniciales**, 165,47 kB estimados transferidos. Se
+mantienen los límites; aparece aviso de 700 kB, sin alcanzar el error de 1 MB.
+Se prepara carga diferida de etapas inactivas para reducir el inicial.
+
+El recorrido `material-workflow.spec.ts --grep 1440px` pasa completo: **1/1**,
+17,8 s de prueba y 20,9 s total. Usa 51 reglas numéricas sintéticas en cadena,
+carga real de XLSX, descripciones literales con etiquetas HTML, validación,
+configuración por API como preparación, simulación/selección/aplicación/descarga
+por UI. Verifica dependencia fuera de página sin autoaceptación, selección de 51,
+lectura del antecesor simulado, desaparición de confirmación, 51 cambios exactos y
+descarga del recibo sin modificar la selección histórica. Un intento previo del
+mismo build falló por una aserción que esperaba «no visibles» en vez del texto real
+«fuera de esta página»; se ajustó la aserción, no el comportamiento.
+
+Capturas inspeccionadas: `.cache/verification-002/material-proposals-1440.png` y
+`material-comparison-1440.png`. Las tablas muestran códigos, importes y estados;
+no imprimen claves JSON en las filas. Hallazgos para corregir antes del cierre:
+alinear flecha con importes, concordancias de singular y priorizar comparación/
+descarga tras aplicar para no obligar a atravesar las filas históricas. Aún faltan
+build final diferido, móvil y regresión E2E completa. Esta es evidencia automática,
+no aceptación humana.
+
+### Cierre US1 — T013–T030
+
+- **79/79 Angular, doce archivos**, con Material/harnesses, exactitud, cursores,
+  navegación, estado de workspace, intentos idempotentes, etiquetas de dependencias
+  (máximo cuatro solicitudes simultáneas), respuestas tardías y foco. Comando:
+  `run-with-toolchain.ps1 -NpmArguments @('run','test','--workspace','@ce/web','--',
+  '--watch=false')`. Vitest informa 6,93 s de ejecución, aparte de compilación.
+- **19/19 E2E, 2,4 minutos**: `run-with-toolchain.ps1 -NpmArguments
+  @('run','test:e2e')`. Incluye los dieciséis recorridos anteriores adaptados y los
+  tres Material a 320/390/1440 px; sin skips. Servidor propio en 3318.
+- Build web final correcto, **657,51 kB iniciales** y 149,98 kB estimados transferidos;
+  etapas Validar/Recalcular/Descargar diferidas. No hay aviso de presupuesto y no se
+  modificaron los límites de 700 kB/1 MB. API/contratos/motor compilan también.
+- Capturas finales guardadas e inspeccionadas bajo `.cache/verification-002/`:
+  `material-proposals-{320,390,1440}.png` y
+  `material-comparison-{320,390,1440}.png`. Son fixtures sintéticos, no informes reales.
+  El móvil mantiene desplazamiento dentro de la tabla, comprobado también mediante
+  flechas del teclado; la página no desborda. Importes completos, flecha alineada,
+  unidad común y foco visible. El recorrido anterior comprueba contraste de texto.
+
+La primera regresión final fue 18/19: detectó que `viewChild` de botones Material
+no obtenía ElementRef para enfocar el cierre. Se corrigió con `read:ElementRef`,
+se añadió prueba de foco Cerrar/Volver y se repitió la suite, ahora 19/19. Se conservan
+severidad y procedencia en detalle; no se eliminaron sus aserciones. Tras aplicar,
+comparación y descarga aparecen primero y las propuestas históricas quedan bajo
+una acción secundaria sin controles de selección. El listado no muestra calculation,
+AST ni claves serializadas; su detalle conserva entradas reales y origen.
+
+Este checkpoint acredita US1 sobre `ce-report-1`, incluida compatibilidad v1 de
+importación, validación, recálculo y exportación. **No acredita todavía COREP visual,
+las demos tipadas, exportación visual, benchmark nuevo ni aceptación humana SC-008.**

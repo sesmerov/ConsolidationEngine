@@ -27,7 +27,9 @@ describe('explicit application acceptance and recovery', () => {
   function acknowledge(fixture: ReturnType<typeof render>) { const checkbox = (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>('input[type="checkbox"]')!; checkbox.click(); fixture.detectChanges(); }
   it('shows every selected change and ancestor, requiring express acceptance before posting the exact set', async () => {
     const fixture = render(), element = fixture.nativeElement as HTMLElement;
-    for (const text of ['SYNTHETIC_A', 'SYNTHETIC_D', '11', '12.00', '22', '24.00']) expect(element.textContent).toContain(text);
+    const review = element.querySelector<HTMLDetailsElement>('details.selection-review')!; expect(review.open).toBe(false); review.querySelector('summary')!.click(); fixture.detectChanges(); expect(review.open).toBe(true);
+    for (const text of ['SYNTHETIC_A', 'SYNTHETIC_D', '11,00', '12,00', '22,00', '24,00']) expect(review.textContent).toContain(text);
+    expect(review.querySelectorAll('.selected-changes > li')).toHaveLength(2);
     expect(button(fixture, 'Aplicar cambios seleccionados').disabled).toBe(true); http.expectNone(request => request.method === 'POST');
     acknowledge(fixture); button(fixture, 'Aplicar cambios seleccionados').click(); fixture.detectChanges();
     const request = http.expectOne(request => request.url.endsWith('/applications')); expect(request.request.method).toBe('POST');
@@ -52,7 +54,10 @@ describe('explicit application acceptance and recovery', () => {
   });
   it('explains a no-op and preserves the existing calculated provenance in the confirmation', () => {
     const fixture = render({ selection: { ...selection, selectedIds: [aId] }, proposals: [{ ...a, before: { ...a.before, originalText: '12', normalizedValue: { numerator: '12', denominator: '1' }, derivation: { receiptId: 'previous-receipt', previewId, proposalId: aId, baseVersionId: versionId } } }] });
-    const text = (fixture.nativeElement as HTMLElement).textContent!; expect(text).toContain('Sin cambio de valor'); expect(text).toContain('previous-receipt'); expect(text).toContain('12.00');
+    const element = fixture.nativeElement as HTMLElement, review = element.querySelector<HTMLDetailsElement>('details.selection-review')!; review.querySelector('summary')!.click(); fixture.detectChanges();
+    expect(review.textContent).toContain('Sin cambio de valor'); expect(review.textContent).toContain('Recalculado'); expect(review.textContent).toContain('12,00');
+    const provenance = Array.from(review.querySelectorAll<HTMLDetailsElement>('details')).find(detail => detail.textContent?.includes('previous-receipt'))!;
+    expect(provenance).toBeDefined(); provenance.querySelector('summary')!.click(); expect(provenance.open).toBe(true); expect(provenance.textContent).toContain('previous-receipt');
   });
   it('does not register an acceptance that arrives after the workspace closes', async () => {
     const fixture = render(); acknowledge(fixture); button(fixture, 'Aplicar cambios seleccionados').click(); const request = http.expectOne(request => request.url.endsWith('/applications'));
@@ -81,9 +86,14 @@ describe('explicit application acceptance and recovery', () => {
       { key: 'fail', before: { ...result, code: 'SYNTHETIC_STILL_FAIL' }, after: { ...result, code: 'SYNTHETIC_STILL_FAIL', versionId: nextVersion } },
       { key: 'error', before: { ...result, code: 'SYNTHETIC_ARITHMETIC', status: 'error' }, after: { ...result, code: 'SYNTHETIC_ARITHMETIC', status: 'error', versionId: nextVersion, diagnostics: [{ code: 'DIVISION_BY_ZERO', message: 'División por cero.' }] } }],
       total: 3, nextCursor: null, receipt: { baseVersionId: versionId, newVersionId: nextVersion, acceptedIds: [aId, dId] }, beforeSummary: summary, afterSummary: summary });
-    fixture.detectChanges(); const text = (fixture.nativeElement as HTMLElement).textContent!;
+    fixture.detectChanges(); for (const request of http.match(request => request.url.endsWith('/runs'))) request.flush({ items: [], total: 0, nextCursor: null, revision: 'rev' });
+    const element = fixture.nativeElement as HTMLElement, text = element.textContent!;
     for (const value of ['SYNTHETIC_WARNING', 'Advertencia', 'SYNTHETIC_STILL_FAIL', 'Falla', 'SYNTHETIC_ARITHMETIC', 'Error', versionId, nextVersion]) expect(text).toContain(value);
     expect(text.toLowerCase()).not.toMatch(/todo correcto|todas las reglas pasan|validación aprobada/);
-    expect(text).toContain('Valor calculado en la aplicación calculated-receipt'); expect(text).toContain('no el valor recalculado en el Excel original');
+    element.querySelector<HTMLButtonElement>('button[aria-label="Ver cálculo y origen de SYNTHETIC_WARNING"]')!.click(); fixture.detectChanges();
+    const details = element.querySelectorAll('ce-calculation-detail'), after = details[1]!;
+    expect(after.textContent).toContain('Recalculado en una aplicación anterior'); expect(after.textContent).toContain('no estaba escrito en el informe original');
+    const technical = after.querySelector<HTMLDetailsElement>('details[data-technical]')!; technical.open = true; technical.dispatchEvent(new Event('toggle')); fixture.detectChanges(); expect(technical.textContent).toContain('calculated-receipt');
+    element.querySelector<HTMLButtonElement>('button[aria-label="Ver cálculo y origen de SYNTHETIC_ARITHMETIC"]')!.click(); fixture.detectChanges(); expect(element.textContent).toContain('División por cero.');
   });
 });

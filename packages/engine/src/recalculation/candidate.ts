@@ -1,4 +1,4 @@
-import type { Diagnostic, DirectionDTO, FactReadDTO, MetadataReadDTO, ProposalAfterDTO, Rational, ReportedFact, Snapshot, SourceLocator } from '@ce/contracts';
+import type { Diagnostic, DirectionDTO, FactReadDTO, MetadataReadDTO, ProposalAfterDTO, ProposalCalculationDTO, Rational, ReportedFact, Snapshot, SourceLocator } from '@ce/contracts';
 import { evaluate, type EvaluationContext, type EvaluationResult } from '../evaluator/evaluate.js';
 import { ValueError } from '../evaluator/value.js';
 import { WorkBudget } from '../execution/budget.js';
@@ -8,12 +8,14 @@ import { ordinal, reportIndex } from '../resolver/coordinates.js';
 import { collectExpressionReads } from '../resolver/static-reads.js';
 import { resolveDirection } from './direction.js';
 import { quantize, RecalculationError } from './quantize.js';
+import { valueToDTO } from '../validation/run.js';
 
 export interface CandidateResult {
   readonly state: 'available' | 'blocked'; readonly before?: FactReadDTO; readonly after?: ProposalAfterDTO;
   readonly exactNominal?: Rational; readonly derivedInterval?: { readonly lo: Rational; readonly hi: Rational };
   readonly readKeys: readonly string[]; readonly metadataReads: readonly MetadataReadDTO[];
   readonly sources: readonly SourceLocator[]; readonly diagnostics: readonly Diagnostic[];
+  readonly calculation?: ProposalCalculationDTO;
   /** Present only after original-rule revalidation; consumers must use this quantized fact. */
   readonly fact?: ReportedFact;
 }
@@ -37,14 +39,37 @@ export function evaluateCandidate(snapshot: Snapshot, direction: DirectionDTO, o
     ...(previous?.normalizedValue !== undefined ? { normalizedValue: previous.normalizedValue } : {}),
     ...(previous?.derivation ? { derivation: previous.derivation } : {}), sourceLocator: previous?.sourceLocator ?? target.sourceLocator };
   const readSet = new Set([...readKeys, target.factKey]);
+  const coordinateByKey = new Map(snapshot.content.coordinates.filter(cell => { budget.check(); return readSet.has(cell.factKey); }).map(cell => [cell.factKey, cell]));
   const sources = uniqueSources([...snapshot.content.catalog.variants.filter(variant => direction.variantIds.includes(variant.variantId)).flatMap(variant => variant.sourceLocators),
-    ...snapshot.content.coordinates.filter(cell => readSet.has(cell.factKey)).map(cell => cell.sourceLocator),
+    ...[...coordinateByKey.values()].map(cell => cell.sourceLocator),
     ...snapshot.content.facts.filter(fact => readSet.has(fact.factKey)).map(fact => fact.sourceLocator),
     ...metadataReads.flatMap(read => read.sourceLocator ? [read.sourceLocator] : [])]);
   const diagnostics: Diagnostic[] = [...sourceReads.diagnostics, ...(conditionReads?.diagnostics ?? [])];
   const details = { before, readKeys, metadataReads, sources };
   let numeric: Pick<CandidateResult, 'exactNominal' | 'derivedInterval'> = {};
-  const blocked = (...issues: Diagnostic[]): CandidateResult => ({ ...details, ...numeric, state: 'blocked', diagnostics: [...diagnostics, ...issues] });
+  let sourceEvaluation: EvaluationResult | undefined, preconditionEvaluation: EvaluationResult | undefined;
+  function calculationEvidence(): Pick<CandidateResult, 'calculation'> {
+    if (!sourceEvaluation && !preconditionEvaluation) return {};
+    // Only original pre-patch evaluations contribute reads. Revalidation below uses a
+    // tentative destination; including it here would fabricate an input to this calculation.
+    const evaluatedKeys = [...new Set([...(preconditionEvaluation?.readKeys ?? []), ...(sourceEvaluation?.readKeys ?? [])])].sort(ordinal);
+    const reads: ProposalCalculationDTO['reads'][number][] = [];
+    for (const key of evaluatedKeys) {
+      budget.check(); const coordinate = coordinateByKey.get(key);
+      if (!coordinate) throw new ValueError('TYPE_MISMATCH', 'La lectura no identifica una coordenada declarada.');
+      const facts = index.facts.get(key) ?? [];
+      if (!facts.length) reads.push({ fact: { factKey: key, coordinate, presence: 'implicit_null', sourceLocator: coordinate.sourceLocator } });
+      else for (const fact of facts) {
+        budget.check(); reads.push({ fact: { factKey: key, coordinate, presence: fact.presence === 'null' ? 'explicit_null' : 'value',
+          ...(fact.normalizedValue !== undefined ? { normalizedValue: fact.normalizedValue } : {}), ...(fact.originalText !== undefined ? { originalText: fact.originalText } : {}),
+          ...(fact.derivation ? { derivation: fact.derivation } : {}), sourceLocator: fact.sourceLocator } });
+      }
+    }
+    return { calculation: { expression: ast.source, ...(precondition ? { precondition: precondition.source } : {}),
+      ...(sourceEvaluation?.value ? { sourceValue: valueToDTO(sourceEvaluation.value) } : {}),
+      ...(preconditionEvaluation?.value ? { preconditionValue: valueToDTO(preconditionEvaluation.value) } : {}), reads } };
+  }
+  const blocked = (...issues: Diagnostic[]): CandidateResult => ({ ...details, ...numeric, ...calculationEvidence(), state: 'blocked', diagnostics: [...diagnostics, ...issues] });
   function conditionPasses(evaluation: EvaluationResult): boolean {
     diagnostics.push(...evaluation.diagnostics);
     if (evaluation.value?.kind === 'boolean' && evaluation.value.value) return true;
@@ -54,8 +79,11 @@ export function evaluateCandidate(snapshot: Snapshot, direction: DirectionDTO, o
   if (targetFacts.length > 1) return blocked(diagnostic('AMBIGUOUS_REFERENCE', 'El destino contiene hechos duplicados.'));
   if (diagnostics.length) return blocked();
   try {
-    if (precondition && !conditionPasses(evaluate(precondition, environment))) return blocked();
-    const evaluated = evaluate(source, environment); diagnostics.push(...evaluated.diagnostics);
+    if (precondition) {
+      preconditionEvaluation = evaluate(precondition, environment);
+      if (!conditionPasses(preconditionEvaluation)) return blocked();
+    }
+    const evaluated = sourceEvaluation = evaluate(source, environment); diagnostics.push(...evaluated.diagnostics);
     const value = evaluated.value;
     if (!value || value.kind === 'null' || value.kind === 'unknown') return blocked(diagnostic('CANDIDATE_NOT_EVALUABLE', 'El lado calculado no tiene un valor conocido.'));
     if (value.kind !== target.dataType) return blocked(diagnostic('TYPE_MISMATCH', 'El valor calculado no coincide con el tipo del destino.'));
@@ -77,7 +105,7 @@ export function evaluateCandidate(snapshot: Snapshot, direction: DirectionDTO, o
     const validation = evaluate(ast, { report, binding, budget }); diagnostics.push(...validation.diagnostics);
     if (validation.value?.kind !== 'boolean' || !validation.value.value) return blocked(diagnostic('CANDIDATE_DOES_NOT_SATISFY_RULE', 'El valor exportable no satisface la igualdad original.'));
     budget.check();
-    return { ...details, ...numeric, state: 'available', after, fact, diagnostics };
+    return { ...details, ...numeric, ...calculationEvidence(), state: 'available', after, fact, diagnostics };
   } catch (error) {
     if (error instanceof NumericError && error.code === 'RESOURCE_LIMIT') throw error;
     if (!(error instanceof RecalculationError) && !(error instanceof NumericError) && !(error instanceof ValueError)) throw error;

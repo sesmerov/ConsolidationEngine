@@ -1,7 +1,8 @@
-import type { Diagnostic, Rational, SourceFile, SourceLocator } from './common.js';
-import type { FactReadDTO, MetadataReadDTO, ValidationBinding } from './validation.js';
-import { normalizedValueSchema, rationalSchema, sourceLocatorSchema, uuidSchema } from './common.schemas.js';
-import { coordinateSchema, factDerivationSchema } from './report.js';
+import type { Diagnostic, PresentationDTO, Rational, SourceFile, SourceLocator } from './common.js';
+import type { FactReadDTO, MetadataReadDTO, ValidationBinding, ValidationValueDTO } from './validation.js';
+import { validationValueSchema } from './validation.js';
+import { normalizedValueSchema, presentationSchema, rationalSchema, sourceLocatorSchema, uuidSchema } from './common.schemas.js';
+import { coordinateSchema, factDerivationSchema, sourceFileSchema } from './report.js';
 import { diagnosticSchema } from './catalog.js';
 
 export const RECALCULATION_POLICY_ID = 'half-even-v1' as const;
@@ -32,7 +33,15 @@ export interface PreviewDTO {
 export type ProposalAfterDTO =
   | { readonly normalizedValue: Rational; readonly originalText: string; readonly decimals: string; readonly unit: string }
   | { readonly normalizedValue: boolean; readonly originalText: 'true' | 'false' };
+export interface ProposalCalculationDTO {
+  readonly expression: string; readonly precondition?: string;
+  readonly sourceValue?: ValidationValueDTO; readonly preconditionValue?: ValidationValueDTO;
+  readonly reads: readonly { readonly fact: FactReadDTO; readonly fromProposalId?: string }[];
+}
 export interface ProposalDTO {
+  readonly presentation?: PresentationDTO;
+  /** Retained simulation evidence. Only detail responses include it. */
+  readonly calculation?: ProposalCalculationDTO;
   readonly id: string; readonly previewId: string; readonly directionId: string; readonly instanceId: string;
   readonly variantIds: readonly string[]; readonly binding: ValidationBinding; readonly code: string; readonly targetKey: string;
   readonly before?: FactReadDTO; readonly exactNominal?: Rational; readonly derivedInterval?: { readonly lo: Rational; readonly hi: Rational };
@@ -98,11 +107,22 @@ export const proposalSchema = { type: 'object', additionalProperties: false,
     ] },
     readKeys: texts, predecessorIds: uuids, metadataReads: metadataReadsSchema, sources: { type: 'array', items: sourceLocatorSchema }, diagnostics,
     state: { enum: ['available', 'blocked', 'accepted', 'applied', 'discarded', 'obsolete'] },
+    presentation: presentationSchema,
+    calculation: { type: 'object', additionalProperties: false, required: ['expression', 'reads'], properties: {
+      expression: text, precondition: text, sourceValue: validationValueSchema, preconditionValue: validationValueSchema,
+      reads: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['fact'], properties: { fact: factReadSchema, fromProposalId: uuidSchema } } },
+    } },
   }, allOf: [
     { if: { type: 'object', properties: { state: { enum: ['available', 'accepted', 'applied'] } } }, then: { type: 'object', required: ['before', 'after'] } },
     { if: { type: 'object', properties: { state: { const: 'blocked' } } }, then: { not: { type: 'object', required: ['after'] } } },
     { if: { type: 'object', required: ['after'], properties: { after: { type: 'object', properties: { normalizedValue: { type: 'boolean' } } } } }, then: { not: { anyOf: [{ type: 'object', required: ['exactNominal'] }, { type: 'object', required: ['derivedInterval'] }] } } },
   ] } as const;
+const { calculation: _calculation, ...proposalListProperties } = proposalSchema.properties;
+export const proposalListItemSchema = { ...proposalSchema, properties: proposalListProperties } as const;
+export const proposalsPageSchema = { type: 'object', additionalProperties: false, required: ['items', 'nextCursor', 'total', 'versionId'], properties: {
+  items: { type: 'array', items: proposalListItemSchema }, nextCursor: { type: ['string', 'null'] }, total: count, versionId: uuidSchema,
+  sourceFiles: { type: 'array', items: sourceFileSchema },
+} } as const;
 export const previewSelectionRequestSchema = { type: 'object', additionalProperties: false, required: ['selectedIds'], properties: { selectedIds: { ...uuids, maxItems: 1_000_000 } } } as const;
 export const previewSelectionSchema = { type: 'object', additionalProperties: false, required: ['selectedIds', 'requiredIds', 'closureHash', 'complete', 'state'], properties: {
   selectedIds: uuids, requiredIds: uuids, closureHash: hash, complete: { type: 'boolean' }, state: previewStates,

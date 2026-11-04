@@ -12,6 +12,9 @@ export const dateValueSchema = { type: 'object', additionalProperties: false, re
   kind: { const: 'date' }, value: civilDateV2Schema,
 } } as const;
 export const normalizedValueSchema = { anyOf: [rationalSchema, { type: 'boolean' }, textValueSchema, dateValueSchema] } as const;
+export const presentationSchema = { type: 'object', additionalProperties: false, properties: {
+  description: { type: 'string', maxLength: 32_767 }, conceptLabel: { type: 'string', maxLength: 32_767 },
+} } as const;
 export const sourceLocatorSchema = { type: 'object', additionalProperties: false, properties: {
   fileId: uuidSchema, sheet: { type: 'string', maxLength: 100 }, row: { type: 'integer', minimum: 1 },
   column: { type: 'string', maxLength: 20 }, ruleCode: { type: 'string', maxLength: 200 },

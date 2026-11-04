@@ -1,0 +1,101 @@
+import { DeferBlockBehavior, TestBed } from '@angular/core/testing';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AppComponent } from '../app.component';
+import { ApiClient } from '../core/api-client';
+import { SessionStore } from '../core/session.store';
+import { By } from '@angular/platform-browser';
+import { HttpErrorResponse } from '@angular/common/http';
+import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
+import { MatButtonHarness } from '@angular/material/button/testing';
+import { WorkspaceShellComponent } from './workspace-shell.component';
+import { ImportStore } from '../import/import.store';
+import { ResultsStore } from '../validation/results.store';
+import { PreviewStore } from '../recalculation/preview.store';
+import { DirectionsStore } from '../recalculation/directions.store';
+import { ApplyStore } from '../recalculation/apply.store';
+import { ExportStore } from '../recalculation/export.store';
+import type { PreviewDTO, ValidationResultsPageDTO } from '@ce/contracts';
+
+const workspace = { id: 'workspace', name: 'Cierre de prueba', state: 'ready' as const, currentVersionId: 'v1', versionIds: ['v0', 'v1'], contexts: [], counts: { snapshots: 1, coordinates: 2, facts: 2, sources: 2 }, sessionBytes: 1 };
+const summary = { complete: true, rows: 0, variants: 0, instances: 0, duplicateRows: 0, applicableVariants: 0, byStatus: { pass: 0, fail: 0, error: 0, not_applicable: 0, not_evaluable: 0 } };
+const page = { items: [], total: 0, nextCursor: null, versionId: 'v1', configuredDirections: [], run: { id: 'run', versionId: 'v1', profileId: 'profile', status: 'completed', startedAt: '2026-11-04', diagnostics: [], summary, resultIds: [] } } as ValidationResultsPageDTO;
+const preview = { id: 'preview', baseVersionId: 'v1', profileId: 'profile', policyId: 'policy', state: 'ready', createdAt: '2026-11-04', proposalIds: [], diagnostics: [], graphSummary: { nodes: 0, edges: 0, order: [], blocked: 0, cycles: [], conflicts: [] } } as PreviewDTO;
+describe('workspace navigation keeps one active stage', () => {
+  beforeEach(() => {
+    TestBed.configureTestingModule({ deferBlockBehavior: DeferBlockBehavior.Playthrough, imports: [AppComponent], providers: [{ provide: ApiClient, useValue: {
+      capabilities: vi.fn().mockResolvedValue({ knownDifferences: [] }),
+      rules: vi.fn().mockResolvedValue({ items: [], total: 0, nextCursor: null, sources: [], coverage: {}, dataSummary: {} }),
+      runs: vi.fn().mockResolvedValue({ items: [], total: 0, nextCursor: null }),
+      previews: vi.fn().mockResolvedValue({ items: [], total: 0, nextCursor: null }),
+      closeWorkspace: vi.fn().mockResolvedValue(undefined),
+      exportReport: vi.fn(),
+    } }] });
+    const session = TestBed.inject(SessionStore); vi.spyOn(session, 'connect').mockResolvedValue(); session.connected.set(true); session.workspace.set(workspace); session.etag.set('"v-v1"');
+  });
+  afterEach(() => TestBed.resetTestingModule());
+  it('renders only Cargar initially, with explicit controls for the four stages', async () => {
+    const fixture = TestBed.createComponent(AppComponent); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('ce-import-page')).not.toBeNull();
+    expect(element.querySelector('ce-validation-page')).toBeNull();
+    expect(element.querySelector('ce-preview-page')).toBeNull();
+    expect(element.querySelector('ce-exports')).toBeNull();
+    expect([...element.querySelectorAll('nav button')].map(button => button.textContent?.trim())).toEqual(['1. Cargar', '2. Validar', '3. Recalcular', '4. Descargar']);
+  });
+  it('changes the active stage without submitting a business operation', async () => {
+    const fixture = TestBed.createComponent(AppComponent); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
+    const element = fixture.nativeElement as HTMLElement;
+    const button = [...element.querySelectorAll<HTMLButtonElement>('nav button')].find(row => row.textContent?.trim() === '2. Validar');
+    expect(button).toBeDefined(); button!.click(); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
+    expect(element.querySelector('ce-import-page')).toBeNull(); expect(element.querySelector('ce-validation-page')).not.toBeNull();
+    expect(TestBed.inject(SessionStore).versionId()).toBe('v1');
+  });
+  it('focuses the explicit close confirmation and returns focus to its Material trigger on Volver', async () => {
+    const fixture = TestBed.createComponent(AppComponent); fixture.detectChanges(); await fixture.whenStable(); const loader = TestbedHarnessEnvironment.loader(fixture);
+    const trigger = await loader.getHarness(MatButtonHarness.with({ text: 'Cerrar conjunto' })); await trigger.click();
+    const confirmation = await loader.getHarness(MatButtonHarness.with({ text: 'Cerrar y descartar' })); expect(await confirmation.isFocused()).toBe(true);
+    await (await loader.getHarness(MatButtonHarness.with({ text: 'Volver' }))).click(); expect(await trigger.isFocused()).toBe(true);
+    expect(TestBed.inject(SessionStore).workspace()?.id).toBe(workspace.id); expect(TestBed.inject(ApiClient).closeWorkspace).not.toHaveBeenCalled();
+  });
+  it('keeps files, filters, the complete direction draft, selection and historical download across Material navigation', async () => {
+    const fixture = TestBed.createComponent(AppComponent); fixture.detectChanges(); await fixture.whenStable();
+    const injector = fixture.debugElement.query(By.directive(WorkspaceShellComponent)).injector;
+    const imports = injector.get(ImportStore), results = injector.get(ResultsStore), proposals = injector.get(PreviewStore), directions = injector.get(DirectionsStore);
+    TestBed.tick(); await fixture.whenStable();
+    directions.page.set(page); TestBed.tick(); directions.draft.set({ remembered: 'left' });
+    const catalog = new File(['x'], 'catalog.xlsx'); imports.catalog.set(catalog); imports.reports.set([new File(['x'], 'report.xlsx')]);
+    results.code.set('ABC'); results.selectedRunId.set('remembered-run'); proposals.selected.set(['remembered-proposal']); proposals.code.set('DEF');
+    TestBed.inject(SessionStore).selectExportVersion('v0');
+    const loader = TestbedHarnessEnvironment.loader(fixture);
+    for (const text of ['2. Validar', '3. Recalcular', '4. Descargar', '1. Cargar']) { await (await loader.getHarness(MatButtonHarness.with({ text }))).click(); }
+    expect(imports.catalog()).toBe(catalog); expect(imports.reports()[0]?.name).toBe('report.xlsx');
+    expect(results.code()).toBe('ABC'); expect(results.selectedRunId()).toBe('remembered-run'); expect(proposals.selected()).toEqual(['remembered-proposal']); expect(proposals.code()).toBe('DEF');
+    expect(directions.draft()).toEqual({ remembered: 'left' }); expect(TestBed.inject(SessionStore).exportVersionId()).toBe('v0');
+    expect((fixture.nativeElement as HTMLElement).querySelectorAll('ce-import-page,ce-validation-page,ce-preview-page,ce-exports')).toHaveLength(1);
+  });
+  it('preserves an uncertain export attempt across navigation and uses its original key, body and CAS on retry', async () => {
+    const fixture = TestBed.createComponent(AppComponent); fixture.detectChanges(); await fixture.whenStable(); const loader = TestbedHarnessEnvironment.loader(fixture);
+    await (await loader.getHarness(MatButtonHarness.with({ text: '4. Descargar' }))).click();
+    const injector = fixture.debugElement.query(By.directive(WorkspaceShellComponent)).injector, exports = injector.get(ExportStore), api = TestBed.inject(ApiClient);
+    const post = vi.mocked(api.exportReport); post.mockRejectedValueOnce(new HttpErrorResponse({ status: 0 })); TestBed.inject(SessionStore).selectExportVersion('v0'); await exports.start();
+    const initial = [...post.mock.calls[0]!]; expect(exports.uncertain()).toBe(true);
+    await (await loader.getHarness(MatButtonHarness.with({ text: '2. Validar' }))).click(); await (await loader.getHarness(MatButtonHarness.with({ text: '4. Descargar' }))).click();
+    TestBed.inject(SessionStore).etag.set('new-cas'); post.mockRejectedValueOnce(new HttpErrorResponse({ status: 0 })); await exports.retry();
+    expect(post.mock.calls[1]).toEqual(initial); expect(exports.uncertain()).toBe(true); expect(TestBed.inject(SessionStore).exportVersionId()).toBe('v0');
+  });
+  it('invalidates acknowledgement on selection/base changes while stage changes leave it intact', async () => {
+    const fixture = TestBed.createComponent(AppComponent); fixture.detectChanges(); await fixture.whenStable(); const injector = fixture.debugElement.query(By.directive(WorkspaceShellComponent)).injector;
+    const apply = injector.get(ApplyStore); TestBed.tick(); apply.preview.set(preview); apply.selection.set({ selectedIds: ['a'], requiredIds: [], closureHash: 'one', complete: true, state: 'ready' }); TestBed.tick(); apply.acknowledged.set(true);
+    const loader = TestbedHarnessEnvironment.loader(fixture); await (await loader.getHarness(MatButtonHarness.with({ text: '4. Descargar' }))).click(); expect(apply.acknowledged()).toBe(true);
+    apply.selection.set({ selectedIds: ['b'], requiredIds: [], closureHash: 'two', complete: true, state: 'ready' }); TestBed.tick(); expect(apply.acknowledged()).toBe(false);
+    apply.acknowledged.set(true); TestBed.inject(SessionStore).workspace.set({ ...workspace, currentVersionId: 'v2', versionIds: ['v0', 'v1', 'v2'] }); TestBed.tick(); expect(apply.acknowledged()).toBe(false);
+  });
+  it('releases local files on close and rejects history that arrives after the workspace has gone', async () => {
+    const fixture = TestBed.createComponent(AppComponent); fixture.detectChanges(); await fixture.whenStable(); const injector = fixture.debugElement.query(By.directive(WorkspaceShellComponent)).injector;
+    const imports = injector.get(ImportStore); imports.catalog.set(new File(['x'], 'private.xlsx'));
+    let resolve!: (page: { items: PreviewDTO[]; total: number; nextCursor: null; revision: string }) => void;
+    vi.mocked(TestBed.inject(ApiClient).previews).mockReturnValueOnce(new Promise(done => { resolve = done; })); const proposals = injector.get(PreviewStore); TestBed.tick();
+    await TestBed.inject(SessionStore).close(); fixture.detectChanges(); resolve({ items: [preview], total: 1, nextCursor: null, revision: 'old' }); await Promise.resolve();
+    expect(imports.catalog()).toBeNull(); expect(proposals.history()).toEqual([]); expect((fixture.nativeElement as HTMLElement).querySelector('ce-workspace-shell')).toBeNull();
+  });
+});

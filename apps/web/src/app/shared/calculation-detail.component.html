@@ -1,0 +1,76 @@
+@if (row(); as entry) {
+  <section class="calculation-detail" role="region" [attr.aria-label]="title()">
+    <div class="section-heading">
+      <h3 #heading tabindex="-1">{{ title() }}</h3>
+      <button mat-button type="button" (click)="close()">Cerrar detalle</button>
+    </div>
+    <ng-content />
+    @if (entry.presentation?.description; as description) { <p>{{ description }}</p> }
+    @if (entry.presentation?.conceptLabel; as label) { <p><strong>{{ label }}</strong></p> }
+
+    @if (proposal(); as proposed) {
+      <h4>Destino · {{ coordinateText(proposed.before?.coordinate) }}</h4>
+      <div class="value-change">
+        <span><span class="value-label">Anterior</span><span class="exact-value">{{ proposed.before ? factText(proposed.before) : 'Sin dato' }}</span></span>
+        <span aria-hidden="true">→</span>
+        <span><span class="value-label">Propuesto</span><span class="exact-value">{{ normalizedText(proposed.after?.normalizedValue, proposed.before?.coordinate?.decimals ?? '') }}</span></span>
+        @if (proposed.before?.coordinate?.unit; as unit) { <span class="unit-label">{{ unit }}</span> }
+      </div>
+      @if (roundedProposal(proposed)) { <p class="value-marker">Redondeado a la precisión del destino. El valor exacto está en el detalle técnico.</p> }
+      @if (hasInterval(proposed)) { <p class="value-marker">El cálculo tiene un intervalo de incertidumbre; puedes consultarlo en el detalle técnico.</p> }
+      @if (!proposed.calculation) { <p class="notice">Esta propuesta no conserva el cálculo detallado. No se reconstruyen sus entradas con los valores originales.</p> }
+    }
+    @if (expression(); as value) { <h4>Expresión</h4><p class="expression exact-value">{{ value }}</p> }
+    @if (precondition(); as value) {
+      <h4>Precondición</h4><p class="expression exact-value">{{ value }}</p>
+      @if (preconditionValue(); as evaluated) { <p>Resultado de la precondición: <strong class="exact-value">{{ validationText(evaluated) }}</strong></p> }
+    }
+    @if (operands().length) {
+      <dl class="detail-grid">
+        @for (operand of operands(); track operand.label) { <div><dt>{{ operand.label }}</dt><dd class="exact-value">{{ validationText(operand.value) }}</dd></div> }
+      </dl>
+    }
+    @if (reads().length) {
+      <div class="table-region" role="region" aria-label="Tabla de entradas utilizadas" tabindex="0">
+        <table mat-table class="data-table" [dataSource]="reads()" aria-label="Entradas utilizadas">
+          <caption>Entradas utilizadas</caption>
+          <ng-container matColumnDef="coordinate"><th mat-header-cell *matHeaderCellDef>Celda</th><td mat-cell *matCellDef="let read">{{ coordinateText(read.fact.coordinate) }}</td></ng-container>
+          <ng-container matColumnDef="value"><th mat-header-cell *matHeaderCellDef>Valor leído</th><td mat-cell *matCellDef="let read"><span class="exact-value">{{ factText(read.fact) }}</span> <span class="unit-label">{{ read.fact.coordinate.unit }}</span></td></ng-container>
+          <ng-container matColumnDef="origin"><th mat-header-cell *matHeaderCellDef>Origen del valor</th><td mat-cell *matCellDef="let read">{{ originLabel(read) }}@if (read.fromProposalId) { <span class="muted"> · Simulado, aún no escrito en el informe original</span> } @else if (read.fact.derivation) { <span class="muted"> · Este valor recalculado no estaba escrito en el informe original</span> }</td></ng-container>
+          <tr mat-header-row *matHeaderRowDef="columns"></tr><tr mat-row *matRowDef="let read; columns: columns"></tr>
+        </table>
+      </div>
+    }
+    @if (entry.metadataReads.length) {
+      <h4>Indicadores utilizados</h4><ul>
+        @for (read of entry.metadataReads; track $index) { <li>{{ read.code }} · {{ read.presence === 'missing' ? 'No declarado' : read.value ? 'Presentada' : 'No presentada' }}</li> }
+      </ul>
+    }
+    @if (entry.diagnostics.length) { <h4>Motivos y avisos</h4><ul>@for (issue of entry.diagnostics; track $index) { <li>{{ issue.message }}</li> }</ul> }
+    @if (origins().length) { <h4>Archivos y celdas de origen</h4><ul class="source-list">@for (origin of origins(); track origin.key) { <li data-source-location>{{ origin.text }}</li> }</ul> }
+
+    <div class="trace-details">
+      <button mat-button type="button" [disabled]="loading()" (click)="loadAlternatives()">Ver descripciones del catálogo</button>
+      @if (loading()) { <p role="status">Consultando descripciones…</p> }
+      @if (error(); as message) { <p role="alert" class="error">{{ message }}</p> }
+      @if (alternativesLoaded()) {
+        @for (alternative of alternatives(); track alternative.description) {
+          <p>{{ alternative.description }}</p><p class="muted">{{ alternative.origins.join(' · ') }}</p>
+        } @empty { <p>No hay descripciones adicionales conservadas para esta variante.</p> }
+      }
+    </div>
+    <details class="trace-details" data-technical [open]="technicalOpen()" (toggle)="toggleTechnical($event)">
+      <summary>Detalle técnico</summary>
+      @if (technicalOpen()) {
+        @if (proposal(); as proposed) {
+          @if (proposed.before) { <p>Precisión del destino: {{ proposed.before.coordinate.decimals }}</p> }
+          @if (proposed.exactNominal; as value) { <p>Resultado exacto antes del redondeo: <span class="exact-value">{{ decimalText(value) }}</span></p> }
+          @if (proposed.derivedInterval; as value) { <p>Intervalo calculado: <span class="exact-value">[{{ decimalText(value.lo) }} → {{ decimalText(value.hi) }}]</span></p> }
+        }
+        @for (operand of operands(); track operand.label) { @if (interval(operand.value); as value) { <p>{{ operand.label }} · intervalo: <span class="exact-value">{{ value }}</span></p> } }
+        <p>Identificadores, valores originales y precisión conservados para la trazabilidad:</p>
+        <pre class="exact-value">{{ technical() }}</pre>
+      }
+    </details>
+  </section>
+}

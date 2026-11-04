@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
+import { navigateStage, openCalculation, openTechnical } from './workflow-helpers.js';
 const root = path.resolve('tests/fixtures/generated');
 async function session(page: Page) { const bootstrap = await (await page.request.get('/api/v1/bootstrap')).json(); return { id: bootstrap.activeWorkspaceId as string, headers: { 'X-CE-Session': bootstrap.sessionToken as string } }; }
 async function catalog(expressions: readonly (readonly [string, string, string?])[]) {
@@ -12,11 +13,13 @@ async function catalog(expressions: readonly (readonly [string, string, string?]
     .map(row => row.map(value => value === null ? null : { type: String, value })), { sheet: source.sheet }).toBuffer();
 }
 async function validate(page: Page) {
+  await navigateStage(page, 'validation');
   const response = page.waitForResponse(response => response.url().endsWith('/validations') && response.request().method() === 'POST'); await page.getByRole('button', { name: 'Validar informes', exact: true }).click();
   const job = await (await response).json(); await expect(page.locator('#validation-run')).toHaveValue(job.resultRef.id, { timeout: 15000 }); const connection = await session(page);
   return (await page.request.get(`/api/v1/workspaces/${connection.id}/runs/${job.resultRef.id}/results?limit=200`, { headers: connection.headers })).json();
 }
 async function configure(page: Page, expressions: readonly (readonly [string, string, string?])[], facts?: Readonly<Record<string, string>>) {
+  await navigateStage(page, 'import');
   await page.getByLabel('Catálogo de reglas (.xlsx)').setInputFiles({ name: 'synthetic-preview.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: await catalog(expressions) });
   if (facts) {
     const sheets = (await readXlsxFile(path.join(root, 'report-42.xlsx'), { parseNumber: text => text, trim: false })).map(sheet => ({ sheet: sheet.sheet, data: sheet.data.map(row => row.map(value => value === null ? null : String(value))) }));
@@ -26,13 +29,16 @@ async function configure(page: Page, expressions: readonly (readonly [string, st
     await page.getByLabel('Informes (.xlsx)', { exact: true }).setInputFiles({ name: 'synthetic-values.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer });
   } else await page.getByLabel('Informes (.xlsx)', { exact: true }).setInputFiles(path.join(root, 'report-42.xlsx'));
   await page.getByRole('button', { name: 'Cargar archivos', exact: true }).click();
+  await navigateStage(page, 'validation');
   await expect(page.getByRole('button', { name: 'Validar informes', exact: true })).toBeEnabled({ timeout: 15000 }); const run = await validate(page);
-  for (const [code] of expressions) await page.locator('.direction-choice').filter({ hasText: code + ' · Destino' }).locator('select').selectOption('left');
+  for (const [code] of expressions) await page.getByLabel(code + ' · Destino', { exact: true }).selectOption('left');
   await page.getByRole('button', { name: 'Guardar configuración', exact: true }).click(); await expect(page.getByText(/Configuración guardada/)).toBeVisible();
+  await navigateStage(page, 'recalculation');
   await expect(page.getByRole('button', { name: 'Simular recálculos', exact: true })).toBeEnabled(); const connection = await session(page);
   const current = await page.request.get(`/api/v1/workspaces/${connection.id}`, { headers: connection.headers }); return { connection, workspace: await current.json(), etag: current.headers()['etag']!, run };
 }
 async function preview(page: Page) {
+  await navigateStage(page, 'recalculation');
   const response = page.waitForResponse(response => response.url().endsWith('/previews') && response.request().method() === 'POST'); await page.getByRole('button', { name: 'Simular recálculos', exact: true }).click();
   const accepted = await (await response).json(), connection = await session(page); let id = '';
   await expect.poll(async () => { const job = await (await page.request.get(`/api/v1/workspaces/${connection.id}/jobs/${accepted.jobId}`, { headers: connection.headers })).json(); id = job.resultRef?.id ?? ''; return job.status; }).toBe('succeeded');
@@ -58,22 +64,24 @@ test('V06-preview/V09: topological simulation re-evaluates a false guard, requir
   await expect(page.getByText('La selección contiene todos sus predecesores. Los datos del informe siguen sin cambios.')).toBeVisible();
   const unchanged = await (await page.request.get(`/api/v1/workspaces/${initial.connection.id}`, { headers: initial.connection.headers })).json(); expect(unchanged.currentVersionId).toBe(initial.workspace.currentVersionId); expect(unchanged.counts).toEqual(initial.workspace.counts);
   await page.locator('ce-preview-page').screenshot({ path: path.resolve('.cache/preview-ui.png') });
-  await page.reload(); await expect(page.locator('#preview-history')).toHaveValue(simulation.id); await expect(page.locator('#validation-run')).toHaveValue(initial.run.run.id); await expect(page.locator('.proposal-row')).toHaveCount(3);
+  await page.reload(); await navigateStage(page, 'recalculation'); await expect(page.locator('#preview-history')).toHaveValue(simulation.id); await expect(page.locator('.proposal-row')).toHaveCount(3);
   expect(await page.locator('ce-preview-page input[type="checkbox"]:checked').count()).toBe(0); // An uncommitted selection is intentionally not persisted.
+  await navigateStage(page, 'validation'); await expect(page.locator('#validation-run')).toHaveValue(initial.run.run.id);
   const after = await validate(page); expect(after.items.map((row: { code: string; status: string; factReads: unknown }) => [row.code, row.status, row.factReads])).toEqual(initial.run.items.map((row: { code: string; status: string; factReads: unknown }) => [row.code, row.status, row.factReads]));
+  await navigateStage(page, 'recalculation');
   await page.getByRole('button', { name: 'Descartar previsualización', exact: true }).click(); await page.getByRole('button', { name: 'Confirmar descarte', exact: true }).click(); await expect(page.getByText('Previsualización descartada. Sus propuestas se conservan para consulta.')).toBeVisible();
-  await page.reload(); await expect(page.getByText('Previsualización descartada. Sus propuestas se conservan para consulta.')).toBeVisible();
+  await page.reload(); await navigateStage(page, 'recalculation'); await expect(page.getByText('Previsualización descartada. Sus propuestas se conservan para consulta.')).toBeVisible();
 });
 test('V09: equal-valued conflicting producers and their dependent proposal are blocked with explanations', async ({ page }) => {
   const initial = await configure(page, [['synthetic_P', '{tC_01.00,r0230,c0010}=1'], ['synthetic_Q', '{tC_01.00,r0230,c0010}=1'], ['synthetic_D', '{tC_01.00,r0250,c0010}={tC_01.00,r0230,c0010}+1']]);
   const simulation = await preview(page); expect(simulation.data.items.every((row: { state: string }) => row.state === 'blocked')).toBe(true);
-  await expect(page.getByRole('heading', { name: 'Productores incompatibles' })).toBeVisible(); await expect(page.locator('ce-preview-page input[type="checkbox"]:enabled')).toHaveCount(0);
+  await expect(page.getByText('Hay productores incompatibles para un mismo destino. Consulta el detalle de las propuestas bloqueadas.', { exact: true })).toBeVisible(); await expect(page.locator('ce-preview-page input[type="checkbox"]:enabled')).toHaveCount(0);
   expect((await (await page.request.get(`/api/v1/workspaces/${initial.connection.id}`, { headers: initial.connection.headers })).json()).currentVersionId).toBe(initial.workspace.currentVersionId);
 });
 test('V08: a cycle blocks its descendants while an independent direction remains available', async ({ page }) => {
   await configure(page, [['synthetic_A', '{tC_01.00,r0230,c0010}={tC_01.00,r0250,c0010}+1'], ['synthetic_B', '{tC_01.00,r0250,c0010}={tC_01.00,r0230,c0010}-1'], ['synthetic_D', '{tC_01.00,r0270,c0010}={tC_01.00,r0230,c0010}+5'], ['synthetic_free', '{tC_01.00,r0260,c0010}=4'], ['synthetic_self', '{tC_05.01,r0090,c0060}=4', '{tC_05.01,r0090,c0060}=10']]);
   const simulation = await preview(page); expect(simulation.data.items.filter((row: { state: string }) => row.state === 'blocked')).toHaveLength(4);
-  expect(simulation.data.items.find((row: { code: string }) => row.code === 'synthetic_free').state).toBe('available'); await expect(page.getByRole('heading', { name: 'Ciclo de dependencias' })).toHaveCount(2);
+  expect(simulation.data.items.find((row: { code: string }) => row.code === 'synthetic_free').state).toBe('available'); await expect(page.getByText(/^Ciclo de dependencias:/)).toHaveCount(2);
   await expect(page.getByLabel('Seleccionar synthetic_free', { exact: true })).toBeEnabled(); await expect(page.getByLabel('Seleccionar synthetic_D', { exact: true })).toBeDisabled();
 });
 test('V07: consumers read .33 at p2 and propose .99; a punctual 1/3 and its consumer stay blocked', async ({ page }) => {
@@ -87,8 +95,10 @@ test('V07: consumers read .33 at p2 and propose .99; a punctual 1/3 and its cons
   expect(find('synthetic_fraction').after.originalText).toBe('0.33'); expect(find('synthetic_fraction').exactNominal).toEqual({ numerator: '1', denominator: '3' });
   expect(find('synthetic_tripled').after.originalText).toBe('0.99'); expect(find('synthetic_tripled').exactNominal).toEqual({ numerator: '99', denominator: '100' });
   expect(find('synthetic_point').state).toBe('blocked'); expect(find('synthetic_point').diagnostics).toContainEqual(expect.objectContaining({ code: 'CANDIDATE_DOES_NOT_SATISFY_RULE' })); expect(find('synthetic_blocked_consumer').state).toBe('blocked');
-  await expect(page.locator('.proposal-row').filter({ has: page.getByRole('heading', { name: 'synthetic_fraction · Disponible', exact: true }) })).toContainText('Resultado antes del redondeo: 1/3');
-  await expect(page.locator('.proposal-row').filter({ has: page.getByRole('heading', { name: 'synthetic_tripled · Disponible', exact: true }) })).toContainText('0.99');
+  const fraction = page.locator('.proposal-row').filter({ has: page.getByRole('button', { name: 'Ver cálculo y origen de synthetic_fraction', exact: true }) }); await expect(fraction.getByText('Disponible', { exact: true })).toBeVisible();
+  const detail = await openCalculation(page, fraction, 'synthetic_fraction'); await openTechnical(detail); await expect(detail).toContainText('Resultado exacto antes del redondeo: 1/3');
+  await detail.getByRole('button', { name: 'Cerrar detalle', exact: true }).click();
+  await expect(page.locator('.proposal-row').filter({ has: page.getByRole('button', { name: 'Ver cálculo y origen de synthetic_tripled', exact: true }) })).toContainText('0,99');
 });
 test('a real queued preview can be cancelled without publishing a partial preview or changing its snapshot', async ({ page }) => {
   const initial = await configure(page, [['synthetic_A', '{tC_01.00,r0230,c0010}=1']]);

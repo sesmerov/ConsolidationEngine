@@ -22,6 +22,8 @@ test.beforeEach(async ({ page }) => {
   }
   await page.goto('/'); await page.getByLabel('Nombre del conjunto').fill('Carga SYNTHETIC'); await page.getByRole('button', { name: 'Crear conjunto', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Cargar catálogo e informes' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '1. Cargar', exact: true })).toBeVisible();
+  await expect(page.locator('ce-validation-page, ce-preview-page, ce-exports')).toHaveCount(0);
 });
 test('V01/V14: real template download, exact import, null/zero summary and browser refresh', async ({ page }) => {
   const downloadPromise = page.waitForEvent('download'); await page.getByRole('button', { name: 'Descargar plantilla Excel' }).click();
@@ -57,7 +59,7 @@ test('V04/V13: invalid and duplicate rules remain visible; a rejected replacemen
   const bad = zipBytes(changeXml(await readZipParts(reportPath), 'xl/worksheets/sheet4.xml', (xml) => replaceCell(xml, 'G2', '<c r="G2"><v>12345678901234567890</v></c>')));
   await page.getByLabel('Informes (.xlsx)', { exact: true }).setInputFiles({ name: 'importe-invalido.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: bad });
   await page.getByRole('button', { name: 'Cargar archivos', exact: true }).click();
-  await expect(page.getByRole('alert').filter({ hasText: 'importe-invalido.xlsx' })).toContainText('Facts · G2', { timeout: 15000 });
+  await expect(page.getByRole('alert').filter({ hasText: 'importe-invalido.xlsx' })).toContainText(/Facts\s*·?\s*G2/, { timeout: 15000 });
   await expect(page.getByRole('alert').filter({ hasText: 'importe-invalido.xlsx' })).toContainText('texto');
   await expect(page.getByRole('alert').filter({ hasText: 'importe-invalido.xlsx' })).toBeFocused();
   await expect(page.getByLabel('Informes (.xlsx)', { exact: true })).toHaveAttribute('aria-invalid', 'true');

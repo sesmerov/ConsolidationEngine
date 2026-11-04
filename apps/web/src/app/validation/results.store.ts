@@ -4,8 +4,9 @@ import { isTerminalJob } from '@ce/contracts';
 import type { Diagnostic, Rational, RunSummaryDTO, SourceLocator, ValidationResultsPageDTO, ValidationStatus, ValidationValueDTO } from '@ce/contracts';
 import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
-import { civilDate } from '../core/display';
-@Injectable()
+import { validationText } from '../core/exact-value';
+import { CursorPage, CursorPageError } from '../core/cursor-page';
+@Injectable({ providedIn: 'root' })
 export class ResultsStore {
   private readonly api = inject(ApiClient); readonly session = inject(SessionStore);
   private generation = 0; private historyGeneration = 0; private observed = ''; private workspaceId: string | undefined;
@@ -13,6 +14,7 @@ export class ResultsStore {
   readonly page = signal<ValidationResultsPageDTO | null>(null); readonly history = signal<readonly RunSummaryDTO[]>([]); readonly selectedRunId = signal<string | null>(null);
   readonly historyCursor = signal<string | null>(null); readonly historyLoading = signal(false);
   readonly status = signal(''); readonly code = signal(''); readonly table = signal('');
+  readonly pagination = new CursorPage();
   readonly historical = computed(() => Boolean(this.page() && this.page()!.versionId !== this.session.versionId()));
   readonly noEvaluatedRules = computed(() => { const summary = this.page()?.run.summary; return !!summary && summary.byStatus.pass + summary.byStatus.fail === 0; });
   readonly labels: Record<ValidationStatus, string> = { pass: 'Pasa', fail: 'Falla', not_applicable: 'No aplica', not_evaluable: 'No evaluable', error: 'Error' };
@@ -38,22 +40,19 @@ export class ResultsStore {
     catch (error) { this.report(error); } finally { this.pending.set(false); }
   }
   selectRun(id: string): void { this.selectedRunId.set(id); this.status.set(''); this.code.set(''); this.table.set(''); void this.load(); }
-  async load(append = false): Promise<void> {
+  async load(append: boolean | number = false): Promise<void> {
     const workspaceId = this.session.workspace()?.id, runId = this.selectedRunId(); if (!workspaceId || !runId) return;
-    const generation = ++this.generation, cursor = append ? this.page()?.nextCursor : undefined; this.loading.set(true); this.error.set(null);
+    const request = this.pagination.begin(JSON.stringify([workspaceId, runId, this.status(), this.code(), this.table()]), typeof append === 'number' ? append : append ? this.pagination.index() + 1 : 0);
+    const generation = ++this.generation, cursor = request.cursor; this.loading.set(true); this.error.set(null);
     try { const page = await this.api.results(workspaceId, runId, { ...(this.status() ? { status: this.status() } : {}), ...(this.code() ? { code: this.code() } : {}), ...(this.table() ? { table: this.table() } : {}), ...(cursor ? { cursor } : {}) });
       if (generation !== this.generation || this.session.workspace()?.id !== workspaceId) return;
-      this.page.set(append ? { ...page, items: [...(this.page()?.items ?? []), ...page.items] } : page);
+      this.pagination.accept(request.index, page.total, page.nextCursor, page.items.length); this.page.set(page);
       this.history.update((runs) => [...runs.filter((run) => run.id !== page.run.id), page.run].sort((a, b) => b.startedAt.localeCompare(a.startedAt)));
     } catch (error) { if (generation === this.generation) this.report(error); } finally { if (generation === this.generation) this.loading.set(false); }
   }
   fraction(value: Rational): string { return value.denominator === '1' ? value.numerator : value.numerator + '/' + value.denominator; }
   value(value: ValidationValueDTO | undefined): string {
-    if (!value) return 'Sin valor calculado'; if (value.kind === 'boolean') return value.value ? 'true' : 'false';
-    if (value.kind === 'text') return value.value === '' ? 'Texto vacío' : value.value;
-    if (value.kind === 'date') return civilDate(value.value);
-    if (value.kind === 'unknown') return 'Metadato desconocido'; if (value.kind === 'null') return value.presence === 'explicit_null' ? 'Nulo explícito' : value.presence === 'implicit_null' ? 'Nulo implícito' : 'Nulo derivado';
-    return this.fraction(value.nominal) + ' ' + value.unit + ' · intervalo [' + this.fraction(value.interval.lo) + ', ' + this.fraction(value.interval.hi) + ']';
+    return validationText(value);
   }
   source(locator: SourceLocator): string {
     const file = this.page()?.sourceFiles?.find((file) => file.id === locator.fileId)?.displayName;
@@ -68,5 +67,5 @@ export class ResultsStore {
       CANCELLED: 'La ejecución fue cancelada.', DEADLINE_EXCEEDED: 'La ejecución superó el plazo.', EMPTY_SELECTION: 'El ámbito no contiene coordenadas para crear instancias.' };
     return messages[diagnostic.code] ?? diagnostic.message;
   }
-  private report(error: unknown): void { this.error.set(error instanceof HttpErrorResponse && typeof error.error?.error?.message === 'string' ? error.error.error.message as string : 'No se pudieron obtener los resultados de esta ejecución.'); }
+  private report(error: unknown): void { this.error.set(error instanceof CursorPageError ? error.message : error instanceof HttpErrorResponse && typeof error.error?.error?.message === 'string' ? error.error.error.message as string : 'No se pudieron obtener los resultados de esta ejecución.'); }
 }

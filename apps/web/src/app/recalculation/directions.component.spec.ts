@@ -14,7 +14,7 @@ const target = { factKey: 'target', contextId: 'demo', tableCode: 'C_01.00', she
 const result: RuleResultDTO = { id: 'result', runId, versionId, profileId: 'ce-dpmxl-0.9-closed-v1', instanceId: a, binding: { contextId: 'demo' }, coverageOnly: false,
   code: 'SYNTHETIC_A', variantIds: [a], sourceRecordIds: [], tables: ['C_01.00'], status: 'not_applicable', severity: 'error', severityOriginal: 'Error',
   expression: '{tC_01.00,r0230,c0010}=1', precondition: 'false', values: {}, readKeys: [], factReads: [], metadataReads: [], sources: [], diagnostics: [],
-  recalculation: { left: { eligible: true, target, diagnostics: [] }, right: { eligible: false, diagnostics: [{ code: 'INVALID_DIRECTION', message: 'El lado elegido debe ser una única celda declarada.' }] } } };
+  recalculation: { policy: { mode: 'standard', profileId: 'ce-dpmxl-0.9-closed-v1', reasons: [] }, left: { eligible: true, target, diagnostics: [] }, right: { eligible: false, diagnostics: [{ code: 'INVALID_DIRECTION', message: 'El lado elegido debe ser una única celda declarada.' }] } } };
 const page = { items: [result], total: 1, nextCursor: null, versionId, configuredDirections: [], run: { id: runId, versionId, profileId: result.profileId, status: 'completed' as const, startedAt: '2026-10-31T00:00:00.000Z', diagnostics: [], resultIds: [result.id],
   summary: { complete: true, rows: 1, variants: 1, applicableVariants: 1, instances: 1, duplicateRows: 0, byStatus: { pass: 0, fail: 0, not_applicable: 1, not_evaluable: 0, error: 0 } } } } as ValidationResultsPageDTO;
 describe('explicit direction configuration', () => {
@@ -23,6 +23,12 @@ describe('explicit direction configuration', () => {
   afterEach(() => { http.verify(); TestBed.resetTestingModule(); });
   function render(data: ValidationResultsPageDTO = page) { const fixture = TestBed.createComponent(DirectionsComponent); fixture.componentRef.setInput('page', data); fixture.detectChanges(); TestBed.tick(); fixture.detectChanges(); return fixture; }
   function choose(fixture: ReturnType<typeof render>, value: string) { const select = (fixture.nativeElement as HTMLElement).querySelector('select')!; select.value = value; select.dispatchEvent(new Event('change')); fixture.detectChanges(); }
+  it.each(['absent', 'undetermined', 'validation_only'] as const)('does not authorize a destination under %s policy, even if its structural side is eligible', async (mode) => {
+    const { policy: _policy, ...sides } = result.recalculation!;
+    const fixture = render({ ...page, items: [{ ...result, recalculation: mode === 'absent' ? sides : { ...sides, policy: { mode, profileId: result.profileId, reasons: mode === 'validation_only' ? ['TEXT'] : [] } } }] });
+    expect((fixture.nativeElement as HTMLElement).querySelector('select')!.disabled).toBe(true);
+    fixture.componentInstance.choose(fixture.componentInstance.page().items[0]!, 'left'); await fixture.componentInstance.save(); expect(fixture.componentInstance.draft()).toEqual({}); http.expectNone(request => request.method === 'PUT');
+  });
   it('starts with no inferred target, allows a structurally eligible false-precondition side and explains the rejected side', () => {
     const fixture = render(), element = fixture.nativeElement as HTMLElement, select = element.querySelector('select')!;
     expect(select.value).toBe(''); expect(select.querySelector<HTMLOptionElement>('option[value="left"]')!.disabled).toBe(false); expect(select.querySelector<HTMLOptionElement>('option[value="right"]')!.disabled).toBe(true);
@@ -32,7 +38,7 @@ describe('explicit direction configuration', () => {
   });
   it('sends the complete explicit selection including configured directions outside the page, then retains the old run as historical', async () => {
     const fixture = render({ ...page, configuredDirections: [{ instanceId: b, targetSide: 'right' }] } as ValidationResultsPageDTO);
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('1 dirección fuera de esta página'); choose(fixture, 'left');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('direcciones fuera de esta página'); choose(fixture, 'left');
     const saving = fixture.componentInstance.save(); const request = http.expectOne('/api/v1/workspaces/' + workspaceId + '/directions');
     expect(request.request.method).toBe('PUT'); expect(request.request.headers.get('If-Match')).toBe('"v-' + versionId + '"'); expect(request.request.headers.get('X-CE-Session')).toBe('memory-only');
     expect(request.request.body).toEqual({ directions: [{ instanceId: a, targetSide: 'left' }, { instanceId: b, targetSide: 'right' }] }); expect(request.request.body).not.toHaveProperty('expression');
@@ -47,8 +53,8 @@ describe('explicit direction configuration', () => {
     const saving = fixture.componentInstance.save(); const request = http.expectOne(request => request.url.endsWith('/directions'));
     expect(request.request.body.directions).toEqual([{ instanceId: a, targetSide: 'left' }, { instanceId: b, targetSide: 'right' }, { instanceId: c, targetSide: 'left' }]);
     request.flush({ error: { message: 'Rechazo de prueba' } }, { status: 422, statusText: 'Unprocessable Entity' }); await saving;
-    fixture.destroy(); const restored = render({ ...page, configuredDirections } as ValidationResultsPageDTO); expect((restored.nativeElement as HTMLElement).textContent).toContain('1 dirección fuera de esta página');
-    choose(restored, 'left'); const retry = restored.componentInstance.save(); const restoredRequest = http.expectOne(request => request.url.endsWith('/directions')); expect(restoredRequest.request.body.directions).toHaveLength(2);
+    fixture.destroy(); const restored = render({ ...page, configuredDirections } as ValidationResultsPageDTO); expect((restored.nativeElement as HTMLElement).textContent).toContain('direcciones fuera de esta página');
+    choose(restored, 'left'); const retry = restored.componentInstance.save(); const restoredRequest = http.expectOne(request => request.url.endsWith('/directions')); expect(restoredRequest.request.body.directions).toHaveLength(3);
     restoredRequest.flush({ error: { message: 'Rechazo de prueba' } }, { status: 422, statusText: 'Unprocessable Entity' }); await retry;
   });
   it('never saves a historical or incomplete run or a page without a complete configuration list', async () => {

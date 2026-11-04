@@ -1,10 +1,11 @@
-import type { DataType, Diagnostic, NormalizedValue, Rational, SourceLocator } from './common.js';
+import type { DataType, Diagnostic, NormalizedValue, PresentationDTO, Rational, SourceLocator } from './common.js';
 import type { RecalculationPolicyDTO } from './profiles.js';
 import type { Coordinate, FactDerivation } from './report.js';
 import type { SourceFile } from './report.js';
 import type { Severity } from './catalog.js';
 import type { DirectionChoiceDTO } from './recalculation.js';
-import { uuidSchema } from './common.schemas.js';
+import { dateValueSchema, rationalSchema, sourceLocatorSchema, textValueSchema, uuidSchema } from './common.schemas.js';
+import { coordinateSchema } from './report.js';
 import { diagnosticSchema } from './catalog.js';
 export type ValidationStatus = 'pass' | 'fail' | 'not_applicable' | 'not_evaluable' | 'error';
 export interface ValidationBinding { readonly contextId?: string; readonly contextIds?: readonly string[]; readonly tableCode?: string; readonly sheetCode?: string; readonly rowCode?: string; readonly columnCode?: string }
@@ -23,6 +24,7 @@ export interface FactReadDTO {
   readonly normalizedValue?: NormalizedValue; readonly originalText?: string; readonly sourceLocator: SourceLocator; readonly derivation?: FactDerivation;
 }
 export interface RuleResultDTO {
+  readonly presentation?: PresentationDTO;
   readonly id: string; readonly runId: string; readonly versionId: string; readonly profileId: string;
   readonly instanceId?: string; readonly coverageOnly: boolean; readonly binding?: ValidationBinding; readonly contextId?: string;
   readonly code: string; readonly variantIds: readonly string[]; readonly sourceRecordIds: readonly string[]; readonly tables: readonly string[];
@@ -33,6 +35,17 @@ export interface RuleResultDTO {
   readonly sources: readonly SourceLocator[]; readonly diagnostics: readonly Diagnostic[];
   readonly recalculation?: { readonly left: DirectionEligibilityDTO; readonly right: DirectionEligibilityDTO; readonly policy?: RecalculationPolicyDTO };
 }
+const trace = { coordinate: coordinateSchema, sourceLocator: sourceLocatorSchema } as const;
+export const validationValueSchema = { oneOf: [
+  { type: 'object', additionalProperties: false, required: ['kind', 'nominal', 'interval', 'unit'], properties: { ...trace, kind: { const: 'number' }, nominal: rationalSchema,
+    interval: { type: 'object', additionalProperties: false, required: ['lo', 'hi'], properties: { lo: rationalSchema, hi: rationalSchema } }, unit: { type: 'string' } } },
+  { type: 'object', additionalProperties: false, required: ['kind', 'value'], properties: { ...trace, kind: { const: 'boolean' }, value: { type: 'boolean' } } },
+  { ...textValueSchema, properties: { ...textValueSchema.properties, ...trace } },
+  { ...dateValueSchema, properties: { ...dateValueSchema.properties, ...trace } },
+  { type: 'object', additionalProperties: false, required: ['kind', 'presence', 'dataType'], properties: { ...trace, kind: { const: 'null' }, presence: { enum: ['explicit_null', 'implicit_null', 'derived_null'] }, dataType: { enum: ['number', 'boolean', 'text', 'date'] }, unit: { type: 'string' } },
+    allOf: [{ if: { type: 'object', properties: { dataType: { enum: ['text', 'date'] } } }, then: { type: 'object', properties: { unit: { const: '' } } } }] },
+  { type: 'object', additionalProperties: false, required: ['kind', 'presence'], properties: { ...trace, kind: { const: 'unknown' }, presence: { const: 'unknown' } } },
+] } as const;
 /** Optional, request-scoped eligibility metadata; it never changes the validation result. */
 export interface DirectionEligibilityDTO { readonly eligible: boolean; readonly target?: Coordinate; readonly diagnostics: readonly Diagnostic[] }
 export interface ValidationSummary {

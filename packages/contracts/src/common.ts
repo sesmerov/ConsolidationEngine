@@ -8,6 +8,8 @@ export type DataType = 'number' | 'boolean' | 'text' | 'date';
 export interface TextValue { readonly kind: 'text'; readonly value: string }
 export interface DateValue { readonly kind: 'date'; readonly value: CivilDate }
 export type NormalizedValue = Rational | boolean | TextValue | DateValue;
+/** Optional display text from trusted catalog/mapping data; never calculation authority. */
+export interface PresentationDTO { readonly description?: string; readonly conceptLabel?: string }
 /** Distinguishes an exact rational DTO from tagged text/date; never coerces a value. */
 export function isRationalValue(value: unknown): value is Rational {
   return typeof value === 'object' && value !== null && !('kind' in value)

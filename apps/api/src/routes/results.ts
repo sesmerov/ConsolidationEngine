@@ -1,48 +1,14 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { uuidSchema, validationResultsPageSchema } from '@ce/contracts';
-import type { Coordinate, NormalizedValue, Rational, RuleResultDTO, SourceLocator, ValidationValueDTO } from '@ce/contracts';
 import { getRecalculationPolicy, resultOrderKey, WorkBudget } from '@ce/engine';
 import { ApiError } from '../errors.js';
 import { canonicalHash } from '../session/canonical-state.js';
 import { getValidation } from '../validation/validation-service.js';
 import { directionEligibility } from '../recalculation/directions-service.js';
+import { publicResult } from '../presentation/public-values.js';
+import { rulePresentation } from '../presentation/rule-presentation.js';
 interface Query { limit?: string; cursor?: string; status?: string; code?: string; table?: string }
-function locator(value: SourceLocator): SourceLocator {
-  return Object.fromEntries(['fileId', 'sheet', 'row', 'column', 'ruleCode'].flatMap(key => {
-    const field = value[key as keyof SourceLocator]; return field === undefined ? [] : [[key, field]];
-  }));
-}
-function coordinate(value: Coordinate): Coordinate {
-  return { factKey: value.factKey, contextId: value.contextId, tableCode: value.tableCode, sheetCode: value.sheetCode,
-    rowCode: value.rowCode, columnCode: value.columnCode, dataType: value.dataType, unit: value.unit, decimals: value.decimals,
-    axes: value.axes, sourceLocator: locator(value.sourceLocator) };
-}
-const rational = (value: Rational): Rational => ({ numerator: value.numerator, denominator: value.denominator });
-function normalized(value: NormalizedValue): NormalizedValue {
-  if (typeof value === 'boolean') return value;
-  return 'kind' in value ? { kind: value.kind, value: value.value } : rational(value);
-}
-/** Project union members before serializer branch selection; unknown internal fields are never wire fields. */
-function effectiveValue(value: ValidationValueDTO): ValidationValueDTO {
-  const trace = { ...(value.coordinate ? { coordinate: coordinate(value.coordinate) } : {}), ...(value.sourceLocator ? { sourceLocator: locator(value.sourceLocator) } : {}) };
-  switch (value.kind) {
-    case 'number': return { kind: 'number', nominal: rational(value.nominal), interval: { lo: rational(value.interval.lo), hi: rational(value.interval.hi) }, unit: value.unit, ...trace };
-    case 'boolean': return { kind: 'boolean', value: value.value, ...trace };
-    case 'text': return { kind: 'text', value: value.value, ...trace };
-    case 'date': return { kind: 'date', value: value.value, ...trace };
-    case 'null': return { kind: 'null', presence: value.presence, dataType: value.dataType, ...(value.unit === undefined ? {} : { unit: value.unit }), ...trace };
-    case 'unknown': return { kind: 'unknown', presence: 'unknown', ...trace };
-  }
-}
-function resultValues(row: RuleResultDTO): RuleResultDTO {
-  return { ...row,
-    ...(row.preconditionResult ? { preconditionResult: effectiveValue(row.preconditionResult) } : {}),
-    values: { ...(row.values.left ? { left: effectiveValue(row.values.left) } : {}), ...(row.values.right ? { right: effectiveValue(row.values.right) } : {}),
-      ...(row.values.result ? { result: effectiveValue(row.values.result) } : {}) },
-    factReads: row.factReads.map(read => ({ ...read, ...(read.normalizedValue === undefined ? {} : { normalizedValue: normalized(read.normalizedValue) }) })),
-  };
-}
 export function registerResults(app: FastifyInstance): void {
   const secret = randomBytes(32), sign = (payload: string) => createHmac('sha256', secret).update(payload).digest('base64url');
   app.get<{ Params: { workspaceId: string; runId: string }; Querystring: Query }>('/api/v1/workspaces/:workspaceId/runs/:runId/results', {
@@ -67,9 +33,10 @@ export function registerResults(app: FastifyInstance): void {
     const remaining = after === undefined ? rows : rows.filter((entry) => entry.key > after!); const entries = remaining.slice(0, Number(query.limit ?? 50));
     let nextCursor: string | null = null;
     if (remaining.length > entries.length) { const payload = Buffer.from(JSON.stringify({ fingerprint, after: entries.at(-1)!.key })).toString('base64url'); nextCursor = payload + '.' + sign(payload); }
-    const snapshot = app.ce.store.snapshot(workspaceId, bundle.run.versionId), budget = new WorkBudget();
+    const snapshot = app.ce.store.snapshot(workspaceId, bundle.run.versionId), budget = new WorkBudget(), present = rulePresentation(snapshot.content);
     const items = entries.map(entry => {
-      const row = resultValues(entry.row);
+      const { presentation: _storedPresentation, ...result } = publicResult(entry.row), presentation = present(result.variantIds);
+      const row = { ...result, ...(presentation ? { presentation } : {}) };
       const classified = getRecalculationPolicy(snapshot, { variantIds: row.variantIds,
         ...(row.binding ? { binding: row.binding } : {}), ...(row.instanceId ? { instanceId: row.instanceId } : {}),
       }, { budget });

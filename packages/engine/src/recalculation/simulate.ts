@@ -52,6 +52,8 @@ export function simulate(snapshot: Snapshot, options: SimulateOptions): PreviewB
   const predecessors = new Map(graph.nodes.map(node => [node.id, new Set<string>()]));
   for (const edge of graph.edges) { budget.check(); predecessors.get(edge.to)!.add(edge.from); }
   const proposals = new Map<string, ProposalDTO>();
+  // This provenance describes the private simulation, never an applied receipt.
+  const simulatedProducers = new Map<string, string>();
   const index = reportIndex(snapshot.content, budget), coordinateByKey = new Map(snapshot.content.coordinates.map(cell => [cell.factKey, cell]));
   let completed = 0;
   function progress(): void { options.progress?.(++completed, graph.nodes.length); budget.check(); }
@@ -89,8 +91,15 @@ export function simulate(snapshot: Snapshot, options: SimulateOptions): PreviewB
       const candidate = evaluateCandidate(current, direction, { budget });
       const { fact, ...details } = candidate;
       if (candidate.state === 'available' && (!fact || !candidate.after)) throw new SimulationError('INVALID_DIRECTION', 'An available candidate must contain its quantized fact');
-      proposals.set(id, { ...identity(node), ...details });
-      if (candidate.state === 'available') current.content = { ...current.content, facts: [...current.content.facts.filter(value => value.factKey !== direction.targetKey), fact!] };
+      const calculation = candidate.calculation ? { ...candidate.calculation, reads: candidate.calculation.reads.map(read => {
+        budget.check(); const fromProposalId = simulatedProducers.get(read.fact.factKey);
+        return { ...read, ...(fromProposalId ? { fromProposalId } : {}) };
+      }) } : undefined;
+      proposals.set(id, { ...identity(node), ...details, ...(calculation ? { calculation } : {}) });
+      if (candidate.state === 'available') {
+        current.content = { ...current.content, facts: [...current.content.facts.filter(value => value.factKey !== direction.targetKey), fact!] };
+        simulatedProducers.set(direction.targetKey, proposalIds.get(id)!);
+      }
     }
     progress();
   }

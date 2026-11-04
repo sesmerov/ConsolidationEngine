@@ -25,7 +25,10 @@ describe('preview explanation and explicit closure', () => {
   }
   it('restores retained preview and explains original null, exact and quantized values without implicitly selecting ancestors', async () => {
     const fixture = await render(); const text = (fixture.nativeElement as HTMLElement).textContent!;
-    expect(text).toContain('Nulo explícito'); expect(text).toContain('1/3'); expect(text).toContain('0.33'); expect(text).toContain('half-even-v1'); expect(text).toContain('SYNTHETIC_A');
+    expect(text).toContain('Sin dato'); expect(text).toContain('0,33');
+    const opening = fixture.componentInstance.store.openDetail('a'); http.expectOne(request => request.url.endsWith('/proposals/a')).flush(a); await opening; fixture.detectChanges();
+    const technical = (fixture.nativeElement as HTMLElement).querySelector<HTMLDetailsElement>('[data-technical]')!; technical.open = true; technical.dispatchEvent(new Event('toggle')); fixture.detectChanges();
+    expect(technical.textContent).toContain('explicit_null'); expect(technical.textContent).toContain('1/3'); expect(text).toContain('half-even-v1'); expect(text).toContain('SYNTHETIC_A');
     const selecting = fixture.componentInstance.store.toggle('b', true);
     const request = http.expectOne(request => request.url.endsWith('/selection')); expect(request.request.body).toEqual({ selectedIds: ['b'] }); expect(request.request.headers.has('If-Match')).toBe(false);
     request.flush({ selectedIds: ['b'], requiredIds: ['a'], complete: false, closureHash: 'hash', state: 'ready' }); await selecting; fixture.detectChanges();
@@ -39,6 +42,26 @@ describe('preview explanation and explicit closure', () => {
     newer.flush({ selectedIds: ['a', 'b'], requiredIds: [], complete: true, closureHash: 'new', state: 'ready' }); await second;
     older.flush({ selectedIds: ['b'], requiredIds: ['a'], complete: false, closureHash: 'old', state: 'ready' }); await first;
     expect(store.selection()?.closureHash).toBe('new'); expect(store.selected()).toEqual(['a', 'b']);
+  });
+  it('resolves an off-page predecessor by identity without selecting it and rejects a detail arriving after close', async () => {
+    const fixture = await render(), store = fixture.componentInstance.store;
+    store.page.set({ ...store.page()!, items: [store.page()!.items[1]!] });
+    const selecting = store.toggle('b', true); http.expectOne(request => request.url.endsWith('/selection')).flush({ selectedIds: ['b'], requiredIds: ['a'], complete: false, closureHash: 'pending', state: 'ready' }); await selecting;
+    const lookup = http.expectOne(request => request.url.endsWith('/proposals/a')); lookup.flush(a); await Promise.resolve();
+    expect(store.proposalName('a')).toBe('SYNTHETIC_A · T · r0010 · c0010'); expect(store.selected()).toEqual(['b']); expect(store.detail()).toBeNull();
+    const opening = store.openDetail('a'), detail = http.expectOne(request => request.url.endsWith('/proposals/a'));
+    session.workspace.set(null); TestBed.tick(); detail.flush(a); await opening;
+    expect(store.detail()).toBeNull(); expect(store.selected()).toEqual([]); expect(store.proposalName('a')).toBe('Dependencia fuera de esta página');
+  });
+  it('bounds dependency lookups across rapid selections and ignores the earlier generation', async () => {
+    const fixture = await render(), store = fixture.componentInstance.store, requiredIds = Array.from({ length: 8 }, (_, index) => 'missing-' + index);
+    const first = store.toggle('b', true); http.expectOne(request => request.url.endsWith('/selection')).flush({ selectedIds: ['b'], requiredIds, complete: false, closureHash: 'older', state: 'ready' }); await first;
+    const inFlight = http.match(request => /\/proposals\/missing-/.test(request.url)); expect(inFlight).toHaveLength(4);
+    const second = store.toggle('a', true); http.expectOne(request => request.url.endsWith('/selection')).flush({ selectedIds: ['a','b'], requiredIds, complete: false, closureHash: 'newer', state: 'ready' }); await second;
+    http.expectNone(request => /\/proposals\/missing-/.test(request.url));
+    session.workspace.set(null); TestBed.tick(); for (const request of inFlight) request.flush({ ...a, id: request.request.url.split('/').at(-1), code: 'STALE' });
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    expect(store.proposalName(requiredIds[0]!)).toBe('Dependencia fuera de esta página'); http.expectNone(request => /\/proposals\/missing-/.test(request.url));
   });
   it('retains an obsolete preview as information and never enables discard or application', async () => {
     const fixture = await render('obsolete'); expect((fixture.nativeElement as HTMLElement).textContent).toContain('obsoleta');
@@ -68,7 +91,7 @@ describe('preview explanation and explicit closure', () => {
     request.flush({ selectedIds: ['a', 'b'], requiredIds: [], complete: true, closureHash: 'new', state: 'ready' }); await completed;
     expect(store.selected()).toEqual(['a', 'b']); expect(store.selection()?.complete).toBe(true);
     expect(store.selectedProposals()).toEqual([b, a]); fixture.detectChanges();
-    const confirmation = (fixture.nativeElement as HTMLElement).querySelector('ce-apply')!.textContent!; expect(confirmation).toContain('SYNTHETIC_A'); expect(confirmation).toContain('SYNTHETIC_B'); expect(confirmation).toContain('0.33');
+    const confirmation = (fixture.nativeElement as HTMLElement).querySelector('ce-apply')!.textContent!; expect(confirmation).toContain('SYNTHETIC_A'); expect(confirmation).toContain('SYNTHETIC_B'); expect(confirmation).toContain('0,33');
   });
   it('starts against current CAS and shows no fabricated preview for a cancelled job', async () => {
     const fixture = TestBed.createComponent(PreviewPageComponent); fixture.detectChanges(); http.expectOne(request => request.url.endsWith('/previews')).flush({ items: [], total: 0, nextCursor: null, revision: 'rev' }); await Promise.resolve();
@@ -83,17 +106,18 @@ describe('preview explanation and explicit closure', () => {
     const summary = { complete: true, rows: 2, variants: 2, applicableVariants: 2, duplicateRows: 0, instances: 2, byStatus: { pass: 0, fail: 1, error: 1, not_applicable: 0, not_evaluable: 0 } };
     const row = { id: 'result', runId: 'after', versionId: 'next', code: 'SYNTHETIC_REMAINING', severity: 'error', status: 'fail', values: {}, factReads: [], metadataReads: [], sources: [], diagnostics: [], variantIds: [], sourceRecordIds: [], tables: [], coverageOnly: false, expression: '1=2' };
     const detail = { receipt, changeCount: 1, beforeSummary: summary, afterSummary: summary };
-    const comparison = { receipt, beforeSummary: summary, afterSummary: summary, items: [{ key: 'first', after: row }], total: 2, nextCursor: 'next-page' };
+    const comparison = { receipt, beforeSummary: summary, afterSummary: summary, items: Array.from({ length: 50 }, (_, index) => ({ key: 'first-' + index, after: { ...row, id: 'first-' + index } })), total: 51, nextCursor: 'next-page' };
     const fixture = TestBed.createComponent(PreviewPageComponent); fixture.detectChanges();
     http.expectOne(request => request.url.endsWith('/previews')).flush({ items: [applied], total: 1, nextCursor: null, revision: 'r' }); await Promise.resolve();
     http.expectOne(request => request.url.endsWith('/previews/' + id)).flush(applied); http.expectOne(request => request.url.endsWith('/proposals')).flush({ ...page, items: page.items.map(row => ({ ...row, state: 'applied' })) });
     await Promise.resolve(); await Promise.resolve();
     http.expectOne(request => request.url.endsWith('/applications/' + receiptId)).flush(detail); http.expectOne(request => request.url.endsWith('/comparison')).flush(comparison);
     await Promise.resolve(); await Promise.resolve(); fixture.detectChanges();
+    for (const history of http.match(request => request.url.endsWith('/runs'))) history.flush({ items: [], total: 0, nextCursor: null });
     const text = (fixture.nativeElement as HTMLElement).textContent!; expect(text).toContain('Aplicación completada'); expect(text).toContain('Valores modificados: 1'); expect(text).toContain('Propuestas sin cambio de valor: 1'); expect(text).toContain('SYNTHETIC_REMAINING'); expect(fixture.componentInstance.store.selected()).toEqual([]);
     const loading = fixture.componentInstance.store.loadApplication(true); http.expectOne(request => request.url.endsWith('/applications/' + receiptId)).flush(detail);
     http.expectOne(request => request.url.endsWith('/comparison') && request.params.get('cursor') === 'next-page').flush({ ...comparison, items: [{ key: 'second', after: { ...row, id: 'second', code: 'SYNTHETIC_ERROR', status: 'error' } }], nextCursor: null }); await loading;
-    expect(fixture.componentInstance.store.comparison()?.items.map(row => row.key)).toEqual(['first', 'second']); http.expectNone(request => request.method === 'POST');
+    expect(fixture.componentInstance.store.comparison()?.items.map(row => row.key)).toEqual(['second']); http.expectNone(request => request.method === 'POST');
   });
   it('ignores late receipt and comparison responses after closing the workspace', async () => {
     const fixture = await render(), store = fixture.componentInstance.store;

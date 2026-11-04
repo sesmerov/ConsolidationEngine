@@ -1,12 +1,16 @@
+import { StageTitleDirective } from '../core/stage-title.directive';
 import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { SessionStore } from '../core/session.store';
 import { ImportStore } from './import.store';
 import type { Diagnostic } from '@ce/contracts';
-@Component({ selector: 'ce-import-page', standalone: true, imports: [FormsModule], providers: [ImportStore], templateUrl: './import-page.component.html', changeDetection: ChangeDetectionStrategy.OnPush })
+@Component({ selector: 'ce-import-page', standalone: true, imports: [StageTitleDirective, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule], templateUrl: './import-page.component.html', changeDetection: ChangeDetectionStrategy.OnPush })
 export class ImportPageComponent {
   readonly store = inject(ImportStore); readonly session = inject(SessionStore);
-  readonly catalog = signal<File | null>(null); readonly reports = signal<readonly File[]>([]);
+  readonly catalog = this.store.catalog; readonly reports = this.store.reports;
   readonly busy = computed(() => this.store.uploading() || this.session.jobActive() || this.session.pending());
   readonly catalogError = computed(() => { const file = this.catalog(); return file && !/\.xlsx$/i.test(file.name) ? 'El catálogo debe ser un archivo .xlsx.' : file && file.size > 10 * 1024 * 1024 ? 'El catálogo supera 10 MiB.' : null; });
   readonly reportsError = computed(() => this.reports().length > 20 ? 'Selecciona como máximo 20 informes.' : this.reports().some(file => !/\.xlsx$/i.test(file.name)) ? 'Todos los informes deben ser archivos .xlsx.' : this.reports().some(file => file.size > 10 * 1024 * 1024) ? 'Un informe supera 10 MiB.' : this.reports().reduce((sum, file) => sum + file.size, this.catalog()?.size ?? 0) > 50 * 1024 * 1024 ? 'El catálogo y los informes superan 50 MiB en total.' : null);

@@ -1,9 +1,9 @@
 import type { Rational, SourceLocator } from './common.js';
 import type { SourceFile } from './report.js';
 import type { FactReadDTO, MetadataReadDTO, RuleResultDTO, ValidationSummary } from './validation.js';
-import { validationRunSchema } from './validation.js';
+import { validationRunSchema, validationValueSchema } from './validation.js';
 import type { ProposalAfterDTO } from './recalculation.js';
-import { dateValueSchema, rationalSchema, sourceLocatorSchema, textValueSchema, uuidSchema } from './common.schemas.js';
+import { presentationSchema, rationalSchema, sourceLocatorSchema, uuidSchema } from './common.schemas.js';
 import { recalculationPolicySchema } from './profiles.js';
 import { coordinateSchema, sourceFileSchema } from './report.js';
 import { bindingSchema, directionChoiceSchema, factReadSchema, metadataReadsSchema, proposalSchema } from './recalculation.js';
@@ -60,16 +60,6 @@ export const completedValidationSummarySchema = { type: 'object', additionalProp
 export const applicationDetailSchema = { type: 'object', additionalProperties: false, required: ['receipt', 'changeCount', 'beforeSummary', 'afterSummary'], properties: {
   receipt: applyReceiptSchema, changeCount: count, beforeSummary: completedValidationSummarySchema, afterSummary: completedValidationSummarySchema,
 } } as const;
-const trace = { coordinate: coordinateSchema, sourceLocator: sourceLocatorSchema } as const;
-export const validationValueSchema = { oneOf: [
-  { type: 'object', additionalProperties: false, required: ['kind', 'nominal', 'interval', 'unit'], properties: { ...trace, kind: { const: 'number' }, nominal: rationalSchema, interval: proposalSchema.properties.derivedInterval, unit: text } },
-  { type: 'object', additionalProperties: false, required: ['kind', 'value'], properties: { ...trace, kind: { const: 'boolean' }, value: { type: 'boolean' } } },
-  { ...textValueSchema, properties: { ...textValueSchema.properties, ...trace } },
-  { ...dateValueSchema, properties: { ...dateValueSchema.properties, ...trace } },
-  { type: 'object', additionalProperties: false, required: ['kind', 'presence', 'dataType'], properties: { ...trace, kind: { const: 'null' }, presence: { enum: ['explicit_null', 'implicit_null', 'derived_null'] }, dataType: { enum: ['number', 'boolean', 'text', 'date'] }, unit: text },
-    allOf: [{ if: { type: 'object', properties: { dataType: { enum: ['text', 'date'] } } }, then: { type: 'object', properties: { unit: { const: '' } } } }] },
-  { type: 'object', additionalProperties: false, required: ['kind', 'presence'], properties: { ...trace, kind: { const: 'unknown' }, presence: { const: 'unknown' } } },
-] } as const;
 const eligibilitySchema = { type: 'object', additionalProperties: false, required: ['eligible', 'diagnostics'], properties: { eligible: { type: 'boolean' }, target: coordinateSchema, diagnostics } } as const;
 export const ruleResultSchema = { type: 'object', additionalProperties: false,
   required: ['id', 'runId', 'versionId', 'profileId', 'coverageOnly', 'code', 'variantIds', 'sourceRecordIds', 'tables', 'status', 'severity', 'severityOriginal', 'expression', 'values', 'readKeys', 'factReads', 'metadataReads', 'sources', 'diagnostics'], properties: {
@@ -78,6 +68,7 @@ export const ruleResultSchema = { type: 'object', additionalProperties: false,
     expression: text, precondition: text, preconditionResult: validationValueSchema, values: { type: 'object', additionalProperties: false, properties: { left: validationValueSchema, right: validationValueSchema, result: validationValueSchema } },
     readKeys: texts, factReads: { type: 'array', items: factReadSchema }, metadataReads: metadataReadsSchema, sources: { type: 'array', items: sourceLocatorSchema }, diagnostics,
     recalculation: { type: 'object', additionalProperties: false, required: ['left', 'right'], properties: { left: eligibilitySchema, right: eligibilitySchema, policy: recalculationPolicySchema } },
+    presentation: presentationSchema,
   } } as const;
 export const comparisonRowSchema = { type: 'object', additionalProperties: false, required: ['key'], properties: { key: text, before: ruleResultSchema, after: ruleResultSchema }, anyOf: [{ type: 'object', required: ['before'] }, { type: 'object', required: ['after'] }] } as const;
 /** Closed response shape: internal snapshots and AST cannot pass through object spreading. */
@@ -91,3 +82,4 @@ export const comparisonPageSchema = { type: 'object', additionalProperties: fals
   items: { type: 'array', items: comparisonRowSchema }, total: count, nextCursor: { type: ['string', 'null'] }, receipt: applyReceiptSchema,
   beforeSummary: completedValidationSummarySchema, afterSummary: completedValidationSummarySchema, sourceFiles: { type: 'array', items: sourceFileSchema },
 } } as const;
+export const changedOnlyQuerySchema = { type: 'string', enum: ['true', 'false'] } as const;

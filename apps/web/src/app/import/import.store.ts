@@ -3,8 +3,9 @@ import { HttpErrorResponse } from '@angular/common/http';
 import type { CapabilitiesDTO, RulesPageDTO } from '@ce/contracts';
 import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
-@Injectable()
+@Injectable({ providedIn: 'root' })
 export class ImportStore {
+  readonly catalog = signal<File | null>(null); readonly reports = signal<readonly File[]>([]);
   private readonly api = inject(ApiClient); private readonly session = inject(SessionStore);
   private controller: AbortController | undefined; private pageGeneration = 0;
   readonly uploading = signal(false); readonly loading = signal(false); readonly error = signal<string | null>(null);
@@ -12,7 +13,7 @@ export class ImportStore {
   readonly code = signal(''); readonly status = signal('');
   constructor() {
     effect(() => { const version = this.session.versionId(); if (version) untracked(() => { void this.load(version); }); else { this.pageGeneration++; this.page.set(null); } });
-    inject(DestroyRef).onDestroy(() => { this.controller?.abort(); this.pageGeneration++; });
+    inject(DestroyRef).onDestroy(() => { this.controller?.abort(); this.pageGeneration++; this.catalog.set(null); this.reports.set([]); });
     void this.api.capabilities().then((value) => this.capabilities.set(value)).catch((error: unknown) => this.report(error));
   }
   async upload(catalog: File, reports: readonly File[]): Promise<void> {
