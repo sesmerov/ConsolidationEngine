@@ -207,6 +207,14 @@ alineado a la derecha, con aviso en Instrucciones. No se convierte a Number para
 Texto con apariencia de fórmula se emite como texto y se aplica el codec OOXML existente.
 La elección de almacenamiento no cambia valor, unidad, escala o precisión declarada.
 
+El serializador mantiene esos umbrales dentro del dominio importable del perfil.
+El exportador completo rechaza estados internos incompatibles (racionales sin
+decimal finito, representaciones que superen las cotas de dígitos/decimales de
+entrada, nulos explícitos COREP o hechos tipados obligatorios ausentes), en vez de
+crear un libro que pierda información al reimportarse. Los bordes matemáticos del
+serializador fuera de ese dominio pueden probarse aisladamente, sin atribuirles
+roundtrip de un informe admitido. El corpus normal sí exige reimportación completa.
+
 La reimportación conserva el dato de negocio y su contexto confirmado, pero produce nuevos
 localizadores de archivo; no restaura recibos históricos. Los libros del perfil anterior
 siguen usando su exportador anterior. Un libro anotado con IDs DPM no se admite como informe.

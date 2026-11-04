@@ -6,6 +6,7 @@ import type { BootstrapDTO, CapabilitiesDTO, DirectionChoiceDTO, DirectionsRespo
 import type { HistoryPageDTO, PreviewDTO, PreviewSelectionDTO, PreviewSummaryDTO, ProposalDTO, ProposalsPageDTO, RunSummaryDTO } from '@ce/contracts';
 import type { ApplicationDetailDTO, ApplicationRequestDTO, ComparisonPageDTO } from '@ce/contracts';
 import type { ActiveImportInspectionDTO, ImportContextInputDTO, ImportInspectionCommitDTO, ImportInspectionDTO } from '@ce/contracts';
+import type { VersionExportSummaryDTO } from '@ce/contracts';
 @Injectable({ providedIn: 'root' })
 export class ApiClient {
   private readonly http = inject(HttpClient);
@@ -97,6 +98,9 @@ export class ApiClient {
   private previewUrl(workspaceId: string, previewId: string): string { return '/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/previews/' + encodeURIComponent(previewId); }
   exportResults(workspaceId: string, versionId: string, runId: string, etag: string, key: string): Promise<JobDTO> {
     return firstValueFrom(this.http.post<JobDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/exports', { versionId, runId, kind: 'results' }, { headers: this.headers(etag).set('Idempotency-Key', key) }));
+  }
+  exportSummary(workspaceId: string, versionId: string): Promise<VersionExportSummaryDTO> {
+    return firstValueFrom(this.http.get<VersionExportSummaryDTO>(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/versions/${encodeURIComponent(versionId)}/export-summary`, { headers: this.headers() }));
   }
   exportReport(workspaceId: string, versionId: string, etag: string, key: string): Promise<JobDTO> {
     return firstValueFrom(this.http.post<JobDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/exports', { versionId, kind: 'report' }, { headers: this.headers(etag).set('Idempotency-Key', key) }));

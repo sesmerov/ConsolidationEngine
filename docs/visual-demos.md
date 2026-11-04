@@ -130,3 +130,28 @@ casos negativos se prueban aparte y no se incluyen en estos dos recorridos princ
 
 El ejemplo anterior de dos reglas sigue disponible en **Formato anterior ce-report-1 →
 Empezar con el ejemplo guiado**, con su carga directa avanzada.
+
+## Guardar una versión o sus resultados
+
+En **Descargar**, elige expresamente la versión. **Contenido de la versión elegida**
+identifica si es vigente o histórica, sus perfiles y la cantidad de informes. Abre
+**Ver informes y contexto** para consultar archivos de origen, hojas, entidad, fecha
+y exclusiones. El resumen procede de esa versión; no se deduce del conjunto vigente.
+Un informe con varios contextos muestra su cantidad y los valores comunes, sin ocultar
+la existencia de entidades o fechas diferentes.
+
+**Informes y registro de cambios** prepara un libro por archivo de origen en su perfil:
+CA1 para COREP, Datos para la demostración tipada y el formato anterior cuando corresponda.
+Los datos y el contexto pertenecen a la versión elegida; las hojas excluidas no se
+reconstruyen. El registro de cambios se entrega separado. Son extractos de trabajo local
+reimportables, no ficheros oficiales de remisión.
+
+**Resultados de validación** permite elegir una ejecución de esa versión. Una ejecución
+incompleta conserva su aviso y estado. Desde Validar, **Descargar resultados de esta
+ejecución** usa la ejecución visible y su propia versión. Repetir esa descarga sólo
+reutiliza un paquete que coincide en versión y ejecución.
+
+Tras aplicar cambios, **Descargar esta versión** exporta la versión nueva del recibo
+consultado, aunque el selector de Descargar apunte a otra versión histórica. Esa acción
+no modifica el selector. El último paquete disponible muestra su propia versión para
+distinguirlo de una selección posterior.

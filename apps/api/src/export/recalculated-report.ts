@@ -1,10 +1,13 @@
-import { CONTEXT_HEADERS, COORDINATE_HEADERS, FACT_HEADERS, RECALCULATION_POLICY_ID, REPORT_TEMPLATE_VERSION } from '@ce/contracts';
-import type { Coordinate, JsonValue, ReportContext, ReportedFact, Snapshot, SourceFile } from '@ce/contracts';
+import { CONTEXT_HEADERS, COORDINATE_HEADERS, FACT_HEADERS, LANGUAGE_PROFILE_V1, LANGUAGE_PROFILE_V2, RECALCULATION_POLICY_ID, REPORT_TEMPLATE_VERSION } from '@ce/contracts';
+import type { Coordinate, JsonValue, ReportContext, ReportedFact, ReportSourceBinding, Snapshot, SourceFile } from '@ce/contracts';
 import { ApiError } from '../errors.js';
 import { canonicalStringify } from '../session/canonical-state.js';
 import { jsonBuffers, writeChunks, writeIncrementalWorkbook, writeStoredZip, type StoredZipEntry } from './bounded-files.js';
 import { checkChangeLog, collectApplicationHistory, sourceSignature, unavailable, writeChangeLogXlsx } from './change-log.js';
 import type { ChangeLogData, ReportExportHistory, ReportManifestEntry } from './change-log.js';
+import { reportOwnership } from './report-ownership.js';
+import { writeCorepReport } from './corep-report.js';
+import { writeTypedReport } from './typed-report.js';
 
 export const REPORT_EXPORT_LIMITS = Object.freeze({ maxContentBytes: 64 * 1024 * 1024, maxTotalBytes: 100 * 1024 * 1024,
   maxXmlWorkloadBytes: 64 * 1024 * 1024, maxReportBytes: 10 * 1024 * 1024, maxImportBatchBytes: 50 * 1024 * 1024, maxExpandedBytes: 100 * 1024 * 1024 });
@@ -15,6 +18,7 @@ export function reportExportLimits(overrides: Partial<ReportExportLimits> = {}):
   return limits;
 }
 export interface ReportPartition {
+  readonly binding?: ReportSourceBinding;
   readonly entryName: string; readonly sourceFileId: string; readonly contextIds: readonly string[];
   readonly contexts: readonly ReportContext[]; readonly coordinates: readonly Coordinate[]; readonly facts: readonly ReportedFact[];
 }
@@ -30,11 +34,12 @@ function catalogSource(sources: readonly SourceFile[]): SourceFile & { readonly 
 /** Projects the requested version and its lineage before Worker structuredClone; contains no AST/catalog. */
 export function prepareReportExportData(target: Snapshot, history: ReportExportHistory, limits: ReportExportLimits = REPORT_EXPORT_LIMITS, check: () => void = () => {}): ReportExportData {
   check(); const catalog = catalogSource(target.content.sources);
+  const ownership = reportOwnership(target, check);
   if (catalog.size >= limits.maxImportBatchBytes || catalog.expandedBytes >= limits.maxExpandedBytes) throw new ApiError('EXPORT_LIMIT');
   const contexts = new Map<string, string>(), partitions = new Map<string, { contexts: ReportContext[]; coordinates: Coordinate[]; facts: ReportedFact[] }>();
   for (const source of target.content.sources) if (source.kind === 'report') partitions.set(source.id, { contexts: [], coordinates: [], facts: [] });
   for (const context of target.content.contexts) {
-    check(); const fileId = context.filingIndicatorsLocator?.fileId;
+    check(); const fileId = ownership.owners.get(context.contextId);
     if (!fileId || !partitions.has(fileId) || contexts.has(context.contextId)) return unavailable('INVALID_REPORT_SOURCE');
     contexts.set(context.contextId, fileId); partitions.get(fileId)!.contexts.push(context);
   }
@@ -55,11 +60,13 @@ export function prepareReportExportData(target: Snapshot, history: ReportExportH
   const reports: ReportPartition[] = [...partitions].sort(([a], [b]) => ordinal(a, b)).map(([sourceFileId, partition], index) => {
     if (!partition.contexts.length) return unavailable('INVALID_REPORT_SOURCE'); if (partition.contexts.length > 200_000) throw new ApiError('EXPORT_LIMIT');
     partition.contexts.sort((a, b) => ordinal(a.contextId, b.contextId)); partition.coordinates.sort((a, b) => ordinal(a.factKey, b.factKey)); partition.facts.sort((a, b) => ordinal(a.factKey, b.factKey));
-    return { entryName: `reports/report-${String(index + 1).padStart(3, '0')}.xlsx`, sourceFileId, contextIds: partition.contexts.map(context => context.contextId), ...partition };
+    const binding = ownership.bindings.get(sourceFileId);
+    return { entryName: `reports/report-${String(index + 1).padStart(3, '0')}.xlsx`, sourceFileId, contextIds: partition.contexts.map(context => context.contextId), ...partition, ...(binding ? { binding } : {}) };
   });
   const application = collectApplicationHistory(target, history, check);
   const data: ReportExportData = { versionId: target.versionId, contentHash: target.contentHash, profileId: target.content.profileId, policyId: RECALCULATION_POLICY_ID,
-    synthetic: target.content.contexts.some(context => context.entityId === 'SYNTHETIC'), sources: target.content.sources, partitions: reports, ...application };
+    synthetic: target.content.contexts.some(context => context.entityId === 'SYNTHETIC'), sources: target.content.sources, partitions: reports,
+    ...(target.content.reportSourceBindings ? { reportSourceBindings: target.content.reportSourceBindings } : {}), ...application };
   // Upper-bound only the tiny measured manifest fields; the final log is checked again after writing reports.
   const manifest = reports.map(report => ({ entryName: report.entryName, sourceFileId: report.sourceFileId, contextIds: report.contextIds,
     size: limits.maxReportBytes, sha256: '0'.repeat(64), expandedBytes: limits.maxExpandedBytes }));
@@ -93,7 +100,13 @@ export async function writeReportExport(data: ReportExportData, paths: ReportExp
   for (const [index, report] of data.partitions.entries()) {
     check(); const maximum = Math.min(limits.maxReportBytes, limits.maxImportBatchBytes - compressedBatch, limits.maxTotalBytes - contentBytes);
     if (maximum <= 0) throw new ApiError('EXPORT_LIMIT');
-    const output = await writeIncrementalWorkbook(paths.reports[index]!, reportSheets(report, data), maximum, expansion, limits.maxExpandedBytes, check);
+    const output = data.profileId === LANGUAGE_PROFILE_V1 && !report.binding
+      ? await writeIncrementalWorkbook(paths.reports[index]!, reportSheets(report, data), maximum, expansion, limits.maxExpandedBytes, check)
+      : data.profileId === LANGUAGE_PROFILE_V2 && report.binding?.profileId === 'eba-corep-of-4.0-ca1-v1'
+        ? await writeCorepReport(paths.reports[index]!, { ...report, binding: report.binding }, data, maximum, expansion, limits.maxExpandedBytes, check)
+        : data.profileId === LANGUAGE_PROFILE_V2 && report.binding?.profileId === 'ce-demo-types-1'
+          ? await writeTypedReport(paths.reports[index]!, { ...report, binding: report.binding }, data, maximum, expansion, limits.maxExpandedBytes, check)
+          : unavailable('INVALID_REPORT_SOURCE');
     compressedBatch += output.size; contentBytes += output.size;
     manifest.push({ entryName: report.entryName, sourceFileId: report.sourceFileId, contextIds: report.contextIds, size: output.size, sha256: output.sha256, expandedBytes: output.expandedBytes });
     entries.push({ name: report.entryName, path: paths.reports[index]!, ...output }); progress(++completed, total);

@@ -1,12 +1,14 @@
-import type { CatalogData, JsonValue, ReportContext, SourceFile, ValidationBundle, ValidationValueDTO } from '@ce/contracts';
+import type { CatalogData, JsonValue, ReportContext, ReportSourceBinding, SourceFile, ValidationBundle, ValidationValueDTO } from '@ce/contracts';
 import { isRationalValue } from '@ce/contracts';
 import { ApiError } from '../errors.js';
 import { jsonBytes } from './bounded-json.js';
 import { jsonBuffers, writeChunks, writeStoredZip, writeIncrementalWorkbook } from './bounded-files.js';
 import { validXmlText } from '../import/ooxml-text.js';
+import { bindingRows } from './binding-rows.js';
 export const EXPORT_LIMITS = { maxContentBytes: 64 * 1024 * 1024, maxTotalBytes: 100 * 1024 * 1024 } as const;
 export interface ExportLimits { readonly maxContentBytes: number; readonly maxTotalBytes: number }
 export interface ResultsExportData extends ValidationBundle { readonly profileId: string; readonly versionId: string; readonly contentHash: string; readonly contexts: readonly ReportContext[];
+  readonly reportSourceBindings?: readonly ReportSourceBinding[];
   readonly sources: readonly SourceFile[]; readonly catalog: Pick<CatalogData, 'records' | 'variants' | 'coverage'>; readonly synthetic: boolean }
 export interface ExportPaths { readonly json: string; readonly xlsx: string; readonly zip: string }
 export function exportLimits(overrides: Partial<ExportLimits> = {}): ExportLimits {
@@ -25,7 +27,8 @@ function* spreadsheetRows(data: ResultsExportData): Generator<SheetRow> {
     ...Object.fromEntries(Object.entries(data.run.summary.byStatus).map(([key, value]) => [key, String(value)])),
     policy: 'Racionales exactos; intervalos cerrados conservadores. Vista literal adicional a results.json; no es un fichero oficial de remisión.' })) yield row('Summary', key, value);
   yield row('Results', 'resultId', 'code', 'status', 'severity', 'coverageOnly', 'instanceId', 'expression', 'precondition', 'left', 'right', 'result');
-  yield row('Facts', 'resultId', 'contextId', 'table', 'sheet', 'row', 'column', 'presence', 'originalText', 'numerator', 'denominator', 'boolean', 'unit', 'decimals', 'fileId', 'sourceSheet', 'sourceRow', 'sourceColumn');
+  yield row('Facts', 'resultId', 'contextId', 'table', 'sheet', 'row', 'column', 'presence', 'originalText', 'numerator', 'denominator', 'boolean', 'unit', 'decimals', 'fileId', 'sourceSheet', 'sourceRow', 'sourceColumn', 'dataType', 'text', 'date');
+  yield* bindingRows(data.reportSourceBindings);
   yield row('Metadata', 'resultId', 'contextId', 'code', 'presence', 'value', 'fileId', 'sheet', 'row', 'column');
   yield row('Diagnostics', 'resultId', 'code', 'message', 'fileId', 'sheet', 'row', 'column');
   yield row('Sources', 'fileId', 'displayName', 'sha256', 'kind', 'bytes');
@@ -37,7 +40,9 @@ function* spreadsheetRows(data: ResultsExportData): Generator<SheetRow> {
     for (const read of result.factReads) { const value = read.normalizedValue, coordinate = read.coordinate, source = read.sourceLocator;
       yield row('Facts', result.id, coordinate.contextId, coordinate.tableCode, coordinate.sheetCode, coordinate.rowCode, coordinate.columnCode, read.presence, read.originalText ?? '',
         isRationalValue(value) ? value.numerator : '', isRationalValue(value) ? value.denominator : '', typeof value === 'boolean' ? String(value) : '', coordinate.unit, coordinate.decimals,
-        source.fileId ?? '', source.sheet ?? '', String(source.row ?? ''), source.column ?? ''); }
+        source.fileId ?? '', source.sheet ?? '', String(source.row ?? ''), source.column ?? '', coordinate.dataType,
+        value && typeof value === 'object' && 'kind' in value && value.kind === 'text' ? value.value : '',
+        value && typeof value === 'object' && 'kind' in value && value.kind === 'date' ? value.value : ''); }
     for (const read of result.metadataReads) yield row('Metadata', result.id, read.contextId, read.code, read.presence, read.value === undefined ? '' : String(read.value), read.sourceLocator?.fileId ?? '', read.sourceLocator?.sheet ?? '', String(read.sourceLocator?.row ?? ''), read.sourceLocator?.column ?? '');
     for (const diagnostic of result.diagnostics) yield row('Diagnostics', result.id, diagnostic.code, diagnostic.message, diagnostic.locator?.fileId ?? '', diagnostic.locator?.sheet ?? '', String(diagnostic.locator?.row ?? ''), diagnostic.locator?.column ?? '');
   }

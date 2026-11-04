@@ -96,8 +96,11 @@ function workbookParts(sheets: readonly LiteralSheet[], check: () => void): { na
     ...sheets.map((sheet, index) => ({ name: `xl/worksheets/sheet${index + 1}.xml`, chunks: worksheetRows(sheet, check) })),
   ];
 }
-async function* deflatedWorkbook(sheets: readonly LiteralSheet[], budget: { expandedBytes: number }, maximum: number, check: () => void): AsyncGenerator<Buffer> {
-  const central: Buffer[] = []; let offset = 0; const parts = workbookParts(sheets, check);
+export interface WorkbookPart { readonly name: string; readonly chunks: Iterable<Buffer> }
+async function* deflatedParts(parts: readonly WorkbookPart[], budget: { expandedBytes: number }, maximum: number, check: () => void): AsyncGenerator<Buffer> {
+  if (!parts.length || parts.length > 2048 || new Set(parts.map(part => part.name)).size !== parts.length
+    || parts.some(part => part.name.length > 512 || !/^[A-Za-z0-9_.\[\]-]+(?:\/[A-Za-z0-9_.\[\]-]+)*$/.test(part.name) || part.name.split('/').some(segment => segment === '.' || segment === '..'))) throw new ApiError('INTERNAL_ERROR');
+  const central: Buffer[] = []; let offset = 0;
   for (const part of parts) {
     check(); const filename = Buffer.from(part.name), local = Buffer.alloc(30); let expanded = 0, compressed = 0, checksum = 0;
     local.writeUInt32LE(0x04034b50); local.writeUInt16LE(20, 4); local.writeUInt16LE(0x808, 6); local.writeUInt16LE(8, 8); local.writeUInt16LE(filename.length, 26);
@@ -123,7 +126,11 @@ async function* deflatedWorkbook(sheets: readonly LiteralSheet[], budget: { expa
   for (const chunk of central) yield chunk; yield end;
 }
 export async function writeIncrementalWorkbook(location: string, sheets: readonly LiteralSheet[], maximum: number, budget: { expandedBytes: number }, maxExpandedBytes: number, check: () => void): Promise<WrittenFile & { expandedBytes: number }> {
+  return writeIncrementalParts(location, workbookParts(sheets, check), maximum, budget, maxExpandedBytes, check);
+}
+/** Streams trusted OOXML parts through the same measured DEFLATE and cancellation path as literal workbooks. */
+export async function writeIncrementalParts(location: string, parts: readonly WorkbookPart[], maximum: number, budget: { expandedBytes: number }, maxExpandedBytes: number, check: () => void): Promise<WrittenFile & { expandedBytes: number }> {
   const initial = budget.expandedBytes;
-  const output = await writeChunks(location, deflatedWorkbook(sheets, budget, maxExpandedBytes, check), maximum, check);
+  const output = await writeChunks(location, deflatedParts(parts, budget, maxExpandedBytes, check), maximum, check);
   return { ...output, expandedBytes: budget.expandedBytes - initial };
 }

@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
-import { emptyQuerySchema, uuidSchema } from '@ce/contracts';
+import { emptyQuerySchema, uuidSchema, versionExportSummarySchema } from '@ce/contracts';
+import { WorkBudget } from '@ce/engine';
 import type { ApplicationBundle, JsonValue } from '@ce/contracts';
 import { ApiError } from '../errors.js';
 import { checkExportData, exportLimits } from '../export/results-export.js';
@@ -12,8 +13,16 @@ import { getValidation } from '../validation/validation-service.js';
 import { exportKey } from '../workers/export.worker.js';
 import type { ExportArtifact } from '../workers/export.worker.js';
 import { registerJobRoute } from './jobs.js';
+import { versionExportSummary } from '../export/report-ownership.js';
 export function registerExports(app: FastifyInstance, overrides?: Partial<ExportLimits>, reportOverrides?: Partial<ReportExportLimits>): void {
   const resultsLimits = exportLimits(overrides), reportLimits = reportExportLimits(reportOverrides);
+  app.get<{ Params: { workspaceId: string; versionId: string } }>('/api/v1/workspaces/:workspaceId/versions/:versionId/export-summary', { schema: {
+    querystring: emptyQuerySchema, params: { type: 'object', additionalProperties: false, required: ['workspaceId', 'versionId'], properties: { workspaceId: uuidSchema, versionId: uuidSchema } },
+    response: { 200: versionExportSummarySchema },
+  } }, request => {
+    const snapshot = app.ce.store.snapshot(request.params.workspaceId, request.params.versionId), budget = new WorkBudget({ cancelled: () => request.raw.aborted });
+    return versionExportSummary(snapshot, () => budget.check());
+  });
   registerJobRoute(app, { path: '/workspaces/:workspaceId/exports', kind: 'export', bodySchema: { oneOf: [
     { type: 'object', additionalProperties: false, required: ['versionId', 'runId', 'kind'], properties: { versionId: uuidSchema, runId: uuidSchema, kind: { const: 'results' } } },
     { type: 'object', additionalProperties: false, required: ['versionId', 'kind'], properties: { versionId: uuidSchema, kind: { const: 'report' } } },
@@ -30,6 +39,7 @@ export function registerExports(app: FastifyInstance, overrides?: Partial<Export
         const bundle = getValidation(app.ce.store, workspaceId, body.runId);
         if (bundle.run.versionId !== snapshot.versionId) throw new ApiError('STALE_VERSION'); if (bundle.run.status === 'running') throw new ApiError('WORKSPACE_BUSY');
         const data: ResultsExportData = { ...bundle, profileId: snapshot.content.profileId, versionId: snapshot.versionId, contentHash: snapshot.contentHash,
+          ...(snapshot.content.reportSourceBindings ? { reportSourceBindings: snapshot.content.reportSourceBindings } : {}),
           contexts: snapshot.content.contexts, sources: snapshot.content.sources, catalog: { records: snapshot.content.catalog.records, variants: snapshot.content.catalog.variants, coverage: snapshot.content.catalog.coverage },
           synthetic: snapshot.content.contexts.some((context) => context.entityId === 'SYNTHETIC') };
         checkExportData(data, resultsLimits); return { kind: 'results' as const, data, limits: resultsLimits, reportCount: 0 };

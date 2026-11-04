@@ -1,13 +1,15 @@
 import { UUID_PATTERN } from '@ce/contracts';
-import type { ApplicationBundle, ApplyChangeDTO, ApplyReceiptDTO, ExportUnavailableReason, JsonValue, Snapshot, SourceFile } from '@ce/contracts';
+import type { ApplicationBundle, ApplyChangeDTO, ApplyReceiptDTO, ExportUnavailableReason, JsonValue, ReportSourceBinding, Snapshot, SourceFile } from '@ce/contracts';
 import { ApiError } from '../errors.js';
 import { canonicalStringify } from '../session/canonical-state.js';
 import { jsonBytes } from './bounded-json.js';
 import { writeIncrementalWorkbook, type WrittenFile } from './bounded-files.js';
 import { validXmlText } from '../import/ooxml-text.js';
+import { bindingRows } from './binding-rows.js';
 
 export interface ReportManifestEntry { readonly entryName: string; readonly sourceFileId: string; readonly contextIds: readonly string[]; readonly size: number; readonly sha256: string; readonly expandedBytes: number }
 export interface ChangeLogData {
+  readonly reportSourceBindings?: readonly ReportSourceBinding[];
   readonly versionId: string; readonly contentHash: string; readonly profileId: string; readonly policyId: string; readonly synthetic: boolean;
   readonly sources: readonly SourceFile[]; readonly reports: readonly ReportManifestEntry[]; readonly receipts: readonly ApplyReceiptDTO[]; readonly changes: readonly ApplyChangeDTO[];
 }
@@ -61,6 +63,7 @@ function* spreadsheetRows(data: ChangeLogData): Generator<SheetRow> {
     applications: String(data.receipts.length), accepted: String(data.changes.length), changed: String(data.changes.filter(change => change.changed).length),
     notice: 'Vista literal del registro de cambios; no es un fichero oficial de remisión.' })) yield row('Summary', key, value);
   yield row('Reports', 'entryName', 'sourceFileId', 'size', 'sha256', 'expandedBytes');
+  yield* bindingRows(data.reportSourceBindings);
   yield row('ReportContexts', 'sourceFileId', 'contextId');
   for (const report of data.reports) { yield row('Reports', report.entryName, report.sourceFileId, String(report.size), report.sha256, String(report.expandedBytes)); for (const contextId of report.contextIds) yield row('ReportContexts', report.sourceFileId, contextId); }
   yield row('OriginalSources', 'fileId', 'displayName', 'kind', 'size', 'expandedBytes', 'sha256');

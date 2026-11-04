@@ -429,3 +429,69 @@ misma prueba pasa **1/1**, 3,46 s, respuesta 200 y bytes idénticos a su plantil
 Build API final correcto. La copia temporal se limpia; no se movieron originales.
 **Checkpoint T047–T062 completo**, con los 28 escenarios E2E verificados entre la
 ejecución conjunta y la repetición focal del selector corregido.
+
+## US4 — exportación visual y versión elegida
+
+Base: `a550442`. Se precisó el contrato HTTP con un resumen de exportación de la
+versión exacta: hasta 20 informes y listas acotadas de hojas, sin hechos ni todos los
+contextos. Es necesario para describir un histórico cuyo perfil difiere del vigente.
+La UI no deduce ese perfil del contexto actual. Se documentó además que la elección
+número/texto del serializador no amplía el dominio de importación del perfil.
+
+Pruebas previas a implementar:
+
+- T063/T064: **tres fallos conductuales**, 1,0 s. La exportación con contexto manual
+  falla por ausencia de localizador; COREP y tipos se escriben con el formato anterior
+  y no se reconocen al reimportarlos como perfiles visuales.
+- T070: **cinco fallos compilados**. Falta el resumen histórico y el aviso de ejecución
+  incompleta; repetir resultados permite un artefacto de informe/otra versión/otra
+  ejecución. Se conservarán las guardias de solicitud/idempotencia existentes.
+- T065 E2E: recorrido COREP real escrito, con exportación aplicada/histórica y
+  reimportación de 110 posiciones; baseline falla en 14,8 s al buscar el resumen de
+  la versión elegida, después de importar, validar, simular y aplicar cinco cambios.
+  El recorrido tipado exige las seis entradas, ocho resultados, XLSX/JSON tipado y
+  que no se repita el paquete ajeno. Log `.cache/us4-roundtrip-red.log`.
+
+La comparación de negocio excluye IDs/localizadores nuevos, pero conserva valores,
+tipos, presencia, precisión, unidades e intervalos; la prueba exige fuentes nuevas
+y ausencia de historial restaurado tras reimportar.
+
+Implementación y verificación de US4:
+
+- Dispatch por perfil/binding de la versión solicitada, con plantillas del producto
+  comprobadas por tamaño/SHA/CRC. No se copia el paquete original. COREP conserva
+  110 posiciones, 335 anclas, merge y disposición; la salida tipada distingue texto
+  vacío informado de nulo y conserva fechas civiles y espacios literalmente.
+- El serializador decimal evita Number y redondeos adicionales. Los casos fuera del
+  dominio reimportable se rechazan completos. Los límites matemáticos del serializador
+  se prueban aparte: no amplían los 128 dígitos/lugares decimales de entrada.
+- T063/T064 y regresiones de informes/resultados/lifecycle: **82/82**, cinco archivos,
+  15,94 s. Serialización decimal adicional: **25/25**. Incluyen escalas 0/3/6,
+  precisión/INF, manual/libro, cifras largas, estilos, 190 exclusiones, cuotas,
+  cancelación y compatibilidad v1; la regresión de recursos usa 100 000 hechos.
+- T065 HTTP: **9/9** con trabajos reales, selección histórica, token/ETag, cancelación
+  y resultados incompletos producidos por una validación interrumpida. Regresiones
+  contractuales de aplicaciones/exportaciones y resultados: **21/21**.
+- Angular: **125/125**, quince archivos, typecheck correcto. Build inicial
+  **660,72 kB**, transferencia estimada 149,66 kB, sin elevar presupuestos.
+  El resumen y la repetición de descarga están ligados a versión/contenido/ejecución.
+- T065 navegador: **2/2**, 36,4 s, log `.cache/us4-roundtrip-first.log`.
+  COREP descarga la versión aplicada y la histórica sin cambiar el selector, cambia
+  después el perfil vigente y sigue describiendo el histórico correcto. Se reimportan
+  las 110 posiciones y se comparan los 16 resultados. La demo tipada comprueba seis
+  entradas, ocho resultados, JSON/XLSX tipado y que un informe no se repita como
+  resultados. Ambos casos crean fuentes nuevas sin restaurar historial.
+- Los cuatro activos de demo mantienen sus hashes antes/después. Copias exactas de
+  los XLSX descargados y capturas quedan en `.cache/verification-002/us4/` para
+  inspección visual, fuera de Git y sin datos privados.
+
+Revisión visual de ocho renders de los XLSX descargados: CA1 aplicado A1:F25 y
+A97:F114, histórico A1:F25, Contexto/Instrucciones COREP y las tres hojas tipadas.
+Los rangos revisados son legibles, mantienen jerarquía, bordes, anchos y filas
+multilínea, sin solapes ni cortes observados. Los cinco cambios se distinguen del
+histórico, y cero, blancos, fechas y estado Informado conservan su representación.
+Los tres XLSX mantienen su SHA tras renderizar. Evidencia:
+`.cache/verification-002/us4/renders/`. Se usó artifact-tool sobre descargas reales;
+esto no acredita apertura nativa en Excel ni aceptación humana.
+**Checkpoint T063–T071 completo**. La revisión conjunta posterior detectó una carrera
+de foco al recargar/navegar con teclado; su corrección y regresión pertenecen a T073.

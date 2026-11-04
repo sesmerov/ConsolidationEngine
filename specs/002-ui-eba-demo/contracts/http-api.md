@@ -208,6 +208,21 @@ No compara IDs/tiempos generados ni cambios meramente cosméticos de etiquetas.
 
 ## 6. Exportación
 
+Para describir la versión elegida sin deducirla del contexto vigente, GET
+`/workspaces/{w}/versions/{versionId}/export-summary` devuelve un DTO cerrado:
+`{versionId,profileId,createdAt,reports}`. Requiere sesión y pertenencia de la versión;
+404 para versión ajena/inexistente. Es lectura de snapshot inmutable, sin If-Match.
+Cada informe contiene `sourceFileId`, `displayName`, `profileId`, `contextCount`,
+`commonEntityId?`, `commonReferenceDate?`, `contextOrigin:"form"|"workbook"`,
+`selectedSheets`, `excludedSheets`, `scaleExponent?` y `displayDecimals?`.
+Hay como máximo 20 informes; cada lista de hojas tiene como máximo 256 nombres de
+hasta 31 caracteres. Los valores comunes se calculan sobre todos los contextos de
+su informe; si difieren, se omiten y la UI indica varios valores. No se recortan
+listas silenciosamente ni se envían todos los contextIds/contextos, hechos, AST,
+mappingSHA o rutas privadas. El formato anterior se agrupa por archivo de origen y
+cuenta sus contextos, sin obligar a renderizarlos. Este resumen informativo no permite
+al cliente elegir el escritor ni modificar los bindings de una exportación.
+
 POST `/exports` conserva `{versionId,runId?,kind}` y sus guardias. El perfil y bindings
 del snapshot elegido determinan el escritor; el cliente no puede imponer otro mapping.
 `report.zip` incluye el libro visual de cada informe admitido, cambios y manifiesto de
@@ -217,6 +232,9 @@ perfil/huellas/contexto/exclusiones. Los informes v1 conservan su salida anterio
 «Descargar esta versión» tras aplicar envía `receipt.newVersionId`. No reemplaza la
 selección del histórico ni usa automáticamente currentVersionId. El ETag protege el
 workspace; `versionId` indica los datos exactos exportados.
+Un artefacto listo conserva su identidad `kind`, `versionId` y `runId?`; repetir
+la descarga de resultados desde una ejecución sólo puede reutilizar su propio
+artefacto, nunca un report.zip o resultados de otra ejecución.
 
 ## 7. Verificación del contrato prevista
 
