@@ -1,0 +1,3586 @@
+{
+  "artifactKind": "design-contract-manifest-not-implemented-adapter",
+  "profileId": "eba-corep-of-4.0-ca1-v1",
+  "official": {
+    "sha256": "f3c4aad1a313e3568ba56d62124c554300c94caee444e837531725b543f4cfa7",
+    "size": 1335372,
+    "entryCount": 639,
+    "expandedBytes": 7905907,
+    "maxEntryBytes": 1705345,
+    "sheetCount": 191,
+    "maxRow": 441,
+    "maxColumn": 16384,
+    "sharedStringCount": 7529,
+    "formulaSheets": [
+      {
+        "name": "CA4",
+        "count": 68
+      },
+      {
+        "name": "IRRBB.8",
+        "count": 2
+      },
+      {
+        "name": "IRRBB.9",
+        "count": 2
+      }
+    ]
+  },
+  "annotated": {
+    "sha256": "610d72d283dd74a6d572c49e1959fba43a662548df4e5399dca2f4b3523c7e5f",
+    "size": 3059614,
+    "entryCount": 666,
+    "expandedBytes": 39327918,
+    "maxEntryBytes": 7453931,
+    "sheetCount": 132,
+    "maxRow": 137,
+    "maxColumn": 118,
+    "sharedStringCount": 24911,
+    "formulaSheets": []
+  },
+  "structureSignatureAlgorithm": "SHA256 of UTF8 no-BOM compact JSON array of ordinal-address-sorted [address,decodedText] pairs; single-pass ST_Xstring decoding; exclude E5:E114 and empty styled cells; preserve whitespace/case/Unicode; do not escape non-ASCII Unicode; reject additional nonempty anchors; verify merges and formula absence separately",
+  "structureSignature": "44268bbb2cf0a044b60130acbfbb9aab8de2ec89737e6f6078fea5023a0bbc17",
+  "structureAnchors": [
+    [
+      "B10",
+      "0045"
+    ],
+    [
+      "B100",
+      "0841"
+    ],
+    [
+      "B101",
+      "0842"
+    ],
+    [
+      "B102",
+      "0880"
+    ],
+    [
+      "B103",
+      "0890"
+    ],
+    [
+      "B104",
+      "0900"
+    ],
+    [
+      "B105",
+      "0910"
+    ],
+    [
+      "B106",
+      "0920"
+    ],
+    [
+      "B107",
+      "0930"
+    ],
+    [
+      "B108",
+      "0940"
+    ],
+    [
+      "B109",
+      "0950"
+    ],
+    [
+      "B11",
+      "0050"
+    ],
+    [
+      "B110",
+      "0955"
+    ],
+    [
+      "B111",
+      "0960"
+    ],
+    [
+      "B112",
+      "0970"
+    ],
+    [
+      "B113",
+      "0974"
+    ],
+    [
+      "B114",
+      "0978"
+    ],
+    [
+      "B12",
+      "0060"
+    ],
+    [
+      "B13",
+      "0070"
+    ],
+    [
+      "B14",
+      "0080"
+    ],
+    [
+      "B15",
+      "0090"
+    ],
+    [
+      "B16",
+      "0091"
+    ],
+    [
+      "B17",
+      "0092"
+    ],
+    [
+      "B18",
+      "0130"
+    ],
+    [
+      "B19",
+      "0140"
+    ],
+    [
+      "B2",
+      "C 01.00 - OWN FUNDS (CA1)"
+    ],
+    [
+      "B20",
+      "0150"
+    ],
+    [
+      "B21",
+      "0160"
+    ],
+    [
+      "B22",
+      "0170"
+    ],
+    [
+      "B23",
+      "0180"
+    ],
+    [
+      "B24",
+      "0200"
+    ],
+    [
+      "B25",
+      "0210"
+    ],
+    [
+      "B26",
+      "0220"
+    ],
+    [
+      "B27",
+      "0230"
+    ],
+    [
+      "B28",
+      "0240"
+    ],
+    [
+      "B29",
+      "0250"
+    ],
+    [
+      "B30",
+      "0260"
+    ],
+    [
+      "B31",
+      "0270"
+    ],
+    [
+      "B32",
+      "0280"
+    ],
+    [
+      "B33",
+      "0285"
+    ],
+    [
+      "B34",
+      "0290"
+    ],
+    [
+      "B35",
+      "0300"
+    ],
+    [
+      "B36",
+      "0310"
+    ],
+    [
+      "B37",
+      "0320"
+    ],
+    [
+      "B38",
+      "0330"
+    ],
+    [
+      "B39",
+      "0335"
+    ],
+    [
+      "B4",
+      "Rows"
+    ],
+    [
+      "B40",
+      "0340"
+    ],
+    [
+      "B41",
+      "0350"
+    ],
+    [
+      "B42",
+      "0352"
+    ],
+    [
+      "B43",
+      "0360"
+    ],
+    [
+      "B44",
+      "0362"
+    ],
+    [
+      "B45",
+      "0365"
+    ],
+    [
+      "B46",
+      "0370"
+    ],
+    [
+      "B47",
+      "0380"
+    ],
+    [
+      "B48",
+      "0390"
+    ],
+    [
+      "B49",
+      "0400"
+    ],
+    [
+      "B5",
+      "0010"
+    ],
+    [
+      "B50",
+      "0410"
+    ],
+    [
+      "B51",
+      "0420"
+    ],
+    [
+      "B52",
+      "0430"
+    ],
+    [
+      "B53",
+      "0440"
+    ],
+    [
+      "B54",
+      "0450"
+    ],
+    [
+      "B55",
+      "0460"
+    ],
+    [
+      "B56",
+      "0470"
+    ],
+    [
+      "B57",
+      "0471"
+    ],
+    [
+      "B58",
+      "0472"
+    ],
+    [
+      "B59",
+      "0480"
+    ],
+    [
+      "B6",
+      "0015"
+    ],
+    [
+      "B60",
+      "0490"
+    ],
+    [
+      "B61",
+      "0500"
+    ],
+    [
+      "B62",
+      "0510"
+    ],
+    [
+      "B63",
+      "0511"
+    ],
+    [
+      "B64",
+      "0512"
+    ],
+    [
+      "B65",
+      "0513"
+    ],
+    [
+      "B66",
+      "0514"
+    ],
+    [
+      "B67",
+      "0515"
+    ],
+    [
+      "B68",
+      "0520"
+    ],
+    [
+      "B69",
+      "0524"
+    ],
+    [
+      "B7",
+      "0020"
+    ],
+    [
+      "B70",
+      "0529"
+    ],
+    [
+      "B71",
+      "0530"
+    ],
+    [
+      "B72",
+      "0540"
+    ],
+    [
+      "B73",
+      "0551"
+    ],
+    [
+      "B74",
+      "0560"
+    ],
+    [
+      "B75",
+      "0571"
+    ],
+    [
+      "B76",
+      "0580"
+    ],
+    [
+      "B77",
+      "0590"
+    ],
+    [
+      "B78",
+      "0620"
+    ],
+    [
+      "B79",
+      "0621"
+    ],
+    [
+      "B8",
+      "0030"
+    ],
+    [
+      "B80",
+      "0622"
+    ],
+    [
+      "B81",
+      "0660"
+    ],
+    [
+      "B82",
+      "0670"
+    ],
+    [
+      "B83",
+      "0680"
+    ],
+    [
+      "B84",
+      "0690"
+    ],
+    [
+      "B85",
+      "0700"
+    ],
+    [
+      "B86",
+      "0710"
+    ],
+    [
+      "B87",
+      "0720"
+    ],
+    [
+      "B88",
+      "0730"
+    ],
+    [
+      "B89",
+      "0740"
+    ],
+    [
+      "B9",
+      "0040"
+    ],
+    [
+      "B90",
+      "0744"
+    ],
+    [
+      "B91",
+      "0748"
+    ],
+    [
+      "B92",
+      "0750"
+    ],
+    [
+      "B93",
+      "0760"
+    ],
+    [
+      "B94",
+      "0771"
+    ],
+    [
+      "B95",
+      "0780"
+    ],
+    [
+      "B96",
+      "0791"
+    ],
+    [
+      "B97",
+      "0800"
+    ],
+    [
+      "B98",
+      "0810"
+    ],
+    [
+      "B99",
+      "0840"
+    ],
+    [
+      "C10",
+      "1.1.1.1.1*"
+    ],
+    [
+      "C100",
+      "1.2.1.4.3"
+    ],
+    [
+      "C101",
+      "1.2.1.5"
+    ],
+    [
+      "C102",
+      "1.2.2"
+    ],
+    [
+      "C103",
+      "1.2.3"
+    ],
+    [
+      "C104",
+      "1.2.4"
+    ],
+    [
+      "C105",
+      "1.2.5"
+    ],
+    [
+      "C106",
+      "1.2.6"
+    ],
+    [
+      "C107",
+      "1.2.7"
+    ],
+    [
+      "C108",
+      "1.2.8"
+    ],
+    [
+      "C109",
+      "1.2.9"
+    ],
+    [
+      "C11",
+      "1.1.1.1.2*"
+    ],
+    [
+      "C110",
+      "1.2.9A"
+    ],
+    [
+      "C111",
+      "1.2.10"
+    ],
+    [
+      "C112",
+      "1.2.11"
+    ],
+    [
+      "C113",
+      "1.2.12"
+    ],
+    [
+      "C114",
+      "1.2.13"
+    ],
+    [
+      "C12",
+      "1.1.1.1.3"
+    ],
+    [
+      "C13",
+      "1.1.1.1.4"
+    ],
+    [
+      "C14",
+      "1.1.1.1.4.1"
+    ],
+    [
+      "C15",
+      "1.1.1.1.4.2"
+    ],
+    [
+      "C16",
+      "1.1.1.1.4.3"
+    ],
+    [
+      "C17",
+      "1.1.1.1.5"
+    ],
+    [
+      "C18",
+      "1.1.1.2"
+    ],
+    [
+      "C19",
+      "1.1.1.2.1"
+    ],
+    [
+      "C20",
+      "1.1.1.2.2"
+    ],
+    [
+      "C21",
+      "1.1.1.2.2.1"
+    ],
+    [
+      "C22",
+      "1.1.1.2.2.2"
+    ],
+    [
+      "C23",
+      "1.1.1.3"
+    ],
+    [
+      "C24",
+      "1.1.1.4"
+    ],
+    [
+      "C25",
+      "1.1.1.5"
+    ],
+    [
+      "C26",
+      "1.1.1.6"
+    ],
+    [
+      "C27",
+      "1.1.1.7"
+    ],
+    [
+      "C28",
+      "1.1.1.8"
+    ],
+    [
+      "C29",
+      "1.1.1.9"
+    ],
+    [
+      "C30",
+      "1.1.1.9.1"
+    ],
+    [
+      "C31",
+      "1.1.1.9.2"
+    ],
+    [
+      "C32",
+      "1.1.1.9.3"
+    ],
+    [
+      "C33",
+      "1.1.1.9.4"
+    ],
+    [
+      "C34",
+      "1.1.1.9.5"
+    ],
+    [
+      "C35",
+      "1.1.1.10"
+    ],
+    [
+      "C36",
+      "1.1.1.10.1"
+    ],
+    [
+      "C37",
+      "1.1.1.10.2"
+    ],
+    [
+      "C38",
+      "1.1.1.10.3"
+    ],
+    [
+      "C39",
+      "1.1.1.10.4"
+    ],
+    [
+      "C4",
+      "ID"
+    ],
+    [
+      "C40",
+      "1.1.1.11"
+    ],
+    [
+      "C41",
+      "1.1.1.11.1"
+    ],
+    [
+      "C42",
+      "1.1.1.11.1.1"
+    ],
+    [
+      "C43",
+      "1.1.1.11.2"
+    ],
+    [
+      "C44",
+      "1.1.1.11.2.1"
+    ],
+    [
+      "C45",
+      "1.1.1.11.3"
+    ],
+    [
+      "C46",
+      "1.1.1.12"
+    ],
+    [
+      "C47",
+      "1.1.1.13"
+    ],
+    [
+      "C48",
+      "1.1.1.14"
+    ],
+    [
+      "C49",
+      "1.1.1.14.1"
+    ],
+    [
+      "C5",
+      "1"
+    ],
+    [
+      "C50",
+      "1.1.1.14.2"
+    ],
+    [
+      "C51",
+      "1.1.1.14.3"
+    ],
+    [
+      "C52",
+      "1.1.1.15"
+    ],
+    [
+      "C53",
+      "1.1.1.16"
+    ],
+    [
+      "C54",
+      "1.1.1.17"
+    ],
+    [
+      "C55",
+      "1.1.1.18"
+    ],
+    [
+      "C56",
+      "1.1.1.19"
+    ],
+    [
+      "C57",
+      "1.1.1.20"
+    ],
+    [
+      "C58",
+      "1.1.1.21"
+    ],
+    [
+      "C59",
+      "1.1.1.22"
+    ],
+    [
+      "C6",
+      "1.1"
+    ],
+    [
+      "C60",
+      "1.1.1.23"
+    ],
+    [
+      "C61",
+      "1.1.1.24"
+    ],
+    [
+      "C62",
+      "1.1.1.25"
+    ],
+    [
+      "C63",
+      "1.1.1.25.1"
+    ],
+    [
+      "C64",
+      "1.1.1.25.2"
+    ],
+    [
+      "C65",
+      "1.1.1.25A"
+    ],
+    [
+      "C66",
+      "1.1.1.25B"
+    ],
+    [
+      "C67",
+      "1.1.1.25C"
+    ],
+    [
+      "C68",
+      "1.1.1.26"
+    ],
+    [
+      "C69",
+      "1.1.1.27"
+    ],
+    [
+      "C7",
+      "1.1.1"
+    ],
+    [
+      "C70",
+      "1.1.1.28"
+    ],
+    [
+      "C71",
+      "1.1.2"
+    ],
+    [
+      "C72",
+      "1.1.2.1"
+    ],
+    [
+      "C73",
+      "1.1.2.1.1"
+    ],
+    [
+      "C74",
+      "1.1.2.1.2*"
+    ],
+    [
+      "C75",
+      "1.1.2.1.3"
+    ],
+    [
+      "C76",
+      "1.1.2.1.4"
+    ],
+    [
+      "C77",
+      "1.1.2.1.4.1"
+    ],
+    [
+      "C78",
+      "1.1.2.1.4.2"
+    ],
+    [
+      "C79",
+      "1.1.2.1.4.3"
+    ],
+    [
+      "C8",
+      "1.1.1.1"
+    ],
+    [
+      "C80",
+      "1.1.2.1.5"
+    ],
+    [
+      "C81",
+      "1.1.2.2"
+    ],
+    [
+      "C82",
+      "1.1.2.3"
+    ],
+    [
+      "C83",
+      "1.1.2.4"
+    ],
+    [
+      "C84",
+      "1.1.2.5"
+    ],
+    [
+      "C85",
+      "1.1.2.6"
+    ],
+    [
+      "C86",
+      "1.1.2.7"
+    ],
+    [
+      "C87",
+      "1.1.2.8"
+    ],
+    [
+      "C88",
+      "1.1.2.9"
+    ],
+    [
+      "C89",
+      "1.1.2.10"
+    ],
+    [
+      "C9",
+      "1.1.1.1.1"
+    ],
+    [
+      "C90",
+      "1.1.2.11"
+    ],
+    [
+      "C91",
+      "1.1.2.12"
+    ],
+    [
+      "C92",
+      "1.2"
+    ],
+    [
+      "C93",
+      "1.2.1"
+    ],
+    [
+      "C94",
+      "1.2.1.1"
+    ],
+    [
+      "C95",
+      "1.2.1.2*"
+    ],
+    [
+      "C96",
+      "1.2.1.3"
+    ],
+    [
+      "C97",
+      "1.2.1.4"
+    ],
+    [
+      "C98",
+      "1.2.1.4.1"
+    ],
+    [
+      "C99",
+      "1.2.1.4.2"
+    ],
+    [
+      "D10",
+      "Of which: Capital instruments subscribed by public authorities in emergency situations"
+    ],
+    [
+      "D100",
+      "(-) Synthetic holdings of T2 instruments"
+    ],
+    [
+      "D101",
+      "(-) Actual or contingent obligations to purchase own T2 instruments"
+    ],
+    [
+      "D102",
+      "Transitional adjustments due to grandfathered T2 Capital instruments"
+    ],
+    [
+      "D103",
+      "Instruments issued by subsidiaries that are given recognition in T2 Capital"
+    ],
+    [
+      "D104",
+      "Transitional adjustments due to additional recognition in T2 Capital of instruments issued by subsidiaries"
+    ],
+    [
+      "D105",
+      "IRB Excess of provisions over expected losses eligible"
+    ],
+    [
+      "D106",
+      "SA General credit risk adjustments"
+    ],
+    [
+      "D107",
+      "(-) Reciprocal cross holdings in T2 Capital"
+    ],
+    [
+      "D108",
+      "(-) T2 instruments of financial sector entities where the institution does not have a significant investment"
+    ],
+    [
+      "D109",
+      "(-) T2 instruments of financial sector entities where the institution has a significant investment"
+    ],
+    [
+      "D11",
+      "Memorandum item: Capital instruments not eligible"
+    ],
+    [
+      "D110",
+      "(-) Excess of deductions from eligible liabilities over eligible liabilities"
+    ],
+    [
+      "D111",
+      "Other transitional adjustments to T2 Capital"
+    ],
+    [
+      "D112",
+      "Excess of deduction from T2 items over T2 Capital (deducted in AT1)"
+    ],
+    [
+      "D113",
+      "(-) Additional deductions of T2 Capital due to Article 3 of Regulation (EU) No 575/2013 "
+    ],
+    [
+      "D114",
+      "T2 capital elements or deductions - other"
+    ],
+    [
+      "D12",
+      "Share premium"
+    ],
+    [
+      "D13",
+      "(-) Own CET1 instruments"
+    ],
+    [
+      "D14",
+      "(-) Direct holdings of CET1 instruments"
+    ],
+    [
+      "D15",
+      "(-) Indirect holdings of CET1 instruments"
+    ],
+    [
+      "D16",
+      "(-) Synthetic holdings of CET1 instruments"
+    ],
+    [
+      "D17",
+      "(-) Actual or contingent obligations to purchase own CET1 instruments"
+    ],
+    [
+      "D18",
+      "Retained earnings"
+    ],
+    [
+      "D19",
+      "Previous years retained earnings"
+    ],
+    [
+      "D20",
+      "Profit or loss eligible"
+    ],
+    [
+      "D21",
+      "Profit or loss attributable to owners of the parent"
+    ],
+    [
+      "D22",
+      "(-) Part of interim or year-end profit not eligible"
+    ],
+    [
+      "D23",
+      "Accumulated other comprehensive income"
+    ],
+    [
+      "D24",
+      "Other reserves"
+    ],
+    [
+      "D25",
+      "Funds for general banking risk"
+    ],
+    [
+      "D26",
+      "Transitional adjustments due to grandfathered CET1 Capital instruments"
+    ],
+    [
+      "D27",
+      "Minority interest given recognition in CET1 capital"
+    ],
+    [
+      "D28",
+      "Transitional adjustments due to additional minority interests"
+    ],
+    [
+      "D29",
+      "Adjustments to CET1 due to prudential filters"
+    ],
+    [
+      "D30",
+      "(-) Increases  in equity resulting from securitised assets"
+    ],
+    [
+      "D31",
+      "Cash flow hedge reserve"
+    ],
+    [
+      "D32",
+      "Cumulative gains and losses due to changes in own credit risk on fair valued liabilities"
+    ],
+    [
+      "D33",
+      "Fair value gains and losses arising from the institution's own credit risk related to derivative liabilities"
+    ],
+    [
+      "D34",
+      "(-) Value adjustments due to the requirements for prudent valuation"
+    ],
+    [
+      "D35",
+      "(-) Goodwill"
+    ],
+    [
+      "D36",
+      "(-) Goodwill accounted for as intangible asset"
+    ],
+    [
+      "D37",
+      "(-) Goodwill included in the valuation of significant investments"
+    ],
+    [
+      "D38",
+      "Deferred tax liabilities associated to goodwill"
+    ],
+    [
+      "D39",
+      "Accounting revaluation of subsidiaries' goodwill derived from the consolidation of subsidiaries attributable to third persons"
+    ],
+    [
+      "D4",
+      "Item"
+    ],
+    [
+      "D40",
+      "(-) Other intangible assets"
+    ],
+    [
+      "D41",
+      "(-) Other intangible assets before deduction of deferred tax liabilities"
+    ],
+    [
+      "D42",
+      "(-) Of which: Software assets accounted for as intangible assets before deduction of deferred tax liabilities"
+    ],
+    [
+      "D43",
+      "Deferred tax liabilities associated to other intangible assets"
+    ],
+    [
+      "D44",
+      "Of which: Deferred tax liabilities associated with software assets accounted for as intangible assets"
+    ],
+    [
+      "D45",
+      "Accounting revaluation of subsidiaries' other intangible assets derived from the consolidation of subsidiaries attributable to third persons"
+    ],
+    [
+      "D46",
+      "(-) Deferred tax assets that rely on future profitability and do not arise from temporary differences net of associated tax liabilities"
+    ],
+    [
+      "D47",
+      "(-) IRB shortfall of credit risk adjustments to expected losses"
+    ],
+    [
+      "D48",
+      "(-) Defined benefit pension fund assets"
+    ],
+    [
+      "D49",
+      "(-)Defined benefit pension fund assets"
+    ],
+    [
+      "D5",
+      "OWN FUNDS"
+    ],
+    [
+      "D50",
+      "Deferred tax liabilities associated to defined benefit pension fund assets"
+    ],
+    [
+      "D51",
+      "Defined benefit pension fund assets which the institution has an unrestricted ability to use"
+    ],
+    [
+      "D52",
+      "(-) Reciprocal cross holdings in CET1 Capital"
+    ],
+    [
+      "D53",
+      "(-) Excess of deduction from AT1 items over AT1 Capital "
+    ],
+    [
+      "D54",
+      "(-) Qualifying holdings outside the financial sector which can alternatively be subject to a 1250% risk weight"
+    ],
+    [
+      "D55",
+      "(-) Securitisation positions which can alternatively be subject to a 1250% risk weight"
+    ],
+    [
+      "D56",
+      "(-) Free deliveries which can alternatively be subject to a 1250% risk weight"
+    ],
+    [
+      "D57",
+      "(-) Positions in a basket for which an institution cannot determine the risk weight under the IRB approach, and can alternatively be subject to a 1250% risk weight"
+    ],
+    [
+      "D58",
+      "(-) Equity exposures under an internal models approach which can alternatively be subject to a 1250% risk weight"
+    ],
+    [
+      "D59",
+      "(-) CET1 instruments of financial sector entites where the institution does not have a significant investment"
+    ],
+    [
+      "D6",
+      "TIER 1 CAPITAL"
+    ],
+    [
+      "D60",
+      "(-) Deductible deferred tax assets that rely on future profitability and arise from temporary differences"
+    ],
+    [
+      "D61",
+      "(-) CET1 instruments of financial sector entities where the institution has a significant investment"
+    ],
+    [
+      "D62",
+      "(-) Amount exceeding the 17.65% threshold"
+    ],
+    [
+      "D63",
+      "(-) Amount exceeding the 17.65% threshold related to CET1 instruments of financial sector entities where the institution has a significant investment"
+    ],
+    [
+      "D64",
+      "(-) Amount exceeding the 17.65% threshold related to deferred tax assets arising from temporary differences"
+    ],
+    [
+      "D65",
+      "(-) Insufficient coverage for non-performing exposures"
+    ],
+    [
+      "D66",
+      "(-) Minimum value commitment shortfalls"
+    ],
+    [
+      "D67",
+      "(-) Other foreseeable tax charges"
+    ],
+    [
+      "D68",
+      "Other transitional adjustments to CET1 Capital"
+    ],
+    [
+      "D69",
+      "(-) Additional deductions of CET1 Capital due to Article 3 of Regulation (EU) No 575/2013 "
+    ],
+    [
+      "D7",
+      "COMMON EQUITY TIER 1 CAPITAL"
+    ],
+    [
+      "D70",
+      "CET1 capital elements or deductions - other"
+    ],
+    [
+      "D71",
+      "ADDITIONAL TIER 1 CAPITAL"
+    ],
+    [
+      "D72",
+      "Capital instruments eligible as AT1 Capital"
+    ],
+    [
+      "D73",
+      "Fully paid up, directly issued capital instruments"
+    ],
+    [
+      "D74",
+      "Memorandum item: Capital instruments not eligible"
+    ],
+    [
+      "D75",
+      "Share premium"
+    ],
+    [
+      "D76",
+      "(-) Own AT1 instruments"
+    ],
+    [
+      "D77",
+      "(-) Direct holdings of AT1 instruments"
+    ],
+    [
+      "D78",
+      "(-) Indirect holdings of AT1 instruments"
+    ],
+    [
+      "D79",
+      "(-) Synthetic holdings of AT1 instruments"
+    ],
+    [
+      "D8",
+      "Capital instruments eligible as CET1 Capital"
+    ],
+    [
+      "D80",
+      "(-) Actual or contingent obligations to purchase own AT1 instruments"
+    ],
+    [
+      "D81",
+      "Transitional adjustments due to grandfathered AT1 Capital instruments"
+    ],
+    [
+      "D82",
+      "Instruments issued by subsidiaries that are given recognition in AT1 Capital"
+    ],
+    [
+      "D83",
+      "Transitional adjustments due to additional recognition in AT1 Capital of instruments issued by subsidiaries"
+    ],
+    [
+      "D84",
+      "(-) Reciprocal cross holdings in AT1 Capital"
+    ],
+    [
+      "D85",
+      "(-) AT1 instruments of financial sector entities where the institution does not have a significant investment"
+    ],
+    [
+      "D86",
+      "(-) AT1 instruments of financial sector entities where the institution has a significant investment"
+    ],
+    [
+      "D87",
+      "(-) Excess of deduction from T2 items over T2 Capital"
+    ],
+    [
+      "D88",
+      "Other transitional adjustments to AT1 Capital"
+    ],
+    [
+      "D89",
+      "Excess of deduction from AT1 items over AT1 Capital (deducted in CET1)"
+    ],
+    [
+      "D9",
+      "Fully paid up capital instruments "
+    ],
+    [
+      "D90",
+      "(-) Additional deductions of AT1 Capital due to Article 3 of Regulation (EU) No 575/2013 "
+    ],
+    [
+      "D91",
+      "AT1 capital elements or deductions - other"
+    ],
+    [
+      "D92",
+      "TIER 2 CAPITAL"
+    ],
+    [
+      "D93",
+      "Capital instruments eligible as T2 Capital"
+    ],
+    [
+      "D94",
+      "Fully paid up, directly issued capital instruments"
+    ],
+    [
+      "D95",
+      "Memorandum item: Capital instruments not eligible"
+    ],
+    [
+      "D96",
+      "Share premium"
+    ],
+    [
+      "D97",
+      "(-) Own T2 instruments"
+    ],
+    [
+      "D98",
+      "(-) Direct holdings of T2 instruments"
+    ],
+    [
+      "D99",
+      "(-) Indirect holdings of T2 instruments"
+    ],
+    [
+      "E4",
+      "Amount"
+    ]
+  ],
+  "expectedMerges": [
+    "B2:E2"
+  ],
+  "selectedSheetMaxRow": 114,
+  "selectedSheetMaxColumn": 10,
+  "mapping": [
+    {
+      "rowCode": "0010",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E5",
+      "labelCell": "D5",
+      "codeCell": "B5",
+      "itemId": "1",
+      "label": "OWN FUNDS",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33413",
+      "annotationCell": "C_01.00!D7",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "OWN FUNDS"
+    },
+    {
+      "rowCode": "0015",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E6",
+      "labelCell": "D6",
+      "codeCell": "B6",
+      "itemId": "1.1",
+      "label": "TIER 1 CAPITAL",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "84817",
+      "annotationCell": "C_01.00!D8",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "TIER 1 CAPITAL"
+    },
+    {
+      "rowCode": "0020",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E7",
+      "labelCell": "D7",
+      "codeCell": "B7",
+      "itemId": "1.1.1",
+      "label": "COMMON EQUITY TIER 1 CAPITAL",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33411",
+      "annotationCell": "C_01.00!D9",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "COMMON EQUITY TIER 1 CAPITAL"
+    },
+    {
+      "rowCode": "0030",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E8",
+      "labelCell": "D8",
+      "codeCell": "B8",
+      "itemId": "1.1.1.1",
+      "label": "Capital instruments eligible as CET1 Capital",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33306",
+      "annotationCell": "C_01.00!D10",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Capital instruments and share premium eligible as CET1 Capital"
+    },
+    {
+      "rowCode": "0040",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E9",
+      "labelCell": "D9",
+      "codeCell": "B9",
+      "itemId": "1.1.1.1.1",
+      "label": "Fully paid up capital instruments ",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32673",
+      "annotationCell": "C_01.00!D11",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Fully paid up capital instruments"
+    },
+    {
+      "rowCode": "0045",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E10",
+      "labelCell": "D10",
+      "codeCell": "B10",
+      "itemId": "1.1.1.1.1*",
+      "label": "Of which: Capital instruments subscribed by public authorities in emergency situations",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "117442",
+      "annotationCell": "C_01.00!D12",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Of which: Capital instruments subscribed by public authorities in emergency situations"
+    },
+    {
+      "rowCode": "0050",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E11",
+      "labelCell": "D11",
+      "codeCell": "B11",
+      "itemId": "1.1.1.1.2*",
+      "label": "Memorandum item: Capital instruments not eligible",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32675",
+      "annotationCell": "C_01.00!D13",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Memorandum item: Capital instruments not eligible"
+    },
+    {
+      "rowCode": "0060",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E12",
+      "labelCell": "D12",
+      "codeCell": "B12",
+      "itemId": "1.1.1.1.3",
+      "label": "Share premium",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32681",
+      "annotationCell": "C_01.00!D14",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Share premium"
+    },
+    {
+      "rowCode": "0070",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E13",
+      "labelCell": "D13",
+      "codeCell": "B13",
+      "itemId": "1.1.1.1.4",
+      "label": "(-) Own CET1 instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33299",
+      "annotationCell": "C_01.00!D15",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Own CET1 instruments"
+    },
+    {
+      "rowCode": "0080",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E14",
+      "labelCell": "D14",
+      "codeCell": "B14",
+      "itemId": "1.1.1.1.4.1",
+      "label": "(-) Direct holdings of CET1 instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32669",
+      "annotationCell": "C_01.00!D16",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Direct holdings of CET1 instruments"
+    },
+    {
+      "rowCode": "0090",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E15",
+      "labelCell": "D15",
+      "codeCell": "B15",
+      "itemId": "1.1.1.1.4.2",
+      "label": "(-) Indirect holdings of CET1 instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33295",
+      "annotationCell": "C_01.00!D17",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Indirect holdings of CET1 instruments"
+    },
+    {
+      "rowCode": "0091",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E16",
+      "labelCell": "D16",
+      "codeCell": "B16",
+      "itemId": "1.1.1.1.4.3",
+      "label": "(-) Synthetic holdings of CET1 instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33297",
+      "annotationCell": "C_01.00!D18",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Synthetic holdings of CET1 instruments"
+    },
+    {
+      "rowCode": "0092",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E17",
+      "labelCell": "D17",
+      "codeCell": "B17",
+      "itemId": "1.1.1.1.5",
+      "label": "(-) Actual or contingent obligations to purchase own CET1 instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33301",
+      "annotationCell": "C_01.00!D19",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Actual or contingent obligations to purchase own CET1 instruments"
+    },
+    {
+      "rowCode": "0130",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E18",
+      "labelCell": "D18",
+      "codeCell": "B18",
+      "itemId": "1.1.1.2",
+      "label": "Retained earnings",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33309",
+      "annotationCell": "C_01.00!D20",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Retained earnings"
+    },
+    {
+      "rowCode": "0140",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E19",
+      "labelCell": "D19",
+      "codeCell": "B19",
+      "itemId": "1.1.1.2.1",
+      "label": "Previous years retained earnings",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32679",
+      "annotationCell": "C_01.00!D21",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Previous years retained earnings"
+    },
+    {
+      "rowCode": "0150",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E20",
+      "labelCell": "D20",
+      "codeCell": "B20",
+      "itemId": "1.1.1.2.2",
+      "label": "Profit or loss eligible",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33307",
+      "annotationCell": "C_01.00!D22",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Profit or loss eligible"
+    },
+    {
+      "rowCode": "0160",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E21",
+      "labelCell": "D21",
+      "codeCell": "B21",
+      "itemId": "1.1.1.2.2.1",
+      "label": "Profit or loss attributable to owners of the parent",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32678",
+      "annotationCell": "C_01.00!D23",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Profit or loss attributable to owners of the parent"
+    },
+    {
+      "rowCode": "0170",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E22",
+      "labelCell": "D22",
+      "codeCell": "B22",
+      "itemId": "1.1.1.2.2.2",
+      "label": "(-) Part of interim or year-end profit not eligible",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33308",
+      "annotationCell": "C_01.00!D24",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Part of interim or year-end profit not eligible"
+    },
+    {
+      "rowCode": "0180",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E23",
+      "labelCell": "D23",
+      "codeCell": "B23",
+      "itemId": "1.1.1.3",
+      "label": "Accumulated other comprehensive income",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32671",
+      "annotationCell": "C_01.00!D25",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Accumulated other comprehensive income"
+    },
+    {
+      "rowCode": "0200",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E24",
+      "labelCell": "D24",
+      "codeCell": "B24",
+      "itemId": "1.1.1.4",
+      "label": "Other reserves",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32677",
+      "annotationCell": "C_01.00!D26",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Other reserves"
+    },
+    {
+      "rowCode": "0210",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E25",
+      "labelCell": "D25",
+      "codeCell": "B25",
+      "itemId": "1.1.1.5",
+      "label": "Funds for general banking risk",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32676",
+      "annotationCell": "C_01.00!D27",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Funds for general banking risk"
+    },
+    {
+      "rowCode": "0220",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E26",
+      "labelCell": "D26",
+      "codeCell": "B26",
+      "itemId": "1.1.1.6",
+      "label": "Transitional adjustments due to grandfathered CET1 Capital instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "38541",
+      "annotationCell": "C_01.00!D28",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Transitional adjustments due to grandfathered CET1 Capital instruments"
+    },
+    {
+      "rowCode": "0230",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E27",
+      "labelCell": "D27",
+      "codeCell": "B27",
+      "itemId": "1.1.1.7",
+      "label": "Minority interest given recognition in CET1 capital",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33293",
+      "annotationCell": "C_01.00!D29",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Minority interest given recognition in CET1 capital"
+    },
+    {
+      "rowCode": "0240",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E28",
+      "labelCell": "D28",
+      "codeCell": "B28",
+      "itemId": "1.1.1.8",
+      "label": "Transitional adjustments due to additional minority interests",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "38533",
+      "annotationCell": "C_01.00!D30",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Transitional adjustments due to additional minority interests"
+    },
+    {
+      "rowCode": "0250",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E29",
+      "labelCell": "D29",
+      "codeCell": "B29",
+      "itemId": "1.1.1.9",
+      "label": "Adjustments to CET1 due to prudential filters",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33329",
+      "annotationCell": "C_01.00!D31",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Adjustments to CET1 due to prudential filters"
+    },
+    {
+      "rowCode": "0260",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E30",
+      "labelCell": "D30",
+      "codeCell": "B30",
+      "itemId": "1.1.1.9.1",
+      "label": "(-) Increases  in equity resulting from securitised assets",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33340",
+      "annotationCell": "C_01.00!D32",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Increases in equity resulting from securitised assets"
+    },
+    {
+      "rowCode": "0270",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E31",
+      "labelCell": "D31",
+      "codeCell": "B31",
+      "itemId": "1.1.1.9.2",
+      "label": "Cash flow hedge reserve",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32682",
+      "annotationCell": "C_01.00!D33",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Cash flow hedge reserve"
+    },
+    {
+      "rowCode": "0280",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E32",
+      "labelCell": "D32",
+      "codeCell": "B32",
+      "itemId": "1.1.1.9.3",
+      "label": "Cumulative gains and losses due to changes in own credit risk on fair valued liabilities",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33341",
+      "annotationCell": "C_01.00!D34",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Cumulative gains and losses due to changes in own credit risk on fair valued liabilities"
+    },
+    {
+      "rowCode": "0285",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E33",
+      "labelCell": "D33",
+      "codeCell": "B33",
+      "itemId": "1.1.1.9.4",
+      "label": "Fair value gains and losses arising from the institution's own credit risk related to derivative liabilities",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "55216",
+      "annotationCell": "C_01.00!D35",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Fair value gains and losses arising from the institution's own credit risk related to derivative liabilities"
+    },
+    {
+      "rowCode": "0290",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E34",
+      "labelCell": "D34",
+      "codeCell": "B34",
+      "itemId": "1.1.1.9.5",
+      "label": "(-) Value adjustments due to the requirements for prudent valuation",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33342",
+      "annotationCell": "C_01.00!D36",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Value adjustments due to the requirements for prudent valuation"
+    },
+    {
+      "rowCode": "0300",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E35",
+      "labelCell": "D35",
+      "codeCell": "B35",
+      "itemId": "1.1.1.10",
+      "label": "(-) Goodwill",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33336",
+      "annotationCell": "C_01.00!D37",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Goodwill"
+    },
+    {
+      "rowCode": "0310",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E36",
+      "labelCell": "D36",
+      "codeCell": "B36",
+      "itemId": "1.1.1.10.1",
+      "label": "(-) Goodwill accounted for as intangible asset",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32692",
+      "annotationCell": "C_01.00!D38",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Goodwill accounted for as intangible asset"
+    },
+    {
+      "rowCode": "0320",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E37",
+      "labelCell": "D37",
+      "codeCell": "B37",
+      "itemId": "1.1.1.10.2",
+      "label": "(-) Goodwill included in the valuation of significant investments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "109293",
+      "annotationCell": "C_01.00!D39",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Goodwill included in the valuation of significant investments"
+    },
+    {
+      "rowCode": "0330",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E38",
+      "labelCell": "D38",
+      "codeCell": "B38",
+      "itemId": "1.1.1.10.3",
+      "label": "Deferred tax liabilities associated to goodwill",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32683",
+      "annotationCell": "C_01.00!D40",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Deferred tax liabilities associated to goodwill"
+    },
+    {
+      "rowCode": "0335",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E39",
+      "labelCell": "D39",
+      "codeCell": "B39",
+      "itemId": "1.1.1.10.4",
+      "label": "Accounting revaluation of subsidiaries' goodwill derived from the consolidation of subsidiaries attributable to third persons",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "458574",
+      "annotationCell": "C_01.00!D41",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Accounting revaluation of subsidiaries' goodwill derived from the consolidation of subsidiaries attributable to third persons"
+    },
+    {
+      "rowCode": "0340",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E40",
+      "labelCell": "D40",
+      "codeCell": "B40",
+      "itemId": "1.1.1.11",
+      "label": "(-) Other intangible assets",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33337",
+      "annotationCell": "C_01.00!D42",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Other intangible assets"
+    },
+    {
+      "rowCode": "0350",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E41",
+      "labelCell": "D41",
+      "codeCell": "B41",
+      "itemId": "1.1.1.11.1",
+      "label": "(-) Other intangible assets before deduction of deferred tax liabilities",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32693",
+      "annotationCell": "C_01.00!D43",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Other intangible assets before deduction of deferred tax liabilities"
+    },
+    {
+      "rowCode": "0352",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E42",
+      "labelCell": "D42",
+      "codeCell": "B42",
+      "itemId": "1.1.1.11.1.1",
+      "label": "(-) Of which: Software assets accounted for as intangible assets before deduction of deferred tax liabilities",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "465427",
+      "annotationCell": "C_01.00!D44",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Of wich: software assets accounted for as intangible assets before deduction of deferred tax liabilities"
+    },
+    {
+      "rowCode": "0360",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E43",
+      "labelCell": "D43",
+      "codeCell": "B43",
+      "itemId": "1.1.1.11.2",
+      "label": "Deferred tax liabilities associated to other intangible assets",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32684",
+      "annotationCell": "C_01.00!D45",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Deferred tax liabilities associated to other intangible assets"
+    },
+    {
+      "rowCode": "0362",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E44",
+      "labelCell": "D44",
+      "codeCell": "B44",
+      "itemId": "1.1.1.11.2.1",
+      "label": "Of which: Deferred tax liabilities associated with software assets accounted for as intangible assets",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "465428",
+      "annotationCell": "C_01.00!D46",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Of which: Deferred tax liabilities associated with software assets accounted for as intangible assets"
+    },
+    {
+      "rowCode": "0365",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E45",
+      "labelCell": "D45",
+      "codeCell": "B45",
+      "itemId": "1.1.1.11.3",
+      "label": "Accounting revaluation of subsidiaries' other intangible assets derived from the consolidation of subsidiaries attributable to third persons",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "458575",
+      "annotationCell": "C_01.00!D47",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Accounting revaluation of subsidiaries' other intangible assets derived from the consolidation of subsidiaries attributable to third persons"
+    },
+    {
+      "rowCode": "0370",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E46",
+      "labelCell": "D46",
+      "codeCell": "B46",
+      "itemId": "1.1.1.12",
+      "label": "(-) Deferred tax assets that rely on future profitability and do not arise from temporary differences net of associated tax liabilities",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33334",
+      "annotationCell": "C_01.00!D48",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Deferred tax assets that rely on future profitability and do not arise from temporary differences net of associated tax liabilities"
+    },
+    {
+      "rowCode": "0380",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E47",
+      "labelCell": "D47",
+      "codeCell": "B47",
+      "itemId": "1.1.1.13",
+      "label": "(-) IRB shortfall of credit risk adjustments to expected losses",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33339",
+      "annotationCell": "C_01.00!D49",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) IRB shortfall of credit risk adjustments to expected losses"
+    },
+    {
+      "rowCode": "0390",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E48",
+      "labelCell": "D48",
+      "codeCell": "B48",
+      "itemId": "1.1.1.14",
+      "label": "(-) Defined benefit pension fund assets",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "109296",
+      "annotationCell": "C_01.00!D50",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-)Defined benefit pension fund assets"
+    },
+    {
+      "rowCode": "0400",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E49",
+      "labelCell": "D49",
+      "codeCell": "B49",
+      "itemId": "1.1.1.14.1",
+      "label": "(-)Defined benefit pension fund assets",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "109292",
+      "annotationCell": "C_01.00!D51",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-)Defined benefit pension fund assets"
+    },
+    {
+      "rowCode": "0410",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E50",
+      "labelCell": "D50",
+      "codeCell": "B50",
+      "itemId": "1.1.1.14.2",
+      "label": "Deferred tax liabilities associated to defined benefit pension fund assets",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32687",
+      "annotationCell": "C_01.00!D52",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Deferred tax liabilities associated to defined benefit pension fund assets"
+    },
+    {
+      "rowCode": "0420",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E51",
+      "labelCell": "D51",
+      "codeCell": "B51",
+      "itemId": "1.1.1.14.3",
+      "label": "Defined benefit pension fund assets which the institution has an unrestricted ability to use",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32688",
+      "annotationCell": "C_01.00!D53",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Defined benefit pension fund assets which the institution has an unrestricted ability to use"
+    },
+    {
+      "rowCode": "0430",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E52",
+      "labelCell": "D52",
+      "codeCell": "B52",
+      "itemId": "1.1.1.15",
+      "label": "(-) Reciprocal cross holdings in CET1 Capital",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33327",
+      "annotationCell": "C_01.00!D54",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Reciprocal cross holdings in CET1 Capital"
+    },
+    {
+      "rowCode": "0440",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E53",
+      "labelCell": "D53",
+      "codeCell": "B53",
+      "itemId": "1.1.1.16",
+      "label": "(-) Excess of deduction from AT1 items over AT1 Capital ",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33407",
+      "annotationCell": "C_01.00!D55",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Excess of deduction from AT1 items over AT1 Capital (see 1.2.10)"
+    },
+    {
+      "rowCode": "0450",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E54",
+      "labelCell": "D54",
+      "codeCell": "B54",
+      "itemId": "1.1.1.17",
+      "label": "(-) Qualifying holdings outside the financial sector which can alternatively be subject to a 1250% risk weight",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "109294",
+      "annotationCell": "C_01.00!D56",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Qualifying holdings outside the financial sector which can alternatively be subject to a 1.250% risk weight"
+    },
+    {
+      "rowCode": "0460",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E55",
+      "labelCell": "D55",
+      "codeCell": "B55",
+      "itemId": "1.1.1.18",
+      "label": "(-) Securitisation positions which can alternatively be subject to a 1250% risk weight",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "109203",
+      "annotationCell": "C_01.00!D57",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Securitisation positions which can alternatively be subject to a 1.250% risk weight"
+    },
+    {
+      "rowCode": "0470",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E56",
+      "labelCell": "D56",
+      "codeCell": "B56",
+      "itemId": "1.1.1.19",
+      "label": "(-) Free deliveries which can alternatively be subject to a 1250% risk weight",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "109295",
+      "annotationCell": "C_01.00!D58",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Free deliveries which can alternatively be subject to a 1.250% risk weight"
+    },
+    {
+      "rowCode": "0471",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E57",
+      "labelCell": "D57",
+      "codeCell": "B57",
+      "itemId": "1.1.1.20",
+      "label": "(-) Positions in a basket for which an institution cannot determine the risk weight under the IRB approach, and can alternatively be subject to a 1250% risk weight",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "109056",
+      "annotationCell": "C_01.00!D59",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Positions in a basket for which an institution cannot determine the risk weight under the IRB approach, and can alternatively be subject to a 1.250% risk weight"
+    },
+    {
+      "rowCode": "0472",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E58",
+      "labelCell": "D58",
+      "codeCell": "B58",
+      "itemId": "1.1.1.21",
+      "label": "(-) Equity exposures under an internal models approach which can alternatively be subject to a 1250% risk weight",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "109143",
+      "annotationCell": "C_01.00!D60",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Equity exposures under an internal models approach which can alternatively be subject to a 1.250% risk weight"
+    },
+    {
+      "rowCode": "0480",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E59",
+      "labelCell": "D59",
+      "codeCell": "B59",
+      "itemId": "1.1.1.22",
+      "label": "(-) CET1 instruments of financial sector entites where the institution does not have a significant investment",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33311",
+      "annotationCell": "C_01.00!D61",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) CET1 instruments of financial sector entities where the institution does not have a significant investment"
+    },
+    {
+      "rowCode": "0490",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E60",
+      "labelCell": "D60",
+      "codeCell": "B60",
+      "itemId": "1.1.1.23",
+      "label": "(-) Deductible deferred tax assets that rely on future profitability and arise from temporary differences",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33330",
+      "annotationCell": "C_01.00!D62",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Deductible deferred tax assets that rely on future profitability and arise from temporary differences"
+    },
+    {
+      "rowCode": "0500",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E61",
+      "labelCell": "D61",
+      "codeCell": "B61",
+      "itemId": "1.1.1.24",
+      "label": "(-) CET1 instruments of financial sector entities where the institution has a significant investment",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33314",
+      "annotationCell": "C_01.00!D63",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) CET1 instruments of financial sector entities where the institution has a significant investment"
+    },
+    {
+      "rowCode": "0510",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E62",
+      "labelCell": "D62",
+      "codeCell": "B62",
+      "itemId": "1.1.1.25",
+      "label": "(-) Amount exceeding the 17.65% threshold",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33331",
+      "annotationCell": "C_01.00!D64",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Amount exceeding the 17.65% threshold"
+    },
+    {
+      "rowCode": "0511",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E63",
+      "labelCell": "D63",
+      "codeCell": "B63",
+      "itemId": "1.1.1.25.1",
+      "label": "(-) Amount exceeding the 17.65% threshold related to CET1 instruments of financial sector entities where the institution has a significant investment",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "456028",
+      "annotationCell": "C_01.00!D65",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Amount exceeding the 17.65% threshold related to CET1 instruments of financial sector entities where the institution has a significant investment"
+    },
+    {
+      "rowCode": "0512",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E64",
+      "labelCell": "D64",
+      "codeCell": "B64",
+      "itemId": "1.1.1.25.2",
+      "label": "(-) Amount exceeding the 17.65% threshold related to deferred tax assets arising from temporary differences",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "456030",
+      "annotationCell": "C_01.00!D66",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Amount exceeding the 17.65% threshold related to deferred tax assets arising from temporary differences"
+    },
+    {
+      "rowCode": "0513",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E65",
+      "labelCell": "D65",
+      "codeCell": "B65",
+      "itemId": "1.1.1.25A",
+      "label": "(-) Insufficient coverage for non-performing exposures",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "456059",
+      "annotationCell": "C_01.00!D67",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Insufficient coverage for non-performing exposures"
+    },
+    {
+      "rowCode": "0514",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E66",
+      "labelCell": "D66",
+      "codeCell": "B66",
+      "itemId": "1.1.1.25B",
+      "label": "(-) Minimum value commitment shortfalls",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "456069",
+      "annotationCell": "C_01.00!D68",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Minimum value commitment shortfalls"
+    },
+    {
+      "rowCode": "0515",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E67",
+      "labelCell": "D67",
+      "codeCell": "B67",
+      "itemId": "1.1.1.25C",
+      "label": "(-) Other foreseeable tax charges",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "455024",
+      "annotationCell": "C_01.00!D69",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Other foreseeable tax charges"
+    },
+    {
+      "rowCode": "0520",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E68",
+      "labelCell": "D68",
+      "codeCell": "B68",
+      "itemId": "1.1.1.26",
+      "label": "Other transitional adjustments to CET1 Capital",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "38632",
+      "annotationCell": "C_01.00!D70",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Other transitional adjustments to CET1 Capital"
+    },
+    {
+      "rowCode": "0524",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E69",
+      "labelCell": "D69",
+      "codeCell": "B69",
+      "itemId": "1.1.1.27",
+      "label": "(-) Additional deductions of CET1 Capital due to Article 3 of Regulation (EU) No 575/2013 ",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "55218",
+      "annotationCell": "C_01.00!D71",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Additional deductions of CET1 Capital due to Article 3 of Regulation (EU) No 575/2013"
+    },
+    {
+      "rowCode": "0529",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E70",
+      "labelCell": "D70",
+      "codeCell": "B70",
+      "itemId": "1.1.1.28",
+      "label": "CET1 capital elements or deductions - other",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33345",
+      "annotationCell": "C_01.00!D72",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "CET1 capital elements or deductions - other"
+    },
+    {
+      "rowCode": "0530",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E71",
+      "labelCell": "D71",
+      "codeCell": "B71",
+      "itemId": "1.1.2",
+      "label": "ADDITIONAL TIER 1 CAPITAL",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33410",
+      "annotationCell": "C_01.00!D73",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "ADDITIONAL TIER 1 CAPITAL"
+    },
+    {
+      "rowCode": "0540",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E72",
+      "labelCell": "D72",
+      "codeCell": "B72",
+      "itemId": "1.1.2.1",
+      "label": "Capital instruments eligible as AT1 Capital",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33305",
+      "annotationCell": "C_01.00!D74",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Capital instruments and share premium eligible as AT1 Capital"
+    },
+    {
+      "rowCode": "0551",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E73",
+      "labelCell": "D73",
+      "codeCell": "B73",
+      "itemId": "1.1.2.1.1",
+      "label": "Fully paid up, directly issued capital instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "455021",
+      "annotationCell": "C_01.00!D75",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Fully paid up, directly issued capital instruments"
+    },
+    {
+      "rowCode": "0560",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E74",
+      "labelCell": "D74",
+      "codeCell": "B74",
+      "itemId": "1.1.2.1.2*",
+      "label": "Memorandum item: Capital instruments not eligible",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32674",
+      "annotationCell": "C_01.00!D76",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Memorandum item: Capital instruments not eligible"
+    },
+    {
+      "rowCode": "0571",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E75",
+      "labelCell": "D75",
+      "codeCell": "B75",
+      "itemId": "1.1.2.1.3",
+      "label": "Share premium",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "455020",
+      "annotationCell": "C_01.00!D77",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Share premium"
+    },
+    {
+      "rowCode": "0580",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E76",
+      "labelCell": "D76",
+      "codeCell": "B76",
+      "itemId": "1.1.2.1.4",
+      "label": "(-) Own AT1 instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33298",
+      "annotationCell": "C_01.00!D78",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Own AT1 instruments"
+    },
+    {
+      "rowCode": "0590",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E77",
+      "labelCell": "D77",
+      "codeCell": "B77",
+      "itemId": "1.1.2.1.4.1",
+      "label": "(-) Direct holdings of AT1 instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32668",
+      "annotationCell": "C_01.00!D79",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Direct holdings of AT1 instruments"
+    },
+    {
+      "rowCode": "0620",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E78",
+      "labelCell": "D78",
+      "codeCell": "B78",
+      "itemId": "1.1.2.1.4.2",
+      "label": "(-) Indirect holdings of AT1 instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33294",
+      "annotationCell": "C_01.00!D80",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Indirect holdings of AT1 instruments"
+    },
+    {
+      "rowCode": "0621",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E79",
+      "labelCell": "D79",
+      "codeCell": "B79",
+      "itemId": "1.1.2.1.4.3",
+      "label": "(-) Synthetic holdings of AT1 instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33296",
+      "annotationCell": "C_01.00!D81",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Synthetic holdings of AT1 instruments"
+    },
+    {
+      "rowCode": "0622",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E80",
+      "labelCell": "D80",
+      "codeCell": "B80",
+      "itemId": "1.1.2.1.5",
+      "label": "(-) Actual or contingent obligations to purchase own AT1 instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33300",
+      "annotationCell": "C_01.00!D82",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Actual or contingent obligations to purchase own AT1 instruments"
+    },
+    {
+      "rowCode": "0660",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E81",
+      "labelCell": "D81",
+      "codeCell": "B81",
+      "itemId": "1.1.2.2",
+      "label": "Transitional adjustments due to grandfathered AT1 Capital instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "38540",
+      "annotationCell": "C_01.00!D83",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Transitional adjustments due to grandfathered AT1 Capital instruments"
+    },
+    {
+      "rowCode": "0670",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E82",
+      "labelCell": "D82",
+      "codeCell": "B82",
+      "itemId": "1.1.2.3",
+      "label": "Instruments issued by subsidiaries that are given recognition in AT1 Capital",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33292",
+      "annotationCell": "C_01.00!D84",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Instruments issued by subsidiaries that are given recognition in AT1 Capital"
+    },
+    {
+      "rowCode": "0680",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E83",
+      "labelCell": "D83",
+      "codeCell": "B83",
+      "itemId": "1.1.2.4",
+      "label": "Transitional adjustments due to additional recognition in AT1 Capital of instruments issued by subsidiaries",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "38532",
+      "annotationCell": "C_01.00!D85",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Transitional adjustments due to additional recognition in AT1 Capital of instruments issued by subsidiaries"
+    },
+    {
+      "rowCode": "0690",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E84",
+      "labelCell": "D84",
+      "codeCell": "B84",
+      "itemId": "1.1.2.5",
+      "label": "(-) Reciprocal cross holdings in AT1 Capital",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32685",
+      "annotationCell": "C_01.00!D86",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Reciprocal cross holdings in AT1 Capital"
+    },
+    {
+      "rowCode": "0700",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E85",
+      "labelCell": "D85",
+      "codeCell": "B85",
+      "itemId": "1.1.2.6",
+      "label": "(-) AT1 instruments of financial sector entities where the institution does not have a significant investment",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33310",
+      "annotationCell": "C_01.00!D87",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) AT1 instruments of financial sector entities where the institution does not have a significant investment"
+    },
+    {
+      "rowCode": "0710",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E86",
+      "labelCell": "D86",
+      "codeCell": "B86",
+      "itemId": "1.1.2.7",
+      "label": "(-) AT1 instruments of financial sector entities where the institution has a significant investment",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33313",
+      "annotationCell": "C_01.00!D88",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) AT1 instruments of financial sector entities where the institution has a significant investment"
+    },
+    {
+      "rowCode": "0720",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E87",
+      "labelCell": "D87",
+      "codeCell": "B87",
+      "itemId": "1.1.2.8",
+      "label": "(-) Excess of deduction from T2 items over T2 Capital",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33406",
+      "annotationCell": "C_01.00!D89",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Excess of deduction from T2 items over T2 Capital"
+    },
+    {
+      "rowCode": "0730",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E88",
+      "labelCell": "D88",
+      "codeCell": "B88",
+      "itemId": "1.1.2.9",
+      "label": "Other transitional adjustments to AT1 Capital",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "38631",
+      "annotationCell": "C_01.00!D90",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Other transitional adjustments to AT1 Capital"
+    },
+    {
+      "rowCode": "0740",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E89",
+      "labelCell": "D89",
+      "codeCell": "B89",
+      "itemId": "1.1.2.10",
+      "label": "Excess of deduction from AT1 items over AT1 Capital (deducted in CET1)",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33408",
+      "annotationCell": "C_01.00!D91",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Excess of deduction from AT1 items over AT1 Capital (deducted in CET1)"
+    },
+    {
+      "rowCode": "0744",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E90",
+      "labelCell": "D90",
+      "codeCell": "B90",
+      "itemId": "1.1.2.11",
+      "label": "(-) Additional deductions of AT1 Capital due to Article 3 of Regulation (EU) No 575/2013 ",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "55217",
+      "annotationCell": "C_01.00!D92",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Additional deductions of AT1 Capital due to Article 3 of Regulation (EU) No 575/2013"
+    },
+    {
+      "rowCode": "0748",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E91",
+      "labelCell": "D91",
+      "codeCell": "B91",
+      "itemId": "1.1.2.12",
+      "label": "AT1 capital elements or deductions - other",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33344",
+      "annotationCell": "C_01.00!D93",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "AT1 capital elements or deductions - other"
+    },
+    {
+      "rowCode": "0750",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E92",
+      "labelCell": "D92",
+      "codeCell": "B92",
+      "itemId": "1.2",
+      "label": "TIER 2 CAPITAL",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33412",
+      "annotationCell": "C_01.00!D94",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "TIER 2 CAPITAL"
+    },
+    {
+      "rowCode": "0760",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E93",
+      "labelCell": "D93",
+      "codeCell": "B93",
+      "itemId": "1.2.1",
+      "label": "Capital instruments eligible as T2 Capital",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33343",
+      "annotationCell": "C_01.00!D95",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Capital instruments and share premium eligible as T2 Capital"
+    },
+    {
+      "rowCode": "0771",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E94",
+      "labelCell": "D94",
+      "codeCell": "B94",
+      "itemId": "1.2.1.1",
+      "label": "Fully paid up, directly issued capital instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "455022",
+      "annotationCell": "C_01.00!D96",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Fully paid up, directly issued capital instruments"
+    },
+    {
+      "rowCode": "0780",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E95",
+      "labelCell": "D95",
+      "codeCell": "B95",
+      "itemId": "1.2.1.2*",
+      "label": "Memorandum item: Capital instruments not eligible",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32690",
+      "annotationCell": "C_01.00!D97",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Memorandum item: Capital instruments not eligible"
+    },
+    {
+      "rowCode": "0791",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E96",
+      "labelCell": "D96",
+      "codeCell": "B96",
+      "itemId": "1.2.1.3",
+      "label": "Share premium",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "455023",
+      "annotationCell": "C_01.00!D98",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Share premium"
+    },
+    {
+      "rowCode": "0800",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E97",
+      "labelCell": "D97",
+      "codeCell": "B97",
+      "itemId": "1.2.1.4",
+      "label": "(-) Own T2 instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33304",
+      "annotationCell": "C_01.00!D99",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Own T2 instruments"
+    },
+    {
+      "rowCode": "0810",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E98",
+      "labelCell": "D98",
+      "codeCell": "B98",
+      "itemId": "1.2.1.4.1",
+      "label": "(-) Direct holdings of T2 instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32670",
+      "annotationCell": "C_01.00!D100",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Direct holdings of T2 instruments"
+    },
+    {
+      "rowCode": "0840",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E99",
+      "labelCell": "D99",
+      "codeCell": "B99",
+      "itemId": "1.2.1.4.2",
+      "label": "(-) Indirect holdings of T2 instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33302",
+      "annotationCell": "C_01.00!D101",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Indirect holdings of T2 instruments"
+    },
+    {
+      "rowCode": "0841",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E100",
+      "labelCell": "D100",
+      "codeCell": "B100",
+      "itemId": "1.2.1.4.3",
+      "label": "(-) Synthetic holdings of T2 instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33303",
+      "annotationCell": "C_01.00!D102",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Synthetic holdings of T2 instruments"
+    },
+    {
+      "rowCode": "0842",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E101",
+      "labelCell": "D101",
+      "codeCell": "B101",
+      "itemId": "1.2.1.5",
+      "label": "(-) Actual or contingent obligations to purchase own T2 instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33328",
+      "annotationCell": "C_01.00!D103",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Actual or contingent obligations to purchase own T2 instruments"
+    },
+    {
+      "rowCode": "0880",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E102",
+      "labelCell": "D102",
+      "codeCell": "B102",
+      "itemId": "1.2.2",
+      "label": "Transitional adjustments due to grandfathered T2 Capital instruments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "38542",
+      "annotationCell": "C_01.00!D104",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Transitional adjustments due to grandfathered T2 Capital instruments"
+    },
+    {
+      "rowCode": "0890",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E103",
+      "labelCell": "D103",
+      "codeCell": "B103",
+      "itemId": "1.2.3",
+      "label": "Instruments issued by subsidiaries that are given recognition in T2 Capital",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33291",
+      "annotationCell": "C_01.00!D105",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Instruments issued by subsidiaries that are given recognition in T2 Capital"
+    },
+    {
+      "rowCode": "0900",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E104",
+      "labelCell": "D104",
+      "codeCell": "B104",
+      "itemId": "1.2.4",
+      "label": "Transitional adjustments due to additional recognition in T2 Capital of instruments issued by subsidiaries",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "38534",
+      "annotationCell": "C_01.00!D106",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Transitional adjustments due to additional recognition in T2 Capital of instruments issued by subsidiaries"
+    },
+    {
+      "rowCode": "0910",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E105",
+      "labelCell": "D105",
+      "codeCell": "B105",
+      "itemId": "1.2.5",
+      "label": "IRB Excess of provisions over expected losses eligible",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33338",
+      "annotationCell": "C_01.00!D107",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "IRB Excess of provisions over expected losses eligible"
+    },
+    {
+      "rowCode": "0920",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E106",
+      "labelCell": "D106",
+      "codeCell": "B106",
+      "itemId": "1.2.6",
+      "label": "SA General credit risk adjustments",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "17459",
+      "annotationCell": "C_01.00!D108",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "SA General credit risk adjustments"
+    },
+    {
+      "rowCode": "0930",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E107",
+      "labelCell": "D107",
+      "codeCell": "B107",
+      "itemId": "1.2.7",
+      "label": "(-) Reciprocal cross holdings in T2 Capital",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "32686",
+      "annotationCell": "C_01.00!D109",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Reciprocal cross holdings in T2 Capital"
+    },
+    {
+      "rowCode": "0940",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E108",
+      "labelCell": "D108",
+      "codeCell": "B108",
+      "itemId": "1.2.8",
+      "label": "(-) T2 instruments of financial sector entities where the institution does not have a significant investment",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33312",
+      "annotationCell": "C_01.00!D110",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) T2 instruments of financial sector entities where the institution does not have a significant investment"
+    },
+    {
+      "rowCode": "0950",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E109",
+      "labelCell": "D109",
+      "codeCell": "B109",
+      "itemId": "1.2.9",
+      "label": "(-) T2 instruments of financial sector entities where the institution has a significant investment",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33315",
+      "annotationCell": "C_01.00!D111",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) T2 instruments of financial sector entities where the institution has a significant investment"
+    },
+    {
+      "rowCode": "0955",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E110",
+      "labelCell": "D110",
+      "codeCell": "B110",
+      "itemId": "1.2.9A",
+      "label": "(-) Excess of deductions from eligible liabilities over eligible liabilities",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "456077",
+      "annotationCell": "C_01.00!D112",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Excess of deductions from eligible liabilities over eligible liabilities"
+    },
+    {
+      "rowCode": "0960",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E111",
+      "labelCell": "D111",
+      "codeCell": "B111",
+      "itemId": "1.2.10",
+      "label": "Other transitional adjustments to T2 Capital",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "38633",
+      "annotationCell": "C_01.00!D113",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Other transitional adjustments to T2 Capital"
+    },
+    {
+      "rowCode": "0970",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E112",
+      "labelCell": "D112",
+      "codeCell": "B112",
+      "itemId": "1.2.11",
+      "label": "Excess of deduction from T2 items over T2 Capital (deducted in AT1)",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33409",
+      "annotationCell": "C_01.00!D114",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "Excess of deduction from T2 items over T2 Capital (deducted in AT1)"
+    },
+    {
+      "rowCode": "0974",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E113",
+      "labelCell": "D113",
+      "codeCell": "B113",
+      "itemId": "1.2.12",
+      "label": "(-) Additional deductions of T2 Capital due to Article 3 of Regulation (EU) No 575/2013 ",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "55219",
+      "annotationCell": "C_01.00!D115",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "(-) Additional deductions of T2 Capital due to Article 3 of Regulation (EU) No 575/2013"
+    },
+    {
+      "rowCode": "0978",
+      "columnCode": "0010",
+      "tableCode": "C_01.00",
+      "sheetCode": "",
+      "sheet": "CA1",
+      "amountCell": "E114",
+      "labelCell": "D114",
+      "codeCell": "B114",
+      "itemId": "1.2.13",
+      "label": "T2 capital elements or deductions - other",
+      "dataType": "number",
+      "unitKind": "currency",
+      "dpmDataPointId": "33346",
+      "annotationCell": "C_01.00!D116",
+      "annotationTypeMarker": "€£$",
+      "annotationLabel": "T2 capital elements or deductions - other"
+    }
+  ],
+  "manifestVersion": 1,
+  "generatedOn": "2026-11-04",
+  "sourceUrls": {
+    "presentation": "https://www.eba.europa.eu/sites/default/files/2025-02/1b4c4008-4224-450f-aa7b-c6fe5284872a/ITS%20on%20supervisory%20reporting.zip",
+    "annotation": "https://www.eba.europa.eu/sites/default/files/2024-12/7ae0363a-ad3d-42d9-a192-34711416c039/annotated_templates.zip"
+  },
+  "expectedFullWorkbookSheetNames": [
+    "STr2",
+    "Str3b",
+    "Str3a",
+    "Str4",
+    "Str10",
+    "Str10 Alt",
+    "Index",
+    "CA1",
+    "CA2",
+    "CA3",
+    "CA4",
+    "CA5.1",
+    "CA5.2",
+    "GS Total",
+    "GS",
+    "CR SA",
+    "CR IRB1",
+    "CR IRB2",
+    "CR IRB3",
+    "CR IRB4",
+    "CR IRB5",
+    "CR IRB5B",
+    "CR IRB6",
+    "CR IRB7",
+    "CR GB1",
+    "CR GB2",
+    "CCB",
+    "CR IRB OF",
+    "CR EQU IRB1",
+    "CR EQU IRB2",
+    "CR SETT",
+    "CR SEC",
+    "CR SEC DETAILS",
+    "CR SEC Details 2",
+    "CCR 1",
+    "CCR 2",
+    "CCR 3",
+    "CCR 4",
+    "CCR 5",
+    "CCR 6",
+    "CCR 7",
+    "CCR 8",
+    "CCR 9",
+    "CCR 10",
+    "CCR 11",
+    "OPR OF",
+    "OPR Details 1",
+    "OPR Details 2",
+    "MKR SSA TDI",
+    "MKR SSA SEC",
+    "MKR SSA CTP",
+    "MKR SSA EQU",
+    "MKR SSA FX",
+    "MKR SSA COM",
+    "MKR IM",
+    "CVA",
+    "PRUVAL 1",
+    "PRUVAL 2",
+    "PRUVAL 3",
+    "PRUVAL 4",
+    "GOV",
+    "NPE LC1",
+    "NPE LC2",
+    "NPE LC3",
+    "TBT",
+    "BOU1",
+    "MKR MOV",
+    "CRYPTO",
+    "1.1",
+    "1.2",
+    "1.3",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "18.1",
+    "18.2",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "30",
+    "31",
+    "40",
+    "41",
+    "42 ",
+    "43",
+    "44",
+    "45",
+    "46",
+    "47",
+    "GAAP 1.1",
+    "GAAP 1.2",
+    "GAAP 1.3",
+    "GAAP 2",
+    "GAAP 3",
+    "GAAP 4",
+    "GAAP 5",
+    "GAAP 6",
+    "GAAP 7",
+    "GAAP 8",
+    "GAAP 9",
+    "GAAP 10",
+    "GAAP 11",
+    "GAAP 12",
+    "GAAP 13",
+    "GAAP 14",
+    "GAAP 15",
+    "GAAP 16",
+    "GAAP 17",
+    "GAAP 18",
+    "GAAP 18.1",
+    "GAAP 18.2",
+    "GAAP 19",
+    "GAAP 20",
+    "GAAP 21",
+    "GAAP 22",
+    "GAAP 23",
+    "GAAP 24",
+    "GAAP 25",
+    "GAAP 26",
+    "GAAP 30",
+    "GAAP 31",
+    "GAAP 40",
+    "GAAP 41",
+    "GAAP 42",
+    "GAAP 43",
+    "GAAP 44",
+    "GAAP 45",
+    "GAAP 46",
+    "GAAP 47",
+    "CR IP LOSSES",
+    "LE Limits",
+    "LE 1",
+    "LE 2, LE 3",
+    "LRCalc",
+    "LR1",
+    "LR4",
+    "LR5",
+    "LR6.1, LR6.2",
+    "NSFR RSF",
+    "NSFR ASF",
+    "NSFR SRSF",
+    "NSFR SASF",
+    "NSFR Sum",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "66",
+    "67",
+    "68",
+    "69",
+    "70",
+    "71",
+    "72",
+    "73",
+    "74",
+    "75",
+    "76",
+    "77",
+    "GSII",
+    "IRRBB.1",
+    "IRRBB.2",
+    "IRRBB.3",
+    "IRRBB.4",
+    "IRRBB.5",
+    "IRRBB.6",
+    "IRRBB.7",
+    "IRRBB.8",
+    "IRRBB.9",
+    "IRRBB.10",
+    "IRRBB.11"
+  ],
+  "optionalOwnSheets": [
+    "Contexto",
+    "Instrucciones"
+  ],
+  "limits": {
+    "maxSheets": 256,
+    "maxRows": 1024,
+    "maxColumns": 16384,
+    "maxPhysicalCellsPerBook": 500000,
+    "maxPhysicalCellsPerSheet": 100000,
+    "maxExternalLinkXmlParts": 32,
+    "maxExternalRelations": 64
+  },
+  "sourceObservedPhysicalCellCount": 166645,
+  "bindingMappingSha256": "SHA256 of this frozen manifest file bytes, computed by package generation; value is not embedded here"
+}

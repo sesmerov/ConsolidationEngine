@@ -1,0 +1,1994 @@
+{
+  "kind": "design_contract_not_implemented",
+  "created": "2026-11-04",
+  "profileId": "ce-dpmxl-0.9-closed-v2",
+  "sourceSha256": "36636afe42b2ef2247822a31ad710afe1128b5b65a250b657e1f20d5a75bba79",
+  "evidence": {
+    "syntax": "24 expressions and 6 formal preconditions parsed with ANTLR 4.13.2 from original grammar; EOF and single-statement checked.",
+    "semantic": "Expected values hand-derived independently; new evaluator, XLSX adapters and end-to-end flow NOT implemented or verified.",
+    "independentArithmetic": {
+      "status": "passed",
+      "method": "BigInt integer cents sum from official expressions in explicit dependency order, without importing or calling engine.",
+      "checks": [
+        {
+          "code": "v0174_m",
+          "target": "0070",
+          "cents": "6000"
+        },
+        {
+          "code": "v0173_m",
+          "target": "0030",
+          "cents": "18500"
+        },
+        {
+          "code": "v0176_m",
+          "target": "0150",
+          "cents": "5000"
+        },
+        {
+          "code": "v0175_m",
+          "target": "0130",
+          "cents": "10000"
+        },
+        {
+          "code": "v0172_m",
+          "target": "0020",
+          "cents": "28500"
+        }
+      ]
+    }
+  },
+  "corep": {
+    "reportProfile": "eba-corep-of-4.0-ca1-v1",
+    "context": {
+      "contextId": "demo",
+      "entityId": "SYNTHETIC",
+      "referenceDate": "2025-12-31",
+      "submissionDate": "2025-12-31",
+      "framework": "COREP",
+      "moduleVersion": "COREP_OF_4.0",
+      "filingIndicators": {
+        "C_01.00": true
+      },
+      "unit": "EUR",
+      "decimals": "2",
+      "scale": 0
+    },
+    "sheet": "CA1",
+    "tableCode": "C_01.00",
+    "columnCode": "0010",
+    "inputs": [
+      {
+        "rowCode": "0010",
+        "label": "OWN FUNDS",
+        "valueCell": "E5",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0015",
+        "label": "TIER 1 CAPITAL",
+        "valueCell": "E6",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0020",
+        "label": "COMMON EQUITY TIER 1 CAPITAL",
+        "valueCell": "E7",
+        "value": "1000",
+        "expectedAfter": "285.00"
+      },
+      {
+        "rowCode": "0030",
+        "label": "Capital instruments eligible as CET1 Capital",
+        "valueCell": "E8",
+        "value": "100",
+        "expectedAfter": "185.00"
+      },
+      {
+        "rowCode": "0040",
+        "label": "Fully paid up capital instruments ",
+        "valueCell": "E9",
+        "value": "100",
+        "expectedAfter": "100"
+      },
+      {
+        "rowCode": "0045",
+        "label": "Of which: Capital instruments subscribed by public authorities in emergency situations",
+        "valueCell": "E10",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0050",
+        "label": "Memorandum item: Capital instruments not eligible",
+        "valueCell": "E11",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0060",
+        "label": "Share premium",
+        "valueCell": "E12",
+        "value": "20",
+        "expectedAfter": "20"
+      },
+      {
+        "rowCode": "0070",
+        "label": "(-) Own CET1 instruments",
+        "valueCell": "E13",
+        "value": "5",
+        "expectedAfter": "60.00"
+      },
+      {
+        "rowCode": "0080",
+        "label": "(-) Direct holdings of CET1 instruments",
+        "valueCell": "E14",
+        "value": "10",
+        "expectedAfter": "10"
+      },
+      {
+        "rowCode": "0090",
+        "label": "(-) Indirect holdings of CET1 instruments",
+        "valueCell": "E15",
+        "value": "20",
+        "expectedAfter": "20"
+      },
+      {
+        "rowCode": "0091",
+        "label": "(-) Synthetic holdings of CET1 instruments",
+        "valueCell": "E16",
+        "value": "30",
+        "expectedAfter": "30"
+      },
+      {
+        "rowCode": "0092",
+        "label": "(-) Actual or contingent obligations to purchase own CET1 instruments",
+        "valueCell": "E17",
+        "value": "5",
+        "expectedAfter": "5"
+      },
+      {
+        "rowCode": "0130",
+        "label": "Retained earnings",
+        "valueCell": "E18",
+        "value": "20",
+        "expectedAfter": "100.00"
+      },
+      {
+        "rowCode": "0140",
+        "label": "Previous years retained earnings",
+        "valueCell": "E19",
+        "value": "50",
+        "expectedAfter": "50"
+      },
+      {
+        "rowCode": "0150",
+        "label": "Profit or loss eligible",
+        "valueCell": "E20",
+        "value": "10",
+        "expectedAfter": "50.00"
+      },
+      {
+        "rowCode": "0160",
+        "label": "Profit or loss attributable to owners of the parent",
+        "valueCell": "E21",
+        "value": "20",
+        "expectedAfter": "20"
+      },
+      {
+        "rowCode": "0170",
+        "label": "(-) Part of interim or year-end profit not eligible",
+        "valueCell": "E22",
+        "value": "30",
+        "expectedAfter": "30"
+      },
+      {
+        "rowCode": "0180",
+        "label": "Accumulated other comprehensive income",
+        "valueCell": "E23",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0200",
+        "label": "Other reserves",
+        "valueCell": "E24",
+        "value": "0",
+        "expectedAfter": "0"
+      },
+      {
+        "rowCode": "0210",
+        "label": "Funds for general banking risk",
+        "valueCell": "E25",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0220",
+        "label": "Transitional adjustments due to grandfathered CET1 Capital instruments",
+        "valueCell": "E26",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0230",
+        "label": "Minority interest given recognition in CET1 capital",
+        "valueCell": "E27",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0240",
+        "label": "Transitional adjustments due to additional minority interests",
+        "valueCell": "E28",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0250",
+        "label": "Adjustments to CET1 due to prudential filters",
+        "valueCell": "E29",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0260",
+        "label": "(-) Increases  in equity resulting from securitised assets",
+        "valueCell": "E30",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0270",
+        "label": "Cash flow hedge reserve",
+        "valueCell": "E31",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0280",
+        "label": "Cumulative gains and losses due to changes in own credit risk on fair valued liabilities",
+        "valueCell": "E32",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0285",
+        "label": "Fair value gains and losses arising from the institution's own credit risk related to derivative liabilities",
+        "valueCell": "E33",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0290",
+        "label": "(-) Value adjustments due to the requirements for prudent valuation",
+        "valueCell": "E34",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0300",
+        "label": "(-) Goodwill",
+        "valueCell": "E35",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0310",
+        "label": "(-) Goodwill accounted for as intangible asset",
+        "valueCell": "E36",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0320",
+        "label": "(-) Goodwill included in the valuation of significant investments",
+        "valueCell": "E37",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0330",
+        "label": "Deferred tax liabilities associated to goodwill",
+        "valueCell": "E38",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0335",
+        "label": "Accounting revaluation of subsidiaries' goodwill derived from the consolidation of subsidiaries attributable to third persons",
+        "valueCell": "E39",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0340",
+        "label": "(-) Other intangible assets",
+        "valueCell": "E40",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0350",
+        "label": "(-) Other intangible assets before deduction of deferred tax liabilities",
+        "valueCell": "E41",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0352",
+        "label": "(-) Of which: Software assets accounted for as intangible assets before deduction of deferred tax liabilities",
+        "valueCell": "E42",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0360",
+        "label": "Deferred tax liabilities associated to other intangible assets",
+        "valueCell": "E43",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0362",
+        "label": "Of which: Deferred tax liabilities associated with software assets accounted for as intangible assets",
+        "valueCell": "E44",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0365",
+        "label": "Accounting revaluation of subsidiaries' other intangible assets derived from the consolidation of subsidiaries attributable to third persons",
+        "valueCell": "E45",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0370",
+        "label": "(-) Deferred tax assets that rely on future profitability and do not arise from temporary differences net of associated tax liabilities",
+        "valueCell": "E46",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0380",
+        "label": "(-) IRB shortfall of credit risk adjustments to expected losses",
+        "valueCell": "E47",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0390",
+        "label": "(-) Defined benefit pension fund assets",
+        "valueCell": "E48",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0400",
+        "label": "(-)Defined benefit pension fund assets",
+        "valueCell": "E49",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0410",
+        "label": "Deferred tax liabilities associated to defined benefit pension fund assets",
+        "valueCell": "E50",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0420",
+        "label": "Defined benefit pension fund assets which the institution has an unrestricted ability to use",
+        "valueCell": "E51",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0430",
+        "label": "(-) Reciprocal cross holdings in CET1 Capital",
+        "valueCell": "E52",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0440",
+        "label": "(-) Excess of deduction from AT1 items over AT1 Capital ",
+        "valueCell": "E53",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0450",
+        "label": "(-) Qualifying holdings outside the financial sector which can alternatively be subject to a 1250% risk weight",
+        "valueCell": "E54",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0460",
+        "label": "(-) Securitisation positions which can alternatively be subject to a 1250% risk weight",
+        "valueCell": "E55",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0470",
+        "label": "(-) Free deliveries which can alternatively be subject to a 1250% risk weight",
+        "valueCell": "E56",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0471",
+        "label": "(-) Positions in a basket for which an institution cannot determine the risk weight under the IRB approach, and can alternatively be subject to a 1250% risk weight",
+        "valueCell": "E57",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0472",
+        "label": "(-) Equity exposures under an internal models approach which can alternatively be subject to a 1250% risk weight",
+        "valueCell": "E58",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0480",
+        "label": "(-) CET1 instruments of financial sector entites where the institution does not have a significant investment",
+        "valueCell": "E59",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0490",
+        "label": "(-) Deductible deferred tax assets that rely on future profitability and arise from temporary differences",
+        "valueCell": "E60",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0500",
+        "label": "(-) CET1 instruments of financial sector entities where the institution has a significant investment",
+        "valueCell": "E61",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0510",
+        "label": "(-) Amount exceeding the 17.65% threshold",
+        "valueCell": "E62",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0511",
+        "label": "(-) Amount exceeding the 17.65% threshold related to CET1 instruments of financial sector entities where the institution has a significant investment",
+        "valueCell": "E63",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0512",
+        "label": "(-) Amount exceeding the 17.65% threshold related to deferred tax assets arising from temporary differences",
+        "valueCell": "E64",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0513",
+        "label": "(-) Insufficient coverage for non-performing exposures",
+        "valueCell": "E65",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0514",
+        "label": "(-) Minimum value commitment shortfalls",
+        "valueCell": "E66",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0515",
+        "label": "(-) Other foreseeable tax charges",
+        "valueCell": "E67",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0520",
+        "label": "Other transitional adjustments to CET1 Capital",
+        "valueCell": "E68",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0524",
+        "label": "(-) Additional deductions of CET1 Capital due to Article 3 of Regulation (EU) No 575/2013 ",
+        "valueCell": "E69",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0529",
+        "label": "CET1 capital elements or deductions - other",
+        "valueCell": "E70",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0530",
+        "label": "ADDITIONAL TIER 1 CAPITAL",
+        "valueCell": "E71",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0540",
+        "label": "Capital instruments eligible as AT1 Capital",
+        "valueCell": "E72",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0551",
+        "label": "Fully paid up, directly issued capital instruments",
+        "valueCell": "E73",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0560",
+        "label": "Memorandum item: Capital instruments not eligible",
+        "valueCell": "E74",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0571",
+        "label": "Share premium",
+        "valueCell": "E75",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0580",
+        "label": "(-) Own AT1 instruments",
+        "valueCell": "E76",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0590",
+        "label": "(-) Direct holdings of AT1 instruments",
+        "valueCell": "E77",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0620",
+        "label": "(-) Indirect holdings of AT1 instruments",
+        "valueCell": "E78",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0621",
+        "label": "(-) Synthetic holdings of AT1 instruments",
+        "valueCell": "E79",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0622",
+        "label": "(-) Actual or contingent obligations to purchase own AT1 instruments",
+        "valueCell": "E80",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0660",
+        "label": "Transitional adjustments due to grandfathered AT1 Capital instruments",
+        "valueCell": "E81",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0670",
+        "label": "Instruments issued by subsidiaries that are given recognition in AT1 Capital",
+        "valueCell": "E82",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0680",
+        "label": "Transitional adjustments due to additional recognition in AT1 Capital of instruments issued by subsidiaries",
+        "valueCell": "E83",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0690",
+        "label": "(-) Reciprocal cross holdings in AT1 Capital",
+        "valueCell": "E84",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0700",
+        "label": "(-) AT1 instruments of financial sector entities where the institution does not have a significant investment",
+        "valueCell": "E85",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0710",
+        "label": "(-) AT1 instruments of financial sector entities where the institution has a significant investment",
+        "valueCell": "E86",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0720",
+        "label": "(-) Excess of deduction from T2 items over T2 Capital",
+        "valueCell": "E87",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0730",
+        "label": "Other transitional adjustments to AT1 Capital",
+        "valueCell": "E88",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0740",
+        "label": "Excess of deduction from AT1 items over AT1 Capital (deducted in CET1)",
+        "valueCell": "E89",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0744",
+        "label": "(-) Additional deductions of AT1 Capital due to Article 3 of Regulation (EU) No 575/2013 ",
+        "valueCell": "E90",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0748",
+        "label": "AT1 capital elements or deductions - other",
+        "valueCell": "E91",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0750",
+        "label": "TIER 2 CAPITAL",
+        "valueCell": "E92",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0760",
+        "label": "Capital instruments eligible as T2 Capital",
+        "valueCell": "E93",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0771",
+        "label": "Fully paid up, directly issued capital instruments",
+        "valueCell": "E94",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0780",
+        "label": "Memorandum item: Capital instruments not eligible",
+        "valueCell": "E95",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0791",
+        "label": "Share premium",
+        "valueCell": "E96",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0800",
+        "label": "(-) Own T2 instruments",
+        "valueCell": "E97",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0810",
+        "label": "(-) Direct holdings of T2 instruments",
+        "valueCell": "E98",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0840",
+        "label": "(-) Indirect holdings of T2 instruments",
+        "valueCell": "E99",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0841",
+        "label": "(-) Synthetic holdings of T2 instruments",
+        "valueCell": "E100",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0842",
+        "label": "(-) Actual or contingent obligations to purchase own T2 instruments",
+        "valueCell": "E101",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0880",
+        "label": "Transitional adjustments due to grandfathered T2 Capital instruments",
+        "valueCell": "E102",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0890",
+        "label": "Instruments issued by subsidiaries that are given recognition in T2 Capital",
+        "valueCell": "E103",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0900",
+        "label": "Transitional adjustments due to additional recognition in T2 Capital of instruments issued by subsidiaries",
+        "valueCell": "E104",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0910",
+        "label": "IRB Excess of provisions over expected losses eligible",
+        "valueCell": "E105",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0920",
+        "label": "SA General credit risk adjustments",
+        "valueCell": "E106",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0930",
+        "label": "(-) Reciprocal cross holdings in T2 Capital",
+        "valueCell": "E107",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0940",
+        "label": "(-) T2 instruments of financial sector entities where the institution does not have a significant investment",
+        "valueCell": "E108",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0950",
+        "label": "(-) T2 instruments of financial sector entities where the institution has a significant investment",
+        "valueCell": "E109",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0955",
+        "label": "(-) Excess of deductions from eligible liabilities over eligible liabilities",
+        "valueCell": "E110",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0960",
+        "label": "Other transitional adjustments to T2 Capital",
+        "valueCell": "E111",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0970",
+        "label": "Excess of deduction from T2 items over T2 Capital (deducted in AT1)",
+        "valueCell": "E112",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0974",
+        "label": "(-) Additional deductions of T2 Capital due to Article 3 of Regulation (EU) No 575/2013 ",
+        "valueCell": "E113",
+        "value": null,
+        "expectedAfter": null
+      },
+      {
+        "rowCode": "0978",
+        "label": "T2 capital elements or deductions - other",
+        "valueCell": "E114",
+        "value": null,
+        "expectedAfter": null
+      }
+    ],
+    "rules": [
+      {
+        "code": "v0172_m",
+        "origin": "official_catalog",
+        "source": {
+          "sourceName": "(from 4.0) EBA_Validation_rules_2025-12-12.xlsx",
+          "sourceSha256": "36636afe42b2ef2247822a31ad710afe1128b5b65a250b657e1f20d5a75bba79",
+          "sourceSheet": "EBA_Validation_rules_2025-12-12",
+          "row": 135,
+          "fields": {
+            "VR Code": "v0172_m",
+            "Source": "user_defined",
+            "Framework": "COREP",
+            "Modules": "COREP_OF_4.0",
+            "Cross module": "No",
+            "Tables": "C_01.00",
+            "Expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0020} = {r0030} + {r0130} + {r0180} + {r0200} + {r0210} + {r0220} + {r0230} + {r0240} + {r0250} + {r0300} + {r0340} + {r0370} + {r0380} + {r0390} + {r0430} + {r0440} + {r0450} + {r0460} + {r0470} + {r0471} + {r0472} + {r0480} + {r0490} + {r0500} + {r0510} + {r0513} + {r0514} + {r0515} + {r0520} + {r0524} + {r0529}",
+            "Precondtion": "{v_C_01.00} ",
+            "Description": "{r0020} = {r0030} + {r0130} + {r0180} + {r0200} + {r0210} + {r0220} + {r0230} + {r0240} + {r0250} + {r0300} + {r0340} + {r0370} + {r0380} + {r0390} + {r0430} + {r0440} + {r0450} + {r0460} + {r0470} + {r0471} + {r0472} + {r0480} + {r0490} + {r0500} + {r0510} + {r0513} + {r0514} + {r0515} + {r0520} + {r0524} + {r0529}",
+            "IsActive": "Active",
+            "FromReferenceDate": "2025-03-31",
+            "ToReferenceDate": "2026-03-30",
+            "Severity": "warning",
+            "FromSubmissionDate": "2025-03-31",
+            "Implemented in XBRL": "Yes"
+          }
+        },
+        "family": "numeric_equality_interval_default",
+        "expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0020} = {r0030} + {r0130} + {r0180} + {r0200} + {r0210} + {r0220} + {r0230} + {r0240} + {r0250} + {r0300} + {r0340} + {r0370} + {r0380} + {r0390} + {r0430} + {r0440} + {r0450} + {r0460} + {r0470} + {r0471} + {r0472} + {r0480} + {r0490} + {r0500} + {r0510} + {r0513} + {r0514} + {r0515} + {r0520} + {r0524} + {r0529}",
+        "precondition": "{v_C_01.00} ",
+        "expectedInitial": "fail",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0020",
+          "0030",
+          "0130",
+          "0180",
+          "0200",
+          "0210",
+          "0220",
+          "0230",
+          "0240",
+          "0250",
+          "0300",
+          "0340",
+          "0370",
+          "0380",
+          "0390",
+          "0430",
+          "0440",
+          "0450",
+          "0460",
+          "0470",
+          "0471",
+          "0472",
+          "0480",
+          "0490",
+          "0500",
+          "0510",
+          "0513",
+          "0514",
+          "0515",
+          "0520",
+          "0524",
+          "0529"
+        ],
+        "configure": "left",
+        "targetRow": "0020",
+        "expectedTargetAfter": "285.00",
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "preconditionSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "standard",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": []
+          },
+          "eligibleSides": [
+            "left"
+          ]
+        }
+      },
+      {
+        "code": "v0173_m",
+        "origin": "official_catalog",
+        "source": {
+          "sourceName": "(from 4.0) EBA_Validation_rules_2025-12-12.xlsx",
+          "sourceSha256": "36636afe42b2ef2247822a31ad710afe1128b5b65a250b657e1f20d5a75bba79",
+          "sourceSheet": "EBA_Validation_rules_2025-12-12",
+          "row": 138,
+          "fields": {
+            "VR Code": "v0173_m",
+            "Source": "user_defined",
+            "Framework": "COREP",
+            "Modules": "COREP_OF_4.0",
+            "Cross module": "No",
+            "Tables": "C_01.00",
+            "Expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0030} = {r0040} + {r0060} + {r0070} + {r0092}",
+            "Precondtion": "{v_C_01.00} ",
+            "Description": "{r0030, c0010} = {r0040, c0010} + {r0060, c0010} + {r0070, c0010} + {r0092, c0010}",
+            "IsActive": "Active",
+            "FromReferenceDate": "2025-03-31",
+            "ToReferenceDate": "2026-03-30",
+            "Severity": "Error",
+            "FromSubmissionDate": "2025-03-31",
+            "Implemented in XBRL": "Yes"
+          }
+        },
+        "family": "numeric_equality_interval_default",
+        "expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0030} = {r0040} + {r0060} + {r0070} + {r0092}",
+        "precondition": "{v_C_01.00} ",
+        "expectedInitial": "fail",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0030",
+          "0040",
+          "0060",
+          "0070",
+          "0092"
+        ],
+        "configure": "left",
+        "targetRow": "0030",
+        "expectedTargetAfter": "185.00",
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "preconditionSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "standard",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": []
+          },
+          "eligibleSides": [
+            "left"
+          ]
+        }
+      },
+      {
+        "code": "v0174_m",
+        "origin": "official_catalog",
+        "source": {
+          "sourceName": "(from 4.0) EBA_Validation_rules_2025-12-12.xlsx",
+          "sourceSha256": "36636afe42b2ef2247822a31ad710afe1128b5b65a250b657e1f20d5a75bba79",
+          "sourceSheet": "EBA_Validation_rules_2025-12-12",
+          "row": 139,
+          "fields": {
+            "VR Code": "v0174_m",
+            "Source": "user_defined",
+            "Framework": "COREP",
+            "Modules": "COREP_OF_4.0",
+            "Cross module": "No",
+            "Tables": "C_01.00",
+            "Expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0070} = {r0080} + {r0090} + {r0091}",
+            "Precondtion": "{v_C_01.00} ",
+            "Description": "{r0070, c0010} = {r0080, c0010} + {r0090, c0010} + {r0091, c0010}",
+            "IsActive": "Active",
+            "FromReferenceDate": "2025-03-31",
+            "ToReferenceDate": "2026-03-30",
+            "Severity": "Error",
+            "FromSubmissionDate": "2025-03-31",
+            "Implemented in XBRL": "Yes"
+          }
+        },
+        "family": "numeric_equality_interval_default",
+        "expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0070} = {r0080} + {r0090} + {r0091}",
+        "precondition": "{v_C_01.00} ",
+        "expectedInitial": "fail",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0070",
+          "0080",
+          "0090",
+          "0091"
+        ],
+        "configure": "left",
+        "targetRow": "0070",
+        "expectedTargetAfter": "60.00",
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "preconditionSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "standard",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": []
+          },
+          "eligibleSides": [
+            "left"
+          ]
+        }
+      },
+      {
+        "code": "v0175_m",
+        "origin": "official_catalog",
+        "source": {
+          "sourceName": "(from 4.0) EBA_Validation_rules_2025-12-12.xlsx",
+          "sourceSha256": "36636afe42b2ef2247822a31ad710afe1128b5b65a250b657e1f20d5a75bba79",
+          "sourceSheet": "EBA_Validation_rules_2025-12-12",
+          "row": 142,
+          "fields": {
+            "VR Code": "v0175_m",
+            "Source": "user_defined",
+            "Framework": "COREP",
+            "Modules": "COREP_OF_4.0",
+            "Cross module": "No",
+            "Tables": "C_01.00",
+            "Expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0130} = {r0140} + {r0150}",
+            "Precondtion": "{v_C_01.00} ",
+            "Description": "{r0130, c0010} = {r0140, c0010} + {r0150, c0010}",
+            "IsActive": "Active",
+            "FromReferenceDate": "2025-03-31",
+            "ToReferenceDate": "2026-03-30",
+            "Severity": "Error",
+            "FromSubmissionDate": "2025-03-31",
+            "Implemented in XBRL": "Yes"
+          }
+        },
+        "family": "numeric_equality_interval_default",
+        "expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0130} = {r0140} + {r0150}",
+        "precondition": "{v_C_01.00} ",
+        "expectedInitial": "fail",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0130",
+          "0140",
+          "0150"
+        ],
+        "configure": "left",
+        "targetRow": "0130",
+        "expectedTargetAfter": "100.00",
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "preconditionSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "standard",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": []
+          },
+          "eligibleSides": [
+            "left"
+          ]
+        }
+      },
+      {
+        "code": "v0176_m",
+        "origin": "official_catalog",
+        "source": {
+          "sourceName": "(from 4.0) EBA_Validation_rules_2025-12-12.xlsx",
+          "sourceSha256": "36636afe42b2ef2247822a31ad710afe1128b5b65a250b657e1f20d5a75bba79",
+          "sourceSheet": "EBA_Validation_rules_2025-12-12",
+          "row": 143,
+          "fields": {
+            "VR Code": "v0176_m",
+            "Source": "user_defined",
+            "Framework": "COREP",
+            "Modules": "COREP_OF_4.0",
+            "Cross module": "No",
+            "Tables": "C_01.00",
+            "Expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0150} = {r0160} + {r0170}",
+            "Precondtion": "{v_C_01.00} ",
+            "Description": "{r0150, c0010} = {r0160, c0010} + {r0170, c0010}",
+            "IsActive": "Active",
+            "FromReferenceDate": "2025-03-31",
+            "ToReferenceDate": "2026-03-30",
+            "Severity": "Error",
+            "FromSubmissionDate": "2025-03-31",
+            "Implemented in XBRL": "Yes"
+          }
+        },
+        "family": "numeric_equality_interval_default",
+        "expression": "with {tC_01.00, c0010, default: 0, interval: true}: {r0150} = {r0160} + {r0170}",
+        "precondition": "{v_C_01.00} ",
+        "expectedInitial": "fail",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0150",
+          "0160",
+          "0170"
+        ],
+        "configure": "left",
+        "targetRow": "0150",
+        "expectedTargetAfter": "50.00",
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "preconditionSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "standard",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": []
+          },
+          "eligibleSides": [
+            "left"
+          ]
+        }
+      },
+      {
+        "code": "DEMO_GT",
+        "origin": "synthetic",
+        "family": "strict_inequality",
+        "expression": "with {tC_01.00,c0010,interval:false}: {r0040}>0",
+        "expectedInitial": "pass",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0040"
+        ],
+        "configure": null,
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "standard",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": []
+          },
+          "eligibleSides": [],
+          "ineligibleReason": "NOT_EQUALITY"
+        }
+      },
+      {
+        "code": "DEMO_LT_FAIL",
+        "origin": "synthetic",
+        "family": "strict_inequality",
+        "expression": "with {tC_01.00,c0010,interval:false}: {r0040}<0",
+        "expectedInitial": "fail",
+        "expectedAfter": "fail",
+        "expectedReads": [
+          "0040"
+        ],
+        "configure": null,
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "standard",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": []
+          },
+          "eligibleSides": [],
+          "ineligibleReason": "NOT_EQUALITY"
+        }
+      },
+      {
+        "code": "DEMO_LE",
+        "origin": "synthetic",
+        "family": "inclusive_inequality",
+        "expression": "with {tC_01.00,c0010,interval:false}: {r0030}<=200",
+        "expectedInitial": "pass",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0030"
+        ],
+        "configure": null,
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "standard",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": []
+          },
+          "eligibleSides": [],
+          "ineligibleReason": "NOT_EQUALITY"
+        }
+      },
+      {
+        "code": "DEMO_NE",
+        "origin": "synthetic",
+        "family": "inequality",
+        "expression": "with {tC_01.00,c0010,interval:false}: {r0140}!=0",
+        "expectedInitial": "pass",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0140"
+        ],
+        "configure": null,
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "standard",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": []
+          },
+          "eligibleSides": [],
+          "ineligibleReason": "NOT_EQUALITY"
+        }
+      },
+      {
+        "code": "DEMO_NULL",
+        "origin": "synthetic",
+        "family": "implicit_null",
+        "expression": "with {tC_01.00,c0010,interval:false}: isnull({r0180})",
+        "expectedInitial": "pass",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0180"
+        ],
+        "configure": null,
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "standard",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": []
+          },
+          "eligibleSides": [],
+          "ineligibleReason": "NOT_EQUALITY"
+        }
+      },
+      {
+        "code": "DEMO_ZERO",
+        "origin": "synthetic",
+        "family": "reported_zero",
+        "expression": "with {tC_01.00,c0010,interval:false}: {r0200}=0",
+        "expectedInitial": "pass",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0200"
+        ],
+        "configure": null,
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "standard",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": []
+          },
+          "eligibleSides": [
+            "left"
+          ]
+        }
+      },
+      {
+        "code": "DEMO_RANGE",
+        "origin": "synthetic",
+        "family": "aggregate_range",
+        "expression": "with {tC_01.00,c0010,interval:false}: sum({r0080-0091})={r0070}",
+        "expectedInitial": "fail",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0080",
+          "0090",
+          "0091",
+          "0070"
+        ],
+        "configure": null,
+        "note": "Do not configure alongside v0174_m: same producer target. Used only for validation in the guided configuration.",
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "standard",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": []
+          },
+          "eligibleSides": [
+            "right"
+          ]
+        }
+      },
+      {
+        "code": "DEMO_PRECONDITION",
+        "origin": "synthetic",
+        "family": "numeric_precondition_false",
+        "expression": "with {tC_01.00,c0010,interval:false}: {r0070}=999",
+        "expectedInitial": "not_applicable",
+        "expectedAfter": "not_applicable",
+        "expectedReads": [
+          "0040"
+        ],
+        "configure": null,
+        "precondition": "with {tC_01.00,c0010,interval:false}: {r0040}<0",
+        "note": "Structural eligibility is independent of current precondition; not configured in guide.",
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "preconditionSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "standard",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": []
+          },
+          "eligibleSides": [
+            "left"
+          ]
+        }
+      },
+      {
+        "code": "DEMO_IF_THEN",
+        "origin": "synthetic",
+        "family": "conditional_true_branch",
+        "expression": "with {tC_01.00,c0010,interval:false}: if {r0040}>0 then {r0070}={r0080}+{r0090}+{r0091} else false endif",
+        "expectedInitial": "fail",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0040",
+          "0070",
+          "0080",
+          "0090",
+          "0091"
+        ],
+        "configure": null,
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "validation_only",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": [
+              "CONDITIONAL"
+            ]
+          },
+          "eligibleSides": [],
+          "ineligibleReason": "RULE_VALIDATION_ONLY"
+        }
+      },
+      {
+        "code": "DEMO_IF_ELSE",
+        "origin": "synthetic",
+        "family": "conditional_false_branch_lazy",
+        "expression": "with {tC_01.00,c0010,interval:false}: if {r0040}<0 then 1/0=0 else {r0040}>=0 endif",
+        "expectedInitial": "pass",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0040"
+        ],
+        "configure": null,
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "validation_only",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": [
+              "CONDITIONAL"
+            ]
+          },
+          "eligibleSides": [],
+          "ineligibleReason": "RULE_VALIDATION_ONLY"
+        }
+      },
+      {
+        "code": "DEMO_INTERVAL",
+        "origin": "synthetic",
+        "family": "point_vs_precision_interval",
+        "expression": "with {tC_01.00,c0010,interval:true}: {r0200}=0.004",
+        "expectedInitial": "pass",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0200"
+        ],
+        "configure": null,
+        "note": "Stored zero with p=2 has interval [-0.005,0.005]; equality overlaps literal 0.004. Not configured in guide.",
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "standard",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": []
+          },
+          "eligibleSides": [
+            "left"
+          ]
+        }
+      }
+    ],
+    "expectedInitialCounts": {
+      "fail": 8,
+      "pass": 7,
+      "not_applicable": 1
+    },
+    "expectedAfterCounts": {
+      "pass": 14,
+      "fail": 1,
+      "not_applicable": 1
+    },
+    "configureOnly": [
+      {
+        "code": "v0172_m",
+        "targetSide": "left"
+      },
+      {
+        "code": "v0173_m",
+        "targetSide": "left"
+      },
+      {
+        "code": "v0174_m",
+        "targetSide": "left"
+      },
+      {
+        "code": "v0175_m",
+        "targetSide": "left"
+      },
+      {
+        "code": "v0176_m",
+        "targetSide": "left"
+      }
+    ],
+    "expectedEdges": [
+      [
+        "v0174_m",
+        "v0173_m"
+      ],
+      [
+        "v0173_m",
+        "v0172_m"
+      ],
+      [
+        "v0176_m",
+        "v0175_m"
+      ],
+      [
+        "v0175_m",
+        "v0172_m"
+      ]
+    ],
+    "expectedChangedValues": [
+      {
+        "rowCode": "0020",
+        "before": "1000",
+        "after": "285.00"
+      },
+      {
+        "rowCode": "0030",
+        "before": "100",
+        "after": "185.00"
+      },
+      {
+        "rowCode": "0070",
+        "before": "5",
+        "after": "60.00"
+      },
+      {
+        "rowCode": "0130",
+        "before": "20",
+        "after": "100.00"
+      },
+      {
+        "rowCode": "0150",
+        "before": "10",
+        "after": "50.00"
+      }
+    ]
+  },
+  "typed": {
+    "reportProfile": "ce-demo-types-1",
+    "sheet": "Datos",
+    "headers": [
+      "Campo",
+      "Valor",
+      "Estado"
+    ],
+    "states": [
+      "Informado",
+      "Sin dato"
+    ],
+    "note": "Blank B with Informado is an empty text value; Sin dato is explicit null and requires blank B. Fixed field labels map to internal coordinates; analyst never edits row/column.",
+    "context": {
+      "contextId": "demo_types",
+      "entityId": "SYNTHETIC",
+      "referenceDate": "2025-12-31",
+      "submissionDate": "2025-12-31",
+      "framework": "DEMO",
+      "moduleVersion": "DEMO_TYPES_1",
+      "filingIndicators": {
+        "DEMO_TYPES": true
+      }
+    },
+    "tableCode": "DEMO_TYPES",
+    "columnCode": "0010",
+    "fields": [
+      {
+        "rowCode": "0010",
+        "label": "Categoría",
+        "valueCell": "B4",
+        "stateCell": "C4",
+        "type": "text",
+        "value": "Banco",
+        "state": "Informado",
+        "labelCell": "A4",
+        "unit": "",
+        "decimals": ""
+      },
+      {
+        "rowCode": "0020",
+        "label": "Categoría en minúsculas",
+        "valueCell": "B5",
+        "stateCell": "C5",
+        "type": "text",
+        "value": "banco",
+        "state": "Informado",
+        "labelCell": "A5",
+        "unit": "",
+        "decimals": ""
+      },
+      {
+        "rowCode": "0030",
+        "label": "Categoría con espacio final",
+        "valueCell": "B6",
+        "stateCell": "C6",
+        "type": "text",
+        "value": "Banco ",
+        "state": "Informado",
+        "labelCell": "A6",
+        "unit": "",
+        "decimals": ""
+      },
+      {
+        "rowCode": "0040",
+        "label": "Observación vacía",
+        "valueCell": "B7",
+        "stateCell": "C7",
+        "type": "text",
+        "value": "",
+        "state": "Informado",
+        "labelCell": "A7",
+        "unit": "",
+        "decimals": ""
+      },
+      {
+        "rowCode": "0050",
+        "label": "Fecha inicial",
+        "valueCell": "B8",
+        "stateCell": "C8",
+        "type": "date",
+        "value": "2024-02-29",
+        "state": "Informado",
+        "labelCell": "A8",
+        "unit": "",
+        "decimals": ""
+      },
+      {
+        "rowCode": "0060",
+        "label": "Fecha final",
+        "valueCell": "B9",
+        "stateCell": "C9",
+        "type": "date",
+        "value": "2025-12-31",
+        "state": "Informado",
+        "labelCell": "A9",
+        "unit": "",
+        "decimals": ""
+      }
+    ],
+    "rules": [
+      {
+        "code": "DEMO_TEXT_EQ",
+        "origin": "synthetic",
+        "family": "text_equality",
+        "expression": "with {tDEMO_TYPES,c0010}: {r0010}=\"Banco\"",
+        "expectedInitial": "pass",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0010"
+        ],
+        "configure": null,
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "validation_only",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": [
+              "TEXT"
+            ]
+          },
+          "eligibleSides": [],
+          "ineligibleReason": "RULE_VALIDATION_ONLY"
+        }
+      },
+      {
+        "code": "DEMO_TEXT_CASE",
+        "origin": "synthetic",
+        "family": "text_case_sensitive",
+        "expression": "with {tDEMO_TYPES,c0010}: {r0010}={r0020}",
+        "expectedInitial": "fail",
+        "expectedAfter": "fail",
+        "expectedReads": [
+          "0010",
+          "0020"
+        ],
+        "configure": null,
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "validation_only",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": [
+              "TEXT"
+            ]
+          },
+          "eligibleSides": [],
+          "ineligibleReason": "RULE_VALIDATION_ONLY"
+        }
+      },
+      {
+        "code": "DEMO_TEXT_SPACE",
+        "origin": "synthetic",
+        "family": "text_space_sensitive",
+        "expression": "with {tDEMO_TYPES,c0010}: {r0010}={r0030}",
+        "expectedInitial": "fail",
+        "expectedAfter": "fail",
+        "expectedReads": [
+          "0010",
+          "0030"
+        ],
+        "configure": null,
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "validation_only",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": [
+              "TEXT"
+            ]
+          },
+          "eligibleSides": [],
+          "ineligibleReason": "RULE_VALIDATION_ONLY"
+        }
+      },
+      {
+        "code": "DEMO_TEXT_EMPTY",
+        "origin": "synthetic",
+        "family": "empty_not_null",
+        "expression": "with {tDEMO_TYPES,c0010}: {r0040}=\"\"",
+        "expectedInitial": "pass",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0040"
+        ],
+        "configure": null,
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "validation_only",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": [
+              "TEXT"
+            ]
+          },
+          "eligibleSides": [],
+          "ineligibleReason": "RULE_VALIDATION_ONLY"
+        }
+      },
+      {
+        "code": "DEMO_DATE_EQUAL",
+        "origin": "synthetic",
+        "family": "civil_date_leap_day",
+        "expression": "with {tDEMO_TYPES,c0010}: {r0050}=#2024-02-29#",
+        "expectedInitial": "pass",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0050"
+        ],
+        "configure": null,
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "validation_only",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": [
+              "DATE"
+            ]
+          },
+          "eligibleSides": [],
+          "ineligibleReason": "RULE_VALIDATION_ONLY"
+        }
+      },
+      {
+        "code": "DEMO_DATE_ORDER",
+        "origin": "synthetic",
+        "family": "civil_date_order",
+        "expression": "with {tDEMO_TYPES,c0010}: {r0050}<{r0060}",
+        "expectedInitial": "pass",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0050",
+          "0060"
+        ],
+        "configure": null,
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "validation_only",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": [
+              "DATE"
+            ]
+          },
+          "eligibleSides": [],
+          "ineligibleReason": "RULE_VALIDATION_ONLY"
+        }
+      },
+      {
+        "code": "DEMO_IF_TEXT",
+        "origin": "synthetic",
+        "family": "text_condition_true",
+        "expression": "with {tDEMO_TYPES,c0010}: if {r0010}=\"Banco\" then {r0050}<={r0060} else false endif",
+        "expectedInitial": "pass",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0010",
+          "0050",
+          "0060"
+        ],
+        "configure": null,
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "validation_only",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": [
+              "CONDITIONAL",
+              "TEXT",
+              "DATE"
+            ]
+          },
+          "eligibleSides": [],
+          "ineligibleReason": "RULE_VALIDATION_ONLY"
+        }
+      },
+      {
+        "code": "DEMO_IF_DATE",
+        "origin": "synthetic",
+        "family": "date_condition_false_lazy",
+        "expression": "with {tDEMO_TYPES,c0010}: if {r0060}<#2025-01-01# then 1/0=0 else {r0010}!=\"Aseguradora\" endif",
+        "expectedInitial": "pass",
+        "expectedAfter": "pass",
+        "expectedReads": [
+          "0060",
+          "0010"
+        ],
+        "configure": null,
+        "antlrSyntax": {
+          "syntaxValid": true,
+          "diagnostics": []
+        },
+        "expectedRecalculation": {
+          "policy": {
+            "mode": "validation_only",
+            "profileId": "ce-dpmxl-0.9-closed-v2",
+            "reasons": [
+              "CONDITIONAL",
+              "TEXT",
+              "DATE"
+            ]
+          },
+          "eligibleSides": [],
+          "ineligibleReason": "RULE_VALIDATION_ONLY"
+        }
+      }
+    ],
+    "expectedInitialCounts": {
+      "pass": 6,
+      "fail": 2
+    },
+    "expectedAfterCounts": {
+      "pass": 6,
+      "fail": 2
+    },
+    "configureOnly": [],
+    "workbook": {
+      "sheets": [
+        "Instrucciones",
+        "Datos",
+        "Contexto"
+      ],
+      "instructionsTitle": "Demostración sintética de texto y fechas",
+      "formatMarkerCell": "Instrucciones!A2",
+      "formatMarker": "ce-demo-types-1",
+      "headersRange": "Datos!A3:C3",
+      "contextHeadersRange": "Contexto!A3:B3",
+      "contextHeaders": [
+        "Campo",
+        "Valor"
+      ],
+      "contextFields": [
+        {
+          "label": "Entidad",
+          "labelCell": "A4",
+          "valueCell": "B4",
+          "value": "SYNTHETIC"
+        },
+        {
+          "label": "Fecha de referencia",
+          "labelCell": "A5",
+          "valueCell": "B5",
+          "value": "2025-12-31"
+        },
+        {
+          "label": "Fecha de envío",
+          "labelCell": "A6",
+          "valueCell": "B6",
+          "value": "2025-12-31"
+        },
+        {
+          "label": "Marco",
+          "labelCell": "A7",
+          "valueCell": "B7",
+          "value": "DEMO"
+        },
+        {
+          "label": "Módulo",
+          "labelCell": "A8",
+          "valueCell": "B8",
+          "value": "DEMO_TYPES_1"
+        },
+        {
+          "label": "Formato",
+          "labelCell": "A9",
+          "valueCell": "B9",
+          "value": "ce-demo-types-1"
+        },
+        {
+          "label": "Tabla declarada",
+          "labelCell": "A10",
+          "valueCell": "B10",
+          "value": "Sí"
+        }
+      ]
+    }
+  },
+  "negativeCases": [
+    {
+      "id": "date-invalid-value",
+      "change": "Datos B8=2025-02-29",
+      "expected": "Import rejects INVALID_DATE at B8; previous workspace intact."
+    },
+    {
+      "id": "date-invalid-literal",
+      "expression": "#2025-02-29#=#2024-02-29#",
+      "expected": "Syntax valid, semantic INVALID_DATE; not pass."
+    },
+    {
+      "id": "datetime-not-civil",
+      "expression": "#2025-12-31T12:00:00#=#2025-12-31#",
+      "expected": "Syntax valid, unsupported civil date-time construct."
+    },
+    {
+      "id": "conditional-null",
+      "expression": "with {tC_01.00,c0010}: if {r0180}>0 then true else false endif",
+      "expected": "not_evaluable CONDITIONAL_NOT_EVALUABLE; neither branch evaluated."
+    },
+    {
+      "id": "conditional-type",
+      "expression": "if 1 then true else false endif",
+      "expected": "TYPE_MISMATCH; validation only, no direction."
+    },
+    {
+      "id": "branch-type",
+      "expression": "if true then 1 else \"Banco\" endif",
+      "expected": "TYPE_MISMATCH even though else is inactive; rule cannot be eligible."
+    },
+    {
+      "id": "numeric-target-conditional",
+      "expression": "with {tC_01.00,c0010}: {r0070}=(if true then {r0080}+{r0090}+{r0091} else 0 endif)",
+      "expected": "Validation result allowed; both direction sides RULE_VALIDATION_ONLY."
+    },
+    {
+      "id": "formal-precondition-text",
+      "expression": "with {tC_01.00,c0010}: {r0070}={r0080}+{r0090}+{r0091}",
+      "precondition": "\"Banco\"=\"Banco\"",
+      "expected": "Rule validation runs; both direction sides RULE_VALIDATION_ONLY, even though body is purely numeric."
+    },
+    {
+      "id": "hidden-branch-type",
+      "expression": "with {tC_01.00,c0010}: if true then {r0070}={r0080}+{r0090}+{r0091} else \"Banco\"=\"Banco\" endif",
+      "expected": "Rule validation runs with numeric selected branch; no directions, no blocked or available proposal."
+    },
+    {
+      "id": "duplicate-producer",
+      "configure": [
+        "v0174_m:left",
+        "DEMO_RANGE:right"
+      ],
+      "expected": "Existing numerical conflict diagnostics; independent branch may continue."
+    },
+    {
+      "id": "numerical-cycle",
+      "rules": [
+        "with {tC_01.00,c0010}: {r0070}={r0030}",
+        "with {tC_01.00,c0010}: {r0030}={r0070}"
+      ],
+      "expected": "Cycle blocked; not mixed into positive guided demo."
+    }
+  ]
+}
