@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-04
 
-**Status**: Draft — especificación; funcionalidades pendientes de planificación e implementación.
+**Status**: Especificación con plan y tareas generados; implementación y aceptación de esta iteración pendientes.
 
 **Input**: Solicitud del usuario: mejorar la estética y la experiencia con Angular Material; presentar recálculos como «antes → después» y reducir el ruido de procedencia; cargar informes con el formato visual de las plantillas EBA; ampliar y comprobar la demo con condicionales, fechas, textos y desigualdades; revisar otras mejoras de legibilidad.
 

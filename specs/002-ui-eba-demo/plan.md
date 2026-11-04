@@ -4,7 +4,7 @@
 
 **Input**: especificación 002 y aclaración del usuario: condicionales, texto y fechas exclusivamente de validación.
 
-**Estado**: fases 0 y 1 completadas. Tareas, implementación, instalación de dependencias y aceptación de esta iteración pendientes.
+**Estado**: fases 0 y 1 completadas; [tareas generadas](tasks.md). Implementación, instalación de dependencias y aceptación de esta iteración pendientes.
 
 ## Summary
 
@@ -61,6 +61,7 @@ specs/002-ui-eba-demo/
 ├── research.md
 ├── data-model.md
 ├── quickstart.md
+├── tasks.md
 ├── checklists/requirements.md
 └── contracts/
     ├── http-api.md
@@ -72,7 +73,7 @@ specs/002-ui-eba-demo/
     └── demo-corpus.json
 ~~~
 
-tasks.md se generará con speckit-tasks; no forma parte de esta fase.
+tasks.md se generó con speckit-tasks después de esta planificación: 76 tareas agrupadas por historia, con dependencias, pruebas y criterios de cierre. Ninguna se ha implementado en esta fase.
 
 ### Source Code (repository root)
 
