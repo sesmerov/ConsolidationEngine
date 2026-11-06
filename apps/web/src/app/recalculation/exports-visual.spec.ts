@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { WorkspaceViewStore } from '../workspace/workspace-view.store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExportsComponent } from './exports.component';
 import { ResultsExportComponent } from '../validation/results-export.component';
@@ -19,6 +20,16 @@ describe('visual export content and exact artifact identity', () => {
   });
   afterEach(() => { TestBed.resetTestingModule(); vi.restoreAllMocks(); });
   async function renderExports() { const fixture = TestBed.createComponent(ExportsComponent); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges(); return fixture; }
+  it('enters from an application receipt and exports only on request, even when a historical version is selected', async () => {
+    const view = TestBed.inject(WorkspaceViewStore), session = TestBed.inject(SessionStore);
+    session.selectExportVersion('original');
+    view.reconcile(workspace.id, 'current'); view.published(workspace.id, 'original', 'current', 'application-job', 'exports', 'receipt'); view.visit('exports');
+    const start = vi.spyOn(TestBed.inject(ExportStore), 'startForVersion').mockResolvedValue();
+    const fixture = await renderExports(), button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('button[data-applied-download]');
+    expect(view.recommended()).toBeNull(); expect(button?.textContent).toContain('Versión 2');
+    expect(start).not.toHaveBeenCalled(); button!.click(); expect(start).toHaveBeenCalledExactlyOnceWith('current');
+    expect(session.exportVersionId()).toBe('original');
+  });
   async function renderResults() { const fixture = TestBed.createComponent(ResultsExportComponent); fixture.componentRef.setInput('run', run); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges(); return fixture; }
   it('describes the selected historical profile instead of the current workspace profile', async () => {
     TestBed.inject(SessionStore).selectExportVersion('original'); const fixture = await renderExports(), element = fixture.nativeElement as HTMLElement;

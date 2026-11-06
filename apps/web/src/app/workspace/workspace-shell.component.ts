@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import type { DoCheck } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -28,6 +28,11 @@ imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatP
 providers: [WorkspaceViewStore, StageFocus, ImportStore, ResultsStore, PreviewStore, DirectionsStore, ApplyStore, ExportStore, { provide: MatPaginatorIntl, useFactory: spanishPaginator }], templateUrl: './workspace-shell.component.html', styleUrl: './workspace-shell.component.scss' })
 export class WorkspaceShellComponent implements DoCheck {
 readonly session = inject(SessionStore); readonly view = inject(WorkspaceViewStore); readonly confirmClose = signal(false);
+readonly stages = [
+  { id: 'import', label: '1. Cargar' }, { id: 'validation', label: '2. Validar' },
+  { id: 'preview', label: '3. Recalcular' }, { id: 'exports', label: '4. Descargar' },
+] as const;
+readonly nextLabel = computed(() => this.stages.find(item => item.id === this.view.recommended())?.label.slice(3));
 private readonly stageFocus = inject(StageFocus);
 private readonly workspaceName = viewChild<ElementRef<HTMLElement>>('workspaceName');
 private readonly contextSelector = viewChild('contextSelector', { read: ElementRef<HTMLSelectElement> });
@@ -47,7 +52,14 @@ readonly civilDate = civilDate; readonly versionLabel = versionLabel;
 readonly stageArea = viewChild<ElementRef<HTMLElement>>('stageArea'); readonly closeTrigger = viewChild('closeTrigger', { read: ElementRef<HTMLButtonElement> }); readonly closeConfirm = viewChild('closeConfirm', { read: ElementRef<HTMLButtonElement> });
 readonly jobFeedback = viewChild<ElementRef<HTMLElement>>('jobFeedback');
 readonly jobStatus: Record<JobStatus, string> = { queued: 'Trabajo pendiente', running: 'Trabajo en curso', succeeded: 'Trabajo terminado', failed: 'No se pudo completar', cancelled: 'Trabajo cancelado', timed_out: 'Plazo de ejecución agotado' };
-constructor() { effect(() => { if (this.confirmClose()) this.closeConfirm()?.nativeElement.focus(); }); effect(() => { const job = this.session.job(), feedback = this.jobFeedback(); if (feedback && (job?.status === 'failed' || job?.status === 'timed_out')) feedback.nativeElement.focus(); }); }
+constructor() {
+  effect(() => {
+    const workspace = this.session.workspace();
+    untracked(() => this.view.reconcile(workspace?.id ?? null, workspace?.currentVersionId ?? null));
+  });
+  effect(() => { if (this.confirmClose()) this.closeConfirm()?.nativeElement.focus(); });
+  effect(() => { const job = this.session.job(), feedback = this.jobFeedback(); if (feedback && (job?.status === 'failed' || job?.status === 'timed_out')) feedback.nativeElement.focus(); });
+}
 ngDoCheck(): void {
   const workspace = this.session.workspace();
   if (!workspace || workspace.contexts.length > 1) return;
@@ -55,7 +67,7 @@ ngDoCheck(): void {
   const select = this.contextSelector()?.nativeElement;
   if (select && select.ownerDocument.activeElement === select) this.workspaceName()?.nativeElement.focus();
 }
-navigate(stage: WorkspaceStage): void { this.stageFocus.request({ import: 'import-title', validation: 'validation-title', preview: 'preview-title', exports: 'exports-title' }[stage]); this.view.stage.set(stage); }
+navigate(stage: WorkspaceStage): void { this.stageFocus.request({ import: 'import-title', validation: 'validation-title', preview: 'preview-title', exports: 'exports-title' }[stage]); this.view.visit(stage); }
 cancelClose(): void { this.confirmClose.set(false); this.closeTrigger()?.nativeElement.focus(); }
 async close(): Promise<void> { await this.session.close(); }
 }

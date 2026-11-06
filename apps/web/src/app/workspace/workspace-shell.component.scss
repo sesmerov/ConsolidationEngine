@@ -1,1 +1,12 @@
 :host { display: block; min-width: 0; }
+.next-stage-badge {
+  display: inline-block;
+  margin-inline-start: .35rem;
+  padding: .05rem .45rem;
+  border: 1px solid currentColor;
+  border-radius: .4rem;
+  color: var(--mat-sys-on-secondary-container);
+  background: var(--mat-sys-secondary-container);
+  font-size: .75rem;
+  line-height: 1.4;
+}

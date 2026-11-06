@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
-import { enableLegacyFormat, navigateStage, openCalculation, openTechnical } from './workflow-helpers.js';
+import { importLegacyFixture, navigateStage, openCalculation, openTechnical } from './workflow-helpers.js';
 const root = path.resolve('tests/fixtures/generated');
 async function session(page: Page) { const bootstrap = await (await page.request.get('/api/v1/bootstrap')).json(); return { id: bootstrap.activeWorkspaceId as string, headers: { 'X-CE-Session': bootstrap.sessionToken as string } }; }
 async function catalog(expressions: readonly (readonly [string, string, string?])[]) {
@@ -19,17 +19,15 @@ async function validate(page: Page) {
   return (await page.request.get(`/api/v1/workspaces/${connection.id}/runs/${job.resultRef.id}/results?limit=200`, { headers: connection.headers })).json();
 }
 async function configure(page: Page, expressions: readonly (readonly [string, string, string?])[], facts?: Readonly<Record<string, string>>) {
-  await navigateStage(page, 'import');
-  await enableLegacyFormat(page);
-  await page.getByLabel('Catálogo de reglas (.xlsx)').setInputFiles({ name: 'synthetic-preview.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: await catalog(expressions) });
+  let report: string | { name: string; buffer: Buffer } = path.join(root, 'report-42.xlsx');
   if (facts) {
     const sheets = (await readXlsxFile(path.join(root, 'report-42.xlsx'), { parseNumber: text => text, trim: false })).map(sheet => ({ sheet: sheet.sheet, data: sheet.data.map(row => row.map(value => value === null ? null : String(value))) }));
     const rows = sheets.find(sheet => sheet.sheet === 'Facts')!.data;
     for (const [rowCode, value] of Object.entries(facts)) { const row = rows.find(row => row[1] === 'C_01.00' && row[3] === rowCode); if (row) { row[5] = 'value'; row[6] = value; } else rows.push(['demo', 'C_01.00', '', rowCode, '0010', 'value', value]); }
     const buffer = await writeXlsxFile(sheets.map(sheet => ({ ...sheet, data: sheet.data.map(row => row.map(value => value === null ? null : { type: String, value })) }))).toBuffer();
-    await page.getByLabel('Informes (.xlsx)', { exact: true }).setInputFiles({ name: 'synthetic-values.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer });
-  } else await page.getByLabel('Informes (.xlsx)', { exact: true }).setInputFiles(path.join(root, 'report-42.xlsx'));
-  await page.getByRole('button', { name: 'Cargar archivos', exact: true }).click();
+    report = { name: 'synthetic-values.xlsx', buffer };
+  }
+  await importLegacyFixture(page, { name: 'synthetic-preview.xlsx', buffer: await catalog(expressions) }, [report]);
   await navigateStage(page, 'validation');
   await expect(page.getByRole('button', { name: 'Validar informes', exact: true })).toBeEnabled({ timeout: 15000 }); const run = await validate(page);
   for (const [code] of expressions) await page.getByLabel(code + ' · Destino', { exact: true }).selectOption('left');

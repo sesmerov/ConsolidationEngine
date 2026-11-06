@@ -7,7 +7,7 @@ import { SessionStore } from './core/session.store';
 import { WorkspaceShellComponent } from './workspace/workspace-shell.component';
 @Component({ selector: 'ce-root', standalone: true, imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, WorkspaceShellComponent], changeDetection: ChangeDetectionStrategy.OnPush,
 template: `<a class="skip-link" href="#main-content">Saltar al contenido principal</a>
-<header class="app-header"><span class="brand-mark" aria-hidden="true">CE</span><div><strong>ConsolidationEngine</strong><span>Validación de informes regulatorios</span></div><span class="session-badge">Sesión local</span></header>
+<header class="app-header"><img class="brand-mark" src="/consolidation-engine.svg" width="40" height="40" alt=""/><div><strong>ConsolidationEngine</strong><span>Validación de informes regulatorios</span></div><span class="session-badge">Sesión local</span></header>
 <main id="main-content" tabindex="-1">
 @if (session.error(); as error) { <p class="error" role="alert">{{ error }}</p> }
 @if (!session.connected()) { <section class="welcome-panel"><h1>Conectar con la sesión local</h1><button mat-flat-button (click)="session.connect()" [disabled]="session.pending()">{{ session.pending() ? 'Conectando…' : 'Conectar' }}</button></section> }

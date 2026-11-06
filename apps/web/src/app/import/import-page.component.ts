@@ -1,5 +1,5 @@
 import { StageTitleDirective } from '../core/stage-title.directive';
-import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -11,9 +11,12 @@ import { ImportStore } from './import.store';
 import { civilDate, versionLabel } from '../core/display';
 import type { Diagnostic } from '@ce/contracts';
 @Component({ selector: 'ce-import-page', standalone: true, imports: [StageTitleDirective, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatCheckboxModule, MatTableModule], templateUrl: './import-page.component.html', changeDetection: ChangeDetectionStrategy.OnPush,
-  styles: [`.context-form { min-width:0; border:1px solid #dce2ec; border-radius:10px; padding:20px; } .context-form legend { padding:0 8px; font-weight:600; } .context-form mat-form-field { min-width:0; width:100%; } .inspection-review { margin-top:24px; border-top:1px solid #dce2ec; padding-top:8px; } .excluded-sheets ul { columns:3 180px; padding-left:24px; } .demo-guide { min-width:0; margin:24px 0; padding:20px; border:1px solid #ccdcd9; border-radius:12px; background:#f5faf9; } .demo-guide h3 { margin-top:0; } .demo-guide mat-form-field { width:100%; max-width:460px; } .demo-guide ol { padding-left:24px; } .demo-guide li { margin-block:8px; } .demo-guide .data-table { min-width:460px; } .demo-guide .expected-change { white-space:nowrap; font-variant-numeric:tabular-nums; } .legacy-format .guided-example { margin-block:16px 0; }`] })
+  styles: [`.context-form { min-width:0; border:1px solid #dce2ec; border-radius:10px; padding:20px; } .context-form legend { padding:0 8px; font-weight:600; } .context-form mat-form-field { min-width:0; width:100%; } .inspection-review { margin-top:24px; border-top:1px solid #dce2ec; padding-top:8px; } .excluded-sheets ul { columns:3 180px; padding-left:24px; } .demo-guide { min-width:0; margin:24px 0; padding:20px; border:1px solid #ccdcd9; border-radius:12px; background:#f5faf9; } .demo-guide h3 { margin-top:0; } .demo-guide mat-form-field { width:100%; max-width:460px; } .demo-guide ol { padding-left:24px; } .demo-guide li { margin-block:8px; } .demo-guide .data-table { min-width:460px; } .demo-guide .expected-change { white-space:nowrap; font-variant-numeric:tabular-nums; }`] })
 export class ImportPageComponent {
   readonly store = inject(ImportStore); readonly session = inject(SessionStore);
+  readonly technicalHelpOpen = signal(false);
+  private readonly helpTrigger = viewChild('helpTrigger', { read: ElementRef<HTMLButtonElement> });
+  private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
   readonly catalog = this.store.catalog; readonly reports = this.store.reports;
   readonly civilDate = civilDate; readonly versionLabel = versionLabel;
   // These are instructions for the distributed example, never inputs to the evaluator or configured directions.
@@ -35,7 +38,13 @@ export class ImportPageComponent {
   constructor() { effect(() => { const error = this.store.error(), feedback = this.feedback(); if (error && feedback) feedback.nativeElement.focus(); }); }
   chooseCatalog(event: Event): void { this.catalog.set((event.target as HTMLInputElement).files?.item(0) ?? null); }
   chooseReports(event: Event): void { this.reports.set(Array.from((event.target as HTMLInputElement).files ?? [])); }
-  async upload(): Promise<void> { const catalog = this.catalog(); if (catalog && this.reports().length && !this.catalogError() && !this.reportsError()) { if (this.store.legacy()) await this.store.upload(catalog, this.reports()); else await this.store.inspect(); } }
-  filter(): void { void this.store.load(); }
+  async upload(): Promise<void> {
+    if (!this.catalogError() && !this.reportsError()) await this.store.inspect();
+  }
+  closeHelp(): void {
+    if (!this.technicalHelpOpen()) return;
+    this.technicalHelpOpen.set(false);
+    (this.helpTrigger()?.nativeElement ?? this.heading()?.nativeElement)?.focus();
+  }
   private fileErrors(names: readonly string[]): readonly Diagnostic[] { const job = this.session.job(); return (job?.kind === 'import' || job?.kind === 'inspect-import') && job.status === 'failed' ? job.diagnostics.filter(error => !!error.fileName && names.includes(error.fileName)) : []; }
 }

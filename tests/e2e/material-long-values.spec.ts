@@ -3,10 +3,10 @@ import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
-import { enableLegacyFormat, navigateStage } from './workflow-helpers.js';
+import { importLegacyFixture, navigateStage } from './workflow-helpers.js';
 
 const fixturesRoot = path.resolve('tests/fixtures/generated');
-const mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
 const ruleCode = 'SYNTHETIC_LONG_VALUES';
 const before = '1234567890123456789012345678900.123456789';
 const after = '1234567890123456789012345678901.123456789';
@@ -92,14 +92,10 @@ for (const width of [320, 390, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.getByLabel('Nombre del conjunto').fill(`Importes largos ${width} SYNTHETIC`);
     await page.getByRole('button', { name: 'Crear conjunto', exact: true }).click();
-    await enableLegacyFormat(page);
     const files = await longValueFiles();
-    await page.getByLabel('Catálogo de reglas (.xlsx)').setInputFiles({ name: 'synthetic-long-values-catalog.xlsx', mimeType, buffer: files.catalog });
-    await page.getByLabel('Informes (.xlsx)', { exact: true }).setInputFiles({ name: 'synthetic-long-values-report.xlsx', mimeType, buffer: files.report });
-    const importing = page.waitForResponse(response => response.url().endsWith('/imports') && response.request().method() === 'POST');
-    await page.getByRole('button', { name: 'Cargar archivos', exact: true }).click();
-    const imported = await finishJob(page, (await (await importing).json()).jobId);
-    await expect(page.getByTestId('current-version-id')).toHaveText(imported.newVersionId);
+    await importLegacyFixture(page, { name: 'synthetic-long-values-catalog.xlsx', buffer: files.catalog }, [
+      { name: 'synthetic-long-values-report.xlsx', buffer: files.report },
+    ]);
     await navigateStage(page, 'validation');
     const validating = page.waitForResponse(response => response.url().endsWith('/validations') && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Validar informes', exact: true }).click();

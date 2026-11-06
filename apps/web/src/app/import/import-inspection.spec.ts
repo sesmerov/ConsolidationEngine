@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ImportPageComponent } from './import-page.component';
 import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
+import { WorkspaceViewStore } from '../workspace/workspace-view.store';
 import type { ImportInspectionDTO, JobDTO } from '@ce/contracts';
 
 const workspace = { id: 'workspace', name: 'COREP', state: 'ready' as const, currentVersionId: 'v1', versionIds: ['v1'], contexts: [], counts: { snapshots: 1, coordinates: 1, facts: 1, sources: 1 }, sessionBytes: 100 };
@@ -31,14 +32,61 @@ describe('visual workbook inspection before publication', () => {
     const loader = TestbedHarnessEnvironment.loader(fixture); expect(await loader.hasHarness(MatButtonHarness.with({ text: 'Inspeccionar archivos' }))).toBe(true);
     expect(api.importFiles).not.toHaveBeenCalled(); expect(api.commitImportInspection).not.toHaveBeenCalled();
   });
-  it('offers workbook or form context and keeps the previous format in an advanced option', async () => {
+  it('offers workbook or form context and removes the retired import controls', async () => {
     const fixture = await render(), element = fixture.nativeElement as HTMLElement;
     expect(element.querySelector('#context-source')).not.toBeNull();
-    expect([...element.querySelectorAll('summary')].some(summary => summary.textContent?.includes('Formato anterior ce-report-1'))).toBe(true);
+    expect(element.textContent).not.toMatch(/Usar formato anterior|Descargar plantilla Excel anterior|Empezar con el ejemplo guiado/);
     expect(element.querySelector('#context-entity')).toBeNull();
+  });
+  it('keeps exclusions visible while technical help is closed, allows selecting a hash and restores focus on close or Escape', async () => {
+    const inspection = ready();
+    api.activeImportInspection.mockResolvedValue({ active: inspection });
+    const fixture = await render(), element = fixture.nativeElement as HTMLElement;
+    const help = Array.from(element.querySelectorAll('button')).find(button => button.textContent?.trim() === 'Información técnica');
+    expect(help).toBeDefined();
+    expect(help!.getAttribute('aria-expanded')).toBe('false');
+    expect(element.textContent).not.toContain(inspection.inspectionHash);
+    expect(element.textContent).toContain('190 hojas excluidas');
+    expect(element.textContent).toContain('Acepto importar únicamente las hojas incluidas');
+    const panel = () => element.querySelector<HTMLElement>('[aria-label="Información técnica de la carga"]')!;
+    for (const keyboard of [true, false]) {
+      help!.click(); fixture.detectChanges();
+      expect(help!.getAttribute('aria-expanded')).toBe('true');
+      const hash = Array.from(panel().querySelectorAll('code')).find(node => node.textContent === inspection.inspectionHash)!;
+      const range = document.createRange(); range.selectNodeContents(hash);
+      const selection = document.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
+      expect(selection.toString()).toBe(inspection.inspectionHash);
+      const close = panel().querySelector<HTMLButtonElement>('button')!;
+      close.focus();
+      if (keyboard) close.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      else close.click();
+      fixture.detectChanges();
+      expect(panel()).toBeNull();
+      expect(document.activeElement).toBe(help);
+    }
   });
   it('recovers the active server inspection when the workspace opens', async () => {
     await render(); expect(api.activeImportInspection).toHaveBeenCalledWith(workspace.id);
+  });
+  it('recommends validation only after the matching commit succeeds and the new version is corroborated', async () => {
+    api.activeImportInspection.mockResolvedValue({ active: ready() });
+    const view = TestBed.inject(WorkspaceViewStore), session = TestBed.inject(SessionStore);
+    view.reconcile(workspace.id, 'v1');
+    const fixture = await render(), store = fixture.componentInstance.store;
+    expect(view.recommended()).toBeNull();
+    store.acceptedExcludedSheets.set(true);
+    await store.commit();
+    expect(view.recommended()).toBeNull();
+    session.trackJob({ ...job('import', 'other-job'), status: 'succeeded', baseVersionId: 'v1', newVersionId: 'wrong' });
+    TestBed.tick();
+    view.reconcile(workspace.id, 'wrong');
+    expect(view.recommended()).toBeNull();
+    view.reconcile(workspace.id, 'v1');
+    session.trackJob({ ...job('import', 'commit-job'), status: 'succeeded', baseVersionId: 'v1', newVersionId: 'v2' });
+    TestBed.tick();
+    expect(view.recommended()).toBeNull();
+    view.reconcile(workspace.id, 'v2');
+    expect(view.recommended()).toBe('validation');
   });
   it('sends business context only, waits for the worker and keeps all 190 exclusions unaccepted', async () => {
     const fixture = await render(), store = fixture.componentInstance.store; store.catalog.set(new File(['rules'], 'rules.xlsx')); store.reports.set([new File(['corep'], 'corep.xlsx')]); store.contextSource.set('form'); store.contextForm.set(form); fixture.detectChanges(); await fixture.whenStable();

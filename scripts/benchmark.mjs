@@ -5,8 +5,8 @@ import { spawn, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 const root = process.cwd();
 const mode = '--' + (process.argv[2] ?? 'prepare').replace(/^--/, '');
-const location = path.resolve(process.argv[3] ?? '.cache/benchmark/reference');
-const criterionId = '002-SC007';
+const location = path.resolve(process.argv[3] ?? '.cache/benchmark/003-reference');
+const criterionId = '003-api-seeded-validation';
 
 if (mode === '--server') {
   let phase = 'startup';
@@ -42,7 +42,8 @@ if (mode === '--server') {
     runtime: { node: process.version, v8: process.versions.v8, chromium: chromiumVersion, headless: true, playwright: '1.64.1' },
     limits: { oldGenerationWorkerMiB: 256, sessionStateMiB: 512, jobMilliseconds: 60000, instances: 1000000, reads: 10000000, edges: 1000000 },
     protocol: { criterionId, trials: 10, retries: 0, reportProfile: 'ce-report-1', workload: 'legacy 500 rules / 100000 facts; separate from the 110-position COREP CA1 measurement', freshApiPerTrial: true, freshBrowserContextPerTrial: true,
-      t0: 'Chromium response event for the first import job succeeded, before coverage refresh, stage navigation and validation click',
+      setup: 'direct authenticated v1 multipart import through the owned API; browser page rehydrated after T0',
+      t0: 'first API poll observes successful import, before page reload, coverage refresh, stage navigation and validation click',
       t1: 'completed run, 250 pass/250 fail, open coverage details with 500 rows/variants/instances and zero duplicates, 50 DOM result rows, and two animation frames',
       audit: 'all 500 paginated results; 250 pass, 250 fail; 100000 distinct fact reads, 200 per result',
       criterion: 'all 10 trials must pass the complete audit; at least 9 of 10 at most 30000 ms; every trial at most 60000 ms, without diagnostic exceptions', loadExcluded: true } };
@@ -75,7 +76,7 @@ if (mode === '--server') {
 } else if (mode === '--pilot' || mode === '--cohort') {
   await fs.access(path.join(location, 'reference.json')); await fs.access(path.join(location, 'manifest.json'));
   const reference = JSON.parse(await fs.readFile(path.join(location, 'reference.json'), 'utf8'));
-  if (reference.protocol?.criterionId !== criterionId) throw new Error('Reference does not use the current SC007 protocol. Prepare a new reference directory.');
+  if (reference.protocol?.criterionId !== criterionId) throw new Error('Reference does not use the 003 API-seeded protocol. Prepare a new reference directory.');
   const manifest = JSON.parse(await fs.readFile(path.join(location, 'manifest.json'), 'utf8'));
   for (const [name, expected] of [['catalog.xlsx', manifest.catalogFile], ['report.xlsx', manifest.reportFile]]) {
     const buffer = await fs.readFile(path.join(location, name));

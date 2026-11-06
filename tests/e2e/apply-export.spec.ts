@@ -6,8 +6,8 @@ import type { Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
 import { readZipParts } from '../helpers/xlsx-fixtures.js';
-import { enableLegacyFormat, navigateStage, openCalculation } from './workflow-helpers.js';
-const root = path.resolve('tests/fixtures/generated'), mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+import { importLegacyFixture, navigateStage, openCalculation } from './workflow-helpers.js';
+const root = path.resolve('tests/fixtures/generated');
 const exact = '123456789012345678901234567890.123456789';
 const hashes = new Map<string, string>();
 const selectedCodes = ['synthetic_A', 'synthetic_D', 'synthetic_fraction', 'synthetic_boolean'];
@@ -36,12 +36,7 @@ async function fixtures() {
   return { catalog, report };
 }
 async function upload(page: Page, catalog: Buffer, reports: { name: string; buffer: Buffer }[]) {
-  await navigateStage(page, 'import');
-  await enableLegacyFormat(page);
-  await page.getByLabel('Catálogo de reglas (.xlsx)').setInputFiles({ name: 'synthetic-apply-catalog.xlsx', mimeType, buffer: catalog });
-  await page.getByLabel('Informes (.xlsx)', { exact: true }).setInputFiles(reports.map(report => ({ ...report, mimeType })));
-  const response = page.waitForResponse(response => response.url().endsWith('/imports') && response.request().method() === 'POST'); await page.getByRole('button', { name: 'Cargar archivos', exact: true }).click();
-  const accepted = await (await response).json(), job = await poll(page, accepted.jobId); expect(job.status).toBe('succeeded'); await expect(page.getByTestId('current-version-id')).toHaveText(job.newVersionId); return job.newVersionId as string;
+  return (await importLegacyFixture(page, { name: 'synthetic-apply-catalog.xlsx', buffer: catalog }, reports)).newVersionId;
 }
 async function validate(page: Page) {
   await navigateStage(page, 'validation');
@@ -114,5 +109,5 @@ test('V10/V11: stale previews and a cancelled real application never publish cha
   await validate(page); // Configuration edits require a complete run of this exact base version.
   const configure = await page.request.put(`/api/v1/workspaces/${connection.id}/directions`, { headers: { ...connection.headers, 'If-Match': prepared.etag }, data: { directions: [] } }); expect(configure.status()).toBe(200);
   const stale = await page.request.post(`/api/v1/workspaces/${connection.id}/applications`, { headers: { ...connection.headers, 'If-Match': prepared.etag, 'Idempotency-Key': randomUUID() }, data: body }); expect(stale.status()).toBe(412); expect((await stale.json()).error.code).toBe('STALE_VERSION');
-  await page.reload(); await navigateStage(page, 'recalculation'); await expect(page.getByText(/Previsualización obsoleta:/)).toBeVisible(); await expect(page.locator('ce-apply button').filter({ hasText: 'Aplicar cambios seleccionados' })).toBeDisabled();
+  await page.reload(); await navigateStage(page, 'recalculation'); await expect(page.getByText(/Previsualización obsoleta:/)).toBeVisible(); await expect(page.getByRole('button', { name: 'Aplicar cambios seleccionados', exact: true })).toHaveCount(0);
 });

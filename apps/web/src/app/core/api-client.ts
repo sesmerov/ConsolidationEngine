@@ -36,7 +36,6 @@ export class ApiClient {
     return firstValueFrom(this.http.delete<JobDTO>(this.jobUrl(workspaceId, jobId), { headers: this.headers() }));
   }
   capabilities(): Promise<CapabilitiesDTO> { return firstValueFrom(this.http.get<CapabilitiesDTO>('/api/v1/capabilities', { headers: this.headers() })); }
-  reportTemplate(): Promise<Blob> { return firstValueFrom(this.http.get('/api/v1/templates/report', { headers: this.headers(), responseType: 'blob' })); }
   corepTemplate(): Promise<Blob> { return firstValueFrom(this.http.get('/api/v1/templates/corep-ca1', { headers: this.headers(), responseType: 'blob' })); }
   visualDemo(kind: 'corep' | 'types', artifact: 'catalog' | 'report'): Promise<Blob> { return firstValueFrom(this.http.get(`/api/v1/templates/demos/${kind}/${artifact}`, { headers: this.headers(), responseType: 'blob' })); }
   activeImportInspection(workspaceId: string): Promise<ActiveImportInspectionDTO> { return firstValueFrom(this.http.get<ActiveImportInspectionDTO>(this.inspectionsUrl(workspaceId), { headers: this.headers() })); }
@@ -48,13 +47,7 @@ export class ApiClient {
   commitImportInspection(workspaceId: string, id: string, body: ImportInspectionCommitDTO, etag: string, key: string): Promise<JobDTO> { return firstValueFrom(this.http.post<JobDTO>(this.inspectionsUrl(workspaceId) + '/' + encodeURIComponent(id) + '/commit', body, { headers: this.headers(etag).set('Idempotency-Key', key) })); }
   discardImportInspection(workspaceId: string, id: string, etag: string): Promise<ImportInspectionDTO> { return firstValueFrom(this.http.delete<ImportInspectionDTO>(this.inspectionsUrl(workspaceId) + '/' + encodeURIComponent(id), { headers: this.headers(etag) })); }
   private inspectionsUrl(workspaceId: string): string { return '/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/import-inspections'; }
-  guidedExample(kind: 'catalog' | 'report'): Promise<Blob> { return firstValueFrom(this.http.get('/api/v1/templates/guided-' + kind, { headers: this.headers(), responseType: 'blob' })); }
-  importFiles(workspaceId: string, etag: string, catalog: File, reports: readonly File[], key: string, signal: AbortSignal): Promise<JobDTO> {
-    const body = new FormData(); body.append('catalog', catalog, catalog.name); for (const report of reports) body.append('reports', report, report.name);
-    return firstValueFrom(this.http.post<JobDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/imports', body,
-      { headers: this.headers(etag).set('Idempotency-Key', key) }).pipe(takeUntil(fromEvent(signal, 'abort'))));
-  }
-  rules(workspaceId: string, versionId: string, filters: { code?: string; status?: string; cursor?: string } = {}): Promise<RulesPageDTO> {
+  rules(workspaceId: string, versionId: string, filters: { code?: string; status?: string; table?: string; cursor?: string } = {}): Promise<RulesPageDTO> {
     return firstValueFrom(this.http.get<RulesPageDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/rules',
       { headers: this.headers(), params: { versionId, limit: '50', ...filters } }));
   }

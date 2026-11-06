@@ -7,8 +7,10 @@ import { MatInputModule } from '@angular/material/input';
 import { MatTableModule } from '@angular/material/table';
 import { ExportStore } from './export.store';
 import { civilDate } from '../core/display';
+import { WorkspaceViewStore } from '../workspace/workspace-view.store';
 @Component({ selector: 'ce-exports', standalone: true, imports: [StageTitleDirective, DatePipe, MatButtonModule, MatFormFieldModule, MatInputModule, MatTableModule], changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './exports.component.html' })
 export class ExportsComponent { readonly store = inject(ExportStore);
+readonly applied = inject(WorkspaceViewStore).downloadEntry;
 readonly versionLabel = this.store.versionLabel;
 readonly session = this.store.session;
 readonly kind = this.store.kind;

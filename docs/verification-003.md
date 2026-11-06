@@ -21,3 +21,15 @@ Antes del cambio de producto, el focal de cabecera presentó dos fallos y doce p
 Tras el cambio pasan las 14 pruebas de cabecera/sesión y las 25 de selección/aplicación. Build web correcto, 663,06 kB iniciales. El helper de compatibilidad importa el catálogo y los informes mediante multipart en el servidor 3318 y comprueba el trabajo terminal, la publicación de una sola versión y la rehidratación de la página.
 
 SC-008/009. En Chromium pasaron los cuatro casos de `material-workflow.spec.ts` en 1,2 min. El cambio 0 → 1 → 2 → 1 → 0 contextos tardó 7,1 s. Los recorridos a 320, 390 y 1440 px tardaron 22,7, 21,1 y 19,0 s. Comprueban selección entre páginas, bloqueo por dependencias pendientes y descarga del ZIP correspondiente al recibo de 51 cambios. Se conservaron seis capturas sintéticas y el log en `.cache/verification-003/base/`.
+
+## Carga, búsqueda, portada y navegación
+
+El primer corte funcional es `4db01e5`. En Cargar, el focal inicial reprodujo cinco regresiones y la versión integrada pasó 35/35 pruebas. La carga por teclado recorrió inspección, confirmación, aplicación y exportación en Chromium. La primera ejecución conjunta detectó dos diferencias: el nombre publicado de la plantilla es `COREP-CA1.xlsx` y una alerta duplicada retiraba el foco del diagnóstico con fichero y celda. Corregidos ambos, pasaron las seis pruebas focales de búsqueda e importación. El servidor siguió sirviendo el fallback de la SPA y protegiendo rutas internas.
+
+SC-002. Catálogo sintético de 500 códigos, SHA-256 `6fd3ba45a853c9d588ca066b0df11b7efd6a89eed7bc72b142156fb39c4a0849`, Chromium 156.0.8078.4 en el equipo de referencia. Desde el último evento de entrada hasta las filas y el total correctos más dos frames se midieron 294,4 ms al escribir 10 coincidencias, 314,2 ms al pegar un código fuera de la primera página, 303,6 ms al obtener cero y 300,1 ms al borrar y recuperar las primeras 50 de 500. Se conservaron el foco y los filtros combinados. La prueba separada de carrera retuvo una respuesta real y verificó que su fila nunca reapareció. Logs `.cache/003-us1-browser.log` y `.cache/003-import-browser-fixed.log`.
+
+SC-007. La portada anónima y el icono responden antes de ejecutar JavaScript. Se comprobó el mismo HTML antes y después de publicar datos marcados y se inspeccionó el símbolo de tabla y visto bueno a 16 y 32 px sobre dos fondos. Capturas en `.cache/verification-003/discovery/`. Las pruebas de señalización y descarga por versión pasaron junto con las de aplicación (28/28). El build de este corte pesó 667,27 kB iniciales.
+
+## Compatibilidad FINREP
+
+SC-006. El ensayo original fue producido por `6bd2476`. Se repitió con la API recompilada de 003 en `.cache/003-finrep-probe/run-pNtvqV/result.json`. El extracto visual F_01.01 recibió 202 y terminó en `INVALID_WORKBOOK / UNRECOGNIZED_COREP_SHEETS`, con cero versiones. Los cuatro importes equivalentes, cargados con el mismo catálogo en formato de coordenadas, dieron «pasa» para 100 = 40 + 35 + 25 y «falla» para 40 > 100. Se comprobó la huella del anexo de origen. La entrada visual FINREP necesita un adaptador.

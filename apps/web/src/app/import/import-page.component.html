@@ -1,8 +1,7 @@
 <section class="workspace-card" aria-labelledby="import-title">
-<div class="section-heading"><div><p class="eyebrow">01 · CARGAR</p><h2 id="import-title" tabindex="-1" ceStageTitle>Cargar catálogo e informes</h2></div><button mat-stroked-button (click)="store.downloadCorepTemplate()">Descargar plantilla COREP CA1</button></div>
+<div class="section-heading"><div><p class="eyebrow">01 · CARGAR</p><h2 #heading id="import-title" tabindex="-1" ceStageTitle>Cargar catálogo e informes</h2></div><button mat-stroked-button (click)="store.downloadCorepTemplate()">Descargar plantilla COREP CA1</button></div>
 <p>Selecciona el catálogo y los informes. Primero revisarás los archivos, el contexto y las hojas incluidas; después confirmarás la carga.</p>
 <p class="muted">Cobertura actual: COREP de fondos propios, tabla C_01.00 (CA1). Las demás hojas del libro oficial se identificarán como excluidas.</p>
-<details class="trace-details"><summary>Formato y límites de la carga</summary><p>Un catálogo EBA y entre 1 y 20 informes Excel. Hasta 10 MiB por archivo y 50 MiB por lote. Puedes usar el libro oficial completo o el extracto CA1 admitido; no cambies códigos ni posiciones.</p></details>
 <section class="demo-guide" role="region" aria-label="Demostraciones guiadas">
 <h3>Demostraciones guiadas</h3><p>Dos conjuntos independientes para recorrer el proceso. Todos sus datos son sintéticos.</p>
 <mat-form-field appearance="outline"><mat-label>Demostración</mat-label><select matNativeControl id="demo-selector" [value]="store.selectedDemo()" (change)="store.selectDemo($any($event.target).value)"><option value="corep">COREP · Validación y recálculos</option><option value="types">Texto y fechas · Solo validación</option></select></mat-form-field>
@@ -35,12 +34,10 @@
 <p class="muted">Estos son resultados esperados del ejemplo sin editar. El resultado real siempre se obtiene al validar los archivos. La cobertura COREP se limita a CA1; no acredita soporte completo de COREP o FINREP.</p>
 </details>
 </section>
-<details class="trace-details legacy-format"><summary>Formato anterior ce-report-1</summary><p>Opción avanzada para informes del formato anterior y el ejemplo guiado. Usa su carga directa y conserva las garantías de esa versión.</p><mat-checkbox [checked]="store.legacy()" [disabled]="busy() || store.liveInspection()" (change)="store.legacy.set($event.checked)">Usar formato anterior ce-report-1</mat-checkbox><button mat-button (click)="store.downloadTemplate()">Descargar plantilla Excel anterior</button><details class="guided-example"><summary>Empezar con el ejemplo guiado</summary><p>Ejemplo anterior, 100 % sintético: A = 11, B = 5, C = 7 y D = 22. Activa «Usar formato anterior ce-report-1» en la opción avanzada para cargar estos archivos.</p><div class="direction-actions"><button mat-stroked-button type="button" (click)="store.downloadExample('catalog')">Descargar catálogo del ejemplo</button><button mat-stroked-button type="button" (click)="store.downloadExample('report')">Descargar informe del ejemplo</button></div><ol><li>Activa el formato anterior y carga ambos archivos. Sustituirá los datos del conjunto cuando la carga sea válida.</li><li>Valida: SYNTHETIC_A falla y SYNTHETIC_D pasa.</li><li>Elige Izquierda en ambas reglas y guarda la configuración.</li><li>Simula: A propone 12,00 y D propone 24,00.</li><li>Selecciona D y después A expresamente.</li><li>Revisa los cambios, marca la confirmación y aplícalos.</li><li>Compara: después pasan ambas reglas.</li><li>En Descargar, guarda los informes de la versión vigente antes de cerrar.</li></ol></details></details>
 <form class="form-stack" (ngSubmit)="upload()">
 <div class="file-field"><label for="catalog-file">Catálogo de reglas (.xlsx)</label><input id="catalog-file" type="file" accept=".xlsx" aria-required="true" aria-describedby="catalog-help catalog-error catalog-server-errors" [attr.aria-invalid]="!!catalogError() || catalogServerErrors().length > 0" (change)="chooseCatalog($event)" [disabled]="busy()"/><p id="catalog-help" class="muted field-help">Un catálogo con las cabeceras EBA.</p><p id="catalog-error" class="error field-help" role="alert" [hidden]="!catalogError()">{{ catalogError() }}</p><div id="catalog-server-errors">@for (error of catalogServerErrors(); track $index) { <p class="error">{{ error.message }} · {{ error.fileName }} · {{ error.locator?.sheet }} {{ error.locator?.column }}{{ error.locator?.row }}</p> }</div></div>
-<div class="file-field"><label for="report-files">Informes (.xlsx)</label><input id="report-files" type="file" accept=".xlsx" multiple aria-required="true" aria-describedby="reports-help reports-error reports-server-errors" [attr.aria-invalid]="!!reportsError() || reportsServerErrors().length > 0" (change)="chooseReports($event)" [disabled]="busy()"/><p id="reports-help" class="muted field-help">{{ store.legacy() ? 'Informes de la plantilla ce-report-1.' : 'Libro COREP completo, extracto CA1 o informe de la demostración de texto y fechas.' }}</p><p id="reports-error" class="error field-help" role="alert" [hidden]="!reportsError()">{{ reportsError() }}</p><div id="reports-server-errors">@for (error of reportsServerErrors(); track $index) { <p class="error">{{ error.message }} · {{ error.fileName }} · {{ error.locator?.sheet }} {{ error.locator?.column }}{{ error.locator?.row }}</p> }</div></div>
+<div class="file-field"><label for="report-files">Informes (.xlsx)</label><input id="report-files" type="file" accept=".xlsx" multiple aria-required="true" aria-describedby="reports-help reports-error reports-server-errors" [attr.aria-invalid]="!!reportsError() || reportsServerErrors().length > 0" (change)="chooseReports($event)" [disabled]="busy()"/><p id="reports-help" class="muted field-help">Libro COREP completo, extracto CA1 o informe de la demostración de texto y fechas.</p><p id="reports-error" class="error field-help" role="alert" [hidden]="!reportsError()">{{ reportsError() }}</p><div id="reports-server-errors">@for (error of reportsServerErrors(); track $index) { <p class="error">{{ error.message }} · {{ error.fileName }} · {{ error.locator?.sheet }} {{ error.locator?.column }}{{ error.locator?.row }}</p> }</div></div>
 <p class="muted">{{ catalog()?.name || 'Ningún catálogo seleccionado' }} · {{ reports().length }} {{ reports().length === 1 ? 'informe seleccionado' : 'informes seleccionados' }}</p>@if (reports().length) { <ul class="selected-files">@for (file of reports(); track $index) { <li>{{ file.name }}</li> }</ul> }
-@if (!store.legacy()) {
 <mat-form-field appearance="outline"><mat-label>Origen del contexto</mat-label><select matNativeControl id="context-source" name="context-source" [ngModel]="store.contextSource()" (ngModelChange)="store.setContextSource($event)" [disabled]="busy()"><option value="workbook">Usar Contexto del libro</option><option value="form">Declarar contexto</option></select></mat-form-field>
 @if (store.contextSource() === 'workbook') { <p class="muted">Se leerá la hoja Contexto de cada informe. La revisión mostrará sus datos antes de confirmar; si falta, declara el contexto en pantalla.</p> }
 @else {
@@ -54,9 +51,7 @@
 <mat-form-field appearance="outline"><mat-label>¿Se presenta la tabla C_01.00?</mat-label><select matNativeControl id="context-filing" name="filing" [ngModel]="store.contextForm().presented" (ngModelChange)="store.updateContext('presented', $event)" required [disabled]="busy()"><option value="">Elige una opción</option><option value="true">Sí, presentada</option><option value="false">No presentada</option></select></mat-form-field>
 </div><p class="muted">La escala y la precisión se declaran expresamente. No se deducen del formato visual de las celdas. Si el libro ya incluye Contexto, sus datos deberán coincidir.</p>@if (store.contextError(); as error) { <p class="notice" id="context-error">{{ error }}</p> }</fieldset>
 }
-}
-@if (store.legacy()) { <button mat-flat-button type="submit" [disabled]="busy() || store.liveInspection() || !catalog() || reports().length < 1 || !!catalogError() || !!reportsError()">{{ store.uploading() ? 'Recibiendo archivos…' : 'Cargar archivos' }}</button> }
-@else { <button mat-flat-button type="submit" [disabled]="!store.canInspect() || !!catalogError() || !!reportsError()">{{ store.uploading() ? 'Recibiendo archivos…' : 'Inspeccionar archivos' }}</button> }
+<button mat-flat-button type="submit" [disabled]="!store.canInspect() || !!catalogError() || !!reportsError()">{{ store.uploading() ? 'Recibiendo archivos…' : 'Inspeccionar archivos' }}</button>
 @if (store.uploading()) { <button mat-stroked-button type="button" (click)="store.cancelUpload()">Cancelar carga</button> }
 </form>
 @if (store.inspectionPending()) { <p role="status">Consultando la revisión de la carga…</p> }
@@ -83,18 +78,54 @@
 @if (inspection.requiresPartialCoverageAcceptance && inspection.state === 'ready') { <mat-checkbox [checked]="store.acceptedExcludedSheets()" [disabled]="store.reviewDirty() || store.locallyExpired() || store.staleInspection() || busy()" (change)="store.acceptedExcludedSheets.set($event.checked)">Acepto importar únicamente las hojas incluidas y excluir las demás</mat-checkbox> }
 @if (inspection.state === 'ready') { <div class="direction-actions"><button mat-flat-button (click)="store.commit()" [disabled]="!store.canCommit()">Confirmar carga</button><button mat-stroked-button (click)="store.discardInspection()" [disabled]="busy()">Descartar inspección</button></div> }
 <button mat-button (click)="store.loadInspection()" [disabled]="store.inspectionPending()">Actualizar revisión</button>
-<details class="trace-details"><summary>Perfil y trazabilidad de la inspección</summary>@for (profile of inspection.profiles; track profile.profileId) { <p>{{ profile.profileId }} · {{ profile.languageProfileId }}</p> }<p>Inspección: {{ inspection.id }}</p><p>Huella: {{ inspection.inspectionHash }}</p><p>Caduca: {{ inspection.expiresAt }}</p></details>
 </section>
 }
+<div class="trace-details" (keydown.escape)="closeHelp()">
+  <button #helpTrigger mat-button type="button" aria-controls="import-technical-information" [attr.aria-expanded]="technicalHelpOpen()" (click)="technicalHelpOpen.set(!technicalHelpOpen())">Información técnica</button>
+  @if (technicalHelpOpen()) {
+    <section id="import-technical-information" role="region" aria-label="Información técnica de la carga">
+      <p>Se admite un catálogo y entre 1 y 20 informes Excel. El límite es de 10 MiB por archivo y 50 MiB por lote.</p>
+      @if (store.inspection(); as inspection) {
+        <dl>
+          @for (profile of inspection.profiles; track profile.profileId) {
+            <dt>Perfil de informe y de cálculo</dt><dd>{{ profile.profileId }} · {{ profile.languageProfileId }}</dd>
+          }
+          <dt>Inspección</dt><dd><code>{{ inspection.id }}</code></dd>
+          <dt>Huella de la inspección</dt><dd class="exact-value"><code>{{ inspection.inspectionHash }}</code></dd>
+          <dt>Caducidad</dt><dd>{{ inspection.expiresAt }}</dd>
+        </dl>
+      }
+      @if (store.capabilities(); as capabilities) {
+        <p>El cálculo utiliza racionales exactos e intervalos conservadores. Los resultados de cumplimiento se consultan en Validar.</p>
+        @if (capabilities.limits; as limits) {
+          @if (limits['jobDeadlineMs']; as deadlineMs) {
+            <p>Hasta {{ limits['maxRules'] }} filas de reglas, {{ limits['maxCoordinates'] }} coordenadas y {{ limits['maxFacts'] }} hechos por conjunto. Plazo por trabajo: {{ deadlineMs / 1000 }} segundos.</p>
+          }
+        }
+      }
+      <button mat-button type="button" (click)="closeHelp()">Cerrar ayuda</button>
+    </section>
+  }
+</div>
 </section>
-@if (store.page(); as page) {
+@if (session.versionId(); as version) {
   <section class="workspace-card" aria-labelledby="coverage-title">
-    <h2 id="coverage-title">Datos cargados · {{ versionLabel(session.workspace(), page.versionId) }}</h2><p>Este panel describe los datos publicados y el soporte de sus reglas. El cumplimiento se consulta en Validación y explicación.</p>
+    <h2 id="coverage-title">Datos cargados · {{ versionLabel(session.workspace(), version) }}</h2><p>Este panel describe los datos publicados y el soporte de sus reglas. El cumplimiento se consulta en Validación y explicación.</p>
+    @if (store.published(); as page) {
     <dl class="workspace-meta"><div><dt>Filas del catálogo</dt><dd>{{ page.coverage.rows }}</dd></div><div><dt>Variantes</dt><dd>{{ page.coverage.variants }}</dd></div><div><dt>Aplicables al contexto</dt><dd>{{ page.coverage.applicableVariants }}</dd></div><div><dt>Con sintaxis y soporte</dt><dd>{{ page.coverage.supportedVariants }}</dd></div><div><dt>Filas con errores</dt><dd>{{ page.coverage.invalidRows }}</dd></div><div><dt>Duplicadas</dt><dd>{{ page.coverage.duplicateRows }}</dd></div><div><dt>Variantes incompatibles</dt><dd>{{ page.coverage.conflictingVariants }}</dd></div></dl>
     <p class="data-summary">{{ session.workspace()?.counts?.coordinates }} coordenadas · {{ session.workspace()?.counts?.facts }} hechos · {{ page.dataSummary.zeroValues }} ceros · {{ page.dataSummary.explicitNulls }} nulos explícitos · {{ page.dataSummary.implicitNulls }} nulos implícitos</p>
     <details class="trace-details"><summary>Cómo se identifican los datos ausentes</summary><p>Los nulos explícitos se han declarado vacíos; los implícitos pertenecen a una celda conocida sin dato informado.</p></details>
-    <form class="filters" (ngSubmit)="filter()"><mat-form-field appearance="outline"><mat-label>Código de regla</mat-label><input matInput name="code" [ngModel]="store.code()" (ngModelChange)="store.code.set($event)"/></mat-form-field><mat-form-field appearance="outline"><mat-label>Estado</mat-label><select matNativeControl name="status" [ngModel]="store.status()" (ngModelChange)="store.status.set($event)"><option value="">Todos</option><option value="error">Error de sintaxis</option><option value="unsupported">No soportada</option><option value="applicable">Aplicable</option><option value="not_applicable">No aplicable</option><option value="not_evaluable">Falta contexto</option></select></mat-form-field><button mat-stroked-button type="submit" class="secondary" [disabled]="store.loading()">Filtrar reglas</button></form>
-    <p aria-live="polite">{{ page.items.length }} de {{ page.total }} registros</p>
+    }
+    <div class="filters">
+      <mat-form-field appearance="outline"><mat-label>Código de regla</mat-label><input matInput name="code" maxlength="128" [ngModel]="store.code()" (ngModelChange)="store.setRuleFilter('code', $event)"/></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Estado</mat-label><select matNativeControl name="status" [ngModel]="store.status()" (ngModelChange)="store.setRuleFilter('status', $event)"><option value="">Todos</option><option value="error">Error de sintaxis</option><option value="unsupported">No soportada</option><option value="applicable">Aplicable</option><option value="not_applicable">No aplicable</option><option value="not_evaluable">Falta contexto</option></select></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Tabla</mat-label><input matInput name="table" maxlength="128" [ngModel]="store.table()" (ngModelChange)="store.setRuleFilter('table', $event)"/></mat-form-field>
+    </div>
+    <p role="status">@if (store.queryState() === 'waiting') { Esperando a que termines de escribir… } @else if (store.queryState() === 'loading') { Buscando reglas… } @else if (store.page(); as page) { {{ page.items.length }} de {{ page.total }} registros@if (!page.total) { · Sin coincidencias } }</p>
+    @if (store.queryError(); as message) {
+      <p role="alert">{{ message }}</p><button mat-button type="button" (click)="store.refreshRules()">Volver a consultar reglas</button>
+    }
+    @if (store.page(); as page) {
     @for (row of page.items; track row.id) {
       <details class="rule-row"><summary><strong>{{ row.code || 'Sin código' }}</strong> · {{ row.syntaxStatus === 'error' ? 'Error de sintaxis' : row.supportStatus === 'unsupported' ? 'No soportada' : row.applicability === 'applicable' ? 'Aplicable' : row.applicability === 'not_evaluable' ? 'Falta contexto' : row.active === false ? 'Inactiva' : row.variantId ? 'No aplicable' : 'Metadatos inválidos' }}</summary>
         <p class="muted">{{ store.fileName(row.sourceLocator.fileId) }} · {{ row.sourceLocator.sheet }} · fila {{ row.sourceLocator.row }}</p>
@@ -104,7 +135,7 @@
         @for (diagnostic of row.diagnostics; track $index) { <p [class.error]="diagnostic.severity === 'error' || !diagnostic.severity" [class.notice]="diagnostic.severity === 'warning'" [class.muted]="diagnostic.severity === 'info'">{{ diagnostic.code }}: {{ diagnostic.message }} @if (diagnostic.locator?.column) { · {{ diagnostic.locator.column }}{{ diagnostic.locator.row }} } @if (diagnostic.line) { · expresión: línea {{ diagnostic.line }}, posición {{ diagnostic.column }} }</p> }
       </details>
     }
-    @if (page.nextCursor) { <button mat-stroked-button class="secondary" (click)="store.load(undefined, true)" [disabled]="store.loading()">Cargar más registros</button> }
+    @if (page.nextCursor) { <button mat-stroked-button class="secondary" (click)="store.loadMoreRules()" [disabled]="store.queryState() !== 'idle'">Cargar más registros</button> }
+    }
   </section>
 }
-@if (store.capabilities(); as capabilities) { <details class="workspace-card"><summary>Alcance y límites del perfil de cálculo</summary><ul>@for (difference of capabilities.knownDifferences; track difference) { <li>{{ difference }}</li> }</ul><p>Se admiten hasta 500 filas de reglas, 100 000 coordenadas y 100 000 hechos por conjunto. Los trabajos tienen un plazo máximo de 60 segundos.</p></details> }

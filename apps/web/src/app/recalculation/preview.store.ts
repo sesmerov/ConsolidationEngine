@@ -107,7 +107,8 @@ export class PreviewStore {
     const generation = ++this.applicationGeneration; this.applicationLoading.set(true);
     try { const [application, page] = await Promise.all([this.api.application(workspaceId, receiptId), this.api.comparison(workspaceId, receiptId, { ...(request.cursor ? { cursor: request.cursor } : {}), changedOnly: this.changedOnly() })]);
       if (generation !== this.applicationGeneration || workspaceId !== this.session.workspace()?.id || receiptId !== this.preview()?.appliedReceiptId) return;
-      this.application.set(application); this.comparisonPagination.accept(request.index, page.total, page.nextCursor, page.items.length); this.comparison.set(page);
+      this.application.set(application); this.applying.confirmReceipt(application.receipt);
+      this.comparisonPagination.accept(request.index, page.total, page.nextCursor, page.items.length); this.comparison.set(page);
     } catch (error) { if (generation === this.applicationGeneration) this.report(error); } finally { if (generation === this.applicationGeneration) this.applicationLoading.set(false); }
   }
   async openDetail(id: string): Promise<void> { const workspaceId = this.session.workspace()?.id, previewId = this.preview()?.id; if (!workspaceId || !previewId) return; const generation = ++this.detailGeneration; this.detailLoading.set(true); this.detail.set(null);

@@ -22,17 +22,21 @@ describe('separate guided visual demonstrations', () => {
     const fixture = await render(), element = fixture.nativeElement as HTMLElement, selector = element.querySelector<HTMLSelectElement>('#demo-selector');
     expect(selector).not.toBeNull(); expect([...selector!.options].map(option => option.value)).toEqual(['corep', 'types']);
     const store = fixture.componentInstance.store, catalog = new File(['catalog'], 'kept.xlsx'), report = new File(['report'], 'kept-report.xlsx');
-    store.catalog.set(catalog); store.reports.set([report]); store.setContextSource('form'); store.updateContext('entityId', 'Conservar'); store.legacy.set(true); fixture.detectChanges(); await fixture.whenStable();
+    store.catalog.set(catalog); store.reports.set([report]); store.setContextSource('form'); store.updateContext('entityId', 'Conservar'); fixture.detectChanges(); await fixture.whenStable();
     selector!.value = 'types'; selector!.dispatchEvent(new Event('change')); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
-    expect(store.catalog()).toBe(catalog); expect(store.reports()).toEqual([report]); expect(store.contextSource()).toBe('form'); expect(store.contextForm().entityId).toBe('Conservar'); expect(store.legacy()).toBe(true);
+    expect(store.catalog()).toBe(catalog); expect(store.reports()).toEqual([report]); expect(store.contextSource()).toBe('form'); expect(store.contextForm().entityId).toBe('Conservar');
     expect(element.querySelector('[aria-label="Demostraciones guiadas"]')?.textContent).toContain('8 reglas sintéticas');
     expect(api.inspectImport).not.toHaveBeenCalled(); expect(api.importFiles).not.toHaveBeenCalled(); expect(api.replaceDirections).not.toHaveBeenCalled();
   });
-  it('exposes explicit COREP catalog/report downloads while preserving the old advanced guide', async () => {
+  it('exposes both visual demos without offering the previous workbook downloads or eight-step guide', async () => {
     const fixture = await render(), loader = TestbedHarnessEnvironment.loader(fixture);
     expect(await loader.hasHarness(MatButtonHarness.with({ text: 'Descargar catálogo COREP' }))).toBe(true);
     expect(await loader.hasHarness(MatButtonHarness.with({ text: 'Descargar informe COREP' }))).toBe(true);
-    expect((fixture.nativeElement as HTMLElement).querySelector('.guided-example > summary')?.textContent).toContain('Empezar con el ejemplo guiado');
+    for (const demo of ['corep', 'types']) {
+      fixture.componentInstance.store.selectDemo(demo); fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).textContent).not.toMatch(/Descargar (plantilla Excel anterior|catálogo del ejemplo|informe del ejemplo)|Empezar con el ejemplo guiado/);
+    }
+    expect(await loader.hasHarness(MatButtonHarness.with({ text: 'Descargar informe de texto y fechas' }))).toBe(true);
   });
   it('distinguishes the published version coverage from a candidate under review', async () => {
     const fixture = await render(); expect((fixture.nativeElement as HTMLElement).querySelector('#coverage-title')?.textContent).toContain('Datos cargados · Versión 1');

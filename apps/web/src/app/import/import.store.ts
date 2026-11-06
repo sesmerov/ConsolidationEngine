@@ -4,6 +4,7 @@ import { isCivilDate, isTerminalJob } from '@ce/contracts';
 import type { CapabilitiesDTO, ImportContextInputDTO, ImportInspectionCommitDTO, ImportInspectionDTO, RulesPageDTO } from '@ce/contracts';
 import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
+import { WorkspaceViewStore } from '../workspace/workspace-view.store';
 export interface ContextForm { entityId: string; referenceDate: string; submissionDate: string; currency: string; scaleExponent: string; displayDecimals: string; presented: string }
 const emptyContext = (): ContextForm => ({ entityId: '', referenceDate: '', submissionDate: '', currency: '', scaleExponent: '', displayDecimals: '', presented: '' });
 interface CommitAttempt { workspaceId: string; id: string; body: ImportInspectionCommitDTO; etag: string; key: string }
@@ -11,13 +12,20 @@ interface CommitAttempt { workspaceId: string; id: string; body: ImportInspectio
 export class ImportStore {
   readonly catalog = signal<File | null>(null); readonly reports = signal<readonly File[]>([]);
   private readonly api = inject(ApiClient); private readonly session = inject(SessionStore);
+  private readonly view = inject(WorkspaceViewStore);
   private controller: AbortController | undefined; private pageGeneration = 0;
-  readonly uploading = signal(false); readonly loading = signal(false); readonly error = signal<string | null>(null);
+  readonly uploading = signal(false); readonly error = signal<string | null>(null);
   readonly page = signal<RulesPageDTO | null>(null); readonly capabilities = signal<CapabilitiesDTO | null>(null);
-  readonly code = signal(''); readonly status = signal('');
+  readonly published = signal<Pick<RulesPageDTO, 'versionId' | 'coverage' | 'dataSummary'> | null>(null);
+  readonly code = signal(''); readonly status = signal(''); readonly table = signal('');
+  readonly queryState = signal<'idle' | 'waiting' | 'loading'>('idle');
+  readonly queryError = signal<string | null>(null);
+  private queryTimer?: ReturnType<typeof setTimeout>;
+  private rulesWorkspaceId: string | undefined;
+  private rulesVersionId: string | null = null;
   readonly selectedDemo = signal<'corep' | 'types'>('corep'); readonly demoDownloading = signal(false); readonly demoError = signal<string | null>(null);
   private downloadGeneration = 0; private demoWorkspaceId: string | undefined;
-  readonly legacy = signal(false); readonly contextSource = signal<'workbook' | 'form'>('workbook'); readonly contextForm = signal<ContextForm>(emptyContext());
+  readonly contextSource = signal<'workbook' | 'form'>('workbook'); readonly contextForm = signal<ContextForm>(emptyContext());
   readonly inspection = signal<ImportInspectionDTO | null>(null); readonly inspectionPending = signal(false); readonly acceptedExcludedSheets = signal(false);
   readonly reviewDirty = signal(false); readonly locallyExpired = signal(false); readonly uncertainCommit = signal(false);
   readonly contextError = computed(() => this.contextSource() === 'workbook' ? null : this.validateContext());
@@ -27,18 +35,49 @@ export class ImportStore {
   readonly canCommit = computed(() => this.inspection()?.state === 'ready' && !this.reviewDirty() && !this.locallyExpired() && !this.staleInspection() && !this.inspectionPending() && !this.uploading() && !this.session.jobActive() && !this.session.pending() && !this.uncertainCommit() && (!this.inspection()!.requiresPartialCoverageAcceptance || this.acceptedExcludedSheets()));
   private workspaceId: string | undefined; private inspectionGeneration = 0; private observedJob = ''; private alive = true; private commitAttempt: CommitAttempt | undefined;
   private commitJobId: string | undefined; private expiryTimer: ReturnType<typeof setTimeout> | undefined; private inputRevision = 0; private preparingRevision: number | undefined;
-  private lastInput: { catalog: File | null; reports: readonly File[]; context: string; legacy: boolean } | undefined;
+  private lastInput: { catalog: File | null; reports: readonly File[]; context: string } | undefined;
   constructor() {
     effect(() => { const id = this.session.workspace()?.id; if (id !== this.demoWorkspaceId) { this.demoWorkspaceId = id; untracked(() => { this.downloadGeneration++; this.selectedDemo.set('corep'); this.demoDownloading.set(false); this.demoError.set(null); }); } });
-    effect(() => { const version = this.session.versionId(); if (version) untracked(() => { void this.load(version); }); else { this.pageGeneration++; this.page.set(null); } });
-    effect(() => { const id = this.session.workspace()?.id; if (id !== this.workspaceId) { const previous = this.workspaceId; this.workspaceId = id; untracked(() => { this.inspectionGeneration++; this.inspection.set(null); this.acceptedExcludedSheets.set(false); this.reviewDirty.set(false); this.locallyExpired.set(false); this.commitAttempt = undefined; this.commitJobId = undefined; this.uncertainCommit.set(false); this.observedJob = ''; this.preparingRevision = undefined; if (this.expiryTimer) clearTimeout(this.expiryTimer); if (previous) { this.controller?.abort(); this.catalog.set(null); this.reports.set([]); this.contextSource.set('workbook'); this.contextForm.set(emptyContext()); this.legacy.set(false); this.inspectionPending.set(false); this.uploading.set(false); this.inputRevision++; this.lastInput = this.captureInput(); } if (id) void this.recoverInspection(); }); } });
-    effect(() => { const input = this.captureInput(); untracked(() => { const previous = this.lastInput; this.lastInput = input; if (previous && (previous.catalog !== input.catalog || previous.reports !== input.reports || previous.context !== input.context || previous.legacy !== input.legacy)) { this.inputRevision++; this.acceptedExcludedSheets.set(false); if (this.liveInspection()) this.reviewDirty.set(true); } }); });
-    effect(() => { const job = this.session.job(); if (!job || job.workspaceId !== this.session.workspace()?.id || !isTerminalJob(job.status) || this.observedJob === job.jobId + ':' + job.status) return;
-      if (job.kind === 'inspect-import' || job.kind === 'import' && job.jobId === this.commitJobId) { this.observedJob = job.jobId + ':' + job.status; untracked(() => { if (job.kind === 'inspect-import' && job.status === 'succeeded' && job.resultRef?.type === 'import-inspection') void this.loadInspection(job.resultRef.id, false); else if (job.kind === 'import' && this.inspection()) void this.loadInspection(this.inspection()!.id, false); else if (job.status !== 'succeeded') this.error.set(job.diagnostics[0]?.message ?? 'La inspección no se completó. El conjunto vigente se conserva.'); }); }
+    effect(() => {
+      const id = this.session.workspace()?.id, version = this.session.versionId();
+      if (id === this.rulesWorkspaceId && version === this.rulesVersionId) return;
+      untracked(() => {
+        if (id !== this.rulesWorkspaceId) { this.code.set(''); this.status.set(''); this.table.set(''); }
+        this.rulesWorkspaceId = id;
+        this.rulesVersionId = version;
+        this.published.set(null);
+        this.refreshRules();
+      });
+    });
+    effect(() => { const id = this.session.workspace()?.id; if (id !== this.workspaceId) { const previous = this.workspaceId; this.workspaceId = id; untracked(() => { this.inspectionGeneration++; this.inspection.set(null); this.acceptedExcludedSheets.set(false); this.reviewDirty.set(false); this.locallyExpired.set(false); this.commitAttempt = undefined; this.commitJobId = undefined; this.uncertainCommit.set(false); this.observedJob = ''; this.preparingRevision = undefined; if (this.expiryTimer) clearTimeout(this.expiryTimer); if (previous) { this.controller?.abort(); this.catalog.set(null); this.reports.set([]); this.contextSource.set('workbook'); this.contextForm.set(emptyContext()); this.inspectionPending.set(false); this.uploading.set(false); this.inputRevision++; this.lastInput = this.captureInput(); } if (id) void this.recoverInspection(); }); } });
+    effect(() => { const input = this.captureInput(); untracked(() => { const previous = this.lastInput; this.lastInput = input; if (previous && (previous.catalog !== input.catalog || previous.reports !== input.reports || previous.context !== input.context)) { this.inputRevision++; this.acceptedExcludedSheets.set(false); if (this.liveInspection()) this.reviewDirty.set(true); } }); });
+    effect(() => {
+      const job = this.session.job();
+      if (!job || job.workspaceId !== this.session.workspace()?.id || !isTerminalJob(job.status)) return;
+      const isCommit = job.kind === 'import' && job.jobId === this.commitJobId;
+      if (job.kind !== 'inspect-import' && !isCommit) return;
+      const key = job.jobId + ':' + job.status;
+      if (this.observedJob === key) return;
+      this.observedJob = key;
+      untracked(() => {
+        if (isCommit && job.status === 'succeeded' && job.newVersionId) {
+          this.view.published(job.workspaceId, job.baseVersionId ?? null, job.newVersionId, job.jobId, 'validation');
+        }
+        const inspection = this.inspection();
+        if (job.kind === 'inspect-import' && job.status === 'succeeded' && job.resultRef?.type === 'import-inspection') {
+          void this.loadInspection(job.resultRef.id);
+        } else if (isCommit && inspection) {
+          void this.loadInspection(inspection.id);
+        } else if (job.status !== 'succeeded' && job.diagnostics.length === 0) {
+          // The workspace focuses job diagnostics with their file and cell. Only add a fallback when none exists.
+          this.error.set('La inspección no se completó. El conjunto vigente se conserva.');
+        }
+      });
     });
     effect(() => { const stale = this.staleInspection(); if (stale) untracked(() => this.acceptedExcludedSheets.set(false)); });
     inject(DestroyRef).onDestroy(() => { this.alive = false; this.controller?.abort(); this.pageGeneration++; this.inspectionGeneration++; if (this.expiryTimer) clearTimeout(this.expiryTimer); this.catalog.set(null); this.reports.set([]); this.contextForm.set(emptyContext()); this.inspection.set(null); this.commitAttempt = undefined; });
     void this.api.capabilities().then((value) => this.capabilities.set(value)).catch((error: unknown) => this.report(error));
+    inject(DestroyRef).onDestroy(() => clearTimeout(this.queryTimer));
   }
   setContextSource(source: 'workbook' | 'form'): void { this.contextSource.set(source); }
   selectDemo(kind: string): void { if (kind === 'corep' || kind === 'types') this.selectedDemo.set(kind); }
@@ -53,7 +92,7 @@ export class ImportStore {
     finally { if (this.alive && generation === this.downloadGeneration) this.demoDownloading.set(false); }
   }
   updateContext(field: keyof ContextForm, value: string): void { this.contextForm.update(form => ({ ...form, [field]: value })); }
-  private captureInput() { return { catalog: this.catalog(), reports: this.reports(), context: JSON.stringify([this.contextSource(), this.contextForm()]), legacy: this.legacy() }; }
+  private captureInput() { return { catalog: this.catalog(), reports: this.reports(), context: JSON.stringify([this.contextSource(), this.contextForm()]) }; }
   private validateContext(): string | null {
     const form = this.contextForm(); if (!form.entityId.trim() || form.entityId.length > 200) return 'Indica una entidad de hasta 200 caracteres.';
     if (!isCivilDate(form.referenceDate)) return 'Indica una fecha de referencia válida.'; if (form.submissionDate && !isCivilDate(form.submissionDate)) return 'Revisa la fecha de envío.';
@@ -121,35 +160,54 @@ export class ImportStore {
     catch (error) { if (this.alive && generation === this.inspectionGeneration) this.report(error); } finally { if (this.alive && generation === this.inspectionGeneration) this.inspectionPending.set(false); }
   }
   async downloadCorepTemplate(): Promise<void> { try { const blob = await this.api.corepTemplate(); const url = URL.createObjectURL(blob), anchor = document.createElement('a'); anchor.href = url; anchor.download = 'COREP-CA1.xlsx'; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 0); } catch (error) { this.report(error); } }
-  async upload(catalog: File, reports: readonly File[]): Promise<void> {
-    const workspace = this.session.workspace(), etag = this.session.etag(); if (!workspace || !etag || this.uploading() || this.session.jobActive() || this.liveInspection() || this.uncertainCommit()) return;
-    const controller = new AbortController(); this.controller = controller; this.uploading.set(true); this.error.set(null);
-    try {
-      const job = await this.api.importFiles(workspace.id, etag, catalog, reports, crypto.randomUUID(), controller.signal);
-      if (this.session.workspace()?.id !== workspace.id) return;
-      this.session.trackJob(job); if (job.status === 'succeeded') await this.session.refreshWorkspace(workspace.id);
-    } catch (error) { if (controller.signal.aborted) this.error.set('Carga cancelada. Se conserva la versión anterior.'); else this.report(error); }
-    finally { if (this.controller === controller) this.controller = undefined; this.uploading.set(false); }
-  }
   cancelUpload(): void { this.controller?.abort(); }
-  async downloadTemplate(): Promise<void> {
-    try { const blob = await this.api.reportTemplate(); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'ce-report-1.xlsx'; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 0); }
-    catch (error) { this.report(error); }
+  setRuleFilter(field: 'code' | 'status' | 'table', value: string): void {
+    if (this[field]() === value) return;
+    this[field].set(value);
+    this.refreshRules(field === 'code');
   }
-  async downloadExample(kind: 'catalog' | 'report'): Promise<void> {
-    try { const blob = await this.api.guidedExample(kind); const url = URL.createObjectURL(blob), anchor = document.createElement('a'); anchor.href = url; anchor.download = kind === 'catalog' ? 'ejemplo-catalogo.xlsx' : 'ejemplo-informe.xlsx'; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 0); }
-    catch (error) { this.report(error); }
+  refreshRules(debounce = false): void {
+    clearTimeout(this.queryTimer);
+    const generation = ++this.pageGeneration;
+    this.page.set(null);
+    this.queryError.set(null);
+    this.queryState.set('idle');
+    if (!this.rulesWorkspaceId || !this.rulesVersionId) return;
+    if (debounce) {
+      this.queryState.set('waiting');
+      this.queryTimer = setTimeout(() => void this.fetchRules(generation), 250);
+    } else {
+      void this.fetchRules(generation);
+    }
   }
-  async load(version = this.session.versionId(), append = false): Promise<void> {
-    const workspaceId = this.session.workspace()?.id; if (!version || !workspaceId) return;
-    const generation = ++this.pageGeneration; this.loading.set(true);
-    const cursor = append ? this.page()?.nextCursor : null;
+  loadMoreRules(): void {
+    const previous = this.page();
+    if (this.queryState() !== 'idle' || !previous?.nextCursor) return;
+    void this.fetchRules(this.pageGeneration, previous);
+  }
+  private async fetchRules(generation: number, previous?: RulesPageDTO): Promise<void> {
+    const workspaceId = this.rulesWorkspaceId, versionId = this.rulesVersionId;
+    const current = () => this.alive && generation === this.pageGeneration
+      && workspaceId === this.session.workspace()?.id && versionId === this.session.versionId();
+    if (!workspaceId || !versionId || !current()) return;
+    this.queryState.set('loading');
+    this.queryError.set(null);
     try {
-      const page = await this.api.rules(workspaceId, version, { ...(this.code() ? { code: this.code() } : {}), ...(this.status() ? { status: this.status() } : {}), ...(cursor ? { cursor } : {}) });
-      if (generation !== this.pageGeneration || this.session.versionId() !== version) return;
-      this.page.set(append ? { ...page, items: [...(this.page()?.items ?? []), ...page.items] } : page);
-    } catch (error) { if (generation === this.pageGeneration) this.report(error); }
-    finally { if (generation === this.pageGeneration) this.loading.set(false); }
+      const result = await this.api.rules(workspaceId, versionId, {
+        ...(this.code() && { code: this.code() }),
+        ...(this.status() && { status: this.status() }),
+        ...(this.table() && { table: this.table() }),
+        ...(previous?.nextCursor && { cursor: previous.nextCursor }),
+      });
+      if (!current() || result.versionId !== versionId) return;
+      this.published.set({ versionId, coverage: result.coverage, dataSummary: result.dataSummary });
+      this.page.set(previous ? { ...result, items: [...previous.items, ...result.items] } : result);
+    } catch (error) {
+      if (current()) this.queryError.set(error instanceof HttpErrorResponse && typeof error.error?.error?.message === 'string'
+        ? error.error.error.message : 'No se pudo consultar el catálogo de reglas.');
+    } finally {
+      if (current()) this.queryState.set('idle');
+    }
   }
   fileName(id: string | undefined): string { return this.page()?.sources.find((source) => source.id === id)?.displayName ?? 'Archivo de origen'; }
   private report(error: unknown): void {
