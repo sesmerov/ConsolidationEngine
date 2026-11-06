@@ -4,9 +4,11 @@
 
 **Created**: 2026-11-06
 
-**Status**: Especificación lista para revisión antes del plan. La comprobación FINREP sobre el producto actual se documenta en [la evidencia de esta iteración](evidencia.md).
+**Status**: Alcance revisado el 2026-11-06 y listo para la planificación. La comprobación FINREP sobre el producto actual se documenta en [la evidencia de esta iteración](evidencia.md).
 
 **Input**: Simplificar Cargar y Validar, señalar la siguiente etapa, preparar los destinos inequívocos, actualizar la identidad de la aplicación y comprobar FINREP con un catálogo propio. Diego confirmó que quiere quitar de la interfaz tanto la carga anterior `ce-report-1` como su ejemplo.
+
+En la revisión, Diego incorporó dos decisiones al alcance. En Recalcular, la confirmación de aplicación aparece a partir de la primera propuesta seleccionada. En la cabecera del conjunto, el contexto único se presenta como dato de lectura y el selector aparece cuando hay varios contextos disponibles.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -23,6 +25,7 @@ Como analista, quiero ver los archivos que debo aportar, revisar la cobertura qu
 1. Al abrir Cargar, el analista encuentra las demos visuales COREP y Texto y fechas. Se retiran de toda la interfaz el selector del formato anterior, su plantilla descargable, el catálogo e informe de su ejemplo y la guía de ocho pasos. «Otros formatos» tampoco da acceso al flujo retirado.
 2. Al inspeccionar un libro con hojas excluidas, se ven las hojas incluidas, la magnitud de la exclusión y la aceptación que exige confirmar. Los identificadores de inspección, huellas, especificaciones de precisión y tamaños máximos se consultan bajo demanda. Si la inspección caduca o un límite impide cargar, el motivo y la acción para continuar se muestran en el lugar de la carga.
 3. Al escribir o pegar parte de un código, se muestran las coincidencias del catálogo completo al dejar de teclear. Al borrar se recupera la primera página del catálogo con los demás filtros vigentes. Se puede seguir escribiendo mientras se actualizan las filas, incluso al pasar por una búsqueda con cero coincidencias.
+4. Antes de cargar datos, la cabecera presenta el conjunto con cero selectores de contexto. Tras publicar un único contexto, la entidad, la fecha de referencia y el módulo se leen una sola vez en la cabecera. Con dos o más contextos, el selector identifica el contexto activo y permite cambiarlo con teclado. Al volver de otra etapa o actualizar la lista se conserva la elección si sigue siendo válida.
 
 ### User Story 2 - Guardar los destinos que tienen sentido (Priority: P1)
 
@@ -45,6 +48,7 @@ Como analista, quiero dedicar mi atención a las reglas que presentan una decisi
 3. Dos reglas con único lado elegible pueden competir por la misma celda. En la demo COREP ocurre con `DEMO_RANGE` y `v0174_m` para la fila 0070. Se identifican la celda y sus productores. Antes de guardar ese destino, el analista conserva uno de los productores u omite el grupo. Los casos independientes siguen disponibles. Puede excluir también `DEMO_INTERVAL` y reproducir los cinco cambios de la guía con las cinco reglas oficiales.
 4. Al volver de otra etapa o paginar, las elecciones del mismo borrador siguen disponibles. Una elección previamente guardada y aún válida tiene prioridad sobre la sugerencia. Si cambia el conjunto o la versión sobre la que se calculó la elegibilidad, se informa del cambio y se vuelve a comprobar el alcance antes de guardar.
 5. Al guardar y simular, se pueden consultar propuestas, dependencias y bloqueos. El analista sigue eligiendo y confirmando de forma expresa las propuestas que desea aplicar. En la demo de Texto y fechas ve sus resultados de validación y puede descargarlos.
+6. Al abrir una simulación con cero propuestas seleccionadas, el panel «Confirmar la aplicación» está oculto. Aparece al seleccionar la primera y sigue visible si el analista pasa a otra página o aplica un filtro que oculta las seleccionadas. El panel muestra el recuento global y los impedimentos para aplicar. Al quitar la última propuesta, el panel desaparece. Al abrirlo con una selección nueva se exige otra vez la confirmación expresa.
 
 ### User Story 3 - Reconocer la siguiente etapa (Priority: P1)
 
@@ -123,6 +127,8 @@ Como usuario, quiero reconocer ConsolidationEngine por su símbolo y por una des
 - **FR-013** — Comprobar y documentar por separado la entrada visual FINREP y la evaluación del equivalente en formato anterior, con el mismo catálogo propio, un caso previsto que pase y otro que falle como mínimo. Si una etapa impide continuar, registrar su diagnóstico y qué comprobaciones quedaron sin ejecutar.
 - **FR-014** — Incorporar un símbolo de producto y favicon coherentes y reconocibles en los tamaños de uso. La identidad sigue siendo legible mediante texto accesible y se sirve con los recursos locales del producto.
 - **FR-015** — Identificar en el documento inicial de la portada el idioma, nombre, título, descripción y favicon del producto para usuarios y lectores automáticos. Limitar la información de descubrimiento a contenidos generales. La publicación en Internet y la indexación efectiva por buscadores externos quedan fuera de esta iteración.
+- **FR-016** — En una simulación pendiente de aplicación, mostrar el panel de confirmación exclusivamente cuando la selección global contenga al menos una propuesta. Ocultarlo de nuevo al vaciar la selección. Las propuestas seleccionadas fuera de la página o el filtro cuentan para el total. La acción de aplicar requiere selección vigente, dependencias satisfechas, ausencia de bloqueos y confirmación explícita de esa selección. Una aplicación ya publicada se consulta mediante su comparación y su recibo.
+- **FR-017** — Con cero contextos disponibles, omitir el selector de la cabecera y los datos de cualquier contexto anterior. Con uno, presentar su entidad, fecha de referencia y módulo como información de lectura. Con varios, mostrar un selector accesible que identifique la opción activa y permita cambiarla. Al navegar entre etapas o refrescar el conjunto, conservar la elección mientras siga disponible. Si deja de estarlo, mostrar el contexto disponible que corresponda al estado vigente del conjunto.
 
 ### Key Entities
 
@@ -144,11 +150,13 @@ Como usuario, quiero reconocer ConsolidationEngine por su símbolo y por una des
 | **SC-005** | Los tres hitos confirmados señalan la etapa esperada, una sola a la vez, a 320, 390 y 1440 píxeles y sin perder el foco. Un fallo, cancelación o respuesta obsoleta no produce una nueva recomendación. Descargar desde el resultado aplicado identifica su versión aun con otra histórica elegida. | FR-010–012 |
 | **SC-006** | Cada uno de los dos ensayos FINREP tiene procedencia, catálogo, valores esperados, operación alcanzada y resultados observados o diagnóstico reproducible. La conclusión distingue formatos y acota las tablas y reglas efectivamente probadas. | FR-013 |
 | **SC-007** | El icono nuevo se reconoce en encabezado y pestaña a los dos tamaños de prueba. La lectura inicial de la portada identifica la aplicación, su finalidad e icono sin ejecución interactiva, tanto con el conjunto vacío como con datos sintéticos cargados. Las dos lecturas contienen cero datos de ese conjunto en la información de descubrimiento. | FR-014–015 |
+| **SC-008** | En la secuencia seleccionar 0 → 1 → 2 → 0 propuestas de una simulación, el panel pasa por oculto → visible → visible → oculto. Con las dos propuestas fuera de la página visible, indica dos seleccionadas. Una dependencia pendiente, una simulación obsoleta o la falta de confirmación impiden aplicar. Tras publicarse la aplicación, la consulta del histórico presenta cero paneles de confirmación. | FR-009, FR-016 |
+| **SC-009** | Con 0, 1 y 2 contextos disponibles en la cabecera hay respectivamente 0, 0 y 1 selectores. Con uno, entidad, fecha y módulo son legibles una sola vez. Con dos, se puede elegir el segundo con teclado y sigue activo al cambiar de etapa. Si la lista se reduce a un único contexto, la cabecera muestra los datos de ese contexto como lectura. | FR-017 |
 
 ## Assumptions
 
-- La entrega solicitada termina con la especificación y la prueba FINREP para revisión antes del plan. La compatibilidad FINREP se caracteriza con el producto actual y datos sintéticos en un conjunto aislado. Implementar un perfil visual FINREP adicional requiere una decisión posterior.
+- La primera entrega documentó la especificación y la prueba FINREP. Tras su revisión, Diego autorizó la planificación con FR-016 y FR-017 incorporados. La compatibilidad FINREP se caracteriza con el producto actual y datos sintéticos en un conjunto aislado. Implementar un perfil visual FINREP adicional requiere una decisión posterior.
 - La retirada aprobada afecta al recorrido de usuario. El ensayo independiente de compatibilidad y las regresiones del motor pueden seguir utilizando el formato anterior. Las pruebas y mediciones históricas que usaban ese control se identificarán como tales al planificar sus sucesoras.
 - Se adopta texto estático «Siguiente paso» junto al nombre de la etapa para que también pueda interpretarse con teclado, lector de pantalla y movimiento reducido. Como criterio de diseño, una omisión explícita prevalece sobre volver a proponer automáticamente la misma regla.
 - La aplicación se utiliza en el entorno local del analista. La verificación de descubrimiento examina la portada allí donde es accesible. La evaluación de posiciones en buscadores, el alojamiento público y la exposición de espacios de trabajo quedan fuera del alcance.
-- Las propuestas adicionales de reducción de contenido se presentan para valoración en [evidencia.md](evidencia.md). Su incorporación requiere una decisión de alcance independiente.
+- Las propuestas de adelantar los campos de archivo a las demos y de retirar el progreso terminado siguen pendientes de valoración. La revisión de las cuatro propuestas está en [evidencia.md](evidencia.md).

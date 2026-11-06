@@ -26,7 +26,7 @@
 
 ## Preparación para planificar
 
-- [x] Los criterios SC-001 a SC-007 cubren todos los requisitos FR-001 a FR-015.
+- [x] Los criterios SC-001 a SC-009 cubren todos los requisitos FR-001 a FR-017.
 - [x] Las historias cubren carga, validación, recálculo, descarga, FINREP e identidad.
 - [x] Los escenarios permiten determinar si se alcanzan los resultados pedidos.
 - [x] La especificación reserva al plan las decisiones técnicas.
@@ -34,5 +34,7 @@
 ## Notas de revisión
 
 Se incorporó la aclaración de Diego sobre la retirada de la carga anterior y su ejemplo. La revisión distinguió la elección del lado de una igualdad, la resolución de productores que coinciden en una celda y la autorización para aplicar cambios. Para el filtro se especificaron el catálogo completo, la primera página y las respuestas que lleguen tarde.
+
+En la revisión del 6 de noviembre se añadieron FR-016 y FR-017. SC-008 comprueba el panel de confirmación con selección vacía, selección fuera de página y aplicación histórica. SC-009 comprueba el contexto de lectura y el selector en conjuntos con cero, uno y varios contextos.
 
 La prueba FINREP informa sobre dos formatos de entrada para un mismo ejemplo. Su resultado pertenece a la [evidencia de la iteración](../evidencia.md). Los 16 puntos marcados corresponden a la calidad de la especificación.

@@ -15,16 +15,23 @@ El filtro existente busca por subcadena sin distinguir mayúsculas y sus página
 
 La demo contiene un caso para evaluar los destinos automáticos. Tanto `v0174_m` como `DEMO_RANGE` pueden apuntar a C_01.00, fila 0070, columna 0010. Conocer el lado correcto en cada regla deja una segunda decisión de negocio: cuál de ellas puede escribir en esa celda. La guía deberá permitir reproducir los cinco cambios originales eligiendo explícitamente los productores del ejemplo. La semántica y los importes de la demo ya están documentados. [Corpus de la iteración 002](../002-ui-eba-demo/contracts/demo-corpus.md)
 
-### Otras simplificaciones propuestas para revisión
+### Simplificaciones revisadas con Diego
+
+El 6 de noviembre Diego incorporó dos de las cuatro propuestas a la especificación.
+
+| Propuesta incorporada | Efecto esperado |
+| --- | --- |
+| Mostrar la confirmación de aplicación cuando haya al menos una propuesta seleccionada (FR-016). | La confirmación acompaña una selección concreta. Su total incluye propuestas seleccionadas fuera de la página visible. |
+| Presentar el contexto único como dato de lectura y mostrar el selector cuando haya varios contextos disponibles (FR-017). | El analista lee la entidad, el periodo y el módulo una sola vez en la cabecera y puede cambiar de contexto cuando tiene alternativas. |
+
+Las otras dos propuestas quedan para una decisión posterior.
 
 | Prioridad | Propuesta | Qué gana el analista |
 | --- | --- | --- |
 | Alta | Colocar los campos «Catálogo de reglas» e «Informes» antes de las demos. Dejar «Probar una demo» como acción secundaria desplegable. | Quien llega con sus propios archivos puede empezar en la primera vista. Las dos demos siguen siendo fáciles de encontrar. |
-| Alta | Mostrar la confirmación de aplicación cuando haya al menos una propuesta seleccionada. | Se evita pedir que se confirmen cero cambios. Después de seleccionar, se ven cantidad, dependencias y confirmación antes de aplicar. |
-| Media | Presentar el contexto como dato de lectura cuando solo haya uno. Mostrar el selector cuando se pueda cambiar de contexto. | Se leen entidad y periodo una sola vez y se distingue una información de una decisión. |
 | Media | Retirar el progreso terminado cuando ya esté visible el resultado de esa misma operación. | El espacio queda para la versión publicada o el siguiente paso. Progreso en curso, cancelación, errores y ejecuciones incompletas conservan su lugar. |
 
-Estas cuatro propuestas se presentan para que Diego decida si incorporarlas al plan. Las fuentes de la revisión son las capturas y las plantillas del proyecto. [Cargar](../../apps/web/src/app/import/import-page.component.html) · [Destinos](../../apps/web/src/app/recalculation/directions.component.html) · [Navegación y progreso](../../apps/web/src/app/workspace/workspace-shell.component.html) · [Recalcular](../../apps/web/src/app/recalculation/preview-page.component.html)
+Las fuentes de la revisión son las capturas y las plantillas del proyecto. [Cargar](../../apps/web/src/app/import/import-page.component.html) · [Destinos](../../apps/web/src/app/recalculation/directions.component.html) · [Navegación y progreso](../../apps/web/src/app/workspace/workspace-shell.component.html) · [Recalcular](../../apps/web/src/app/recalculation/preview-page.component.html)
 
 ## Identidad y descubrimiento
 
