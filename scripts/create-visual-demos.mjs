@@ -53,7 +53,18 @@ for (const input of data.corep.inputs) if (input.value !== null) {
 corep.set('xl/worksheets/sheet1.xml', xml);
 const context = data.corep.context;
 corep.set('xl/worksheets/sheet2.xml', sheetXml([['Campo', 'Valor'], ['Perfil', 'eba-corep-of-4.0-ca1-v1'], ['Framework', context.framework], ['Módulo', context.moduleVersion], ['Entidad', context.entityId], ['Fecha de referencia', context.referenceDate], ['Fecha de envío', context.submissionDate], ['Divisa', context.unit], ['Escala', String(context.scale)], ['Decimales del importe', context.decimals], ['Tabla presentada', String(context.filingIndicators['C_01.00'])]]));
-corep.set('xl/worksheets/sheet3.xml', sheetXml([['Demostración COREP 4.0 · C_01.00 · importes sintéticos'], ['Extracto derivado para trabajo local, no fichero oficial de remisión. Las reglas incluyen cinco del catálogo publicado EBA y once sintéticas.'], ['Resultado inicial esperado: 7 pasan, 8 fallan y 1 no aplica. La desigualdad negativa falla intencionadamente.'], ['Configura expresamente Izquierda solo en v0172_m, v0173_m, v0174_m, v0175_m y v0176_m.'], ['Simula: r0070 5 → 60,00; r0030 100 → 185,00; r0150 10 → 50,00; r0130 20 → 100,00; r0020 1000 → 285,00.'], ['Seleccionar v0172_m exige elegir sus cuatro antecedentes; el motor no añade selecciones automáticamente.'], ['Las dependencias son v0174_m → v0173_m → v0172_m y v0176_m → v0175_m → v0172_m.'], ['Aplica las cinco propuestas tras revisarlas: 14 pasan, 1 falla y 1 no aplica. Los dos condicionales también se revalidan.'], ['Los condicionales solo validan. No configures DEMO_RANGE: comparte destino con v0174_m.'], ['95 posiciones están vacías: no son cero. r0200 contiene un cero informado. EUR, escala 0, precisión 2.']], [115]));
+corep.set('xl/worksheets/sheet3.xml', sheetXml([
+  ['Demostración COREP 4.0 · C_01.00 · importes sintéticos'],
+  ['Extracto derivado para trabajo local, no fichero oficial de remisión. Las reglas incluyen cinco del catálogo publicado EBA y once sintéticas.'],
+  ['Resultado inicial esperado: 7 pasan, 8 fallan y 1 no aplica. La desigualdad negativa falla intencionadamente.'],
+  ['Prepara la revisión de destinos. En r0070 conserva v0174_m frente a DEMO_RANGE y DEMO_PRECONDITION. En r0200 omite el grupo de DEMO_ZERO y DEMO_INTERVAL.'],
+  ['Guarda la configuración con 5 incluidas, 4 omitidas y 7 excluidas. Simula los cinco productores oficiales: r0070 5 → 60,00; r0030 100 → 185,00; r0150 10 → 50,00; r0130 20 → 100,00; r0020 1000 → 285,00.'],
+  ['Seleccionar v0172_m exige elegir sus cuatro antecedentes; el motor no añade selecciones automáticamente.'],
+  ['Las dependencias son v0174_m → v0173_m → v0172_m y v0176_m → v0175_m → v0172_m.'],
+  ['Aplica las cinco propuestas tras revisarlas: 14 pasan, 1 falla y 1 no aplica. Los dos condicionales también se revalidan.'],
+  ['Los condicionales solo validan. Sigue «Siguiente paso» para descargar la versión aplicada.'],
+  ['95 posiciones están vacías: no son cero. r0200 contiene un cero informado. EUR, escala 0, precisión 2.'],
+], [115]));
 await save('corep', 'report', deterministicZip(corep)); await save('types', 'report', typedWorkbook(typedMapping, data.typed.context, data.typed.fields));
 await writeFile(path.join(directory, 'manifest.json'), JSON.stringify({ version: 1, files }, null, 2) + '\n');
 if (process.argv.includes('--package')) {

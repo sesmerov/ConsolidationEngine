@@ -1,96 +1,158 @@
-import { TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { RuleResultDTO, ValidationResultsPageDTO } from '@ce/contracts';
-import { DirectionsComponent } from './directions.component';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { HttpErrorResponse, HttpHeaders, HttpResponse } from '@angular/common/http';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { DirectionReviewRowDTO, DirectionReviewSummaryDTO, JobDTO, ValidationResultsPageDTO } from '@ce/contracts';
 import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
+import { WorkspaceViewStore } from '../workspace/workspace-view.store';
+import { DirectionsComponent } from './directions.component';
 
-const workspaceId = 'a4a99ec0-bb65-41f5-90d1-b857f4ebefb2', versionId = 'bfda41bd-2a55-4a80-9f22-2fc1aa89894c', nextVersion = '027345c5-36db-4bb2-bcee-0f55b13165ad', runId = '5976e981-9b8d-4e80-af2a-b1ffeced4b55';
-const a = 'a'.repeat(64), b = 'b'.repeat(64), c = 'c'.repeat(64);
-const workspace = { id: workspaceId, name: 'SYNTHETIC', state: 'ready' as const, currentVersionId: versionId, versionIds: [versionId], contexts: [], counts: { snapshots: 1, coordinates: 6, facts: 5, sources: 2 }, sessionBytes: 100 };
-const target = { factKey: 'target', contextId: 'demo', tableCode: 'C_01.00', sheetCode: '', rowCode: '0230', columnCode: '0010', dataType: 'number' as const, unit: 'EUR', decimals: '2', axes: {}, sourceLocator: {} };
-const result: RuleResultDTO = { id: 'result', runId, versionId, profileId: 'ce-dpmxl-0.9-closed-v1', instanceId: a, binding: { contextId: 'demo' }, coverageOnly: false,
-  code: 'SYNTHETIC_A', variantIds: [a], sourceRecordIds: [], tables: ['C_01.00'], status: 'not_applicable', severity: 'error', severityOriginal: 'Error',
-  expression: '{tC_01.00,r0230,c0010}=1', precondition: 'false', values: {}, readKeys: [], factReads: [], metadataReads: [], sources: [], diagnostics: [],
-  recalculation: { policy: { mode: 'standard', profileId: 'ce-dpmxl-0.9-closed-v1', reasons: [] }, left: { eligible: true, target, diagnostics: [] }, right: { eligible: false, diagnostics: [{ code: 'INVALID_DIRECTION', message: 'El lado elegido debe ser una única celda declarada.' }] } } };
-const page = { items: [result], total: 1, nextCursor: null, versionId, configuredDirections: [], run: { id: runId, versionId, profileId: result.profileId, status: 'completed' as const, startedAt: '2026-10-31T00:00:00.000Z', diagnostics: [], resultIds: [result.id],
-  summary: { complete: true, rows: 1, variants: 1, applicableVariants: 1, instances: 1, duplicateRows: 0, byStatus: { pass: 0, fail: 0, not_applicable: 1, not_evaluable: 0, error: 0 } } } } as ValidationResultsPageDTO;
-describe('explicit direction configuration', () => {
-  let http: HttpTestingController, session: SessionStore;
-  beforeEach(() => { TestBed.configureTestingModule({ imports: [DirectionsComponent], providers: [provideHttpClient(), provideHttpClientTesting()] }); http = TestBed.inject(HttpTestingController); session = TestBed.inject(SessionStore); TestBed.inject(ApiClient).setSessionToken('memory-only'); session.workspace.set(workspace); session.etag.set('"v-' + versionId + '"'); });
-  afterEach(() => { http.verify(); TestBed.resetTestingModule(); });
-  function render(data: ValidationResultsPageDTO = page) { const fixture = TestBed.createComponent(DirectionsComponent); fixture.componentRef.setInput('page', data); fixture.detectChanges(); TestBed.tick(); fixture.detectChanges(); return fixture; }
-  function choose(fixture: ReturnType<typeof render>, value: string) { const select = (fixture.nativeElement as HTMLElement).querySelector('select')!; select.value = value; select.dispatchEvent(new Event('change')); fixture.detectChanges(); }
-  it.each(['absent', 'undetermined', 'validation_only'] as const)('does not authorize a destination under %s policy, even if its structural side is eligible', async (mode) => {
-    const { policy: _policy, ...sides } = result.recalculation!;
-    const fixture = render({ ...page, items: [{ ...result, recalculation: mode === 'absent' ? sides : { ...sides, policy: { mode, profileId: result.profileId, reasons: mode === 'validation_only' ? ['TEXT'] : [] } } }] });
-    expect((fixture.nativeElement as HTMLElement).querySelector('select')).toBeNull();
-    fixture.componentInstance.choose(fixture.componentInstance.page().items[0]!, 'left'); await fixture.componentInstance.save(); expect(fixture.componentInstance.draft()).toEqual({}); http.expectNone(request => request.method === 'PUT');
+const workspace = { id: 'workspace', name: 'Revisión', state: 'ready' as const, currentVersionId: 'base', versionIds: ['base'], contexts: [], counts: { snapshots: 1, coordinates: 3, facts: 3, sources: 2 }, sessionBytes: 100 };
+const page = { items: [], total: 0, nextCursor: null, versionId: 'base', run: { id: 'run', versionId: 'base', status: 'completed', summary: { complete: true } } } as unknown as ValidationResultsPageDTO;
+const counts = { totalRows: 5, included: 1, omitted: 0, pending: 1, conflicted: 2, excluded: 1, undetermined: 0 };
+const ready: DirectionReviewSummaryDTO = { id: 'review', workspaceId: workspace.id, runId: 'run', baseVersionId: 'base', state: 'ready', revision: 1, expiresAt: '2099-11-01T12:00:00.000Z', counts, conflictGroupCount: 1 };
+const single: DirectionReviewRowDTO = { rowId: 'one', instanceId: 'instance-1', code: 'SINGLE', location: 'T · r0010', contextLabel: 'Banco', classification: 'singleRight', state: 'included', selectedSide: 'right', origin: 'automatic', options: [{ side: 'right', label: 'T · r0010' }], reasons: [] };
+const both: DirectionReviewRowDTO = { ...single, rowId: 'two', instanceId: 'instance-2', code: 'BOTH', classification: 'both', state: 'pending', options: [{ side: 'left', label: 'T · r0040' }, { side: 'right', label: 'T · r0050' }] };
+const excluded: DirectionReviewRowDTO = { rowId: 'excluded', code: 'TEXT', location: 'T', contextLabel: 'Banco', classification: 'none', state: 'excluded', options: [], reasons: [{ code: 'TEXT', message: 'Solo validación de texto' }] };
+const group = { ...single, rowId: 'c1', instanceId: 'i3', code: 'v0174_m', location: 'T', options:[{side:'right' as const,label:'T · r0070'}], state: 'conflicted' as const, groupId: 'g', producerCount: 2 };
+const rows = [single, both, excluded, group, { ...group, rowId: 'c2', instanceId: 'i4', code: 'DEMO_RANGE' }];
+const receipt = { reviewId: ready.id, runId: ready.runId, baseVersionId: 'base', newVersionId: 'new', configVersion: 'config', included: 1 };
+const job = (kind: 'prepare-directions'|'commit-directions'): JobDTO => ({ jobId: kind, kind, workspaceId: workspace.id, baseVersionId: 'base', status: 'queued', progress: { completed: 0, total: 1, complete: false }, diagnostics: [], pollAfterMs: 60_000 });
+const api = {
+  activeDirectionReviews: vi.fn(), directionReview: vi.fn(), directionReviewRows: vi.fn(), prepareDirectionReview: vi.fn(),
+  editDirectionReview: vi.fn(), commitDirectionReview: vi.fn(), discardDirectionReview: vi.fn(), job: vi.fn(), workspace: vi.fn(),
+};
+describe('global destination review', () => {
+  let session: SessionStore;
+  beforeEach(() => {
+    vi.resetAllMocks();
+    api.activeDirectionReviews.mockResolvedValue({ active: ready });
+    api.directionReview.mockResolvedValue(ready);
+    api.directionReviewRows.mockResolvedValue({ reviewId: ready.id, revision: 1, items: rows, total: rows.length, nextCursor: null });
+    api.prepareDirectionReview.mockResolvedValue(job('prepare-directions'));
+    api.commitDirectionReview.mockResolvedValue(job('commit-directions'));
+    TestBed.configureTestingModule({ imports: [DirectionsComponent], providers: [{ provide: ApiClient, useValue: api }] });
+    session = TestBed.inject(SessionStore);
+    session.workspace.set(workspace); session.etag.set('"base"');
+    TestBed.inject(WorkspaceViewStore).reconcile(workspace.id, 'base');
   });
-  it('starts with no inferred target, allows a structurally eligible false-precondition side and explains the rejected side', () => {
-    const fixture = render(), element = fixture.nativeElement as HTMLElement, select = element.querySelector('select')!;
-    expect(select.value).toBe(''); expect(select.querySelector<HTMLOptionElement>('option[value="left"]')!.disabled).toBe(false); expect(select.querySelector<HTMLOptionElement>('option[value="right"]')!.disabled).toBe(true);
-    expect(element.textContent).toContain('una única celda declarada'); expect(element.textContent).toContain('no modifica los valores');
-    const save = Array.from(element.querySelectorAll('button')).find(button => button.textContent?.includes('Guardar configuración'))!; expect(save.disabled).toBe(true);
-    choose(fixture, 'left'); expect(save.disabled).toBe(false); http.expectNone(request => request.method !== 'GET');
+  afterEach(() => TestBed.resetTestingModule());
+  async function stable(fixture: ComponentFixture<DirectionsComponent>) {
+    fixture.detectChanges();
+    // Let the mocked HTTP promises settle, including collection → summary → first page.
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    await fixture.whenStable();
+    fixture.detectChanges();
+  }
+  async function render(value = page) {
+    const fixture = TestBed.createComponent(DirectionsComponent);
+    fixture.componentRef.setInput('page', value);
+    await stable(fixture);
+    return fixture;
+  }
+  function button(root: HTMLElement, label: string) {
+    const found = [...root.querySelectorAll('button')].find(node => node.textContent?.trim() === label);
+    expect(found, label).toBeDefined();
+    return found!;
+  }
+  function row(root: HTMLElement, code: string) {
+    const found = [...root.querySelectorAll<HTMLElement>('tr')].find(node => node.querySelector('strong')?.textContent?.trim() === code);
+    expect(found, code).toBeDefined(); return found!;
+  }
+  it('recovers independently of the first result page and prepares only on explicit action', async () => {
+    api.activeDirectionReviews.mockResolvedValue({ active: null });
+    const fixture = await render(), root = fixture.nativeElement as HTMLElement;
+    expect(api.prepareDirectionReview).not.toHaveBeenCalled();
+    button(root, 'Preparar revisión de destinos').click();
+    await stable(fixture);
+    expect(api.prepareDirectionReview).toHaveBeenCalledTimes(1);
+    expect(api.prepareDirectionReview.mock.calls[0]!.slice(0,3)).toEqual([workspace.id, { baseVersionId:'base',runId:'run' }, '"base"']);
+    expect(api.commitDirectionReview).not.toHaveBeenCalled();
   });
-  it.each([['CONDITIONAL', 'condicionales'], ['TEXT', 'texto'], ['DATE', 'fechas']] as const)('explains %s validation-only policy without offering a destination', (reason, readable) => {
-    const fixture = render({ ...page, items: [{ ...result, recalculation: { ...result.recalculation!, policy: { mode: 'validation_only', profileId: result.profileId, reasons: [reason] } } }] });
-    const element = fixture.nativeElement as HTMLElement; expect(element.textContent).toContain('Solo validación'); expect(element.textContent).toContain(`La regla usa ${readable}`); expect(element.textContent).toContain('Se valida sin modificar datos'); expect(element.querySelector('select')).toBeNull();
+  it('only gives ambiguous rows a side selector and sends small deltas instead of the displayed results', async () => {
+    const fixture = await render(), root = fixture.nativeElement as HTMLElement;
+    expect(row(root, 'SINGLE').textContent).toContain('Automático');
+    expect(row(root, 'SINGLE').querySelector('select')).toBeNull();
+    expect(row(root, 'BOTH').querySelector('select')).not.toBeNull();
+    expect(root.textContent).toContain('Solo validación de texto');
+    api.editDirectionReview.mockResolvedValue({ summary: { ...ready, revision:2 }, appliedRevision:2 });
+    api.directionReviewRows.mockResolvedValue({ reviewId:ready.id, revision:2, items:[{ ...single, state:'omitted',origin:'saved' }], total:1, nextCursor:null });
+    button(row(root, 'SINGLE'), 'Omitir').click(); await stable(fixture);
+    const omitted = api.editDirectionReview.mock.calls[0]!;
+    expect(omitted[2]).toEqual({ expectedRevision:1, mutationId:expect.any(String), operations:[{ op:'set',instanceId:single.instanceId,choice:'omit' }] });
+    expect(row(root, 'SINGLE').textContent).toContain('Guardado');
+    button(row(root, 'SINGLE'),'Usar').click(); await stable(fixture);
+    expect(api.editDirectionReview.mock.calls[1]![2].operations).toEqual([{ op:'set',instanceId:single.instanceId,choice:'suggest' }]);
   });
-  it('retains the server explanation for a numerical inequality that has no eligible side', () => {
-    const side = { eligible: false, diagnostics: [{ code: 'INVALID_DIRECTION' as const, message: 'Sólo una igualdad numérica puede configurar un destino.' }] };
-    const fixture = render({ ...page, items: [{ ...result, expression: '{tC_01.00,r0230,c0010}>1', recalculation: { policy: { mode: 'standard', profileId: result.profileId, reasons: [] }, left: side, right: side } }] });
-    const element = fixture.nativeElement as HTMLElement; expect(element.textContent).toContain('Sólo una igualdad numérica'); expect(element.querySelector<HTMLOptionElement>('option[value="left"]')!.disabled).toBe(true);
-    fixture.componentInstance.choose(fixture.componentInstance.page().items[0]!, 'left'); expect(fixture.componentInstance.draft()).toEqual({});
+  it('uses the global conflict group and requires acknowledgement of pending rows before commit', async () => {
+    const fixture = await render(), root = fixture.nativeElement as HTMLElement;
+    expect(button(root,'Guardar configuración').disabled).toBe(true);
+    const groupPanel = root.querySelector<HTMLElement>('[role=group][aria-label*="r0070"]')!;
+    expect(groupPanel).toBeTruthy();
+    const updated = { ...ready, revision:2, conflictGroupCount:0, counts:{ ...counts, included:2,omitted:1,conflicted:0 } };
+    api.editDirectionReview.mockResolvedValue({ summary:updated, appliedRevision:2 });
+    api.directionReviewRows.mockResolvedValue({ reviewId:ready.id, revision:2, items:[single,both], total:2,nextCursor:null });
+    button(groupPanel,'Conservar v0174_m').click(); await stable(fixture);
+    expect(api.editDirectionReview.mock.calls[0]![2].operations).toEqual([{ op:'resolveGroup',groupId:'g',winnerInstanceId:'i3' }]);
+    expect(button(root,'Guardar configuración').disabled).toBe(true);
+    root.querySelector<HTMLInputElement>('input[type=checkbox]')!.click(); await stable(fixture);
+    button(root,'Guardar configuración').click(); await stable(fixture);
+    expect(api.commitDirectionReview.mock.calls[0]!.slice(0,4)).toEqual([workspace.id,ready.id,{expectedRevision:2,acceptPartial:true},'"base"']);
   });
-  it('sends the complete explicit selection including configured directions outside the page, then retains the old run as historical', async () => {
-    const fixture = render({ ...page, configuredDirections: [{ instanceId: b, targetSide: 'right' }] } as ValidationResultsPageDTO);
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('direcciones fuera de esta página'); choose(fixture, 'left');
-    const saving = fixture.componentInstance.save(); const request = http.expectOne('/api/v1/workspaces/' + workspaceId + '/directions');
-    expect(request.request.method).toBe('PUT'); expect(request.request.headers.get('If-Match')).toBe('"v-' + versionId + '"'); expect(request.request.headers.get('X-CE-Session')).toBe('memory-only');
-    expect(request.request.body).toEqual({ directions: [{ instanceId: a, targetSide: 'left' }, { instanceId: b, targetSide: 'right' }] }); expect(request.request.body).not.toHaveProperty('expression');
-    request.flush({ versionId: nextVersion, configVersion: 'changed', directions: [] }, { headers: { ETag: '"v-' + nextVersion + '"' } }); await Promise.resolve();
-    http.expectOne('/api/v1/workspaces/' + workspaceId).flush({ ...workspace, currentVersionId: nextVersion, versionIds: [versionId, nextVersion] }, { headers: { ETag: '"v-' + nextVersion + '"' } }); await saving; fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
-    expect(session.versionId()).toBe(nextVersion); expect(fixture.componentInstance.page().versionId).toBe(versionId); expect((fixture.nativeElement as HTMLElement).textContent).toContain('Configuración guardada');
-    expect((fixture.nativeElement as HTMLElement).querySelector('select')!.disabled).toBe(true); http.expectNone(request => request.url.endsWith('/applications') || request.url.endsWith('/previews'));
+  it('replays the original mutation and CAS after a lost response and reloads the latest revision', async () => {
+    const fixture = await render(), root = fixture.nativeElement as HTMLElement;
+    api.editDirectionReview.mockRejectedValueOnce(new HttpErrorResponse({status:0})).mockResolvedValueOnce({ summary:{...ready,revision:3},appliedRevision:2 });
+    button(row(root,'SINGLE'),'Omitir').click(); await stable(fixture);
+    const first = api.editDirectionReview.mock.calls[0];
+    session.etag.set('"another"');
+    api.directionReviewRows.mockResolvedValue({ reviewId:ready.id,revision:3,items:[single],total:1,nextCursor:null });
+    button(root,'Reintentar la misma operación').click(); await stable(fixture);
+    expect(api.editDirectionReview.mock.calls[1]).toEqual(first);
+    expect(row(root,'SINGLE')).toBeTruthy();
   });
-  it('preserves a draft across filters/pages and restores the full configuration after recreating the component', async () => {
-    const configuredDirections = [{ instanceId: b, targetSide: 'right' as const }]; const fixture = render({ ...page, configuredDirections } as ValidationResultsPageDTO); choose(fixture, 'left');
-    fixture.componentRef.setInput('page', { ...page, items: [{ ...result, id: 'other', instanceId: c, code: 'SYNTHETIC_C' }], configuredDirections }); fixture.detectChanges(); TestBed.tick(); choose(fixture, 'left');
-    const saving = fixture.componentInstance.save(); const request = http.expectOne(request => request.url.endsWith('/directions'));
-    expect(request.request.body.directions).toEqual([{ instanceId: a, targetSide: 'left' }, { instanceId: b, targetSide: 'right' }, { instanceId: c, targetSide: 'left' }]);
-    request.flush({ error: { message: 'Rechazo de prueba' } }, { status: 422, statusText: 'Unprocessable Entity' }); await saving;
-    fixture.destroy(); const restored = render({ ...page, configuredDirections } as ValidationResultsPageDTO); expect((restored.nativeElement as HTMLElement).textContent).toContain('direcciones fuera de esta página');
-    choose(restored, 'left'); const retry = restored.componentInstance.save(); const restoredRequest = http.expectOne(request => request.url.endsWith('/directions')); expect(restoredRequest.request.body.directions).toHaveLength(3);
-    restoredRequest.flush({ error: { message: 'Rechazo de prueba' } }, { status: 422, statusText: 'Unprocessable Entity' }); await retry;
+  it('allows choosing a producer from another page of a large conflict group', async () => {
+    const members = Array.from({ length:51 }, (_,i) => ({ ...group, rowId:'row-'+i, instanceId:'producer-'+i, code:'RULE_'+i, producerCount:51 }));
+    api.directionReviewRows.mockImplementation(async (_w, _id, query) => {
+      if (!query.groupId) return {reviewId:ready.id,revision:1,items:[members[0]],total:1,nextCursor:null};
+      return {reviewId:ready.id,revision:1,items:query.cursor ? members.slice(50) : members.slice(0,50),total:51,nextCursor:query.cursor ? null : 'next'};
+    });
+    const fixture = await render(), root = fixture.nativeElement as HTMLElement;
+    const first = root.querySelector<HTMLElement>('[role=group][aria-label*="r0070"]')!;
+    button(first,'Ver todos los productores').click(); await stable(fixture);
+    await fixture.componentInstance.store.loadRows(1); await stable(fixture);
+    expect(api.directionReviewRows.mock.lastCall?.[2]).toEqual({groupId:'g',cursor:'next'});
+    api.editDirectionReview.mockResolvedValue({summary:{...ready,revision:2},appliedRevision:2});
+    button(root,'Conservar RULE_50').click(); await stable(fixture);
+    expect(api.editDirectionReview.mock.calls[0]![2].operations).toEqual([{op:'resolveGroup',groupId:'g',winnerInstanceId:'producer-50'}]);
   });
-  it('never saves a historical or incomplete run or a page without a complete configuration list', async () => {
-    const fixture = render(); choose(fixture, 'left'); session.workspace.set({ ...workspace, currentVersionId: nextVersion }); fixture.detectChanges(); await fixture.componentInstance.save();
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('histórica'); http.expectNone(request => request.method === 'PUT');
-    session.workspace.set(workspace); fixture.componentRef.setInput('page', { ...page, run: { ...page.run, status: 'incomplete' } }); fixture.detectChanges(); await fixture.componentInstance.save(); http.expectNone(request => request.method === 'PUT');
-    fixture.destroy(); const { configuredDirections: _configured, ...missing } = page; const unavailable = render(missing); expect((unavailable.nativeElement as HTMLElement).textContent).toContain('configuración completa'); await unavailable.componentInstance.save(); http.expectNone(request => request.method === 'PUT');
+  it('reloads changes from another tab after a stale patch without retrying it as a new mutation', async () => {
+    const fixture = await render(), root = fixture.nativeElement as HTMLElement;
+    api.editDirectionReview.mockRejectedValue(new HttpErrorResponse({status:409,error:{error:{message:'Otra edición modificó esta revisión.'}}}));
+    api.activeDirectionReviews.mockResolvedValue({active:{...ready,revision:2}});
+    api.directionReviewRows.mockResolvedValue({reviewId:ready.id,revision:2,items:[{...single,state:'omitted',origin:'saved'}],total:1,nextCursor:null});
+    button(row(root,'SINGLE'),'Omitir').click(); await stable(fixture);
+    expect(api.editDirectionReview).toHaveBeenCalledTimes(1);
+    expect(root.textContent).toContain('Otra edición');
+    expect(button(row(root,'SINGLE'),'Usar').disabled).toBe(false);
   });
-  it('can explicitly clear every configured direction, including hidden choices', async () => {
-    const fixture = render({ ...page, configuredDirections: [{ instanceId: b, targetSide: 'right' }] } as ValidationResultsPageDTO);
-    Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find(button => button.textContent?.includes('Quitar todas'))!.click(); fixture.detectChanges();
-    const saving = fixture.componentInstance.save(); const request = http.expectOne(request => request.url.endsWith('/directions')); expect(request.request.body).toEqual({ directions: [] });
-    request.flush({ error: { message: 'Rechazo de prueba' } }, { status: 422, statusText: 'Unprocessable Entity' }); await saving;
+  it('disallows preparation and editing for a historical result', async () => {
+    session.workspace.set({...workspace,currentVersionId:'new',versionIds:['base','new']});
+    const fixture = await render(), root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent).toContain('histórica');
+    expect(root.querySelector('table')).toBeNull();
+    expect(api.prepareDirectionReview).not.toHaveBeenCalled();
   });
-  it('refreshes after a stale-version rejection, keeps the draft visible and requires a current validation before retry', async () => {
-    const fixture = render(); choose(fixture, 'left'); const saving = fixture.componentInstance.save();
-    http.expectOne(request => request.url.endsWith('/directions')).flush({ error: { code: 'STALE_VERSION', message: 'La versión ha cambiado.' } }, { status: 412, statusText: 'Precondition Failed' }); await Promise.resolve();
-    http.expectOne('/api/v1/workspaces/' + workspaceId).flush({ ...workspace, currentVersionId: nextVersion }, { headers: { ETag: '"v-' + nextVersion + '"' } }); await saving; fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
-    expect(fixture.componentInstance.draft()[a]).toBe('left'); expect((fixture.nativeElement as HTMLElement).textContent).toContain('La versión ha cambiado'); expect((fixture.nativeElement as HTMLElement).querySelector('select')!.value).toBe('left'); expect((fixture.nativeElement as HTMLElement).querySelector('select')!.disabled).toBe(true);
-    await fixture.componentInstance.save(); http.expectNone(request => request.method === 'PUT');
-  });
-  it('keeps saving blocked after a stale rejection even when the workspace refresh fails', async () => {
-    const fixture = render(); choose(fixture, 'left'); const saving = fixture.componentInstance.save();
-    http.expectOne(request => request.url.endsWith('/directions')).flush({ error: { code: 'STALE_VERSION', message: 'La versión ha cambiado.' } }, { status: 412, statusText: 'Precondition Failed' }); await Promise.resolve();
-    http.expectOne('/api/v1/workspaces/' + workspaceId).flush({ error: { message: 'No disponible' } }, { status: 503, statusText: 'Service Unavailable' }); await saving; fixture.detectChanges();
-    expect(fixture.componentInstance.draft()[a]).toBe('left'); expect(fixture.componentInstance.canSave()).toBe(false); expect((fixture.nativeElement as HTMLElement).textContent).toContain('Recarga la sesión');
-    await fixture.componentInstance.save(); http.expectNone(request => request.method === 'PUT');
+  it('recovers a committed version after an uncertain commit without resending changes', async () => {
+    const clean = { ...ready, counts:{...counts,pending:0,conflicted:0,included:4},conflictGroupCount:0 };
+    api.activeDirectionReviews.mockResolvedValueOnce({ active:clean }).mockResolvedValue({active:null,latestCommit:receipt});
+    const fixture = await render(), root = fixture.nativeElement as HTMLElement;
+    api.commitDirectionReview.mockRejectedValue(new HttpErrorResponse({status:0}));
+    api.workspace.mockResolvedValue(new HttpResponse({body:{...workspace,currentVersionId:'new',versionIds:['base','new']},headers:new HttpHeaders({ETag:'"new"'})}));
+    button(root,'Guardar configuración').click(); await stable(fixture);
+    expect(api.commitDirectionReview).toHaveBeenCalledTimes(1);
+    expect(root.textContent).toContain('Configuración guardada');
+    const view = TestBed.inject(WorkspaceViewStore);
+    view.reconcile(workspace.id,'new');
+    expect(view.recommended()).toBe('preview');
   });
 });

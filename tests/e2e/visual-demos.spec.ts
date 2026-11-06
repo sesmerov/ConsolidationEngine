@@ -1,7 +1,9 @@
 import { readFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import type { Page, TestInfo } from '@playwright/test';
+import { configureCorepDemo, prepareDirections } from './direction-review-helpers.js';
 
 // Independent, frozen expectations belong to tests, never to the shipped evaluator.
 const corpus = JSON.parse(await readFile(path.resolve('specs/002-ui-eba-demo/contracts/demo-corpus.json'), 'utf8'));
@@ -30,7 +32,23 @@ async function stage(page: Page, name: string, title: string) {
   await expect(page.locator(title)).toBeFocused();
 }
 async function noPageOverflow(page: Page) { expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true); }
-async function loadDemo(page: Page, kind: 'corep' | 'types', info: TestInfo) {
+// Move focus to a persistent control while the real publication response is in flight.
+// Its location must survive the recommendation, including when the submit button disappears.
+async function milestone<T>(page: Page, current: string, next: string, url: string, action: () => Promise<T>) {
+  const currentStage = page.getByRole('button', { name: current, exact: true });
+  await page.route(url, async route => {
+    const response = await route.fetch();
+    await currentStage.focus();
+    await route.fulfill({ response });
+  }, { times: 1 });
+  const result = await action();
+  await expect(currentStage).toHaveAttribute('aria-current', 'step');
+  await expect(page.locator('#next-stage-badge')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: next, exact: true }).locator('#next-stage-badge')).toHaveText('Siguiente paso');
+  await expect(currentStage).toBeFocused();
+  return result;
+}
+async function inspectDemo(page: Page, kind: 'corep' | 'types', info: TestInfo) {
   const guide = page.getByRole('region', { name: 'Demostraciones guiadas', exact: true });
   await expect(guide).toBeVisible(); await page.locator('#demo-selector').selectOption(kind);
   const files: string[] = [];
@@ -54,11 +72,18 @@ async function loadDemo(page: Page, kind: 'corep' | 'types', info: TestInfo) {
   expect(inspected.reports[0].values).toBe(kind === 'corep' ? 15 : 6);
   expect(inspected.context[0].declaration.referenceDate).toBe('2025-12-31');
   await expect(review).toContainText('SYNTHETIC'); await noPageOverflow(page);
-  const imported = await runAction(page, `/import-inspections/${inspection.resultRef.id}/commit`, 'Confirmar carga');
+  return inspection.resultRef.id as string;
+}
+async function loadDemo(page: Page, kind: 'corep' | 'types', info: TestInfo) {
+  const id = await inspectDemo(page, kind, info);
+  await expect(page.locator('#next-stage-badge')).toHaveCount(0);
+  const imported = await milestone(page, '1. Cargar', '2. Validar', `**/import-inspections/${id}/commit`,
+    () => runAction(page, `/import-inspections/${id}/commit`, 'Confirmar carga'));
   await expect(page.getByTestId('current-version-id')).toHaveText(imported.newVersionId); return imported;
 }
 async function validateDemo(page: Page, kind: 'corep' | 'types') {
   await stage(page, '2. Validar', '#validation-title');
+  await expect(page.locator('#next-stage-badge')).toHaveCount(0);
   const job = await runAction(page, '/validations', 'Validar informes');
   const results = await get(page, `/runs/${job.resultRef.id}/results?limit=200`), oracle = kind === 'corep' ? corpus.corep : corpus.typed;
   expect(results.total).toBe(oracle.rules.length);
@@ -92,7 +117,37 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/');
 });
 
+test('a cancelled job notification and rejected publication keep the current stage without a recommendation', async ({ page }, info) => {
+  await page.getByLabel('Nombre del conjunto').fill('Hitos interrumpidos SYNTHETIC');
+  await page.getByRole('button', { name: 'Crear conjunto', exact: true }).click();
+  const inspectionId = await inspectDemo(page, 'corep', info);
+  const session = await connection(page);
+  const commitPath = `${session.base}/import-inspections/${inspectionId}/commit`;
+  const commit = page.getByRole('button', { name: 'Confirmar carga', exact: true });
+  // Deliver a controlled terminal response to exercise the UI without a race against the worker.
+  // No publication request is sent to the server in this cancellation case.
+  await page.route('**' + commitPath, route => route.fulfill({ status: 202, json: {
+    kind: 'import', status: 'cancelled', jobId: randomUUID(), workspaceId: session.id,
+    progress: { completed: 0, total: 1, complete: false }, diagnostics: [], pollAfterMs: 250,
+  } }), { times: 1 });
+  await commit.click();
+  await expect(page.getByText('Trabajo cancelado', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '1. Cargar', exact: true })).toHaveAttribute('aria-current', 'step');
+  await expect(page.locator('#next-stage-badge')).toHaveCount(0);
+  await expect(commit).toBeEnabled();
+  // A real stale If-Match is rejected by the server before a job or snapshot can be published.
+  await page.route('**' + commitPath, route => route.continue({ headers: { ...route.request().headers(), 'if-match': '"v-00000000-0000-4000-8000-000000000000"' } }), { times: 1 });
+  const rejected = page.waitForResponse(r => r.url().endsWith(commitPath) && r.request().method() === 'POST');
+  await commit.click();
+  expect((await rejected).status()).toBe(412);
+  await expect(page.getByRole('alert').filter({ hasText: /versión/i }).first()).toBeVisible();
+  await expect(page.locator('#next-stage-badge')).toHaveCount(0);
+  expect((await get(page, '')).versionIds).toHaveLength(0);
+});
+
 for (const width of [320, 390, 1440]) {
+  test.describe(`viewport ${width}`, () => {
+  test.use({ hasTouch: width === 390, reducedMotion: 'reduce' });
   test(`COREP demo ${width}px: real downloads, 16 rule oracle and five explicit dependent changes`, async ({ page }, info) => {
     test.setTimeout(180_000); await page.setViewportSize({ width, height: 1000 });
     await page.getByLabel('Nombre del conjunto').fill(`Demo COREP ${width} SYNTHETIC`);
@@ -100,14 +155,17 @@ for (const width of [320, 390, 1440]) {
     await loadDemo(page, 'corep', info); const results = await validateDemo(page, 'corep');
     const excluded = results.items.filter((item: any) => item.recalculation.policy.mode === 'validation_only'); expect(excluded).toHaveLength(2);
     await rejectForcedDirection(page, excluded[0].instanceId);
-    // Only the analyst's five choices enter the configuration; the guide does not configure them.
-    for (const code of officialCodes) {
-      const select = page.getByLabel(`${code} · Destino`, { exact: true }); await expect(select).toHaveValue(''); await select.selectOption('left');
-    }
-    const configuring = page.waitForResponse(response => response.url().endsWith('/directions') && response.request().method() === 'PUT');
-    await page.getByRole('button', { name: 'Guardar configuración', exact: true }).click(); const configured = await configuring;
-    expect(configured.status()).toBe(200); expect(configured.request().postDataJSON().directions).toHaveLength(5);
-    await stage(page, '3. Recalcular', '#preview-title'); const simulated = await runAction(page, '/previews', 'Simular recálculos');
+    await milestone(page, '2. Validar', '3. Recalcular', '**/direction-reviews/*/commit', () => configureCorepDemo(page, undefined, async () => {
+      await noPageOverflow(page);
+      await page.locator('.directions-panel').screenshot({ path: info.outputPath(`revision-corep-${width}.png`) });
+    }));
+    await page.getByRole('navigation', { name: 'Etapas del trabajo' }).screenshot({ path: info.outputPath(`siguiente-etapa-${width}.png`) });
+    if (width === 390) {
+      await page.getByRole('button', { name: '3. Recalcular', exact: true }).tap();
+      await expect(page.locator('#preview-title')).toBeFocused();
+    } else await stage(page, '3. Recalcular', '#preview-title');
+    await expect(page.locator('#next-stage-badge')).toHaveCount(0);
+    const simulated = await runAction(page, '/previews', 'Simular recálculos');
     const proposals = await get(page, `/previews/${simulated.resultRef.id}/proposals?limit=200`);
     expect(proposals.items.map((item: any) => item.code).sort()).toEqual(officialCodes);
     for (const proposal of proposals.items) {
@@ -126,7 +184,8 @@ for (const width of [320, 390, 1440]) {
     await expect(page.getByText(/La selección contiene todos sus predecesores/)).toBeVisible(); await expect(acknowledgement).toBeEnabled();
     await expect(table).not.toContainText('["'); await expect(table).toContainText('→'); await noPageOverflow(page);
     await table.scrollIntoViewIfNeeded(); await page.screenshot({ path: info.outputPath(`demo-corep-proposals-${width}.png`) });
-    await acknowledgement.focus(); await page.keyboard.press('Space'); const applied = await runAction(page, '/applications', 'Aplicar cambios seleccionados');
+    await acknowledgement.focus(); await page.keyboard.press('Space');
+    const applied = await milestone(page, '3. Recalcular', '4. Descargar', '**/applications', () => runAction(page, '/applications', 'Aplicar cambios seleccionados'));
     const comparison = page.locator('ce-comparison'); await expect(comparison).toContainText('Valores modificados: 5'); await expect(acknowledgement).toHaveCount(0);
     const application = await get(page, `/applications/${applied.resultRef.id}/comparison?limit=200`);
     expect(application.afterSummary.byStatus).toMatchObject({ ...corpus.corep.expectedAfterCounts, not_evaluable: 0, error: 0 });
@@ -144,7 +203,12 @@ for (const width of [320, 390, 1440]) {
     await loadDemo(page, 'types', info); const results = await validateDemo(page, 'types');
     expect(results.items.every((item: any) => item.recalculation.policy.mode === 'validation_only')).toBe(true);
     await rejectForcedDirection(page, results.items[0].instanceId);
-    await expect(page.getByRole('table', { name: 'Destinos de recálculo', exact: true }).getByRole('combobox')).toHaveCount(0);
+    const reviewId = await prepareDirections(page);
+    const summary = await get(page, `/direction-reviews/${reviewId}`);
+    expect(summary.counts).toMatchObject({ totalRows: 8, excluded: 8, included: 0 });
+    await expect(page.locator('ce-directions').getByRole('combobox', { name: / · Destino$/ })).toHaveCount(0);
+    await expect(page.locator('#next-stage-badge')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Descargar resultados de esta ejecución', exact: true })).toBeEnabled();
     await page.getByRole('table', { name: 'Resultados de validación', exact: true }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: info.outputPath(`demo-types-results-${width}.png`) });
     await stage(page, '3. Recalcular', '#preview-title'); const simulated = await runAction(page, '/previews', 'Simular recálculos');
@@ -152,5 +216,6 @@ for (const width of [320, 390, 1440]) {
     await expect(page.getByText('No hay direcciones guardadas.', { exact: false })).toBeVisible();
     const apply = page.getByRole('button', { name: 'Aplicar cambios seleccionados', exact: true }); if (await apply.count()) await expect(apply).toBeDisabled();
     await noPageOverflow(page);
+  });
   });
 }

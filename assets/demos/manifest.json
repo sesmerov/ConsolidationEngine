@@ -19,8 +19,8 @@
       "demo": "corep",
       "kind": "report",
       "file": "demo-corep-report.xlsx",
-      "sha256": "f4b8a6ae0cd0bd93078682d6c58820f04c517a9a0ee236c4804f3f9ba48461ab",
-      "size": 71618
+      "sha256": "64840d2e6443956f41e0acb3944701cfff12fbb6bde20cc22aba22e1aeaf29f3",
+      "size": 71723
     },
     {
       "demo": "types",

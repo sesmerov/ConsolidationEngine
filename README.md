@@ -2,8 +2,8 @@
 
 Aplicación local para validar informes Excel con reglas EBA, explicar los resultados y proponer
 recálculos con dependencias. Angular Material presenta los datos; Node.js ejecuta el motor con
-ANTLR JavaScript, aritmética exacta y ordenamiento topológico de Kahn. Cada cambio requiere
-seleccionar un destino, revisar una propuesta y confirmarla. La aplicación conserva versiones
+ANTLR JavaScript, aritmética exacta y ordenamiento topológico de Kahn. El analista revisa los
+destinos, selecciona los cambios y confirma su aplicación. El sistema conserva versiones
 anteriores y vuelve a validar después de aplicar.
 
 Las funcionalidades US1–US4 de la iteración 002 están implementadas y tienen evidencia por
@@ -46,17 +46,10 @@ reiniciar el comando. No detener un proceso con datos de otra sesión para ejecu
 
 ## Cuatro etapas de trabajo
 
-1. **Cargar**: seleccionar catálogo e informes, declarar el contexto o usar el del libro,
-   inspeccionar los archivos y confirmar la carga revisada. Inspeccionar todavía no cambia datos.
-2. **Validar**: consultar tablas paginadas con estados, descripciones y motivos. Abrir
-   **Ver cálculo y origen** para revisar operandos, lecturas y procedencia. Elegir expresamente
-   los destinos de las reglas que admiten recálculo.
-3. **Recalcular**: simular, revisar **Anterior → Propuesto**, consultar dependencias y seleccionar
-   cada propuesta. Ningún antecedente se acepta automáticamente. Confirmar publica una nueva
-   versión y muestra la comparación con la validación anterior.
-4. **Descargar**: elegir una versión y guardar sus informes o una ejecución de validación.
-   **Descargar esta versión** desde una aplicación usa la versión de ese recibo, aunque el
-   selector histórico apunte a otra; el selector conserva su elección.
+1. En **Cargar**, seleccionar catálogo e informes, revisar su contexto y confirmar las hojas que se importarán. La cabecera muestra el contexto único como texto y permite elegir cuando hay varios. La búsqueda por código alcanza todo el catálogo.
+2. En **Validar**, consultar el resultado y abrir **Ver cálculo y origen** para revisar las entradas. **Preparar revisión de destinos** sugiere la celda cuando solo hay un lado elegible. El analista puede omitirla. Cuando hay dos lados posibles, elige el lado o la omisión. Si varias reglas apuntan a la misma celda, decide cuál conservar o si omitir el grupo. **Guardar configuración** publica esas decisiones.
+3. En **Recalcular**, simular, comparar **Anterior → Propuesto** y seleccionar cada cambio y sus predecesores. La confirmación aparece con la primera selección y cuenta las propuestas de todas las páginas. Aplicar publica una versión con los valores elegidos y vuelve a validar el conjunto.
+4. En **Descargar**, guardar resultados o informes de una versión. **Siguiente paso** señala la etapa disponible tras publicar la carga, guardar destinos utilizables o aplicar cambios. La descarga de informes aplicados toma la versión del recibo y respeta la elección del selector histórico.
 
 La cobertura regulatoria visual es **COREP de fondos propios 4.0, C_01.00 / CA1**: 110 posiciones.
 Se admite el extracto saneado o el libro oficial completo reconocido. En este último se incluye
@@ -70,7 +63,7 @@ datos son sintéticos. Descargar una guía o cambiar de ejemplo no importa datos
 
 | Ejemplo | Reglas | Resultado inicial | Recálculo |
 |---|---:|---|---|
-| COREP CA1 | 16: cinco procedentes del catálogo EBA y once sintéticas | 7 pasan, 8 fallan y 1 no aplica | Cinco destinos explícitos; después 14 pasan, 1 falla y 1 no aplica. |
+| COREP CA1 | Cinco procedentes del catálogo EBA y once sintéticas | 7 pasan, 8 fallan y 1 no aplica | Conservar `v0174_m` en r0070 y omitir el grupo r0200 deja cinco productores oficiales. Después pasan 14 reglas, falla 1 y 1 no aplica. |
 | Texto y fechas | 8 sintéticas | 6 pasan y 2 fallan | Sólo validación, sin destinos ni propuestas. |
 
 Son **24 reglas: cinco de origen EBA y diecinueve sintéticas**. El ejemplo COREP muestra dos ramas
@@ -81,9 +74,7 @@ En el perfil nuevo, las reglas que contienen condicionales, texto o fechas son *
 incluso si su resultado es numérico o el tipo aparece en una rama no ejecutada. Las desigualdades
 tampoco ofrecen destino porque no son igualdades. Las comprobaciones se repiten en API y motor.
 
-El formato anterior `ce-report-1` y el ejemplo de dos reglas permanecen en
-**Formato anterior ce-report-1**, como opción avanzada de carga directa. Sus hojas
-Instructions/Contexts/Coordinates/Facts y el perfil v1 conservan sus reglas de compatibilidad.
+La interfaz de carga ofrece el perfil visual COREP y el ejemplo tipado. La API de compatibilidad conserva `ce-report-1` para pruebas y consumidores existentes. En la prueba FINREP, la inspección del extracto F_01.01 terminó con `INVALID_WORKBOOK`. Sobre las mismas cuatro cifras en el formato de compatibilidad, el motor evaluó las dos reglas del catálogo propio y obtuvo los resultados previstos. [Ensayo FINREP](specs/003-simplificar-flujo/evidencia.md)
 
 ## Exportación, límites y sesión
 
@@ -110,7 +101,7 @@ los resultados de la ejecución elegida en JSON y XLSX, incluido su estado si qu
 - Un fallo o cancelación anterior a publicar conserva la versión vigente. Cancelar después no
   deshace una aplicación publicada. Una aceptación sin cambio se audita con `changed:false`.
 
-La medición nueva de 500 reglas y 100.000 datos pasa **10/10 ejecuciones ≤30 s**, con máximo
+La medición de la iteración 002 de 500 reglas y 100.000 datos pasó **10/10 ejecuciones ≤30 s**, con máximo
 **15,78 s** desde fin de carga hasta resultados visibles; las diez auditorías completas pasan. La carga se mide
 aparte: media **30,20 s**. Equipo Ryzen 5 3600X/32 GB, Windows 11. CA1, con 110 posiciones,
 se mide por API de forma independiente: **0,84 s** para el extracto y **2,47 s** para el libro
@@ -119,6 +110,7 @@ el [rendimiento de 001](docs/performance.md) se conserva como evidencia históri
 
 ## Documentos y desarrollo
 
+- [Recorrido y comprobaciones de la iteración 003](specs/003-simplificar-flujo/quickstart.md), [revisión de destinos](specs/003-simplificar-flujo/contracts/direction-review.md) y [registro de verificación 003](docs/verification-003.md).
 - [Inicio y comprobaciones 002](specs/002-ui-eba-demo/quickstart.md), [demos](docs/visual-demos.md)
   y [evidencia ejecutada](docs/verification-002.md).
 - [Especificación 002](specs/002-ui-eba-demo/spec.md), [plan](specs/002-ui-eba-demo/plan.md),

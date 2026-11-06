@@ -11,7 +11,9 @@ beforeEach(() => { TestBed.configureTestingModule({ providers: [ResultsStore, pr
 afterEach(() => { http.verify(); TestBed.resetTestingModule(); });
 it('restores retained validation references and its newest results without browser persistence', async () => {
   const store = TestBed.inject(ResultsStore); TestBed.tick(); http.expectOne(request => request.url.endsWith('/runs')).flush({ items: [run], total: 1, nextCursor: null, revision: 'rev' }); await Promise.resolve();
-  http.expectOne(request => request.url.endsWith('/runs/restored/results')).flush({ items: [], total: 0, nextCursor: null, versionId: 'version', run: { ...run, summary: { byStatus: { pass: 0, fail: 0 } } } }); await Promise.resolve();
+  const results = http.expectOne(request => request.url.endsWith('/runs/restored/results'));
+  expect(String(results.request.params.get('includeConfiguredDirections'))).toBe('false');
+  results.flush({ items: [], total: 0, nextCursor: null, versionId: 'version', run: { ...run, summary: { byStatus: { pass: 0, fail: 0 } } } }); await Promise.resolve();
   expect(store.selectedRunId()).toBe('restored'); expect(store.page()?.run.id).toBe('restored'); expect(store.history()[0]!.id).toBe('restored');
 });
 it('does not expose stale history after the workspace closes during its request', async () => {

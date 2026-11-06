@@ -13,7 +13,7 @@ export class ApplyStore {
   readonly selection = signal<PreviewSelectionDTO | null>(null); readonly proposals = signal<readonly ProposalDTO[]>([]); readonly sources = signal<readonly SourceFile[]>([]);
   readonly session = inject(SessionStore); private readonly api = inject(ApiClient);
   private readonly view = inject(WorkspaceViewStore);
-  private accepted: { jobId: string; attempt: Attempt } | null = null;
+  private accepted: { jobId: string; previewId: string; baseVersionId: string; closureHash: string } | null = null;
   readonly acknowledged = signal(false); readonly pending = signal(false); readonly error = signal<string | null>(null); readonly uncertain = signal(false); readonly rejected = signal(false);
   private contextKey = ''; private attempt: Attempt | undefined; private workspaceId: string | undefined;
   readonly selectedProposals = computed(() => {
@@ -40,7 +40,7 @@ export class ApplyStore {
       }
     });
     effect(() => { const preview = this.preview(), selection = this.selection(), base = this.session.versionId(); const key = JSON.stringify([preview?.id, preview?.state, base, selection?.closureHash, selection?.selectedIds]); untracked(() => { if (key !== this.contextKey) { this.contextKey = key; this.acknowledged.set(false); if (!this.uncertain()) this.rejected.set(false); } }); });
-    effect(() => { const id = this.session.workspace()?.id; if (id !== this.workspaceId) { this.workspaceId = id; untracked(() => { this.attempt = undefined; this.uncertain.set(false); this.pending.set(false); this.rejected.set(false); this.error.set(null); this.acknowledged.set(false); }); } });
+    effect(() => { const id = this.session.workspace()?.id; if (id !== this.workspaceId) { this.workspaceId = id; untracked(() => { this.attempt = undefined; this.accepted = null; this.uncertain.set(false); this.pending.set(false); this.rejected.set(false); this.error.set(null); this.acknowledged.set(false); }); } });
   }
   private async observeReceipt(job: JobDTO): Promise<void> {
     try {
@@ -54,8 +54,8 @@ export class ApplyStore {
     const accepted = this.accepted, job = this.session.job();
     if (!accepted || !job || job.jobId !== accepted.jobId || job.status !== 'succeeded' || job.resultRef?.id !== receipt.id ||
         job.newVersionId !== receipt.newVersionId || job.workspaceId !== this.session.workspace()?.id ||
-        accepted.attempt.body.previewId !== receipt.previewId || accepted.attempt.body.baseVersionId !== receipt.baseVersionId ||
-        accepted.attempt.body.closureHash !== receipt.closureHash) return;
+        accepted.previewId !== receipt.previewId || accepted.baseVersionId !== receipt.baseVersionId ||
+        accepted.closureHash !== receipt.closureHash) return;
     this.view.published(job.workspaceId, receipt.baseVersionId, receipt.newVersionId, job.jobId, 'exports', receipt.id);
     this.accepted = null;
   }
@@ -75,7 +75,9 @@ export class ApplyStore {
     const attempt = this.attempt; if (!attempt || attempt.workspaceId !== this.session.workspace()?.id) return; this.pending.set(true); this.error.set(null);
     try { const job = await this.api.apply(attempt.workspaceId, attempt.body, attempt.etag, attempt.key); if (this.attempt !== attempt || attempt.workspaceId !== this.session.workspace()?.id) return;
       this.uncertain.set(false); this.acknowledged.set(false); this.attempt = undefined;
-      this.accepted = { jobId: job.jobId, attempt }; this.session.trackJob(job); if (isTerminalJob(job.status)) await this.session.refreshWorkspace(attempt.workspaceId);
+      const { previewId, baseVersionId, closureHash } = attempt.body;
+      this.accepted = { jobId: job.jobId, previewId, baseVersionId, closureHash };
+      this.session.trackJob(job); if (isTerminalJob(job.status)) await this.session.refreshWorkspace(attempt.workspaceId);
     } catch (error) { if (this.attempt !== attempt || attempt.workspaceId !== this.session.workspace()?.id) return;
       const uncertain = error instanceof HttpErrorResponse && (error.status === 0 || error.status >= 500); this.uncertain.set(uncertain); this.rejected.set(!uncertain);
       this.error.set(uncertain ? 'No se ha podido confirmar la respuesta. Reintenta la misma aplicación para recuperar su estado sin duplicar cambios.' : error instanceof HttpErrorResponse && typeof error.error?.error?.message === 'string' ? error.error.error.message as string : 'No se pudo aplicar la selección.');

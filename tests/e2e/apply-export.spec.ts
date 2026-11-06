@@ -6,6 +6,7 @@ import type { Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
 import { readZipParts } from '../helpers/xlsx-fixtures.js';
+import { prepareDirections, saveDirections } from './direction-review-helpers.js';
 import { importLegacyFixture, navigateStage, openCalculation } from './workflow-helpers.js';
 const root = path.resolve('tests/fixtures/generated');
 const exact = '123456789012345678901234567890.123456789';
@@ -45,8 +46,13 @@ async function validate(page: Page) {
 }
 async function prepare(page: Page) {
   const files = await fixtures(), originalVersion = await upload(page, files.catalog, [{ name: 'synthetic-original.xlsx', buffer: files.report }]), initial = await validate(page);
-  for (const code of selectedCodes) await page.getByLabel(code + ' · Destino', { exact: true }).selectOption('left');
-  await page.getByRole('button', { name: 'Guardar configuración', exact: true }).click(); await expect(page.getByText(/Configuración guardada/)).toBeVisible();
+  const reviewId = await prepareDirections(page);
+  const zero = page.getByRole('table', { name: 'Destinos de recálculo' }).getByRole('row').filter({ has: page.getByText('synthetic_zero', { exact: true }) });
+  const omitting = page.waitForResponse(response => response.url().endsWith('/direction-reviews/' + reviewId) && response.request().method() === 'PATCH');
+  await zero.getByRole('button', { name: 'Omitir', exact: true }).click();
+  expect((await omitting).status()).toBe(200);
+  await expect(zero.getByRole('button', { name: 'Usar', exact: true })).toBeVisible();
+  await saveDirections(page, reviewId, selectedCodes.length);
   await navigateStage(page, 'recalculation');
   const connection = await session(page), response = await page.request.get(`/api/v1/workspaces/${connection.id}`, { headers: connection.headers }), workspace = await response.json(), etag = response.headers()['etag']!;
   const previewResponse = page.waitForResponse(response => response.url().endsWith('/previews') && response.request().method() === 'POST'); await page.getByRole('button', { name: 'Simular recálculos', exact: true }).click(); const job = await poll(page, (await (await previewResponse).json()).jobId); expect(job.status).toBe('succeeded');

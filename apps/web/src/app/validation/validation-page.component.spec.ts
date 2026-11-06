@@ -17,7 +17,10 @@ const terminalJob = { jobId: '0cfafc23-142c-48f1-8cdf-c346df5ec02b', workspaceId
 describe('validation page HTTP workflow', () => {
   let http: HttpTestingController, session: SessionStore;
   beforeEach(() => { TestBed.configureTestingModule({ imports: [ValidationPageComponent], providers: [provideHttpClient(), provideHttpClientTesting()] }); http = TestBed.inject(HttpTestingController); session = TestBed.inject(SessionStore); TestBed.inject(ApiClient).setSessionToken('memory-only'); session.workspace.set(workspace); session.etag.set('"v-' + versionId + '"'); });
-  function flushHistory() { for (const request of http.match(request => request.url.endsWith('/runs'))) request.flush({ items: [], total: 0, nextCursor: null, revision: 'rev' }); }
+  function flushHistory() {
+    for (const request of http.match(request => request.url.endsWith('/runs'))) request.flush({ items: [], total: 0, nextCursor: null, revision: 'rev' });
+    for (const request of http.match(request => request.method === 'GET' && request.url.endsWith('/direction-reviews'))) request.flush({ active:null });
+  }
   afterEach(() => { http.verify(); TestBed.resetTestingModule(); });
   it('starts validation against the visible snapshot and separates pass from warning severity with exact values', async () => {
     const fixture = TestBed.createComponent(ValidationPageComponent); fixture.detectChanges(); flushHistory();

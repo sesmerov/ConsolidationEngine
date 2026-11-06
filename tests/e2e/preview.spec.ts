@@ -4,6 +4,7 @@ import type { Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
 import { importLegacyFixture, navigateStage, openCalculation, openTechnical } from './workflow-helpers.js';
+import { prepareDirections, saveDirections } from './direction-review-helpers.js';
 const root = path.resolve('tests/fixtures/generated');
 async function session(page: Page) { const bootstrap = await (await page.request.get('/api/v1/bootstrap')).json(); return { id: bootstrap.activeWorkspaceId as string, headers: { 'X-CE-Session': bootstrap.sessionToken as string } }; }
 async function catalog(expressions: readonly (readonly [string, string, string?])[]) {
@@ -18,7 +19,8 @@ async function validate(page: Page) {
   const job = await (await response).json(); await expect(page.locator('#validation-run')).toHaveValue(job.resultRef.id, { timeout: 15000 }); const connection = await session(page);
   return (await page.request.get(`/api/v1/workspaces/${connection.id}/runs/${job.resultRef.id}/results?limit=200`, { headers: connection.headers })).json();
 }
-async function configure(page: Page, expressions: readonly (readonly [string, string, string?])[], facts?: Readonly<Record<string, string>>) {
+async function configure(page: Page, expressions: readonly (readonly [string, string, string?])[], options: { facts?: Readonly<Record<string, string>>; legacyProducerConflict?: boolean } = {}) {
+  const { facts } = options;
   let report: string | { name: string; buffer: Buffer } = path.join(root, 'report-42.xlsx');
   if (facts) {
     const sheets = (await readXlsxFile(path.join(root, 'report-42.xlsx'), { parseNumber: text => text, trim: false })).map(sheet => ({ sheet: sheet.sheet, data: sheet.data.map(row => row.map(value => value === null ? null : String(value))) }));
@@ -28,10 +30,25 @@ async function configure(page: Page, expressions: readonly (readonly [string, st
     report = { name: 'synthetic-values.xlsx', buffer };
   }
   await importLegacyFixture(page, { name: 'synthetic-preview.xlsx', buffer: await catalog(expressions) }, [report]);
-  await navigateStage(page, 'validation');
-  await expect(page.getByRole('button', { name: 'Validar informes', exact: true })).toBeEnabled({ timeout: 15000 }); const run = await validate(page);
-  for (const [code] of expressions) await page.getByLabel(code + ' · Destino', { exact: true }).selectOption('left');
-  await page.getByRole('button', { name: 'Guardar configuración', exact: true }).click(); await expect(page.getByText(/Configuración guardada/)).toBeVisible();
+  const run = await validate(page);
+  if (options.legacyProducerConflict) {
+    // Seed the conflicting configuration accepted by the previous client to exercise the preview guard.
+    const connection = await session(page), base = `/api/v1/workspaces/${connection.id}`;
+    const current = await page.request.get(base, { headers: connection.headers });
+    expect(current.status()).toBe(200);
+    const directions = expressions.map(([code]) => {
+      const instanceId = run.items.find((result: { code: string }) => result.code === code)?.instanceId;
+      expect(instanceId).toBeTruthy();
+      return { instanceId, targetSide: 'left' };
+    });
+    const configured = await page.request.put(base + '/directions', { headers: { ...connection.headers, 'If-Match': current.headers()['etag']! }, data: { directions } });
+    expect(configured.status()).toBe(200);
+    await page.reload();
+    await expect(page.getByTestId('current-version-id')).toHaveText((await configured.json()).versionId);
+  } else {
+    const reviewId = await prepareDirections(page);
+    await saveDirections(page, reviewId, expressions.length);
+  }
   await navigateStage(page, 'recalculation');
   await expect(page.getByRole('button', { name: 'Simular recálculos', exact: true })).toBeEnabled(); const connection = await session(page);
   const current = await page.request.get(`/api/v1/workspaces/${connection.id}`, { headers: connection.headers }); return { connection, workspace: await current.json(), etag: current.headers()['etag']!, run };
@@ -54,7 +71,7 @@ test('V06-preview/V09: topological simulation re-evaluates a false guard, requir
     ['synthetic_Z_producer', 'with {tC_01.00,c0010,interval:false}: {r0230}={r0250}+{r0260}'],
     ['synthetic_A_consumer', 'with {tC_01.00,c0010,interval:false}: {r0270}={r0230}*2'],
     ['synthetic_guard', '{tC_05.01,r0090,c0060}=3', '{tC_01.00,r0270,c0010}=24'],
-  ], { '0230': '11', '0250': '5', '0260': '7', '0270': '22' });
+  ], { facts: { '0230': '11', '0250': '5', '0260': '7', '0270': '22' } });
   expect(initial.run.items.find((row: { code: string }) => row.code === 'synthetic_guard').status).toBe('not_applicable');
   const simulation = await preview(page); expect(simulation.data.items.map((row: { code: string }) => row.code)).toEqual(['synthetic_Z_producer', 'synthetic_A_consumer', 'synthetic_guard']);
   expect(simulation.data.items.map((row: { after: { originalText: string } }) => row.after.originalText)).toEqual(['12.00', '24.00', '3.00']);
@@ -72,7 +89,7 @@ test('V06-preview/V09: topological simulation re-evaluates a false guard, requir
   await page.reload(); await navigateStage(page, 'recalculation'); await expect(page.getByText('Previsualización descartada. Sus propuestas se conservan para consulta.')).toBeVisible();
 });
 test('V09: equal-valued conflicting producers and their dependent proposal are blocked with explanations', async ({ page }) => {
-  const initial = await configure(page, [['synthetic_P', '{tC_01.00,r0230,c0010}=1'], ['synthetic_Q', '{tC_01.00,r0230,c0010}=1'], ['synthetic_D', '{tC_01.00,r0250,c0010}={tC_01.00,r0230,c0010}+1']]);
+  const initial = await configure(page, [['synthetic_P', '{tC_01.00,r0230,c0010}=1'], ['synthetic_Q', '{tC_01.00,r0230,c0010}=1'], ['synthetic_D', '{tC_01.00,r0250,c0010}={tC_01.00,r0230,c0010}+1']], { legacyProducerConflict: true });
   const simulation = await preview(page); expect(simulation.data.items.every((row: { state: string }) => row.state === 'blocked')).toBe(true);
   await expect(page.getByText('Hay productores incompatibles para un mismo destino. Consulta el detalle de las propuestas bloqueadas.', { exact: true })).toBeVisible(); await expect(page.locator('ce-preview-page input[type="checkbox"]:enabled')).toHaveCount(0);
   expect((await (await page.request.get(`/api/v1/workspaces/${initial.connection.id}`, { headers: initial.connection.headers })).json()).currentVersionId).toBe(initial.workspace.currentVersionId);

@@ -44,7 +44,7 @@ export class ResultsStore {
     const workspaceId = this.session.workspace()?.id, runId = this.selectedRunId(); if (!workspaceId || !runId) return;
     const request = this.pagination.begin(JSON.stringify([workspaceId, runId, this.status(), this.code(), this.table()]), typeof append === 'number' ? append : append ? this.pagination.index() + 1 : 0);
     const generation = ++this.generation, cursor = request.cursor; this.loading.set(true); this.error.set(null);
-    try { const page = await this.api.results(workspaceId, runId, { ...(this.status() ? { status: this.status() } : {}), ...(this.code() ? { code: this.code() } : {}), ...(this.table() ? { table: this.table() } : {}), ...(cursor ? { cursor } : {}) });
+    try { const page = await this.api.results(workspaceId, runId, { includeConfiguredDirections: false, ...(this.status() ? { status: this.status() } : {}), ...(this.code() ? { code: this.code() } : {}), ...(this.table() ? { table: this.table() } : {}), ...(cursor ? { cursor } : {}) });
       if (generation !== this.generation || this.session.workspace()?.id !== workspaceId) return;
       this.pagination.accept(request.index, page.total, page.nextCursor, page.items.length); this.page.set(page);
       this.history.update((runs) => [...runs.filter((run) => run.id !== page.run.id), page.run].sort((a, b) => b.startedAt.localeCompare(a.startedAt)));

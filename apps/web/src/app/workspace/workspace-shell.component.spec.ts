@@ -30,6 +30,7 @@ describe('workspace navigation keeps one active stage', () => {
     TestBed.configureTestingModule({ deferBlockBehavior: DeferBlockBehavior.Playthrough, imports: [AppComponent], providers: [{ provide: ApiClient, useValue: {
       capabilities: vi.fn().mockResolvedValue({ knownDifferences: [] }),
       activeImportInspection: vi.fn().mockResolvedValue({ active: null }),
+      activeDirectionReviews: vi.fn().mockResolvedValue({ active: null }),
       rules: vi.fn().mockResolvedValue({ items: [], total: 0, nextCursor: null, sources: [], coverage: {}, dataSummary: {} }),
       runs: vi.fn().mockResolvedValue({ items: [], total: 0, nextCursor: null }),
       previews: vi.fn().mockResolvedValue({ items: [], total: 0, nextCursor: null }),
@@ -108,12 +109,12 @@ describe('workspace navigation keeps one active stage', () => {
     await (await loader.getHarness(MatButtonHarness.with({ text: 'Volver' }))).click(); expect(await trigger.isFocused()).toBe(true);
     expect(TestBed.inject(SessionStore).workspace()?.id).toBe(workspace.id); expect(TestBed.inject(ApiClient).closeWorkspace).not.toHaveBeenCalled();
   });
-  it('keeps files, filters, the complete direction draft, selection and historical download across Material navigation', async () => {
+  it('keeps files, filters, the direction review scope, selection and historical download across Material navigation', async () => {
     const fixture = TestBed.createComponent(AppComponent); fixture.detectChanges(); await fixture.whenStable();
     const injector = fixture.debugElement.query(By.directive(WorkspaceShellComponent)).injector;
     const imports = injector.get(ImportStore), results = injector.get(ResultsStore), proposals = injector.get(PreviewStore), directions = injector.get(DirectionsStore);
     TestBed.tick(); await fixture.whenStable();
-    directions.page.set(page); TestBed.tick(); directions.draft.set({ remembered: 'left' });
+    directions.bind(page.run); directions.stateFilter.set('omitted');
     const catalog = new File(['x'], 'catalog.xlsx'); imports.catalog.set(catalog); imports.reports.set([new File(['x'], 'report.xlsx')]);
     results.code.set('ABC'); results.selectedRunId.set('remembered-run'); proposals.selected.set(['remembered-proposal']); proposals.code.set('DEF');
     TestBed.inject(SessionStore).selectExportVersion('v0');
@@ -121,7 +122,7 @@ describe('workspace navigation keeps one active stage', () => {
     for (const text of ['2. Validar', '3. Recalcular', '4. Descargar', '1. Cargar']) { await (await loader.getHarness(MatButtonHarness.with({ text }))).click(); }
     expect(imports.catalog()).toBe(catalog); expect(imports.reports()[0]?.name).toBe('report.xlsx');
     expect(results.code()).toBe('ABC'); expect(results.selectedRunId()).toBe('remembered-run'); expect(proposals.selected()).toEqual(['remembered-proposal']); expect(proposals.code()).toBe('DEF');
-    expect(directions.draft()).toEqual({ remembered: 'left' }); expect(TestBed.inject(SessionStore).exportVersionId()).toBe('v0');
+    expect(directions.run()?.id).toBe(page.run.id); expect(directions.stateFilter()).toBe('omitted'); expect(TestBed.inject(SessionStore).exportVersionId()).toBe('v0');
     expect((fixture.nativeElement as HTMLElement).querySelectorAll('ce-import-page,ce-validation-page,ce-preview-page,ce-exports')).toHaveLength(1);
   });
   it('preserves an uncertain export attempt across navigation and uses its original key, body and CAS on retry', async () => {

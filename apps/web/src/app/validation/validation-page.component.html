@@ -27,7 +27,8 @@
 <tr mat-header-row *matHeaderRowDef="['rule','status','severity','location','capability','detail']"></tr><tr mat-row class="result-row" *matRowDef="let row; columns: ['rule','status','severity','location','capability','detail'];"></tr>
 <tr *matNoDataRow><td colspan="6">No hay resultados para esta búsqueda.</td></tr></table></div><mat-paginator aria-label="Páginas de resultados de validación" [length]="page.total" [pageSize]="50" [pageIndex]="store.pagination.index()" [hidePageSize]="true" [showFirstLastButtons]="false" [disabled]="store.loading()" (page)="closeDetail(); store.load($event.pageIndex)"/>
 @if (detail(); as result) { <ce-calculation-detail [result]="result" [files]="page.sourceFiles || []" (closed)="closeDetail()"/> }
-<ce-directions [page]="page"/><ce-results-export [run]="page.run"/>
+@if (page.run.id === store.selectedRunId()) { <ce-directions [page]="page"/> }
+<ce-results-export [run]="page.run"/>
 <details class="trace-details"><summary>Cobertura y trazabilidad de la ejecución</summary><p>{{ page.run.summary.rows }} filas · {{ page.run.summary.variants }} variantes · {{ page.run.summary.instances }} instancias · {{ page.run.summary.duplicateRows }} duplicadas</p><p>{{ page.run.id }} · {{ page.versionId }}</p></details>
 }
 </section>

@@ -7,6 +7,10 @@ import type { HistoryPageDTO, PreviewDTO, PreviewSelectionDTO, PreviewSummaryDTO
 import type { ApplicationDetailDTO, ApplicationRequestDTO, ComparisonPageDTO } from '@ce/contracts';
 import type { ActiveImportInspectionDTO, ImportContextInputDTO, ImportInspectionCommitDTO, ImportInspectionDTO } from '@ce/contracts';
 import type { VersionExportSummaryDTO } from '@ce/contracts';
+import type {
+  DirectionReviewActiveDTO, DirectionReviewCommitDTO, DirectionReviewDecision, DirectionReviewMutationResponseDTO,
+  DirectionReviewPageDTO, DirectionReviewPatchDTO, DirectionReviewPrepareDTO, DirectionReviewSummaryDTO,
+} from '@ce/contracts';
 @Injectable({ providedIn: 'root' })
 export class ApiClient {
   private readonly http = inject(HttpClient);
@@ -54,8 +58,33 @@ export class ApiClient {
   validate(workspaceId: string, baseVersionId: string, etag: string, key: string): Promise<JobDTO> {
     return firstValueFrom(this.http.post<JobDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/validations', { baseVersionId }, { headers: this.headers(etag).set('Idempotency-Key', key) }));
   }
-  results(workspaceId: string, runId: string, filters: { code?: string; status?: string; table?: string; cursor?: string } = {}): Promise<ValidationResultsPageDTO> {
+  results(workspaceId: string, runId: string, filters: { code?: string; status?: string; table?: string; cursor?: string; includeConfiguredDirections?: boolean } = {}): Promise<ValidationResultsPageDTO> {
     return firstValueFrom(this.http.get<ValidationResultsPageDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/runs/' + encodeURIComponent(runId) + '/results', { headers: this.headers(), params: { limit: '50', ...filters } }));
+  }
+  private reviewsUrl(workspaceId: string, reviewId?: string): string {
+    const collection = '/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/direction-reviews';
+    return reviewId ? collection + '/' + encodeURIComponent(reviewId) : collection;
+  }
+  activeDirectionReviews(workspaceId: string): Promise<DirectionReviewActiveDTO> {
+    return firstValueFrom(this.http.get<DirectionReviewActiveDTO>(this.reviewsUrl(workspaceId), { headers: this.headers() }));
+  }
+  directionReview(workspaceId: string, id: string): Promise<DirectionReviewSummaryDTO> {
+    return firstValueFrom(this.http.get<DirectionReviewSummaryDTO>(this.reviewsUrl(workspaceId, id), { headers: this.headers() }));
+  }
+  directionReviewRows(workspaceId: string, id: string, filters: { cursor?: string; groupId?: string; state?: DirectionReviewDecision }): Promise<DirectionReviewPageDTO> {
+    return firstValueFrom(this.http.get<DirectionReviewPageDTO>(this.reviewsUrl(workspaceId, id) + '/rows', { headers:this.headers(), params:{limit:'50',...filters} }));
+  }
+  prepareDirectionReview(workspaceId: string, body: DirectionReviewPrepareDTO, etag: string, key: string): Promise<JobDTO> {
+    return firstValueFrom(this.http.post<JobDTO>(this.reviewsUrl(workspaceId), body, {headers:this.headers(etag).set('Idempotency-Key',key)}));
+  }
+  editDirectionReview(workspaceId: string, id: string, body: DirectionReviewPatchDTO, etag: string): Promise<DirectionReviewMutationResponseDTO> {
+    return firstValueFrom(this.http.patch<DirectionReviewMutationResponseDTO>(this.reviewsUrl(workspaceId,id), body, {headers:this.headers(etag)}));
+  }
+  commitDirectionReview(workspaceId: string, id: string, body: DirectionReviewCommitDTO, etag: string, key: string): Promise<JobDTO> {
+    return firstValueFrom(this.http.post<JobDTO>(this.reviewsUrl(workspaceId,id) + '/commit', body, {headers:this.headers(etag).set('Idempotency-Key',key)}));
+  }
+  discardDirectionReview(workspaceId: string, id: string, etag: string): Promise<DirectionReviewSummaryDTO> {
+    return firstValueFrom(this.http.delete<DirectionReviewSummaryDTO>(this.reviewsUrl(workspaceId,id), {headers:this.headers(etag)}));
   }
   replaceDirections(workspaceId: string, directions: readonly DirectionChoiceDTO[], etag: string): Promise<HttpResponse<DirectionsResponseDTO>> {
     return firstValueFrom(this.http.put<DirectionsResponseDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/directions', { directions }, { headers: this.headers(etag), observe: 'response' }));

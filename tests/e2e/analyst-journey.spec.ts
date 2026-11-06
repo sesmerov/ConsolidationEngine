@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import { readZipParts } from '../helpers/xlsx-fixtures.js';
+import { configureCorepDemo } from './direction-review-helpers.js';
 async function tabTo(page: Page, target: Locator) {
   await expect(target).toBeVisible();
   await expect(target).toBeEnabled();
@@ -83,15 +84,7 @@ test('COREP analyst journey by keyboard: inspect, confirm, validate, apply five 
   await expect(page.locator('.result-row').filter({ hasText: 'v0174_m' }).getByText('Falla', { exact: true })).toBeVisible();
   await expect(page.locator('.result-row').filter({ hasText: 'DEMO_IF_ELSE' }).getByText('Pasa', { exact: true })).toBeVisible();
   const official = ['v0172_m', 'v0173_m', 'v0174_m', 'v0175_m', 'v0176_m'];
-  for (const code of official) {
-    const control = page.getByLabel(code + ' · Destino', { exact: true });
-    await tabTo(page, control);
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('Enter');
-    await expect(control).toHaveValue('left');
-  }
-  await activate(page, page.getByRole('button', { name: 'Guardar configuración', exact: true }));
-  await expect(page.getByText(/Configuración guardada/)).toBeVisible();
+  await configureCorepDemo(page, control => activate(page, control));
   await stage(/^3\. Recalcular\b/, '#preview-title');
   const preview = await action('/previews', 'Simular recálculos');
   await expect(page.locator('#preview-history')).toHaveValue(preview.resultRef.id);

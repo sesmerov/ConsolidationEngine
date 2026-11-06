@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
-import type { Page, TestInfo } from '@playwright/test';
+import { configureCorepDemo } from './direction-review-helpers.js';
+import type { Locator, Page, TestInfo } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import { readZipParts } from '../helpers/xlsx-fixtures.js';
 import type { ZipPart } from '../helpers/xlsx-fixtures.js';
@@ -59,9 +60,10 @@ async function validate(page: Page) {
   await navigateStage(page, 'validation'); const job = await action(page, '/validations', 'Validar informes');
   await expect(page.locator('#validation-run')).toHaveValue(job.resultRef.id); return get(page, `/runs/${job.resultRef.id}/results?limit=200`);
 }
-async function download(page: Page, trigger: string, info: TestInfo, name: string, expected: { versionId: string; kind: 'report' | 'results'; runId?: string }) {
+async function download(page: Page, trigger: string | Locator, info: TestInfo, name: string, expected: { versionId: string; kind: 'report' | 'results'; runId?: string }) {
   const request = page.waitForRequest(value => value.url().endsWith('/exports') && value.method() === 'POST'), downloading = page.waitForEvent('download');
-  await page.getByRole('button', { name: trigger, exact: true }).click(); expect((await request).postDataJSON()).toEqual(expected);
+  const button = typeof trigger === 'string' ? page.getByRole('button', { name: trigger, exact: true }) : trigger;
+  await button.click(); expect((await request).postDataJSON()).toEqual(expected);
   const artifact = await downloading; expect(artifact.suggestedFilename()).toBe(`${expected.kind}.zip`);
   const location = info.outputPath(name); await artifact.saveAs(location); return readZipParts(location);
 }
@@ -100,21 +102,30 @@ test.beforeEach(async ({ page }) => { await page.setViewportSize({ width: 1440, 
 
 test('COREP exports the receipt and historical version, preserves selection across profiles, and reimports 110 values', async ({ page }, info) => {
   test.setTimeout(180_000); const files = await demo(page, 'corep'), originalVersion = await upload(page, files.catalog, files.report, 'corep');
-  const initial = await validate(page), connection = await session(page), current = await page.request.get(connection.base, { headers: connection.headers });
-  // Setup through the same public endpoint tested through manual choices in visual-demos.spec.ts.
-  const configured = await page.request.put(connection.base + '/directions', { headers: { ...connection.headers, 'If-Match': current.headers()['etag']! }, data: { directions: initial.items.filter((row: any) => /^v017[2-6]_m$/.test(row.code)).map((row: any) => ({ instanceId: row.instanceId, targetSide: 'left' })) } });
-  expect(configured.status()).toBe(200); await page.reload(); await navigateStage(page, 'recalculation');
+  const initial = await validate(page);
+  await configureCorepDemo(page);
+  await navigateStage(page, 'recalculation');
   await action(page, '/previews', 'Simular recálculos');
   for (const code of ['v0172_m', 'v0173_m', 'v0174_m', 'v0175_m', 'v0176_m']) await page.getByLabel(`Seleccionar ${code}`, { exact: true }).check();
+  await navigateStage(page, 'download');
+  await page.locator('#export-version').selectOption(originalVersion);
+  await navigateStage(page, 'recalculation');
   await page.getByLabel('He revisado cada propuesta y acepto aplicar el conjunto completo mostrado.').check();
   const applied = await action(page, '/applications', 'Aplicar cambios seleccionados'), comparison = await get(page, `/applications/${applied.resultRef.id}/comparison?limit=200`);
-  await navigateStage(page, 'download'); await page.locator('#export-version').selectOption(originalVersion);
+  await expect(page.getByRole('button', { name: 'Descargar esta versión', exact: true })).toBeVisible();
+  const next = page.getByRole('button', { name: '4. Descargar', exact: true });
+  await expect(next.locator('#next-stage-badge')).toHaveText('Siguiente paso');
+  await next.focus(); await page.keyboard.press('Enter');
+  await expect(page.locator('#exports-title')).toBeFocused();
+  await expect(page.locator('#next-stage-badge')).toHaveCount(0);
+  await expect(page.locator('#export-version')).toHaveValue(originalVersion);
   const summary = page.getByRole('region', { name: 'Contenido de la versión elegida', exact: true }); await expect(summary).toContainText('COREP'); await expect(summary).toContainText('histórica');
-  await navigateStage(page, 'recalculation');
-  const appliedZip = await download(page, 'Descargar esta versión', info, 'applied-corep.zip', { versionId: applied.newVersionId, kind: 'report' });
+  const appliedDownload = page.locator('button[data-applied-download]');
+  await expect(appliedDownload).toHaveAccessibleName(/Descargar informes aplicados.*Versión 3/);
+  const appliedZip = await download(page, appliedDownload, info, 'applied-corep.zip', { versionId: applied.newVersionId, kind: 'report' });
   const appliedReport = reportBytes(appliedZip); await assertCorep(appliedReport, true, info, 'applied-corep.xlsx');
   const changeLog = JSON.parse(appliedZip.find(part => part.name === 'changes.json')!.data.toString('utf8')); expect(changeLog.versionId).toBe(applied.newVersionId); expect(changeLog.changes).toHaveLength(5);
-  await navigateStage(page, 'download'); await expect(page.locator('#export-version')).toHaveValue(originalVersion);
+  await expect(page.locator('#export-version')).toHaveValue(originalVersion);
   const historicalZip = await download(page, 'Preparar descarga', info, 'historical-corep.zip', { versionId: originalVersion, kind: 'report' });
   await assertCorep(reportBytes(historicalZip), false, info, 'historical-corep.xlsx');
   expect(JSON.parse(historicalZip.find(part => part.name === 'changes.json')!.data.toString('utf8')).changes).toEqual([]);

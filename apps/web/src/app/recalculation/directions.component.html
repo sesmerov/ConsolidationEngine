@@ -1,17 +1,110 @@
 <section class="directions-panel" aria-labelledby="directions-title">
-<div class="section-heading"><div><h3 id="directions-title">Configurar destinos de recálculo</h3><p class="muted">Elige qué lado puede cambiar. Guardar no modifica los valores del informe.</p></div></div>
-@if (historical()) { <p class="notice">Esta ejecución es histórica. Valida la versión vigente para configurar cambios.</p> }
-@else if (!completeRun()) { <p class="notice">Se necesita una validación completa de la versión vigente para configurar destinos.</p> }
-@else if (!knownConfiguration()) { <p class="notice">No se ha recibido la configuración completa. Recarga los resultados antes de editar.</p> }
-@if (message(); as message) { <p class="notice" role="status">{{ message }}</p> } @if (error(); as error) { <p class="error" role="alert">{{ error }}</p> }
-<p id="directions-scroll-help" class="table-scroll-hint">Desplaza la tabla horizontalmente para ver todas las columnas.</p>
-<div class="table-region" role="region" aria-label="Configuración de destinos" aria-describedby="directions-scroll-help" tabindex="0"><table mat-table [dataSource]="page().items" class="data-table" aria-label="Destinos de recálculo">
-<ng-container matColumnDef="rule"><th mat-header-cell *matHeaderCellDef>Regla</th><td mat-cell *matCellDef="let row"><strong>{{ row.code }}</strong><span class="cell-secondary">{{ policyLabel(row) }}</span></td></ng-container>
-<ng-container matColumnDef="target"><th mat-header-cell *matHeaderCellDef>Destino</th><td mat-cell *matCellDef="let row">@if (row.recalculation?.policy?.mode === 'standard') { <mat-form-field appearance="outline"><mat-label>{{ row.code }} · Destino</mat-label><select matNativeControl [id]="'direction-' + row.id" [attr.aria-label]="row.code + ' · Destino'" [value]="row.instanceId ? draft()[row.instanceId] || '' : ''" (change)="choose(row, $any($event.target).value)" [disabled]="!editable() || !row.instanceId || row.recalculation?.policy?.mode !== 'standard'"><option value="">Sin dirección</option><option value="left" [disabled]="!row.recalculation?.left?.eligible">Izquierda{{ row.recalculation?.left?.target ? ' · ' + target(row.recalculation.left.target) : '' }}</option><option value="right" [disabled]="!row.recalculation?.right?.eligible">Derecha{{ row.recalculation?.right?.target ? ' · ' + target(row.recalculation.right.target) : '' }}</option></select></mat-form-field> } @else { <span class="muted">Sin destino</span> }</td></ng-container>
-<ng-container matColumnDef="reason"><th mat-header-cell *matHeaderCellDef>Disponibilidad</th><td mat-cell *matCellDef="let row">@if (row.recalculation?.policy?.mode === 'standard') { @if (!row.recalculation.left.eligible) { <p class="muted">Izquierda: {{ reason(row, 'left') }}</p> } @if (!row.recalculation.right.eligible) { <p class="muted">Derecha: {{ reason(row, 'right') }}</p> } } @else { {{ policyReason(row) }} }</td></ng-container>
-<tr mat-header-row *matHeaderRowDef="['rule','target','reason']"></tr><tr mat-row *matRowDef="let row; columns: ['rule','target','reason'];"></tr>
-</table></div>
-<p aria-live="polite"><strong>{{ choices().length }} destinos en la configuración completa.</strong> @if (hiddenCount()) { {{ hiddenCount() }} direcciones fuera de esta página se conservarán. }</p>
-@if (choices().length) { <details class="direction-summary"><summary>Revisar configuración completa ({{ choices().length }})</summary><ul>@for (choice of choices(); track choice.instanceId) { <li>{{ known()[choice.instanceId]?.code || 'Dirección configurada fuera de esta página' }} · {{ choice.targetSide === 'left' ? 'Izquierda' : 'Derecha' }} @if (known()[choice.instanceId]?.[choice.targetSide]; as cell) { · {{ target(cell) }} }</li> }</ul></details> }
-<div class="direction-actions"><button mat-stroked-button (click)="save()" [disabled]="!canSave()">{{ pending() ? 'Guardando configuración…' : 'Guardar configuración' }}</button><button mat-button (click)="clear()" [disabled]="!editable() || !choices().length">Quitar todas las direcciones</button></div>
+  <h3 id="directions-title">Configurar destinos de recálculo</h3>
+  @if (store.receipt(); as receipt) {
+    <p role="status">Configuración guardada · {{ versionLabel(store.session.workspace(), receipt.newVersionId) }} · {{ receipt.included }} destinos.</p>
+  }
+  @if (store.historical()) {
+    <p class="notice">Esta ejecución es histórica. Valida la versión vigente para configurar sus destinos.</p>
+  } @else if (!store.complete()) {
+    <p class="notice">Se necesita una validación completa para revisar sus destinos.</p>
+  }
+  @if (store.otherReview(); as other) {
+    <p class="notice">Hay una revisión abierta para otra ejecución. Puedes volver a esa ejecución o descartar su borrador.</p>
+    @if (other.state === 'ready') { <button mat-button (click)="store.discard()" [disabled]="store.busy() || store.uncertain()">Descartar revisión anterior</button> }
+  }
+  @if (store.error(); as error) { <p role="alert" class="error">{{ error }}</p> }
+  @if (store.uncertain()) {
+    <p class="notice">La respuesta está sin confirmar. El reintento conserva la solicitud original.</p>
+    <button mat-stroked-button [disabled]="store.pending()" (click)="store.retry()">Reintentar la misma operación</button>
+  }
+  @if (store.looking()) { <p role="status">Consultando la revisión…</p> }
+  @if (!store.historical() && store.complete() && !store.otherReview() && (store.canPrepare() || !store.review())) {
+    <button mat-stroked-button [disabled]="!store.canPrepare()" (click)="store.prepare()">Preparar revisión de destinos</button>
+  }
+  @if (store.review(); as review) {
+    @if (store.expired()) { <p class="notice">La revisión ha caducado. Prepara una nueva para continuar.</p> }
+    @if (review.state === 'preparing' || review.state === 'committing') { <p role="status">Trabajo de destinos en curso.</p> }
+    @if (review.state === 'ready' && !store.expired() && !store.historical()) {
+      @if (review.counts; as counts) {
+        <dl class="workspace-meta" aria-label="Resumen de la revisión completa">
+          @for (category of categories; track category.key) {
+            <div><dt>{{ category.label }}</dt><dd>{{ counts[category.key] }}</dd></div>
+          }
+        </dl>
+        <mat-form-field appearance="outline">
+          <mat-label>Decisiones de la revisión</mat-label>
+          <select matNativeControl [value]="store.stateFilter()" (change)="store.filter($any($event.target).value)" [disabled]="store.pending()">
+            <option value="">Todas</option>
+            @for (category of categories; track category.key) { <option [value]="category.key">{{ category.label }}</option> }
+          </select>
+        </mat-form-field>
+        @if (store.groupFilter()) { <button mat-button (click)="store.filter('')">Volver a todas las decisiones</button> }
+        @if (store.loading()) { <p role="status">Consultando destinos…</p> }
+        @if (store.rows(); as rows) {
+          @for (group of store.conflicts(); track group.id) {
+            <div class="confirmation" role="group" [attr.aria-label]="'Conflicto en ' + group.targetLabel + ' · ' + group.contextLabel">
+              <strong>{{ group.targetLabel }} · {{ group.contextLabel }}</strong>
+              <p>{{ group.total }} reglas proponen escribir en esta celda. Conserva una u omite el grupo.</p>
+              @for (member of group.members; track member.rowId) {
+                <button mat-stroked-button [disabled]="!store.editable()" (click)="store.resolveGroup(group.id, member.instanceId!)">Conservar {{ member.code }}</button>
+              }
+              <button mat-button [disabled]="!store.editable()" (click)="store.resolveGroup(group.id, null)">Omitir grupo</button>
+              @if (group.members.length < group.total && !store.groupFilter()) {
+                <button mat-button (click)="store.filter('', group.id)">Ver todos los productores</button>
+              }
+            </div>
+          }
+          @if (store.configurable().length) {
+            <p id="directions-scroll-help" class="table-scroll-hint">Desplaza la tabla horizontalmente para ver todas las columnas.</p>
+            <div class="table-region" role="region" aria-label="Configuración de destinos" aria-describedby="directions-scroll-help" tabindex="0">
+              <table mat-table class="data-table" aria-label="Destinos de recálculo" [dataSource]="store.configurable()">
+                <ng-container matColumnDef="rule"><th mat-header-cell *matHeaderCellDef>Regla</th><td mat-cell *matCellDef="let row"><strong>{{ row.code }}</strong><span class="cell-secondary">{{ row.contextLabel }}</span></td></ng-container>
+                <ng-container matColumnDef="target"><th mat-header-cell *matHeaderCellDef>Destino</th><td mat-cell *matCellDef="let row">
+                  @if (row.classification === 'both') {
+                    <mat-form-field appearance="outline"><mat-label>{{ row.code }} · Destino</mat-label>
+                      <select matNativeControl [value]="row.state === 'omitted' ? 'omit' : row.selectedSide || ''" [disabled]="!store.editable()" (change)="store.choose(row, $any($event.target).value)">
+                        <option value="" disabled>Elige un destino</option>
+                        @for (option of row.options; track option.side) { <option [value]="option.side">{{ option.label }} · {{ option.side === 'left' ? 'Izquierda' : 'Derecha' }}</option> }
+                        <option value="omit">Omitir</option>
+                      </select>
+                    </mat-form-field>
+                  } @else {
+                    {{ row.options[0]?.label || row.location }}
+                    @if (row.state === 'omitted') {
+                      <button mat-button [disabled]="!store.editable()" (click)="store.choose(row, 'suggest')">Usar</button>
+                    } @else { <button mat-button [disabled]="!store.editable()" (click)="store.choose(row, 'omit')">Omitir</button> }
+                  }
+                </td></ng-container>
+                <ng-container matColumnDef="decision"><th mat-header-cell *matHeaderCellDef>Decisión</th><td mat-cell *matCellDef="let row">
+                  {{ row.state === 'omitted' ? 'Omitida' : row.state === 'pending' ? 'Por decidir' : 'Incluida' }}
+                  @if (row.origin) { <span class="cell-secondary">{{ row.origin === 'automatic' ? 'Automático' : row.origin === 'saved' ? 'Guardado' : 'Manual' }}</span> }
+                </td></ng-container>
+                <tr mat-header-row *matHeaderRowDef="['rule','target','decision']"></tr><tr mat-row *matRowDef="let row; columns: ['rule','target','decision'];"></tr>
+              </table>
+            </div>
+          }
+          @if (store.unavailable().length) {
+            <details class="trace-details"><summary>Ver motivos de las reglas sin destino en esta página ({{ store.unavailable().length }})</summary>
+              <ul>@for (row of store.unavailable(); track row.rowId) {
+                <li><strong>{{ row.code }}</strong> · {{ row.location }} · {{ row.contextLabel }}
+                  @for (reason of row.reasons; track $index) { <span class="cell-secondary">{{ reason.message }}</span> }
+                </li>
+              }</ul>
+            </details>
+          }
+          @if (!rows.total) { <p>No hay decisiones que coincidan con este filtro.</p> }
+          <mat-paginator aria-label="Páginas de destinos" [length]="rows.total" [pageSize]="50" [pageIndex]="store.pagination.index()" [hidePageSize]="true" [disabled]="store.busy()" (page)="store.loadRows($event.pageIndex)"/>
+        }
+        @if (review.conflictGroupCount) { <p class="notice">Quedan {{ review.conflictGroupCount }} grupos en conflicto en la revisión completa.</p> }
+        @if (store.needsPartial()) { <mat-checkbox [checked]="store.partialAccepted()" [disabled]="!store.editable()" (change)="store.partialAccepted.set($event.checked)">He revisado los pendientes y acepto guardar el subconjunto incluido</mat-checkbox> }
+        @if (!counts.included) { <p>Sin destinos incluidos. Puedes descargar los resultados de esta ejecución.</p> }
+        <div class="direction-actions">
+          <button mat-stroked-button [disabled]="!store.canSave()" (click)="store.save()">Guardar configuración</button>
+          <button mat-button [disabled]="!store.editable()" (click)="store.omitAll()">Omitir todos los destinos</button>
+          <button mat-button [disabled]="store.busy() || store.uncertain()" (click)="store.discard()">Descartar revisión</button>
+        </div>
+      }
+    }
+  }
+  @if (store.review() || store.otherReview() || store.error()) { <button mat-button [disabled]="store.busy()" (click)="store.recover()">Actualizar revisión de destinos</button> }
 </section>

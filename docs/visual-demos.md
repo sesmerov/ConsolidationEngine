@@ -45,10 +45,11 @@ y [su JSON](../specs/002-ui-eba-demo/contracts/demo-corpus.json).
 Sin editar el ejemplo, se esperan **7 reglas que pasan, 8 que fallan y 1 que no aplica**.
 Los fallos son casos de demostración, no una señal de que los archivos estén dañados.
 
-En **Configurar destinos de recálculo**, elige **Izquierda** expresamente en las cinco
-reglas de la tabla y pulsa **Guardar configuración**. Esta configuración no modifica
-importes. No configures `DEMO_RANGE`: comparte destino con v0174_m y crearía otro
-productor para la misma celda.
+En **Validar**, pulsa **Preparar revisión de destinos**. Revisa los dos grupos en conflicto:
+
+1. En r0070, pulsa **Conservar v0174_m**. `DEMO_RANGE` y `DEMO_PRECONDITION` también podrían escribir en esa celda y quedan omitidas.
+2. En r0200, pulsa **Omitir grupo** para excluir de la configuración tanto `DEMO_ZERO` como `DEMO_INTERVAL`.
+3. Comprueba **5 incluidas, 4 omitidas y 7 excluidas** de 16 reglas. Pulsa **Guardar configuración**. Se publica la configuración que se usará para simular. El cambio en los importes es posterior, cuando selecciones propuestas y confirmes su aplicación.
 
 | Regla | Destino C_01.00, columna 0010 | Anterior → propuesto (EUR) |
 |---|---|---|
@@ -128,8 +129,7 @@ La cobertura regulatoria visual se limita a CA1. Los ejemplos no acreditan sopor
 completo de COREP, FINREP o DPM-XL. Los errores deliberados de sintaxis, ciclos y otros
 casos negativos se prueban aparte y no se incluyen en estos dos recorridos principales.
 
-El ejemplo anterior de dos reglas sigue disponible en **Formato anterior ce-report-1 →
-Empezar con el ejemplo guiado**, con su carga directa avanzada.
+El importador de compatibilidad `ce-report-1` se utiliza por API en las regresiones del motor. El control de FINREP por esa vía conserva los mismos cuatro importes y dos reglas del ensayo de entrada visual. [Resultado y procedencia del ensayo](../specs/003-simplificar-flujo/evidencia.md)
 
 ## Guardar una versión o sus resultados
 
@@ -151,7 +151,4 @@ incompleta conserva su aviso y estado. Desde Validar, **Descargar resultados de 
 ejecución** usa la ejecución visible y su propia versión. Repetir esa descarga sólo
 reutiliza un paquete que coincide en versión y ejecución.
 
-Tras aplicar cambios, **Descargar esta versión** exporta la versión nueva del recibo
-consultado, aunque el selector de Descargar apunte a otra versión histórica. Esa acción
-no modifica el selector. El último paquete disponible muestra su propia versión para
-distinguirlo de una selección posterior.
+Tras aplicar cambios, sigue **Siguiente paso** en **Descargar**. **Descargar informes aplicados** identifica la versión nueva del recibo y conserva la elección histórica del selector. También puedes usar **Descargar esta versión** desde la comparación. El último paquete disponible muestra la versión que contiene.

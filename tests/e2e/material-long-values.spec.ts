@@ -4,6 +4,7 @@ import type { Locator, Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
 import { importLegacyFixture, navigateStage } from './workflow-helpers.js';
+import { prepareDirections, saveDirections } from './direction-review-helpers.js';
 
 const fixturesRoot = path.resolve('tests/fixtures/generated');
 
@@ -148,9 +149,8 @@ for (const width of [320, 390, 1440]) {
     await expect(detailTrigger).toBeFocused();
 
     // A single simulation exposes the exact amount in the main table; application is covered elsewhere.
-    await page.getByLabel(`${ruleCode} · Destino`, { exact: true }).selectOption('left');
-    await page.getByRole('button', { name: 'Guardar configuración', exact: true }).click();
-    await expect(page.getByText(/Configuración guardada/)).toBeVisible();
+    const reviewId = await prepareDirections(page);
+    await saveDirections(page, reviewId, 1);
     await navigateStage(page, 'recalculation');
     const previewing = page.waitForResponse(response => response.url().endsWith('/previews') && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Simular recálculos', exact: true }).click();
