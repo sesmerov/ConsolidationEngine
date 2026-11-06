@@ -2,7 +2,7 @@
 
 Rama `codex/003-simplificar-flujo`, base `b74bba9`. Se distinguen las comprobaciones ejecutadas en esta iteración de la [verificación histórica de 002](verification-002.md) y del [ensayo FINREP de la especificación](../specs/003-simplificar-flujo/resultado-finrep.json).
 
-| Alcance | Criterios de 003 | Comprobación prevista |
+| Alcance | Criterios de 003 | Comprobación ejecutada |
 | --- | --- | --- |
 | Carga, ayuda, catálogo y contexto (FR-001–004,017) | SC-001,002,009 | Demos visuales, búsqueda global y cabecera con 0/1/varios contextos |
 | Revisión, simulación y consentimiento (FR-005–009,016) | SC-003,004,008 | Decisiones globales, selección fuera de página, conflictos, publicación y recuperación |
@@ -47,3 +47,40 @@ El motor y las siete operaciones quedaron en `f9e2606`. La sonda FINREP sobre es
 SC-003/004/005. Un primer recorrido móvil permitió ver dos grupos con la misma etiqueta de tabla y columna. La etiqueta ahora usa la celda de destino completa, incluida su fila. El recorrido integrado posterior pasó 4/4 a 320 px, incluida la prueba de rechazo y cancelación. Conservar `v0174_m` en r0070 y omitir el grupo r0200 dio 5 destinos incluidos, 4 omitidos y 7 excluidos. Los cambios antes → después en EUR fueron 5 → 60, 100 → 185, 10 → 50, 20 → 100 y 1.000 → 285. La revalidación dio 14 aprobadas, 1 fallida y 1 no aplicable. La demo tipada validó ocho reglas y produjo cero escrituras. La descarga ligada al recibo conservó la selección histórica y el informe exportado volvió a importarse con sus 110 celdas. Log `.cache/003-corep-final-focal.log`.
 
 En las dos copias del informe COREP se actualizó la hoja de instrucciones con las decisiones r0070/r0200. Se compararon las nueve entradas descomprimidas con Git. Solo cambió `xl/worksheets/sheet3.xml`. La huella del nuevo informe es `64840d2e6443956f41e0acb3944701cfff12fbb6bde20cc22aba22e1aeaf29f3`.
+
+## Aceptación automática
+
+Código entregado en `f74ea0a`, con el motor de `f9e2606`. Se ejecutó `npm ci --offline` con los manifiestos y el lock del workspace en `.cache/003-locked-install` (382 paquetes). El wrapper `scripts/run-with-toolchain.ps1` verificó Node y npm contra los pins locales. Se prepararon plantillas y fixtures y se ejecutaron `build`, `typecheck`, `test:unit`, `test:integration`, `test:contract` y `test:e2e`. Integración y contrato se repitieron en serie sobre el árbol entregado. ANTLR 4.13.2 regeneró lexer, parser y visitor con las huellas originales; se contrastaron también los dos libros del manifiesto y el catálogo EBA fuente. El bundle inicial de producción pesa 676,02 kB (advertencia 700 kB, error 1 MB).
+
+| Suite | Resultado | Log en `.cache/` |
+| --- | ---: | --- |
+| Motor | 624/624 | `003-unit.log` |
+| Angular | 140/140 | `003-unit.log` |
+| Integración | 497/497 | `003-integration-final.log` |
+| Contrato | 161/161 | `003-contract-final.log` |
+| Chromium E2E | 38/38 en 5,4 min | `003-e2e.log` |
+
+SC-001–009 cubiertos por los recorridos y pruebas anteriores. En la suite completa, SC-002 registró 304,2 ms al escribir, 299,7 ms al pegar, 297,9 ms para cero coincidencias y 299,8 ms al borrar. SC-005 pasó en los tres anchos, con teclado, toque en 390 px y movimiento reducido. Se verificaron la persistencia del foco durante cada publicación y el consumo de la indicación solo al visitar la etapa. El rechazo por ETag fue real. La prueba de notificación de cancelación en el navegador fue controlada y las cancelaciones del servidor se verificaron por separado.
+
+Se conservaron 15 capturas de datos sintéticos en `.cache/verification-003/workflow/`. Incluyen `revision-corep-{320,390,1440}.png` y `siguiente-etapa-{320,390,1440}.png`. Se inspeccionaron la distinción visual entre etapa actual y recomendada, las dos celdas en conflicto y las acciones por productor. La portada y el icono de la instancia local de demostración respondieron HTTP 200, con `image/svg+xml` para el icono. La aceptación de esta iteración se basa en las pruebas automáticas y en la inspección visual descrita. No se registraron observaciones de una prueba humana de 003. La entrega usa commits locales y revisión externa `disabled/unmanaged`.
+
+## Regresión de volumen
+
+Protocolo `003-api-seeded-validation`, referencia nueva en `.cache/benchmark/003-reference/`. El catálogo de carga tiene SHA-256 `d76eaad8a4e2a06659163df996bb2c3fbe69e25f1c3fb941ca20ba50bf7c73bd` y el informe `e893027a81ec189be87b3f98022be69c5e9ca06ac8982f6153dbe18ce9c31f00`. Se registraron equipo y commit limpio antes del piloto. Windows 11 Pro x64, Ryzen 5 3600X, 12 procesadores lógicos, 34.277.588.992 bytes de RAM, Node 24.22.2 y Chromium 156.0.8078.4 headless mediante Playwright 1.64.1.
+
+El piloto obtuvo 14,207 s. En la cohorte `cohort-2026-11-06T21-54-59-281Z`, cada ejecución inició un servidor propio y un contexto de navegador nuevo. El intervalo medido empezó al observar por HTTP la carga publicada, antes de rehidratar la página, y terminó con el resumen completo y 50 filas correctas visibles más dos frames. La auditoría posterior cotejó las 500 reglas, 250 aprobadas, 250 fallidas y 100.000 lecturas distintas en cada ejecución. La cohorte duró 9,2 minutos y conservó los diez ensayos.
+
+| Ensayo | Carga aparte (s) | Hasta resultados visibles (s) |
+| ---: | ---: | ---: |
+| 1 | 29,256 | 15,388 |
+| 2 | 29,952 | 14,510 |
+| 3 | 29,412 | 14,450 |
+| 4 | 28,951 | 16,928 |
+| 5 | 29,416 | 14,929 |
+| 6 | 29,617 | 15,458 |
+| 7 | 29,692 | 16,486 |
+| 8 | 29,477 | 15,984 |
+| 9 | 28,679 | 14,716 |
+| 10 | 29,274 | 15,324 |
+
+10/10 auditorías correctas, todas por debajo de 30 s, mediana 15,356 s. Los tiempos de búsqueda SC-002 y la medición de 002 utilizan protocolos diferentes.
