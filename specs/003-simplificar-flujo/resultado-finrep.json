@@ -1,0 +1,181 @@
+{
+  "outputDirectory": ".cache/003-finrep-probe/run-MrmU6q",
+  "nodeVersion": "v24.22.2",
+  "gitCommit": "6bd247674daf2e2d157e67a2689ee5d7117d3174",
+  "source": {
+    "sourceSha256": "f3c4aad1a313e3568ba56d62124c554300c94caee444e837531725b543f4cfa7",
+    "sheet": "1.1",
+    "sheetPath": "xl/worksheets/sheet69.xml",
+    "table": "F_01.01",
+    "column": "0010",
+    "contextModule": "FINREP_SYNTHETIC",
+    "referenceDate": "2025-12-31",
+    "cells": [
+      {
+        "address": "F8",
+        "row": "0010",
+        "value": "100"
+      },
+      {
+        "address": "F9",
+        "row": "0020",
+        "value": "40"
+      },
+      {
+        "address": "F10",
+        "row": "0030",
+        "value": "35"
+      },
+      {
+        "address": "F11",
+        "row": "0040",
+        "value": "25"
+      }
+    ]
+  },
+  "fixtureHashes": {
+    "catalog": "335a64e9bef795cef4c21e178cf5ef229187acb0d5cc83c0752a2dd0c4033d00",
+    "visual": "2b9a877f3ccc3ce22ca2bf447520e5d2d783d348e7abedf8abf94da07edf4e8d",
+    "legacy": "f968cd6b431ee11abf54848fbf3317277d9278c1a3d5544066ff8c8283d7a27f"
+  },
+  "expected": {
+    "CUSTOM_FIN_TOTAL": {
+      "status": "pass",
+      "left": "100",
+      "right": "100",
+      "rows": [
+        "0010",
+        "0020",
+        "0030",
+        "0040"
+      ]
+    },
+    "CUSTOM_FIN_GREATER": {
+      "status": "fail",
+      "left": "40",
+      "right": "100",
+      "rows": [
+        "0010",
+        "0020"
+      ]
+    }
+  },
+  "recognition": {
+    "code": "INVALID_WORKBOOK",
+    "reason": "UNRECOGNIZED_COREP_SHEETS"
+  },
+  "visual": {
+    "http": 202,
+    "job": "failed",
+    "diagnostics": [
+      {
+        "code": "INVALID_WORKBOOK",
+        "message": "El libro contiene datos no válidos.",
+        "fileName": "finrep-1.1.xlsx"
+      }
+    ],
+    "versions": 0
+  },
+  "legacy": {
+    "http": 202,
+    "job": "succeeded",
+    "diagnostics": [],
+    "versions": 1,
+    "counts": {
+      "snapshots": 1,
+      "coordinates": 4,
+      "facts": 4,
+      "sources": 2
+    },
+    "runStatus": "completed",
+    "complete": true,
+    "byStatus": {
+      "pass": 1,
+      "fail": 1,
+      "not_applicable": 0,
+      "not_evaluable": 0,
+      "error": 0
+    },
+    "items": [
+      {
+        "code": "CUSTOM_FIN_GREATER",
+        "status": "fail",
+        "expression": "with {tF_01.01,c0010,interval:false}: {r0020}>{r0010}",
+        "left": {
+          "numerator": "40",
+          "denominator": "1"
+        },
+        "right": {
+          "numerator": "100",
+          "denominator": "1"
+        },
+        "reads": [
+          {
+            "table": "F_01.01",
+            "row": "0010",
+            "column": "0010",
+            "type": "number",
+            "originalText": "100",
+            "unit": "EUR"
+          },
+          {
+            "table": "F_01.01",
+            "row": "0020",
+            "column": "0010",
+            "type": "number",
+            "originalText": "40",
+            "unit": "EUR"
+          }
+        ]
+      },
+      {
+        "code": "CUSTOM_FIN_TOTAL",
+        "status": "pass",
+        "expression": "with {tF_01.01,c0010,interval:false}: {r0010}={r0020}+{r0030}+{r0040}",
+        "left": {
+          "numerator": "100",
+          "denominator": "1"
+        },
+        "right": {
+          "numerator": "100",
+          "denominator": "1"
+        },
+        "reads": [
+          {
+            "table": "F_01.01",
+            "row": "0010",
+            "column": "0010",
+            "type": "number",
+            "originalText": "100",
+            "unit": "EUR"
+          },
+          {
+            "table": "F_01.01",
+            "row": "0020",
+            "column": "0010",
+            "type": "number",
+            "originalText": "40",
+            "unit": "EUR"
+          },
+          {
+            "table": "F_01.01",
+            "row": "0030",
+            "column": "0010",
+            "type": "number",
+            "originalText": "35",
+            "unit": "EUR"
+          },
+          {
+            "table": "F_01.01",
+            "row": "0040",
+            "column": "0010",
+            "type": "number",
+            "originalText": "25",
+            "unit": "EUR"
+          }
+        ]
+      }
+    ]
+  },
+  "sourceUnchanged": true
+}
