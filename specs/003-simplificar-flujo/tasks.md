@@ -8,8 +8,8 @@ Las pruebas indicadas corresponden a escenarios del alcance aprobado o a regresi
 
 ## Fase 1 · Preparación
 
-- [ ] T001 Abrir `docs/verification-003.md` (nuevo) con commit, versiones fijadas, FR-001–017 y SC-001–009. Registrar qué evidencia corresponde a 002, cuál pertenece al ensayo FINREP 003 ya ejecutado y qué se medirá en esta implementación.
-- [ ] T002 Preparar el checkout de prueba según `specs/003-simplificar-flujo/quickstart.md` usando `scripts/run-with-toolchain.ps1`: dependencias del lock, plantillas, fixtures, compilación y Chromium local. Verificar fuentes de `tests/fixtures/eba/source-manifest.json` y reservar procesos propios (E2E 3318, volumen 3317, manual en puerto disponible). Registrar el resultado en `docs/verification-003.md`.
+- [X] T001 Abrir `docs/verification-003.md` (nuevo) con commit, versiones fijadas, FR-001–017 y SC-001–009. Registrar qué evidencia corresponde a 002, cuál pertenece al ensayo FINREP 003 ya ejecutado y qué se medirá en esta implementación.
+- [X] T002 Preparar el checkout de prueba según `specs/003-simplificar-flujo/quickstart.md` usando `scripts/run-with-toolchain.ps1`: dependencias del lock, plantillas, fixtures, compilación y Chromium local. Verificar fuentes de `tests/fixtures/eba/source-manifest.json` y reservar procesos propios (E2E 3318, volumen 3317, manual en puerto disponible). Registrar el resultado en `docs/verification-003.md`.
 
 ## Fase 2 · Base común y primer incremento de interfaz
 
