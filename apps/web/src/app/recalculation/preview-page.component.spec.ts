@@ -23,6 +23,76 @@ describe('preview explanation and explicit closure', () => {
     http.expectOne(request => request.url.endsWith('/proposals')).flush(state === 'ready' ? page : { ...page, items: page.items.map(row => ({ ...row, state: 'obsolete' })) });
     await Promise.resolve(); await Promise.resolve(); fixture.detectChanges(); return fixture;
   }
+  it('shows the current global selection immediately and keeps off-page changes in the confirmation', async () => {
+    const fixture = await render();
+    const element = fixture.nativeElement as HTMLElement;
+    const store = fixture.componentInstance.store;
+    const panel = () => element.querySelector<HTMLElement>('[aria-labelledby="apply-title"]');
+    const trigger = element.querySelector<HTMLInputElement>('.proposal-row input[type="checkbox"]')!;
+    trigger.focus();
+    expect(panel()).toBeNull();
+
+    const first = store.toggle('b', true);
+    const pending = http.expectOne(request => request.url.endsWith('/selection'));
+    fixture.detectChanges();
+    expect(panel()?.textContent).toMatch(/1 propuesta/);
+    expect(panel()?.querySelector<HTMLButtonElement>('button')?.disabled).toBe(true);
+    expect(document.activeElement).toBe(trigger);
+    pending.flush({ selectedIds: ['b'], requiredIds: ['a'], complete: false, closureHash: 'partial', state: 'ready' });
+    await first;
+    const second = store.toggle('a', true);
+    http.expectOne(request => request.url.endsWith('/selection')).flush({ selectedIds: ['a', 'b'], requiredIds: [], complete: true, closureHash: 'both', state: 'ready' });
+    await second;
+
+    store.code.set('NO_MATCH');
+    const filtering = store.load();
+    http.expectOne(request => request.url.endsWith('/previews/' + id)).flush(preview);
+    http.expectOne(request => request.url.endsWith('/proposals') && request.params.get('code') === 'NO_MATCH').flush({ ...page, total: 0, items: [] });
+    await filtering;
+    fixture.detectChanges();
+    expect(store.hiddenSelectedCount()).toBe(2);
+    expect(panel()?.textContent).toMatch(/2 propuestas/);
+    expect(panel()?.textContent).toContain('SYNTHETIC_B');
+
+    const removingB = store.toggle('b', false);
+    const older = http.expectOne(request => request.url.endsWith('/selection'));
+    const removingA = store.toggle('a', false);
+    const latest = http.expectOne(request => request.url.endsWith('/selection'));
+    fixture.detectChanges();
+    expect(panel()).toBeNull();
+    latest.flush({ selectedIds: [], requiredIds: [], complete: true, closureHash: 'empty', state: 'ready' });
+    await removingA;
+    older.flush({ selectedIds: ['a'], requiredIds: [], complete: true, closureHash: 'old', state: 'ready' });
+    await removingB;
+    fixture.detectChanges();
+    expect(panel()).toBeNull();
+    http.expectNone(request => request.url.endsWith('/applications'));
+  });
+  it('requires a new acknowledgement when the same selection and closure return after a rapid deselection', async () => {
+    const fixture = await render();
+    const store = fixture.componentInstance.store;
+    const element = fixture.nativeElement as HTMLElement;
+    const acknowledgement = () => element.querySelector<HTMLInputElement>('[aria-labelledby="apply-title"] input[type="checkbox"]')!;
+    const closure = { selectedIds: ['a'], requiredIds: [], complete: true, closureHash: 'same', state: 'ready' };
+    const first = store.toggle('a', true);
+    http.expectOne(request => request.url.endsWith('/selection')).flush(closure);
+    await first;
+    fixture.detectChanges();
+    acknowledgement().click();
+    fixture.detectChanges();
+    expect(acknowledgement().checked).toBe(true);
+
+    const removing = store.toggle('a', false);
+    const stale = http.expectOne(request => request.url.endsWith('/selection'));
+    const adding = store.toggle('a', true);
+    http.expectOne(request => request.url.endsWith('/selection')).flush(closure);
+    await adding;
+    stale.flush({ ...closure, selectedIds: [], closureHash: 'empty' });
+    await removing;
+    fixture.detectChanges();
+    expect(acknowledgement().checked).toBe(false);
+    http.expectNone(request => request.url.endsWith('/applications'));
+  });
   it('restores retained preview and explains original null, exact and quantized values without implicitly selecting ancestors', async () => {
     const fixture = await render(); const text = (fixture.nativeElement as HTMLElement).textContent!;
     expect(text).toContain('Sin dato'); expect(text).toContain('0,33');
@@ -65,6 +135,7 @@ describe('preview explanation and explicit closure', () => {
   });
   it('retains an obsolete preview as information and never enables discard or application', async () => {
     const fixture = await render('obsolete'); expect((fixture.nativeElement as HTMLElement).textContent).toContain('obsoleta');
+    expect((fixture.nativeElement as HTMLElement).querySelector('#apply-title')).toBeNull();
     expect(fixture.componentInstance.store.canDiscard()).toBe(false);
     await fixture.componentInstance.store.discard(); http.expectNone(request => request.method === 'DELETE');
   });
@@ -115,6 +186,7 @@ describe('preview explanation and explicit closure', () => {
     await Promise.resolve(); await Promise.resolve(); fixture.detectChanges();
     for (const history of http.match(request => request.url.endsWith('/runs'))) history.flush({ items: [], total: 0, nextCursor: null });
     const text = (fixture.nativeElement as HTMLElement).textContent!; expect(text).toContain('Aplicación completada'); expect(text).toContain('Valores modificados: 1'); expect(text).toContain('Propuestas sin cambio de valor: 1'); expect(text).toContain('SYNTHETIC_REMAINING'); expect(fixture.componentInstance.store.selected()).toEqual([]);
+    expect((fixture.nativeElement as HTMLElement).querySelector('#apply-title')).toBeNull();
     const loading = fixture.componentInstance.store.loadApplication(true); http.expectOne(request => request.url.endsWith('/applications/' + receiptId)).flush(detail);
     http.expectOne(request => request.url.endsWith('/comparison') && request.params.get('cursor') === 'next-page').flush({ ...comparison, items: [{ key: 'second', after: { ...row, id: 'second', code: 'SYNTHETIC_ERROR', status: 'error' } }], nextCursor: null }); await loading;
     expect(fixture.componentInstance.store.comparison()?.items.map(row => row.key)).toEqual(['second']); http.expectNone(request => request.method === 'POST');

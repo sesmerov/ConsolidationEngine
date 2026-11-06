@@ -1,7 +1,26 @@
 @if (session.workspace(); as workspace) {
-<section class="workspace-context" aria-labelledby="workspace-name"><div class="section-heading"><div><p class="eyebrow">CONJUNTO DE INFORMES</p><h1 id="workspace-name">{{ workspace.name }}</h1></div><button mat-button #closeTrigger (click)="confirmClose.set(true)" [disabled]="session.pending()">Cerrar conjunto</button></div>
-<div class="context-row"><dl class="workspace-meta"><div><dt>Versión</dt><dd>{{ versionLabel(workspace, session.versionId()) }}</dd></div>@if (session.selectedContext(); as context) { <div><dt>Entidad</dt><dd>{{ context.entityId }}</dd></div><div><dt>Periodo de referencia</dt><dd>{{ civilDate(context.referenceDate) }}</dd></div> }<div><dt>Archivos</dt><dd>{{ workspace.counts.sources }}</dd></div></dl>
-@if (workspace.contexts.length) { <mat-form-field appearance="outline"><mat-label>Contexto</mat-label><select matNativeControl id="context-selector" [ngModel]="session.selectedContextId()" (ngModelChange)="session.selectContext($event)">@for (context of workspace.contexts; track context.contextId) { <option [value]="context.contextId">{{ context.entityId }} · {{ civilDate(context.referenceDate) }} · {{ context.moduleVersion }}</option> }</select></mat-form-field> }</div>
+<section class="workspace-context" aria-labelledby="workspace-name"><div class="section-heading"><div><p class="eyebrow">CONJUNTO DE INFORMES</p><h1 #workspaceName id="workspace-name" tabindex="-1">{{ workspace.name }}</h1></div><button mat-button #closeTrigger (click)="confirmClose.set(true)" [disabled]="session.pending()">Cerrar conjunto</button></div>
+<div class="context-row">
+  <dl class="workspace-meta">
+    <div><dt>Versión</dt><dd>{{ versionLabel(workspace, session.versionId()) }}</dd></div>
+    @if (workspace.contexts.length === 1 && session.selectedContext(); as context) {
+      <div><dt>Entidad</dt><dd>{{ context.entityId }}</dd></div>
+      <div><dt>Periodo de referencia</dt><dd>{{ civilDate(context.referenceDate) }}</dd></div>
+      <div><dt>Módulo</dt><dd>{{ context.moduleVersion }}</dd></div>
+    }
+    <div><dt>Archivos</dt><dd>{{ workspace.counts.sources }}</dd></div>
+  </dl>
+  @if (workspace.contexts.length > 1) {
+    <mat-form-field appearance="outline">
+      <mat-label>Contexto</mat-label>
+      <select #contextSelector matNativeControl id="context-selector" [ngModel]="session.selectedContextId()" (ngModelChange)="session.selectContext($event)">
+        @for (option of contextOptions(); track option.id) {
+          <option [value]="option.id">{{ option.label }}</option>
+        }
+      </select>
+    </mat-form-field>
+  }
+</div>
 <details class="trace-details"><summary>Información de la sesión</summary><p>Sesión temporal: al cerrar este conjunto o reiniciar el servidor se descartan sus datos. Guarda primero las descargas que necesites.</p><p data-testid="current-version-id">{{ session.versionId() ?? 'Pendiente de la primera carga' }}</p></details>
 @if (confirmClose()) { <div class="confirmation" role="group" aria-label="Confirmar cierre"><p>Cerrar descarta los datos temporales y cancela el trabajo en curso. Las descargas guardadas permanecen en tu equipo.</p><button mat-flat-button #closeConfirm (click)="close()" [disabled]="session.pending()">Cerrar y descartar</button><button mat-button (click)="cancelClose()">Volver</button></div> }
 </section>

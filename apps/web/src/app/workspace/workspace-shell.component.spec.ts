@@ -14,9 +14,14 @@ import { PreviewStore } from '../recalculation/preview.store';
 import { DirectionsStore } from '../recalculation/directions.store';
 import { ApplyStore } from '../recalculation/apply.store';
 import { ExportStore } from '../recalculation/export.store';
-import type { PreviewDTO, ValidationResultsPageDTO } from '@ce/contracts';
+import type { PreviewDTO, ReportContext, ValidationResultsPageDTO } from '@ce/contracts';
 
 const workspace = { id: 'workspace', name: 'Cierre de prueba', state: 'ready' as const, currentVersionId: 'v1', versionIds: ['v0', 'v1'], contexts: [], counts: { snapshots: 1, coordinates: 2, facts: 2, sources: 2 }, sessionBytes: 1 };
+const domesticContext: ReportContext = {
+  contextId: 'nacional', canonicalContextKey: 'scope-1', entityId: 'Banco de prueba',
+  referenceDate: '2025-12-31', framework: 'COREP', moduleVersion: 'COREP_OF_4.0', filingIndicators: {},
+};
+const consolidatedContext: ReportContext = { ...domesticContext, contextId: 'consolidado', canonicalContextKey: 'scope-2' };
 const summary = { complete: true, rows: 0, variants: 0, instances: 0, duplicateRows: 0, applicableVariants: 0, byStatus: { pass: 0, fail: 0, error: 0, not_applicable: 0, not_evaluable: 0 } };
 const page = { items: [], total: 0, nextCursor: null, versionId: 'v1', configuredDirections: [], run: { id: 'run', versionId: 'v1', profileId: 'profile', status: 'completed', startedAt: '2026-11-04', diagnostics: [], summary, resultIds: [] } } as ValidationResultsPageDTO;
 const preview = { id: 'preview', baseVersionId: 'v1', profileId: 'profile', policyId: 'policy', state: 'ready', createdAt: '2026-11-04', proposalIds: [], diagnostics: [], graphSummary: { nodes: 0, edges: 0, order: [], blocked: 0, cycles: [], conflicts: [] } } as PreviewDTO;
@@ -34,6 +39,51 @@ describe('workspace navigation keeps one active stage', () => {
     const session = TestBed.inject(SessionStore); vi.spyOn(session, 'connect').mockResolvedValue(); session.connected.set(true); session.workspace.set(workspace); session.etag.set('"v-v1"');
   });
   afterEach(() => TestBed.resetTestingModule());
+  it('shows one context as entity, civil date and module once and removes those values when the context list empties', async () => {
+    const session = TestBed.inject(SessionStore);
+    session.workspace.set({ ...workspace, contexts: [domesticContext] });
+    session.selectContext(domesticContext.contextId);
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const header = fixture.nativeElement.querySelector('.workspace-context') as HTMLElement;
+    expect(header.querySelector('select')).toBeNull();
+    for (const value of ['Banco de prueba', '31/12/2025', 'COREP_OF_4.0']) {
+      expect(header.textContent!.split(value)).toHaveLength(2);
+    }
+
+    session.workspace.set(workspace);
+    fixture.detectChanges();
+    expect(header.querySelector('select')).toBeNull();
+    for (const value of ['Banco de prueba', '31/12/2025', 'COREP_OF_4.0']) expect(header.textContent).not.toContain(value);
+  });
+  it('distinguishes contexts with matching business labels, keeps the selected ID across stages and restores focus when the choice disappears', async () => {
+    const session = TestBed.inject(SessionStore);
+    session.workspace.set({ ...workspace, contexts: [domesticContext, consolidatedContext] });
+    session.selectContext(domesticContext.contextId);
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const header = fixture.nativeElement.querySelector('.workspace-context') as HTMLElement;
+    const select = header.querySelector('select')!;
+    expect(header.querySelectorAll('select')).toHaveLength(1);
+    expect(new Set(Array.from(select.options, option => option.text)).size).toBe(2);
+    select.focus();
+    select.selectedIndex = 1;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(session.selectedContextId()).toBe(consolidatedContext.contextId);
+
+    const navigation = TestbedHarnessEnvironment.loader(fixture);
+    await (await navigation.getHarness(MatButtonHarness.with({ text: '2. Validar' }))).click();
+    expect(select.value).toBe(consolidatedContext.contextId);
+    select.focus();
+    expect(document.activeElement).toBe(select);
+    session.workspace.set({ ...workspace, contexts: [consolidatedContext] });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(header.querySelector('select')).toBeNull();
+    expect(document.activeElement).toBe(header.querySelector('h1'));
+  });
   it('renders only Cargar initially, with explicit controls for the four stages', async () => {
     const fixture = TestBed.createComponent(AppComponent); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
     const element = fixture.nativeElement as HTMLElement;

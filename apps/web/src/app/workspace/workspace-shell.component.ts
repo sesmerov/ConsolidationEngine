@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, ElementRef, effect, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, signal, viewChild } from '@angular/core';
+import type { DoCheck } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -25,14 +26,35 @@ import type { WorkspaceStage } from './workspace-view.store';
 @Component({ selector: 'ce-workspace-shell', standalone: true, changeDetection: ChangeDetectionStrategy.OnPush,
 imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatProgressBarModule, ImportPageComponent, ValidationPageComponent, PreviewPageComponent, ExportsComponent],
 providers: [WorkspaceViewStore, StageFocus, ImportStore, ResultsStore, PreviewStore, DirectionsStore, ApplyStore, ExportStore, { provide: MatPaginatorIntl, useFactory: spanishPaginator }], templateUrl: './workspace-shell.component.html', styleUrl: './workspace-shell.component.scss' })
-export class WorkspaceShellComponent {
+export class WorkspaceShellComponent implements DoCheck {
 readonly session = inject(SessionStore); readonly view = inject(WorkspaceViewStore); readonly confirmClose = signal(false);
 private readonly stageFocus = inject(StageFocus);
+private readonly workspaceName = viewChild<ElementRef<HTMLElement>>('workspaceName');
+private readonly contextSelector = viewChild('contextSelector', { read: ElementRef<HTMLSelectElement> });
+readonly contextOptions = computed(() => {
+  const contexts = this.session.workspace()?.contexts ?? [];
+  const labelCounts = new Map<string, number>();
+  const options = contexts.map(context => {
+    const label = [context.entityId, civilDate(context.referenceDate), context.moduleVersion].join(' · ');
+    labelCounts.set(label, (labelCounts.get(label) ?? 0) + 1);
+    return { id: context.contextId, label };
+  });
+  return options.map(option => labelCounts.get(option.label) === 1
+    ? option
+    : { id: option.id, label: option.label + ' · ' + option.id });
+});
 readonly civilDate = civilDate; readonly versionLabel = versionLabel;
 readonly stageArea = viewChild<ElementRef<HTMLElement>>('stageArea'); readonly closeTrigger = viewChild('closeTrigger', { read: ElementRef<HTMLButtonElement> }); readonly closeConfirm = viewChild('closeConfirm', { read: ElementRef<HTMLButtonElement> });
 readonly jobFeedback = viewChild<ElementRef<HTMLElement>>('jobFeedback');
 readonly jobStatus: Record<JobStatus, string> = { queued: 'Trabajo pendiente', running: 'Trabajo en curso', succeeded: 'Trabajo terminado', failed: 'No se pudo completar', cancelled: 'Trabajo cancelado', timed_out: 'Plazo de ejecución agotado' };
 constructor() { effect(() => { if (this.confirmClose()) this.closeConfirm()?.nativeElement.focus(); }); effect(() => { const job = this.session.job(), feedback = this.jobFeedback(); if (feedback && (job?.status === 'failed' || job?.status === 'timed_out')) feedback.nativeElement.focus(); }); }
+ngDoCheck(): void {
+  const workspace = this.session.workspace();
+  if (!workspace || workspace.contexts.length > 1) return;
+  // Return focus before Angular removes a context selector the analyst was using.
+  const select = this.contextSelector()?.nativeElement;
+  if (select && select.ownerDocument.activeElement === select) this.workspaceName()?.nativeElement.focus();
+}
 navigate(stage: WorkspaceStage): void { this.stageFocus.request({ import: 'import-title', validation: 'validation-title', preview: 'preview-title', exports: 'exports-title' }[stage]); this.view.stage.set(stage); }
 cancelClose(): void { this.confirmClose.set(false); this.closeTrigger()?.nativeElement.focus(); }
 async close(): Promise<void> { await this.session.close(); }

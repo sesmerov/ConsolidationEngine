@@ -33,7 +33,7 @@ export class PreviewStore {
   constructor() {
     effect(() => { const id = this.session.workspace()?.id, version = this.session.versionId(); untracked(() => {
       if (id !== this.workspaceId) { this.workspaceId = id; this.version = version; this.reset(); if (id) void this.loadHistory(); }
-      else if (version !== this.version) { this.dependencyLabels.set(new Map()); this.closeDetail(); this.pagination.reset(); this.version = version; this.selected.set([]); this.selectedDetails.set(new Map()); this.selection.set(null); this.selectionGeneration++; if (id) { void this.loadHistory(); if (this.selectedPreviewId()) void this.load(); } }
+      else if (version !== this.version) { this.dependencyLabels.set(new Map()); this.closeDetail(); this.pagination.reset(); this.version = version; this.clearSelection(); if (id) { void this.loadHistory(); if (this.selectedPreviewId()) void this.load(); } }
     }); });
     effect(() => { const job = this.session.job(); if (job?.workspaceId === this.session.workspace()?.id && job?.kind === 'preview' && isTerminalJob(job.status) && job.resultRef?.type === 'preview' && job.jobId !== this.observed) {
       this.observed = job.jobId; untracked(() => { this.choose(job.resultRef!.id); void this.loadHistory(); });
@@ -43,7 +43,15 @@ export class PreviewStore {
     } });
     inject(DestroyRef).onDestroy(() => this.reset());
   }
-  private reset(): void { this.dependencyLabels.set(new Map()); this.closeDetail(); this.pagination.reset(); this.comparisonPagination.reset(); this.changedOnly.set(true); this.generation++; this.historyGeneration++; this.selectionGeneration++; this.applicationGeneration++; this.observed = ''; this.observedApplication = ''; this.history.set([]); this.historyCursor.set(null); this.selectedPreviewId.set(null); this.preview.set(null); this.page.set(null); this.selected.set([]); this.selectedDetails.set(new Map()); this.selection.set(null); this.application.set(null); this.comparison.set(null); this.applicationLoading.set(false); this.confirmDiscard.set(false); this.loading.set(false); this.historyLoading.set(false); this.selecting.set(false); this.pending.set(false); this.error.set(null); }
+  private clearSelection(): void {
+    this.applying.invalidateSelection();
+    this.selected.set([]);
+    this.selectedDetails.set(new Map());
+    this.selection.set(null);
+    this.selecting.set(false);
+    this.selectionGeneration++;
+  }
+  private reset(): void { this.dependencyLabels.set(new Map()); this.closeDetail(); this.pagination.reset(); this.comparisonPagination.reset(); this.changedOnly.set(true); this.generation++; this.historyGeneration++; this.applicationGeneration++; this.observed = ''; this.observedApplication = ''; this.history.set([]); this.historyCursor.set(null); this.selectedPreviewId.set(null); this.preview.set(null); this.page.set(null); this.clearSelection(); this.application.set(null); this.comparison.set(null); this.applicationLoading.set(false); this.confirmDiscard.set(false); this.loading.set(false); this.historyLoading.set(false); this.selecting.set(false); this.pending.set(false); this.error.set(null); }
   async loadHistory(append = false): Promise<void> {
     const workspaceId = this.session.workspace()?.id; if (!workspaceId) return; const generation = ++this.historyGeneration, cursor = append ? this.historyCursor() : null; this.historyLoading.set(true);
     try { const history = await this.api.previews(workspaceId, cursor ?? undefined); if (generation !== this.historyGeneration || workspaceId !== this.session.workspace()?.id) return;
@@ -52,7 +60,7 @@ export class PreviewStore {
       if (!this.selectedPreviewId() && history.items[0]) this.choose(history.items[0].id);
     } catch (error) { if (generation === this.historyGeneration) this.report(error); } finally { if (generation === this.historyGeneration) this.historyLoading.set(false); }
   }
-  choose(id: string): void { this.dependencyLabels.set(new Map()); this.closeDetail(); this.pagination.reset(); this.comparisonPagination.reset(); this.changedOnly.set(true); this.selectedPreviewId.set(id); this.status.set(''); this.code.set(''); this.table.set(''); this.selected.set([]); this.selectedDetails.set(new Map()); this.selection.set(null); this.selectionGeneration++; this.applicationGeneration++; this.application.set(null); this.comparison.set(null); this.applicationLoading.set(false); this.confirmDiscard.set(false); this.preview.set(null); this.page.set(null); void this.load(); }
+  choose(id: string): void { this.dependencyLabels.set(new Map()); this.closeDetail(); this.pagination.reset(); this.comparisonPagination.reset(); this.changedOnly.set(true); this.selectedPreviewId.set(id); this.status.set(''); this.code.set(''); this.table.set(''); this.clearSelection(); this.applicationGeneration++; this.application.set(null); this.comparison.set(null); this.applicationLoading.set(false); this.confirmDiscard.set(false); this.preview.set(null); this.page.set(null); void this.load(); }
   async load(append: boolean | number = false): Promise<void> {
     const workspaceId = this.session.workspace()?.id, id = this.selectedPreviewId(); if (!workspaceId || !id) return;
     const request = this.pagination.begin(JSON.stringify([workspaceId, id, this.status(), this.code(), this.table(), this.session.versionId()]), typeof append === 'number' ? append : append ? this.pagination.index() + 1 : 0);
@@ -73,7 +81,14 @@ export class PreviewStore {
   selectable(proposal: ProposalDTO): boolean { return !this.pending() && !this.applying.pending() && !this.applying.uncertain() && !this.session.pending() && !this.session.jobActive() && ((this.preview()?.state === 'ready' && proposal.state === 'available') || (this.preview()?.state === 'obsolete' && proposal.state === 'obsolete')); }
   async toggle(id: string, checked: boolean): Promise<void> {
     const workspaceId = this.session.workspace()?.id, preview = this.preview(), proposal = this.page()?.items.find(row => row.id === id) ?? this.selectedDetails().get(id) ?? (this.detail()?.id === id ? this.detail() : null); if (!workspaceId || !preview || !proposal || !this.selectable(proposal)) return;
-    const selected = new Set(this.selected()); if (checked) selected.add(id); else selected.delete(id); const selectedIds = [...selected].sort(); this.selected.set(selectedIds); this.selection.set(null); this.selecting.set(true);
+    const selected = new Set(this.selected());
+    if (selected.has(id) === checked) return;
+    this.applying.invalidateSelection();
+    if (checked) selected.add(id); else selected.delete(id);
+    const selectedIds = [...selected].sort();
+    this.selected.set(selectedIds);
+    this.selection.set(null);
+    this.selecting.set(true);
     this.selectedDetails.update(rows => { const next = new Map(rows); if (checked) next.set(id, proposal); else next.delete(id); return next; });
     const generation = ++this.selectionGeneration;
     try { const selection = await this.api.previewSelection(workspaceId, preview.id, selectedIds); if (generation === this.selectionGeneration && workspaceId === this.session.workspace()?.id && preview.id === this.preview()?.id) { this.selection.set(selection); void this.resolveDependencies(selection, workspaceId, preview.id, generation); } }
@@ -83,7 +98,7 @@ export class PreviewStore {
     const workspaceId = this.session.workspace()?.id, preview = this.preview(), etag = this.session.etag(); if (!workspaceId || !preview || !etag || !this.canDiscard()) return;
     this.pending.set(true); this.error.set(null);
     try { const discarded = await this.api.discardPreview(workspaceId, preview.id, etag); if (workspaceId !== this.session.workspace()?.id || preview.id !== this.preview()?.id) return;
-      this.preview.set(discarded); this.selected.set([]); this.selectedDetails.set(new Map()); this.selection.set(null); this.selectionGeneration++; this.confirmDiscard.set(false); await this.load(); await this.loadHistory();
+      this.preview.set(discarded); this.clearSelection(); this.confirmDiscard.set(false); await this.load(); await this.loadHistory();
     } catch (error) { if (workspaceId === this.session.workspace()?.id) this.report(error); } finally { if (workspaceId === this.session.workspace()?.id) this.pending.set(false); }
   }
   async loadApplication(append: boolean | number = false): Promise<void> {

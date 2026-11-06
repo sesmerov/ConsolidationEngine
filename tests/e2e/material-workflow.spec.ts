@@ -5,10 +5,9 @@ import type { Locator, Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
 import { readZipParts } from '../helpers/xlsx-fixtures.js';
-import { enableLegacyFormat } from './workflow-helpers.js';
+import { importLegacyFixture, navigateStage } from './workflow-helpers.js';
 
 const fixturesRoot = path.resolve('tests/fixtures/generated');
-const mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const code = (index: number) => `SYNTHETIC_MATERIAL_${String(index).padStart(3, '0')}`;
 async function connection(page: Page) {
   const bootstrap = await (await page.request.get('/api/v1/bootstrap')).json();
@@ -61,6 +60,85 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/');
 });
 
+test('Context in the workspace header: empty, single read-only and distinct choices with the same entity and date', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.getByLabel('Nombre del conjunto').fill('Prueba de contextos');
+  await page.getByRole('button', { name: 'Crear conjunto', exact: true }).click();
+  const header = page.getByRole('region', { name: 'Prueba de contextos', exact: true });
+  const selector = header.getByRole('combobox', { name: 'Contexto', exact: true });
+  await expect(header).toBeVisible();
+  await expect(selector).toHaveCount(0);
+  await expect(header).not.toContainText('SYNTHETIC');
+
+  const catalog = path.join(fixturesRoot, 'eba-subset.xlsx');
+  const report = path.join(fixturesRoot, 'report-42.xlsx');
+  async function expectSingleContext() {
+    await expect(selector).toHaveCount(0);
+    for (const field of ['SYNTHETIC', '30/06/2026', 'COREP_OF_4.2']) {
+      await expect(header).toContainText(field);
+      expect((await header.innerText()).split(field).length - 1, field).toBe(1);
+    }
+  }
+  const single = await importLegacyFixture(page, catalog, [report]);
+  expect(single.workspace.contexts.map(context => context.contextId)).toEqual(['demo']);
+  await expectSingleContext();
+
+  // Both workbooks describe the same entity, date and module but different rows and context IDs.
+  const sheets = (await readXlsxFile(report, { trim: false, parseNumber: value => value })).map(sheet => ({
+    sheet: sheet.sheet, data: sheet.data.map(row => row.map(value => value === null ? null : String(value))),
+  }));
+  const extraId = 'contexto_adicional';
+  sheets.find(sheet => sheet.sheet === 'Contexts')!.data[1]![1] = extraId;
+  for (const sheetName of ['Coordinates', 'Facts']) {
+    const sheet = sheets.find(entry => entry.sheet === sheetName)!;
+    const otherRow = [...sheet.data[1]!];
+    otherRow[0] = extraId;
+    otherRow[3] = '9999';
+    sheet.data = [sheet.data[0]!, otherRow];
+  }
+  const extra = await writeXlsxFile(sheets.map(sheet => ({
+    sheet: sheet.sheet,
+    data: sheet.data.map(row => row.map(value => value === null ? null : { type: String, value })),
+  }))).toBuffer();
+  const multiple = await importLegacyFixture(page, catalog, [report, { name: 'otro-contexto.xlsx', buffer: extra }]);
+  const ids = multiple.workspace.contexts.map(context => context.contextId);
+  expect([...ids].sort()).toEqual([extraId, 'demo'].sort());
+  expect(multiple.workspace.contexts.every(context =>
+    context.entityId === 'SYNTHETIC' && context.referenceDate === '2026-06-30' && context.moduleVersion === 'COREP_OF_4.2'
+  )).toBe(true);
+  await expect(selector).toHaveCount(1);
+  await expect(selector.getByRole('option')).toHaveCount(2);
+  expect(new Set(await selector.getByRole('option').allTextContents()).size).toBe(2);
+  const secondId = await selector.locator('option').nth(1).getAttribute('value');
+  expect(ids).toContain(secondId);
+  await selector.focus();
+  await page.keyboard.press('End');
+  await expect(selector).toHaveValue(secondId!);
+
+  await navigateStage(page, 'validation');
+  const workspacePath = '/api/v1/workspaces/' + multiple.workspace.id;
+  const refreshed = page.waitForResponse(async response => response.request().method() === 'GET'
+    && new URL(response.url()).pathname === workspacePath && response.ok()
+    && !(await response.json()).activeJobId);
+  await page.getByRole('button', { name: 'Validar informes', exact: true }).click();
+  await refreshed;
+  await expect(page.getByRole('heading', { name: 'Ejecución terminada', exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(selector).toHaveValue(secondId!);
+  await navigateStage(page, 'import');
+  await expect(selector).toHaveValue(secondId!);
+
+  await importLegacyFixture(page, catalog, [report]);
+  await expectSingleContext();
+  await header.getByRole('button', { name: 'Cerrar conjunto', exact: true }).click();
+  await header.getByRole('button', { name: 'Cerrar y descartar', exact: true }).click();
+  await page.getByLabel('Nombre del conjunto').fill('Conjunto vacío');
+  await page.getByRole('button', { name: 'Crear conjunto', exact: true }).click();
+  const emptyHeader = page.getByRole('region', { name: 'Conjunto vacío', exact: true });
+  await expect(emptyHeader).toBeVisible();
+  await expect(emptyHeader.getByRole('combobox')).toHaveCount(0);
+  await expect(emptyHeader).not.toContainText('SYNTHETIC');
+});
+
 for (const width of [320, 390, 1440]) {
   test(`Material workflow ${width}px: explicit off-page dependencies, preserved state and receipt download`, async ({ page }, testInfo) => {
     test.setTimeout(180_000); await page.setViewportSize({ width, height: 1000 });
@@ -71,15 +149,11 @@ for (const width of [320, 390, 1440]) {
     // The baseline renders all stages together and has anchor links; the new shell has an active stage.
     await expect(page.getByRole('button', { name: '2. Validar', exact: true })).toBeVisible();
     await expect(page.locator('ce-import-page')).toBeVisible(); await expect(page.locator('ce-validation-page')).toHaveCount(0);
-    await enableLegacyFormat(page);
     await assertNoPageOverflow(page);
     const files = await chainFiles();
-    await page.getByLabel('Catálogo de reglas (.xlsx)').setInputFiles({ name: 'material-catalog.xlsx', mimeType, buffer: files.catalog });
-    await page.getByLabel('Informes (.xlsx)', { exact: true }).setInputFiles({ name: 'material-report.xlsx', mimeType, buffer: files.report });
-    const importing = page.waitForResponse(response => response.url().endsWith('/imports') && response.request().method() === 'POST');
-    await page.getByRole('button', { name: 'Cargar archivos', exact: true }).click();
-    const imported = await finishJob(page, (await (await importing).json()).jobId);
-    await expect(page.getByTestId('current-version-id')).toHaveText(imported.newVersionId);
+    const imported = await importLegacyFixture(page, { name: 'material-catalog.xlsx', buffer: files.catalog }, [
+      { name: 'material-report.xlsx', buffer: files.report },
+    ]);
     await stage(page, '2. Validar', '#validation-title');
     const validating = page.waitForResponse(response => response.url().endsWith('/validations') && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Validar informes', exact: true }).click();
@@ -104,17 +178,42 @@ for (const width of [320, 390, 1440]) {
     expect(proposals.items.map((proposal: { code: string }) => proposal.code)).toEqual(Array.from({ length: 51 }, (_, index) => code(index + 1)));
     const preview = page.locator('ce-preview-page'), table = preview.getByRole('table', { name: 'Propuestas de recálculo', exact: true });
     await expect(table.getByRole('row')).toHaveCount(51);
+    const confirmation = preview.getByRole('region', { name: 'Confirmar la aplicación', exact: true });
+    const apply = preview.getByRole('button', { name: 'Aplicar cambios seleccionados', exact: true });
+    await expect(confirmation).toHaveCount(0);
+    await expect(apply).toHaveCount(0);
     await preview.getByRole('button', { name: 'Siguiente', exact: true }).click();
     await expect(table.getByRole('row')).toHaveCount(2);
     await page.getByLabel(`Seleccionar ${code(51)}`, { exact: true }).check();
     await expect(preview.getByText(/Faltan 50 predecesores/)).toBeVisible();
+    await expect(confirmation).toBeVisible();
+    await expect(apply).toBeDisabled();
     const dependency = preview.getByRole('button', { name: `Consultar ${code(1)}`, exact: true });
     await dependency.click();
     const firstSelection = page.getByLabel(`Seleccionar ${code(1)}`, { exact: true });
     await expect(firstSelection).not.toBeChecked(); // Merely inspecting an off-page dependency grants no consent.
     await firstSelection.check();
+    await preview.getByRole('button', { name: 'Cerrar detalle', exact: true }).click();
+    const filterCode = preview.getByLabel('Código de propuesta', { exact: true });
+    const filter = preview.getByRole('button', { name: 'Filtrar propuestas', exact: true });
+    await filterCode.fill(code(12));
+    await filter.click();
+    await expect(table.getByRole('row')).toHaveCount(2);
+    await expect(table).toContainText(code(12));
+    await expect(preview.getByText(/2 propuestas seleccionadas fuera de esta página/)).toBeVisible();
+    await expect(confirmation).toContainText(/2 propuestas/);
+    await expect(apply).toBeDisabled();
+    await filterCode.fill('');
+    await filter.click();
+    await expect(table.getByRole('row')).toHaveCount(51);
+    await table.getByLabel(`Seleccionar ${code(1)}`, { exact: true }).uncheck();
+    await preview.getByRole('button', { name: 'Siguiente', exact: true }).click();
+    await table.getByLabel(`Seleccionar ${code(51)}`, { exact: true }).uncheck();
+    await expect(confirmation).toHaveCount(0);
+    await expect(apply).toHaveCount(0);
+    await table.getByLabel(`Seleccionar ${code(51)}`, { exact: true }).check();
     await preview.getByRole('button', { name: 'Anterior', exact: true }).click();
-    for (let index = 2; index <= 50; index++) await table.getByLabel(`Seleccionar ${code(index)}`, { exact: true }).check();
+    for (let index = 1; index <= 50; index++) await table.getByLabel(`Seleccionar ${code(index)}`, { exact: true }).check();
     await expect(table.getByLabel(`Seleccionar ${code(1)}`, { exact: true })).toBeChecked();
     await expect(preview.getByText(/La selección contiene todos sus predecesores/)).toBeVisible();
     await expect(preview.getByText(/1 propuesta.*fuera de esta página/)).toBeVisible();
@@ -147,6 +246,7 @@ for (const width of [320, 390, 1440]) {
     expect(acceptedApplication.request().postDataJSON().selectedIds.slice().sort()).toEqual(proposals.items.map((proposal: { id: string }) => proposal.id).sort());
     const applied = await finishJob(page, (await acceptedApplication.json()).jobId);
     const comparison = page.locator('ce-comparison'); await expect(comparison).toContainText('Valores modificados: 51');
+    await expect(confirmation).toHaveCount(0);
     await expect(acknowledgement).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Aplicar cambios seleccionados', exact: true })).toHaveCount(0);
     await expect(comparison).toContainText('Antes'); await expect(comparison).toContainText('Después');

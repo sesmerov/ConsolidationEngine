@@ -7,24 +7,41 @@ import { SessionStore } from '../core/session.store';
 interface Attempt { workspaceId: string; etag: string; key: string; body: ApplicationRequestDTO }
 @Injectable({ providedIn: 'root' })
 export class ApplyStore {
-  readonly preview = signal<PreviewDTO>(undefined!); readonly selection = signal<PreviewSelectionDTO | null>(null); readonly proposals = signal<readonly ProposalDTO[]>([]); readonly sources = signal<readonly SourceFile[]>([]);
+  readonly preview = signal<PreviewDTO | null>(null);
+  readonly selectedIds = signal<readonly string[]>([]);
+  readonly selection = signal<PreviewSelectionDTO | null>(null); readonly proposals = signal<readonly ProposalDTO[]>([]); readonly sources = signal<readonly SourceFile[]>([]);
   readonly session = inject(SessionStore); private readonly api = inject(ApiClient);
   readonly acknowledged = signal(false); readonly pending = signal(false); readonly error = signal<string | null>(null); readonly uncertain = signal(false); readonly rejected = signal(false);
   private contextKey = ''; private attempt: Attempt | undefined; private workspaceId: string | undefined;
-  readonly selectedProposals = computed(() => { const ids = new Set(this.selection()?.selectedIds ?? []); return this.proposals().filter(row => ids.has(row.id)); });
+  readonly selectedProposals = computed(() => {
+    const ids = new Set(this.selectedIds());
+    return this.proposals().filter(row => ids.has(row.id));
+  });
   readonly canApply = computed(() => {
-    const preview = this.preview(), selection = this.selection(), rows = this.selectedProposals();
-    return !!preview && preview.state === 'ready' && preview.baseVersionId === this.session.versionId() && selection?.state === 'ready' && selection.complete && selection.requiredIds.length === 0 && selection.selectedIds.length > 0
-      && rows.length === new Set(selection.selectedIds).size && rows.length === selection.selectedIds.length && rows.every(row => row.previewId === preview.id && row.state === 'available' && row.before && row.after)
+    const preview = this.preview(), selection = this.selection();
+    if (preview?.state !== 'ready' || preview.baseVersionId !== this.session.versionId()) return false;
+    if (selection?.state !== 'ready' || !selection.complete || selection.requiredIds.length) return false;
+
+    const chosen = this.selectedIds();
+    const closed = new Set(selection.selectedIds);
+    if (!chosen.length || chosen.length !== closed.size || closed.size !== selection.selectedIds.length || !chosen.every(id => closed.has(id))) return false;
+    const rows = this.selectedProposals();
+    return rows.length === chosen.length && rows.every(row => row.previewId === preview.id && row.state === 'available' && row.before && row.after)
       && !!this.session.etag() && !this.session.pending() && !this.session.jobActive() && !this.pending() && !this.uncertain() && !this.rejected();
   });
   constructor() {
     effect(() => { const preview = this.preview(), selection = this.selection(), base = this.session.versionId(); const key = JSON.stringify([preview?.id, preview?.state, base, selection?.closureHash, selection?.selectedIds]); untracked(() => { if (key !== this.contextKey) { this.contextKey = key; this.acknowledged.set(false); if (!this.uncertain()) this.rejected.set(false); } }); });
     effect(() => { const id = this.session.workspace()?.id; if (id !== this.workspaceId) { this.workspaceId = id; untracked(() => { this.attempt = undefined; this.uncertain.set(false); this.pending.set(false); this.rejected.set(false); this.error.set(null); this.acknowledged.set(false); }); } });
   }
+  invalidateSelection(): void {
+    // A rapid remove/reselect can produce the same closure before Angular renders again.
+    this.acknowledged.set(false);
+    this.selection.set(null);
+  }
   async apply(): Promise<void> {
-    const workspaceId = this.session.workspace()?.id, etag = this.session.etag(), selection = this.selection(); if (!workspaceId || !etag || !selection || !this.canApply() || !this.acknowledged()) return;
-    this.attempt = { workspaceId, etag, key: crypto.randomUUID(), body: { baseVersionId: this.preview().baseVersionId, previewId: this.preview().id, selectedIds: [...selection.selectedIds], closureHash: selection.closureHash } };
+    const workspaceId = this.session.workspace()?.id, etag = this.session.etag(), selection = this.selection(), preview = this.preview();
+    if (!workspaceId || !etag || !selection || !preview || !this.canApply() || !this.acknowledged()) return;
+    this.attempt = { workspaceId, etag, key: crypto.randomUUID(), body: { baseVersionId: preview.baseVersionId, previewId: preview.id, selectedIds: [...selection.selectedIds], closureHash: selection.closureHash } };
     await this.send();
   }
   async retry(): Promise<void> { if (!this.uncertain() || this.pending() || this.session.pending() || this.session.jobActive()) return; await this.send(); }

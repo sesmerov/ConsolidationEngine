@@ -40,8 +40,10 @@
 @if (preview.state !== 'applied' && preview.state !== 'discarded') {
 <div class="selection-summary"><h3>Selección explícita: {{ store.selected().length }}</h3>@if (store.hiddenSelectedCount()) { <p>{{ store.hiddenSelectedCount() }} {{ store.hiddenSelectedCount() === 1 ? 'propuesta seleccionada' : 'propuestas seleccionadas' }} fuera de esta página.</p> }@if (store.selecting()) { <p aria-live="polite">Comprobando dependencias…</p> }
 @if (store.selection(); as selection) { @if (selection.requiredIds.length) { <p class="notice">Faltan {{ selection.requiredIds.length }} predecesores. Revisa y selecciona cada uno expresamente; no se han añadido automáticamente.</p><details open><summary>Dependencias pendientes ({{ selection.requiredIds.length }})</summary><ul>@for (id of selection.requiredIds; track id) { <li>{{ store.proposalName(id) }} <button mat-button (click)="openDetail(id, $event)">Consultar {{ store.proposalName(id).startsWith('Dependencia') ? 'dependencia' : store.proposalName(id).split(' · ')[0] }}</button></li> }</ul></details> } @else if (store.selected().length) { <p>La selección contiene todos sus predecesores. Los datos del informe siguen sin cambios.</p> } }</div>
-<ce-apply [preview]="preview" [selection]="store.selection()" [proposals]="store.selectedProposals()" [sources]="store.page()?.sourceFiles || []"/>
 }
+}
+<ce-apply [preview]="store.preview()" [selectedIds]="store.selected()" [selection]="store.selection()" [proposals]="store.selectedProposals()" [sources]="store.page()?.sourceFiles || []"/>
+@if (store.preview(); as preview) {
 @if (session.job()?.kind === 'apply' && session.jobActive()) { <p aria-live="polite">Aplicación y revalidación en curso. Todavía no se ha publicado una nueva versión.</p> }
 
 

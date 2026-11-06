@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SessionStore } from './session.store';
+import type { ReportContext } from '@ce/contracts';
 const workspaceId = 'a4a99ec0-bb65-41f5-90d1-b857f4ebefb2';
 const workspace = { id: workspaceId, name: 'Cierre', state: 'empty', versionIds: [], contexts: [], counts: { snapshots: 0, coordinates: 0, facts: 0, sources: 0 }, sessionBytes: 0 };
 describe('SessionStore HTTP lifecycle', () => {
@@ -10,6 +11,26 @@ describe('SessionStore HTTP lifecycle', () => {
   let store: SessionStore;
   beforeEach(() => { TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] }); http = TestBed.inject(HttpTestingController); store = TestBed.inject(SessionStore); });
   afterEach(() => { http.verify(); TestBed.resetTestingModule(); });
+  it('preserves the active context by ID on refresh and falls back to the first remaining context or none', async () => {
+    const firstContext: ReportContext = { contextId: 'primero', canonicalContextKey: 'scope-a', entityId: 'Entidad', referenceDate: '2025-12-31', framework: 'COREP', moduleVersion: 'COREP_OF_4.0', filingIndicators: {} };
+    const secondContext = { ...firstContext, contextId: 'segundo', canonicalContextKey: 'scope-b' };
+    async function refresh(contexts: readonly ReportContext[]): Promise<void> {
+      const pending = store.refreshWorkspace(workspaceId);
+      http.expectOne('/api/v1/workspaces/' + workspaceId).flush({ ...workspace, contexts }, { headers: { ETag: '"refreshed"' } });
+      await pending;
+    }
+
+    await refresh([firstContext, secondContext]);
+    expect(store.selectedContextId()).toBe(firstContext.contextId);
+    store.selectContext(secondContext.contextId);
+    await refresh([secondContext, firstContext]);
+    expect(store.selectedContextId()).toBe(secondContext.contextId);
+    await refresh([firstContext]);
+    expect(store.selectedContext()).toEqual(firstContext);
+    await refresh([]);
+    expect(store.selectedContextId()).toBeNull();
+    expect(store.selectedContext()).toBeNull();
+  });
   it('restores the active workspace after bootstrap using only the token in memory', async () => {
     const connect = store.connect();
     const bootstrap = http.expectOne('/api/v1/bootstrap'); expect(bootstrap.request.headers.has('X-CE-Session')).toBe(false);

@@ -20,8 +20,14 @@ describe('explicit application acceptance and recovery', () => {
   let http: HttpTestingController, session: SessionStore;
   beforeEach(() => { TestBed.configureTestingModule({ imports: [ApplyComponent, ComparisonComponent], providers: [provideHttpClient(), provideHttpClientTesting()] }); http = TestBed.inject(HttpTestingController); session = TestBed.inject(SessionStore); TestBed.inject(ApiClient).setSessionToken('memory-only'); session.workspace.set(workspace); session.etag.set('"v-' + versionId + '"'); });
   afterEach(() => { http.verify(); TestBed.resetTestingModule(); });
-  function render(options: { preview?: object; selection?: object; proposals?: readonly object[] } = {}) {
-    const fixture = TestBed.createComponent(ApplyComponent); fixture.componentRef.setInput('preview', options.preview ?? preview); fixture.componentRef.setInput('selection', options.selection ?? selection); fixture.componentRef.setInput('proposals', options.proposals ?? [a, d]); fixture.detectChanges(); TestBed.tick(); fixture.detectChanges(); return fixture;
+  function render(options: { preview?: object; selection?: { selectedIds: readonly string[] }; proposals?: readonly object[] } = {}) {
+    const fixture = TestBed.createComponent(ApplyComponent);
+    const closure = options.selection ?? selection;
+    fixture.componentRef.setInput('preview', options.preview ?? preview);
+    fixture.componentRef.setInput('selectedIds', closure.selectedIds);
+    fixture.componentRef.setInput('selection', closure);
+    fixture.componentRef.setInput('proposals', options.proposals ?? [a, d]);
+    fixture.detectChanges(); TestBed.tick(); fixture.detectChanges(); return fixture;
   }
   function button(fixture: ReturnType<typeof render>, text: string) { return Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find(button => button.textContent?.includes(text))!; }
   function acknowledge(fixture: ReturnType<typeof render>) { const checkbox = (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>('input[type="checkbox"]')!; checkbox.click(); fixture.detectChanges(); }
@@ -45,11 +51,15 @@ describe('explicit application acceptance and recovery', () => {
     { preview: { ...preview, state: 'obsolete' }, selection: { ...selection, state: 'obsolete' } },
     { preview: { ...preview, state: 'discarded' } },
   ])('never confirms incomplete, empty, missing-detail or unavailable selections (%#)', (options) => {
-    const fixture = render(options); expect(button(fixture, 'Aplicar cambios seleccionados').disabled).toBe(true); http.expectNone(request => request.method === 'POST');
+    const fixture = render(options);
+    const action = button(fixture, 'Aplicar cambios seleccionados');
+    if (options.preview || options.selection.selectedIds.length === 0) expect(action).toBeUndefined();
+    else expect(action.disabled).toBe(true);
+    http.expectNone(request => request.method === 'POST');
   });
   it('resets express acknowledgement when the selected set changes', () => {
     const fixture = render(); acknowledge(fixture); expect(button(fixture, 'Aplicar cambios seleccionados').disabled).toBe(false);
-    fixture.componentRef.setInput('selection', { ...selection, selectedIds: [aId], closureHash: 'b'.repeat(64) }); fixture.componentRef.setInput('proposals', [a]); fixture.detectChanges(); TestBed.tick(); fixture.detectChanges();
+    fixture.componentRef.setInput('selectedIds', [aId]); fixture.componentRef.setInput('selection', { ...selection, selectedIds: [aId], closureHash: 'b'.repeat(64) }); fixture.componentRef.setInput('proposals', [a]); fixture.detectChanges(); TestBed.tick(); fixture.detectChanges();
     expect((fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked).toBe(false); expect(button(fixture, 'Aplicar cambios seleccionados').disabled).toBe(true);
   });
   it('explains a no-op and preserves the existing calculated provenance in the confirmation', () => {
@@ -74,6 +84,11 @@ describe('explicit application acceptance and recovery', () => {
     const first = http.expectOne(request => request.url.endsWith('/applications')), body = first.request.body, key = first.request.headers.get('Idempotency-Key');
     first.error(new ProgressEvent('error')); await Promise.resolve(); fixture.detectChanges();
     session.workspace.set({ ...workspace, currentVersionId: nextVersion, versionIds: [versionId, nextVersion] }); session.etag.set('"v-' + nextVersion + '"'); TestBed.tick(); fixture.detectChanges();
+    fixture.componentRef.setInput('selection', null);
+    fixture.componentRef.setInput('selectedIds', []);
+    fixture.componentRef.setInput('proposals', []);
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('#apply-title')).toBeNull();
     button(fixture, 'Reintentar misma aplicación').click(); const retry = http.expectOne(request => request.url.endsWith('/applications'));
     expect(retry.request.body).toEqual(body); expect(retry.request.headers.get('Idempotency-Key')).toBe(key); expect(retry.request.headers.get('If-Match')).toBe('"v-' + versionId + '"');
     retry.flush({ jobId: 'same-job', workspaceId, kind: 'apply', status: 'queued', progress: { completed: 0, total: 2, complete: false }, diagnostics: [], pollAfterMs: 60000 }); await Promise.resolve(); expect(session.job()?.jobId).toBe('same-job');

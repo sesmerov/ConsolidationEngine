@@ -1,6 +1,17 @@
-<section class="confirmation" aria-labelledby="apply-title"><h3 id="apply-title">Confirmar la aplicación</h3><p>Se aplicarán {{ selection()?.selectedIds?.length || 0 }} propuestas elegidas expresamente. Se creará una versión y se volverá a validar todo el catálogo.</p>
+@if (showConfirmation()) {
+<section class="confirmation" aria-labelledby="apply-title">
+<h3 id="apply-title">Confirmar la aplicación</h3>
+<p>{{ selectedIds().length }} {{ selectedIds().length === 1 ? 'propuesta seleccionada' : 'propuestas seleccionadas' }}. Al aplicar se creará una versión y se volverá a validar todo el catálogo.</p>
 <details class="selection-review"><summary>Revisar selección completa ({{ selectedProposals().length }})</summary><ul class="selected-changes">@for (row of selectedProposals(); track row.id) { <li><strong>{{ row.code }}</strong> · {{ target(row) }} <span class="value-change"><ce-exact-value [value]="row.before?.normalizedValue" [decimals]="row.before?.coordinate?.decimals || ''"/><span aria-hidden="true">→</span><ce-exact-value [value]="row.after?.normalizedValue" [decimals]="row.before?.coordinate?.decimals || ''"/></span>@if (row.before?.derivation; as derivation) { <span class="muted">Recalculado en una aplicación anterior</span><details class="trace-details"><summary>Origen del valor anterior</summary><p>Aplicación {{ derivation.receiptId }} · propuesta {{ derivation.proposalId }}</p><p>La celda identifica el origen, no el valor recalculado en el Excel original.</p></details> }@if (noChange(row)) { <span class="muted">Sin cambio de valor</span> }</li> }</ul></details>
-@if (!canApply() && !uncertain()) { <p class="notice">Selecciona una propuesta vigente y todos sus predecesores para continuar.</p> }
+@if (!selection()) { <p class="notice">Pendiente de comprobar las dependencias de esta selección.</p> }
+@else if (selection()?.requiredIds?.length) { <p class="notice">Selecciona los predecesores pendientes para continuar.</p> }
+@else if (!canApply() && !uncertain() && !pending()) { <p class="notice">Para aplicar se necesita la selección completa y vigente con el detalle de cada propuesta.</p> }
 <mat-checkbox [checked]="acknowledged()" [disabled]="!canApply()" (change)="acknowledged.set($event.checked)">He revisado cada propuesta y acepto aplicar el conjunto completo mostrado.</mat-checkbox>
-<div class="direction-actions"><button mat-flat-button (click)="apply()" [disabled]="!canApply() || !acknowledged()">Aplicar cambios seleccionados</button>@if (uncertain()) { <button mat-stroked-button (click)="retry()" [disabled]="pending() || session.pending() || session.jobActive()">Reintentar misma aplicación</button> }</div>
-@if (pending()) { <p aria-live="polite">Enviando la aplicación…</p> } @if (error(); as message) { <p class="error" role="alert">{{ message }}</p> }</section>
+<button mat-flat-button (click)="apply()" [disabled]="!canApply() || !acknowledged()">Aplicar cambios seleccionados</button>
+</section>
+}
+@if (pending()) { <p aria-live="polite">Enviando la aplicación…</p> }
+@if (error(); as message) { <p class="error" role="alert">{{ message }}</p> }
+@if (uncertain()) {
+  <button mat-stroked-button (click)="retry()" [disabled]="pending() || session.pending() || session.jobActive()">Reintentar misma aplicación</button>
+}
