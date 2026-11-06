@@ -157,10 +157,16 @@ describe('explicit directions and read-only previews', () => {
     const first = (await fetch(configured.run.id, '?limit=1&code=synthetic_A')).json(); expect(first.items).toHaveLength(1);
     expect(first.configuredDirections).toHaveLength(2); expect(first.configuredDirections).toEqual(expect.arrayContaining(choices));
     expect(first.configuredDirections.every((choice: object) => Object.keys(choice).sort().join(',') === 'instanceId,targetSide')).toBe(true);
+    const compact = await fetch(configured.run.id, '?limit=1&code=synthetic_A&includeConfiguredDirections=false');
+    expect(compact.statusCode).toBe(200);
+    expect(compact.json()).not.toHaveProperty('configuredDirections');
+    expect(compact.json().items).toEqual(first.items);
+    expect(app.ce.store.current(workspace.id)!.content.directionDecisionState).toMatchObject({ mode: 'reviewed', source: 'replace' });
     expect((await fetch(bundle!.run.id)).json().configuredDirections).toEqual([]);
     expect((await configure([])).statusCode).toBe(200); const newer = recordRun();
     expect((await fetch(configured.run.id, '?limit=1')).json().configuredDirections).toEqual(first.configuredDirections);
     expect((await fetch(newer.run.id)).json().configuredDirections).toEqual([]);
+    expect(app.ce.store.current(workspace.id)!.content.directionDecisionState).toMatchObject({ mode: 'reviewed', unselectedDefault: 'omitted' });
   });
   it.each([false, true])('versions configuration and invalidates only ready previews atomically (quota rejection=%s)', async (limited) => {
     const { app, workspace, snapshot, bundle, instance, configure } = await setup(limited ? { store: new WorkspaceStore({ maxSnapshots: 1 }) } : {});

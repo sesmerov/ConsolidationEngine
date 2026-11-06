@@ -3,6 +3,7 @@ import { Worker } from 'node:worker_threads';
 import { ERROR_MESSAGES, JOB_DEADLINE_MS, isTerminalJob } from '@ce/contracts';
 import type { JobDTO, JobKind, JsonValue, ResultRef } from '@ce/contracts';
 import { ApiError } from '../errors.js';
+import { WorkLimitError } from '@ce/engine';
 import type { PublicationOutput, WorkspaceStore } from '../session/workspace-store.js';
 import type { StateRecord, WorkerMessage, WorkerOutput, WorkerRequest } from '../workers/protocol.js';
 import { receivedDiagnostic } from '../public-diagnostic.js';
@@ -14,6 +15,8 @@ export interface JobManagerOptions {
 }
 export interface JobAcceptance { input?: JsonValue; initialRecords?: readonly StateRecord[]; resultRef?: ResultRef; includeSnapshot?: boolean;
   retainedState?: JsonValue;
+  /** Final synchronous resource CAS after asynchronous acceptance and before publishing initial records. */
+  assertStart?: () => void;
   preparePublication?: (job: JobDTO, output: WorkerOutput) => { output: PublicationOutput; assertCommit?: () => void };
   onTerminal?: (job: JobDTO) => readonly StateRecord[]; finalize?: () => Promise<void> }
 export interface StartJob extends JobAcceptance { workspaceId: string; kind: JobKind; baseVersionId?: string; input: JsonValue; jobId?: string }
@@ -42,6 +45,7 @@ export class JobManager {
     if (this.disposed) throw new ApiError('RESOURCE_NOT_FOUND');
     const job: JobDTO = { jobId: input.jobId ?? randomUUID(), workspaceId: input.workspaceId, kind: input.kind, status: 'queued',
       ...(input.baseVersionId ? { baseVersionId: input.baseVersionId } : {}), ...(input.resultRef ? { resultRef: input.resultRef } : {}), progress: { completed: 0, total: 0, complete: false }, diagnostics: [], pollAfterMs: 1000 };
+    input.assertStart?.();
     this.store.registerJob(job, input.initialRecords, input.retainedState);
     const running: Running = { cancellation: new Int32Array(new SharedArrayBuffer(4)), expiresAt: Infinity, stopping: false, ...(input.finalize ? { finalize: input.finalize } : {}),
       ...(input.onTerminal ? { onTerminal: input.onTerminal } : {}), ...(input.preparePublication ? { preparePublication: input.preparePublication } : {}), ...(input.includeSnapshot !== undefined ? { includeSnapshot: input.includeSnapshot } : {}) };
@@ -109,7 +113,8 @@ export class JobManager {
     // Preserve the finite policy explanation at main-thread rejection as well as at worker rejection.
     const policyDiagnostics = error instanceof ApiError && code === 'INVALID_DIRECTION' && error.details.reason === 'RULE_VALIDATION_ONLY'
       ? [receivedDiagnostic({ code: 'RULE_VALIDATION_ONLY' })] : [];
-    const failed: JobDTO = { ...current, status: 'failed', endedAt: new Date().toISOString(), progress: { ...current.progress, complete: false }, diagnostics: [{ code, message: ERROR_MESSAGES[code] }] };
+    const failure = error instanceof WorkLimitError ? receivedDiagnostic({ code: error.code }) : { code, message: ERROR_MESSAGES[code] };
+    const failed: JobDTO = { ...current, status: 'failed', endedAt: new Date().toISOString(), progress: { ...current.progress, complete: false }, diagnostics: [failure] };
     const explained: JobDTO = policyDiagnostics.length ? { ...failed, diagnostics: [...failed.diagnostics, ...policyDiagnostics] } : failed;
     this.store.updateJob(explained, running.onTerminal?.(explained));
     this.cleanup(original.jobId);

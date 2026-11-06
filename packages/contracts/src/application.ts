@@ -71,6 +71,12 @@ export const ruleResultSchema = { type: 'object', additionalProperties: false,
     presentation: presentationSchema,
   } } as const;
 export const comparisonRowSchema = { type: 'object', additionalProperties: false, required: ['key'], properties: { key: text, before: ruleResultSchema, after: ruleResultSchema }, anyOf: [{ type: 'object', required: ['before'] }, { type: 'object', required: ['after'] }] } as const;
+export const validationResultsQuerySchema = { type: 'object', additionalProperties: false, properties: {
+  limit: { type: 'string', pattern: '^(?:[1-9]|[1-9][0-9]|1[0-9]{2}|200)$' },
+  cursor: { type: 'string', maxLength: 8192 }, status: ruleResultSchema.properties.status,
+  code: { type: 'string', maxLength: 128 }, table: { type: 'string', maxLength: 128 },
+  includeConfiguredDirections: { type: 'string', enum: ['true', 'false'] },
+} } as const;
 /** Closed response shape: internal snapshots and AST cannot pass through object spreading. */
 export const validationResultsPageSchema = { type: 'object', additionalProperties: false,
   required: ['items', 'total', 'nextCursor', 'versionId', 'run'], properties: {

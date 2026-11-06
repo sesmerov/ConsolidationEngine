@@ -33,3 +33,9 @@ SC-007. La portada anónima y el icono responden antes de ejecutar JavaScript. S
 ## Compatibilidad FINREP
 
 SC-006. El ensayo original fue producido por `6bd2476`. Se repitió con la API recompilada de 003 en `.cache/003-finrep-probe/run-pNtvqV/result.json`. El extracto visual F_01.01 recibió 202 y terminó en `INVALID_WORKBOOK / UNRECOGNIZED_COREP_SHEETS`, con cero versiones. Los cuatro importes equivalentes, cargados con el mismo catálogo en formato de coordenadas, dieron «pasa» para 100 = 40 + 35 + 25 y «falla» para 40 > 100. Se comprobó la huella del anexo de origen. La entrada visual FINREP necesita un adaptador.
+
+## Motor y API de revisión
+
+Las tres pruebas HTTP iniciales reprodujeron la ausencia de las rutas. Con la implementación pasan 624 comprobaciones de motor y 11 de contrato y ciclo de vida de revisión. Los escenarios incluyen las dos direcciones, un lado inconcluso, un grupo de 270 productores que cruza páginas, dos contextos con coordenadas iguales, omisión global, guardado parcial o vacío, replay, dos pestañas, vencimiento fijo, cancelación y límites de memoria y snapshots. La publicación crea una sola versión con sus decisiones y recibo y conserva los importes. Las consultas de resultados siguen admitiendo clientes anteriores.
+
+En este corte pasaron las suites completas de integración (497, en 31 archivos, 160,22 s) y contrato (161, en 18 archivos, 116,72 s) en serie. El ensayo focal de presentación/previews pasó 34/34 y el de trabajos y atomicidad, 39/39. Los logs completos son `.cache/003-integration.log`, `.cache/003-contract.log` y `.cache/003-review-first.log`.

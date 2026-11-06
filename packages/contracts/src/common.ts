@@ -27,6 +27,7 @@ export interface SnapshotContent {
   readonly profileId: string; readonly contexts: readonly ReportContext[];
   readonly catalog: CatalogData; readonly coordinates: readonly Coordinate[];
   readonly facts: readonly ReportedFact[]; readonly directions: readonly DirectionDTO[];
+  readonly directionDecisionState?: import('./direction-review.js').DirectionDecisionState;
   readonly sources: readonly SourceFile[];
   /** Absent for legacy ce-report-1. Trusted adapters bind visual reports to their actual source. */
   readonly reportSourceBindings?: readonly ReportSourceBinding[];
@@ -35,7 +36,8 @@ export interface Snapshot {
   readonly versionId: UUID; readonly parentVersionId?: UUID; readonly contentHash: string;
   readonly createdAt: string; readonly content: SnapshotContent;
 }
-export type JobKind = 'import' | 'inspect-import' | 'validate' | 'preview' | 'apply' | 'export';
+export const JOB_KINDS = ['import','inspect-import','prepare-directions','commit-directions','validate','preview','apply','export'] as const;
+export type JobKind = typeof JOB_KINDS[number];
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'timed_out';
 export interface ResultRef { readonly type: string; readonly id: string }
 export interface JobProgress { readonly completed: number; readonly total: number; readonly complete: boolean }

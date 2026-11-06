@@ -58,6 +58,10 @@ export interface ValidationRunDTO {
   readonly diagnostics: readonly Diagnostic[];
 }
 export interface ValidationBundle { readonly run: ValidationRunDTO; readonly results: readonly RuleResultDTO[] }
+export interface ValidationResultsQueryDTO {
+  readonly limit?: string; readonly cursor?: string; readonly status?: ValidationStatus;
+  readonly code?: string; readonly table?: string; readonly includeConfiguredDirections?: 'true' | 'false';
+}
 export interface ValidationResultsPageDTO { readonly items: readonly RuleResultDTO[]; readonly total: number; readonly nextCursor: string | null; readonly versionId: string; readonly run: ValidationRunDTO; readonly sourceFiles?: readonly SourceFile[]; readonly configuredDirections?: readonly DirectionChoiceDTO[] }
 const count = { type: 'integer', minimum: 0 } as const;
 export const validationSummarySchema = { type: 'object', additionalProperties: false,

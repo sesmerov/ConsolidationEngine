@@ -1,6 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { uuidSchema, validationResultsPageSchema } from '@ce/contracts';
+import { uuidSchema, validationResultsPageSchema, validationResultsQuerySchema } from '@ce/contracts';
+import type { ValidationResultsQueryDTO } from '@ce/contracts';
 import { getRecalculationPolicy, resultOrderKey, WorkBudget } from '@ce/engine';
 import { ApiError } from '../errors.js';
 import { canonicalHash } from '../session/canonical-state.js';
@@ -8,13 +9,11 @@ import { getValidation } from '../validation/validation-service.js';
 import { directionEligibility } from '../recalculation/directions-service.js';
 import { publicResult } from '../presentation/public-values.js';
 import { rulePresentation } from '../presentation/rule-presentation.js';
-interface Query { limit?: string; cursor?: string; status?: string; code?: string; table?: string }
 export function registerResults(app: FastifyInstance): void {
   const secret = randomBytes(32), sign = (payload: string) => createHmac('sha256', secret).update(payload).digest('base64url');
-  app.get<{ Params: { workspaceId: string; runId: string }; Querystring: Query }>('/api/v1/workspaces/:workspaceId/runs/:runId/results', {
+  app.get<{ Params: { workspaceId: string; runId: string }; Querystring: ValidationResultsQueryDTO }>('/api/v1/workspaces/:workspaceId/runs/:runId/results', {
     schema: { params: { type: 'object', additionalProperties: false, required: ['workspaceId', 'runId'], properties: { workspaceId: uuidSchema, runId: uuidSchema } },
-      querystring: { type: 'object', additionalProperties: false, properties: { limit: { type: 'string', pattern: '^(?:[1-9]|[1-9][0-9]|1[0-9]{2}|200)$' }, cursor: { type: 'string', maxLength: 8192 },
-        status: { enum: ['pass', 'fail', 'not_applicable', 'not_evaluable', 'error'] }, code: { type: 'string', maxLength: 128 }, table: { type: 'string', maxLength: 128 } } },
+      querystring: validationResultsQuerySchema,
       response: { 200: validationResultsPageSchema } },
   }, async (request) => {
     const { workspaceId, runId } = request.params, query = request.query, bundle = getValidation(app.ce.store, workspaceId, runId);
@@ -53,6 +52,7 @@ export function registerResults(app: FastifyInstance): void {
       return { ...row, recalculation: { policy: classified.policy, left, right } };
     });
     return { items, total: rows.length, nextCursor, versionId: bundle.run.versionId, run: bundle.run, sourceFiles: snapshot.content.sources,
-      configuredDirections: snapshot.content.directions.map(({ instanceId, targetSide }) => ({ instanceId, targetSide })) };
+      ...(query.includeConfiguredDirections === 'false' ? {} : {
+        configuredDirections: snapshot.content.directions.map(({ instanceId, targetSide }) => ({ instanceId, targetSide })) }) };
   });
 }

@@ -1,9 +1,9 @@
 import { LANGUAGE_PROFILE_V2 } from '@ce/contracts';
 import type { DirectionChoiceDTO, DirectionDTO, DirectionEligibilityDTO, ProposalDTO, RuleResultDTO, Snapshot, ValidationBundle } from '@ce/contracts';
-import { assertRecalculationConfiguration, getRecalculationPolicy, ProfileError, RecalculationConfigurationError, resolveDirection, WorkBudget, WorkLimitError } from '@ce/engine';
+import { assertRecalculationConfiguration, getRecalculationPolicy, ProfileError, RecalculationConfigurationError, replacedDirectionDecisionState, resolveDirection, WorkBudget, WorkLimitError } from '@ce/engine';
 import type { WorkLimits } from '@ce/engine';
 import { ApiError } from '../errors.js';
-import { canonicalHash, canonicalStringify } from '../session/canonical-state.js';
+import { canonicalStringify, directionConfigurationVersion } from '../session/canonical-state.js';
 import type { WorkspaceStore } from '../session/workspace-store.js';
 
 /** Public and final-publication guard; the worker repeats this against its private input. */
@@ -68,5 +68,7 @@ export function replaceDirections(store: WorkspaceStore, workspaceId: string, ch
   }
   directions.sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   // Snapshot and preview invalidation share the store's single quota-checked publication.
-  return store.publish(workspaceId, snapshot.versionId, { ...snapshot.content, configVersion: canonicalHash(directions), directions });
+  const directionDecisionState = replacedDirectionDecisionState();
+  const configVersion = directionConfigurationVersion(directions, directionDecisionState);
+  return store.publish(workspaceId, snapshot.versionId, { ...snapshot.content, configVersion, directionDecisionState, directions });
 }

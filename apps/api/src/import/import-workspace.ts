@@ -2,7 +2,7 @@ import { ENGINE_PROFILE_ID, parseRule } from '@ce/engine';
 import { LANGUAGE_PROFILE_V2 } from '@ce/contracts';
 import type { CatalogData, Coordinate, Diagnostic, ImportContextInputDTO, ImportInspectionContextDTO, ImportInspectionProfileDTO, ImportInspectionReportDTO, ReportContext, ReportedFact, ReportSourceBinding, RuleAnalysis, SnapshotContent, SourceFile, SourceLocator } from '@ce/contracts';
 import { ApiError } from '../errors.js';
-import { canonicalHash, canonicalStringify } from '../session/canonical-state.js';
+import { canonicalHash, canonicalStringify, directionConfigurationVersion } from '../session/canonical-state.js';
 import type { InspectionCandidate, OperationContext } from '../workers/protocol.js';
 import type { StagedFile } from './multipart-staging.js';
 import { preflightXlsx } from './xlsx-preflight.js';
@@ -102,7 +102,8 @@ async function buildWorkspace(files: readonly StagedFile[], operation: Operation
   } };
   const sources: SourceFile[] = files.map(({ id, sha256, displayName, kind, size, importedAt }) => ({ id, sha256, displayName, kind, size, importedAt, expandedBytes: expansionBySource.get(id)! }));
   check(); operation.progress(files.length + 1, files.length + 1);
-  const content: SnapshotContent = { catalogVersion: canonicalHash(catalog), reportVersion: canonicalHash({ contexts, coordinates, facts, ...(declaration ? { reportSourceBindings } : {}) }), configVersion: canonicalHash([]), profileId,
+  const directionDecisionState = { schemaVersion: 1, mode: 'new' } as const;
+  const content: SnapshotContent = { catalogVersion: canonicalHash(catalog), reportVersion: canonicalHash({ contexts, coordinates, facts, ...(declaration ? { reportSourceBindings } : {}) }), configVersion: directionConfigurationVersion([], directionDecisionState), directionDecisionState, profileId,
     contexts, coordinates, facts, catalog, directions: [], sources, ...(declaration ? { reportSourceBindings } : {}) };
   return { content, profiles, context: inspectionContexts, reports, diagnostics: [] };
 }

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { DirectionDecisionState, DirectionDTO } from '@ce/contracts';
 
 function primitive(value: unknown): string | undefined {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return JSON.stringify(value);
@@ -24,6 +25,9 @@ export function canonicalStringify(value: unknown): string {
   return encode(value);
 }
 export function canonicalHash(value: unknown): string { return createHash('sha256').update(canonicalStringify(value), 'utf8').digest('hex'); }
+export function directionConfigurationVersion(directions: readonly DirectionDTO[], directionDecisionState: DirectionDecisionState): string {
+  return canonicalHash({ directions, directionDecisionState });
+}
 /** Count canonical JSON syntax and primitives, visiting a shared object/array only once across all retained roots. */
 export function canonicalStateBytes(roots: readonly unknown[]): number {
   const seen = new WeakSet<object>(); const ancestors = new WeakSet<object>();
@@ -44,17 +48,29 @@ export function canonicalStateBytes(roots: readonly unknown[]): number {
   return roots.reduce<number>((sum, value) => sum + count(value), 0);
 }
 /** Take ownership of mutable inputs; immutable branches are shared by subsequent snapshots. */
+const owned = new WeakSet<object>();
 export function immutable<T>(value: T): T {
-  canonicalStringify(value);
+  const ancestors = new WeakSet<object>();
+  const copies = new WeakMap<object, unknown>();
   function copy(item: unknown): unknown {
-    if (item === null || typeof item !== 'object') return item;
+    if (item === null || typeof item !== 'object') { primitive(item); return item; }
+    if (owned.has(item)) return item;
+    const prior = copies.get(item);
+    if (prior) return prior;
+    if (ancestors.has(item)) throw new TypeError('Cyclic session data.');
+    ancestors.add(item);
+    let result: object;
     if (Array.isArray(item)) {
       const children = item.map(copy);
-      return Object.isFrozen(item) && children.every((child, i) => child === item[i]) ? item : Object.freeze(children);
+      result = Object.isFrozen(item) && children.every((child, i) => child === item[i]) ? item : Object.freeze(children);
+    } else {
+      keys(item);
+      const entries = Object.entries(item).map(([key, child]) => [key, copy(child)] as const);
+      result = Object.isFrozen(item) && entries.every(([key, child]) => child === (item as Record<string, unknown>)[key])
+        ? item : Object.freeze(Object.fromEntries(entries));
     }
-    const entries = Object.entries(item).map(([key, child]) => [key, copy(child)] as const);
-    return Object.isFrozen(item) && entries.every(([key, child]) => child === (item as Record<string, unknown>)[key])
-      ? item : Object.freeze(Object.fromEntries(entries));
+    ancestors.delete(item); copies.set(item, result); owned.add(result);
+    return result;
   }
   return copy(value) as T;
 }

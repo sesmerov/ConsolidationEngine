@@ -1,6 +1,7 @@
 import type { Diagnostic, ImportContextInputDTO, ImportInspectionContextDTO, ImportInspectionDTO, ImportInspectionProfileDTO, ImportInspectionReportDTO, JobDTO, JsonValue, ResultRef, Snapshot, SnapshotContent } from '@ce/contracts';
 import type { StagedFile } from '../import/multipart-staging.js';
-import type { ApplicationCandidate } from '@ce/engine';
+import type { ApplicationCandidate, DirectionReviewProjection, ReviewSeed, WorkLimits } from '@ce/engine';
+import type { DirectionDecisionState, DirectionDTO } from '@ce/contracts';
 export interface StateRecord { readonly key: string; readonly value: JsonValue }
 export interface WorkerOutput {
   readonly complete: boolean; readonly snapshotContent?: SnapshotContent;
@@ -9,7 +10,12 @@ export interface WorkerOutput {
   readonly applicationCandidate?: ApplicationCandidate;
   readonly inspectionCandidate?: InspectionCandidate;
   readonly verifiedInspectionHash?: string;
+  readonly directionReviewProjection?: DirectionReviewProjection;
+  readonly directionCompilation?: DirectionCompilation;
 }
+export interface DirectionCompilation { readonly directions: readonly DirectionDTO[]; readonly decisionState: DirectionDecisionState }
+export interface PrepareDirectionsInput { readonly reviewId: string; readonly seeds: readonly ReviewSeed[]; readonly limits?: Partial<WorkLimits> }
+export interface CommitDirectionsInput { readonly projection: DirectionReviewProjection; readonly limits?: Partial<WorkLimits> }
 export interface InspectionCandidate {
   readonly content: SnapshotContent; readonly profiles: readonly ImportInspectionProfileDTO[];
   readonly context: readonly ImportInspectionContextDTO[]; readonly reports: readonly ImportInspectionReportDTO[];

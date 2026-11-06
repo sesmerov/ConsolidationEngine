@@ -81,6 +81,11 @@ describe('presentation and stored calculation details', () => {
     const response = await f.app.inject({ url: `${f.base}/runs/${run.run.id}/results` }); expect(response.statusCode, response.body).toBe(200);
     expect(response.json().items[0].presentation).toEqual({ description: 'Capital disponible <b>texto</b>' });
     expect(response.json().items[0].recalculation.policy).toEqual({ profileId: profile, mode: 'standard', reasons: [] });
+    const compact = await f.app.inject({ url: `${f.base}/runs/${run.run.id}/results?includeConfiguredDirections=false` });
+    expect(compact.statusCode).toBe(200);
+    expect(compact.json().items).toEqual(response.json().items);
+    expect(compact.json()).not.toHaveProperty('configuredDirections');
+    expect((await f.app.inject({ url: `${f.base}/runs/${run.run.id}/results?includeConfiguredDirections=no` })).statusCode).toBe(400);
   });
   it('omits unavailable labels rather than inventing business concepts', async () => {
     const f = setup(), run = f.saveRun([{ ...f.result('UNKNOWN'), variantIds: [], sourceRecordIds: [] }]);

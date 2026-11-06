@@ -5,6 +5,8 @@ import { ApiError } from '../errors.js';
 import { canonicalHash, immutable } from './canonical-state.js';
 import { RetainedSize } from './retained-size.js';
 import type { InspectionRecord, StateRecord, WorkerOutput } from '../workers/protocol.js';
+import { activeReviewKey, releasedReview, reviewKey } from '../recalculation/direction-review-record.js';
+import type { ReviewRecord } from '../recalculation/direction-review-record.js';
 /** Reserved version identifiers are supplied only by main-thread publication preparation. */
 export interface PublicationOutput extends WorkerOutput { readonly snapshotVersionId?: string }
 
@@ -45,6 +47,12 @@ export class WorkspaceStore {
   }
   get currentWorkspaceId(): string | undefined { return this.workspace?.state === 'closed' ? undefined : this.workspace?.id; }
   get bytes(): number { return this.retained.bytes; }
+  get availableBytes(): number { return this.maxBytes - this.bytes; }
+  /** Check peak occupancy while an old projection and its replacement are both alive. */
+  assertTransientCapacity(extra: readonly unknown[]): void {
+    const roots = [...(this.workspace ? [this.workspace] : []), ...this.snapshots.values(), ...this.recordRoots.values(), ...extra];
+    if (this.retained.prepare(roots).bytes > this.maxBytes) throw new ApiError('SESSION_LIMIT');
+  }
   current(id: string): Snapshot | undefined { const w = this.require(id); return w.currentVersionId ? this.snapshot(id, w.currentVersionId) : undefined; }
   snapshot(id: string, versionId: string): Snapshot { this.require(id); const result = this.snapshots.get(versionId); if (!result) throw new ApiError('RESOURCE_NOT_FOUND'); return result; }
   etag(id: string): string { const version = this.require(id).currentVersionId; return version ? '"v-' + version + '"' : '"empty"'; }
@@ -71,6 +79,7 @@ export class WorkspaceStore {
     this.assertBase(id, base); const w = this.require(id); const snapshot = this.candidate(w, content);
     const next = { ...w, state: 'ready' as const, currentVersionId: snapshot.versionId, versionIds: [...w.versionIds, snapshot.versionId] };
     const snapshots = new Map(this.snapshots).set(snapshot.versionId, snapshot); const records = this.invalidateInspections(this.obsoletePreviews(this.withRecords(additions), snapshot.versionId), snapshot.versionId);
+    this.invalidateDirectionReview(records, id, snapshot.versionId);
     const commitSize = this.check(next, snapshots, records); commitSize(); this.workspace = next; this.snapshots = snapshots; this.records = records; this.inspectionInvalidated?.(id); return snapshot;
   }
   private withRecords(additions: readonly StateRecord[]): Map<string, unknown> {
@@ -80,6 +89,14 @@ export class WorkspaceStore {
       records.set(entry.key, immutable(entry.value));
     }
     return records;
+  }
+  private invalidateDirectionReview(records: Map<string, unknown>, workspaceId: string, versionId: string): void {
+    const active = activeReviewKey(workspaceId), id = records.get(active);
+    if (typeof id !== 'string') return;
+    const key = reviewKey(workspaceId, id), prior = records.get(key) as ReviewRecord | undefined;
+    if (!prior || prior.summary.baseVersionId === versionId) return;
+    records.set(key, immutable(releasedReview(prior, 'obsolete')));
+    records.delete(active);
   }
   putRecords(additions: readonly StateRecord[]): void { const records = this.withRecords(additions); const commitSize = this.check(this.workspace, this.snapshots, records); commitSize(); this.records = records; }
   getRecord<T = unknown>(key: string): T | undefined { return this.records.get(key) as T | undefined; }
@@ -127,10 +144,14 @@ export class WorkspaceStore {
   publishJobResult(job: JobDTO, output: PublicationOutput, assertCommit: () => void = () => undefined): JobDTO {
     this.assertAccepting(job.workspaceId); this.assertBase(job.workspaceId, job.baseVersionId); let w = this.require(job.workspaceId);
     if (w.activeJobId !== job.jobId || this.job(job.workspaceId, job.jobId).status !== 'running' || !output.complete) throw new ApiError('INTERNAL_ERROR');
-    if (job.kind === 'apply' ? !output.applicationCandidate || !output.snapshotContent || !output.snapshotVersionId : output.snapshotVersionId !== undefined || output.applicationCandidate !== undefined) throw new ApiError('INTERNAL_ERROR');
+    if (job.kind === 'apply') {
+      if (!output.applicationCandidate || !output.snapshotContent || !output.snapshotVersionId) throw new ApiError('INTERNAL_ERROR');
+    } else if (job.kind === 'commit-directions') {
+      if (!output.snapshotVersionId || !output.snapshotContent || output.applicationCandidate) throw new ApiError('INTERNAL_ERROR');
+    } else if (output.snapshotVersionId !== undefined || output.applicationCandidate !== undefined) throw new ApiError('INTERNAL_ERROR');
     let records = this.withRecords(output.records ?? []); const snapshots = new Map(this.snapshots);
     const snapshot = output.snapshotContent ? this.candidate(w, output.snapshotContent, output.snapshotVersionId) : undefined;
-    if (snapshot) { snapshots.set(snapshot.versionId, snapshot); records = this.invalidateInspections(this.obsoletePreviews(records, snapshot.versionId), snapshot.versionId); w = { ...w, state: 'ready', currentVersionId: snapshot.versionId, versionIds: [...w.versionIds, snapshot.versionId] }; }
+    if (snapshot) { snapshots.set(snapshot.versionId, snapshot); records = this.invalidateInspections(this.obsoletePreviews(records, snapshot.versionId), snapshot.versionId); this.invalidateDirectionReview(records, w.id, snapshot.versionId); w = { ...w, state: 'ready', currentVersionId: snapshot.versionId, versionIds: [...w.versionIds, snapshot.versionId] }; }
     if (snapshot && job.kind === 'import') for (const [key, value] of records) if (key.startsWith(`inspection:${job.workspaceId}:`)) {
       const record = value as InspectionRecord;
       if (record.inspection.state === 'committed' && record.inspection.commitJobId === job.jobId && !record.inspection.committedVersionId)

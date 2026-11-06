@@ -37,24 +37,26 @@ function unwrap(node: Expression, initial: Selection | undefined, binding: Bindi
 }
 const sameBinding = (a: Binding, b: Binding) => JSON.stringify([a.contextId, [...(a.contextIds ?? [])].sort(ordinal), a.tableCode, a.sheetCode, a.rowCode, a.columnCode]) === JSON.stringify([b.contextId, [...(b.contextIds ?? [])].sort(ordinal), b.tableCode, b.sheetCode, b.rowCode, b.columnCode]);
 /** Resolve structure only: a false/null current precondition does not remove eligibility. */
-export function resolveDirection(snapshot: Snapshot, input: DirectionInput, options: { budget?: WorkBudget } = {}): { resolved?: ResolvedDirection; diagnostics: readonly Diagnostic[] } {
+export function resolveDirection(snapshot: Snapshot, input: DirectionInput, options: { budget?: WorkBudget } = {}): { resolved?: ResolvedDirection; diagnostics: readonly Diagnostic[]; inconclusive?: true } {
   const invalid = (message: string, diagnostics: readonly Diagnostic[] = []): { diagnostics: readonly Diagnostic[] } => ({ diagnostics: diagnostics.length ? diagnostics : [{ code: 'INVALID_DIRECTION', message, severity: 'error' }] });
+  const inconclusive = (message: string, diagnostics: readonly Diagnostic[] = []) => ({ ...invalid(message, diagnostics), inconclusive: true as const });
   options.budget?.check();
   if (input.targetSide !== 'left' && input.targetSide !== 'right') return invalid('Elige un único lado de la igualdad.');
   const profileDiagnostics = snapshotProfileDiagnostics(snapshot, options.budget);
-  if (profileDiagnostics.length) return invalid('Los datos no pertenecen al perfil declarado.', profileDiagnostics);
+  if (profileDiagnostics.length) return inconclusive('Los datos no pertenecen al perfil declarado.', profileDiagnostics);
   if (snapshot.content.profileId === LANGUAGE_PROFILE_V2) {
     const policy = getRecalculationPolicy(snapshot, input, options);
     if (policy.policy.mode !== 'standard') {
       const limit = policy.diagnostics.find(issue => issue.code === 'RESOURCE_LIMIT' || issue.code === 'CANCELLED' || issue.code === 'DEADLINE_EXCEEDED');
       if (limit) throw new WorkLimitError(limit.code as 'RESOURCE_LIMIT' | 'CANCELLED' | 'DEADLINE_EXCEEDED', limit.message);
-      return invalid('La regla no admite una dirección de recálculo.', policy.diagnostics);
+      const reject = policy.policy.mode === 'undetermined' ? inconclusive : invalid;
+      return reject('La regla no admite una dirección de recálculo.', policy.diagnostics);
     }
   }
   const variants = input.variantIds.map(id => snapshot.content.catalog.variants.find(variant => variant.variantId === id));
-  if (!variants.length || variants.some(variant => !variant) || new Set(input.variantIds).size !== input.variantIds.length) return invalid('La instancia no identifica una variante válida.');
+  if (!variants.length || variants.some(variant => !variant) || new Set(input.variantIds).size !== input.variantIds.length) return inconclusive('La instancia no identifica una variante válida.');
   const variant = variants[0]!, index = reportIndex(snapshot.content, options.budget), context = input.binding.contextId ? index.contexts.get(input.binding.contextId) : undefined;
-  if (!context) return invalid('La instancia necesita un contexto declarado.');
+  if (!context) return inconclusive('La instancia necesita un contexto declarado.');
   const applies = (candidate: RuleVariant, contextId: string): boolean => {
     const ctx = index.contexts.get(contextId); return !!ctx && candidate.active && candidate.framework === ctx.framework && candidate.modules.includes(ctx.moduleVersion)
       && (!candidate.referenceWindow.from || ctx.referenceDate >= candidate.referenceWindow.from) && (!candidate.referenceWindow.to || ctx.referenceDate <= candidate.referenceWindow.to)
@@ -67,18 +69,18 @@ export function resolveDirection(snapshot: Snapshot, input: DirectionInput, opti
   const compatible = input.binding.contextIds ?? [context.contextId];
   if (!compatible.includes(context.contextId) || compatible.some(id => !applies(variant, id) || index.contexts.get(id)!.entityId !== context.entityId || index.contexts.get(id)!.referenceDate !== context.referenceDate)
     || (!variant.crossModule && compatible.some(id => index.contexts.get(id)!.canonicalContextKey !== context.canonicalContextKey))
-    || (variant.crossModule && variant.modules.some(module => !compatible.some(id => index.contexts.get(id)!.moduleVersion === module)))) return invalid('Los contextos de resolución no corresponden a esta regla.');
-  if (snapshot.content.catalog.variants.some(candidate => candidate.code === variant.code && fullyApplies(candidate) && effectiveRuleKey(candidate) !== key)) return invalid('Hay variantes incompatibles para el mismo código y contexto.');
+    || (variant.crossModule && variant.modules.some(module => !compatible.some(id => index.contexts.get(id)!.moduleVersion === module)))) return inconclusive('Los contextos de resolución no corresponden a esta regla.');
+  if (snapshot.content.catalog.variants.some(candidate => candidate.code === variant.code && fullyApplies(candidate) && effectiveRuleKey(candidate) !== key)) return inconclusive('Hay variantes incompatibles para el mismo código y contexto.');
   const cache = workCache(snapshot, options.budget);
   const parsed = parse(cache, variant.expression, snapshot.content.profileId), condition = variant.precondition ? parse(cache, variant.precondition, snapshot.content.profileId) : undefined;
-  if (!parsed.ast || parsed.supportStatus !== 'supported' || condition && (!condition.ast || condition.supportStatus !== 'supported')) return invalid('La expresión o precondición no pertenece al perfil admitido.', [...parsed.diagnostics, ...(condition?.diagnostics ?? [])]);
+  if (!parsed.ast || parsed.supportStatus !== 'supported' || condition && (!condition.ast || condition.supportStatus !== 'supported')) return inconclusive('La expresión o precondición no pertenece al perfil admitido.', [...parsed.diagnostics, ...(condition?.diagnostics ?? [])]);
   const expansionKey = JSON.stringify([key, context.contextId, [...compatible].sort(ordinal)]); let instances = cache.expansions.get(expansionKey);
   if (!instances) {
     const expanded = expandRuleInstances(parsed.ast, snapshot.content, { contextId: context.contextId, ruleKey: key, ...(variant.crossModule ? { contextIds: compatible } : {}), ...(options.budget ? { budget: options.budget } : {}) });
-    if (expanded.diagnostics.length) return invalid('La regla no tiene un ámbito finito válido.', expanded.diagnostics);
+    if (expanded.diagnostics.length) return inconclusive('La regla no tiene un ámbito finito válido.', expanded.diagnostics);
     instances = expanded.instances; cache.expansions.set(expansionKey, instances);
   }
-  if (!instances.some(instance => instance.instanceId === input.instanceId && sameBinding(instance.binding, input.binding))) return invalid('La identidad de instancia no corresponde al snapshot.');
+  if (!instances.some(instance => instance.instanceId === input.instanceId && sameBinding(instance.binding, input.binding))) return inconclusive('La identidad de instancia no corresponde al snapshot.');
   const equality = unwrap(parsed.ast.body, undefined, input.binding);
   if (equality.node.kind !== 'binary' || equality.node.op !== '=') {
     const message = 'Solo una igualdad admite una dirección de recálculo.';
@@ -87,14 +89,16 @@ export function resolveDirection(snapshot: Snapshot, input: DirectionInput, opti
   const targetNode = unwrap(input.targetSide === 'left' ? equality.node.left : equality.node.right, equality.scope, input.binding);
   if (targetNode.node.kind !== 'reference') return invalid('El lado elegido debe ser una única celda declarada.');
   const selected = resolveSelection(targetNode.node.selection, targetNode.scope, snapshot.content, input.binding, options.budget);
-  if (selected.diagnostics.length || selected.coordinates.length !== 1) return invalid('El destino no identifica una única celda declarada.', selected.diagnostics);
+  if (selected.diagnostics.length) return inconclusive('El destino no identifica una única celda declarada.', selected.diagnostics);
+  if (selected.coordinates.length !== 1) return invalid('El destino no identifica una única celda declarada.');
   const target = selected.coordinates[0]!, source = input.targetSide === 'left' ? equality.node.right : equality.node.left;
   if (snapshot.content.profileId === LANGUAGE_PROFILE_V2) {
     const type = inspectExpression(source, { snapshot, binding: input.binding, ...(equality.scope ? { scope: equality.scope } : {}), ...(options.budget ? { budget: options.budget } : {}) });
-    if (target.dataType !== 'number' || type.dataType !== 'number' || type.multiple || type.diagnostics.length) return invalid('El perfil v2 solo admite destino y expresión calculada numéricos compatibles.', type.diagnostics);
+    if (type.diagnostics.length) return inconclusive('No se pudo determinar el tipo del lado calculado.', type.diagnostics);
+    if (target.dataType !== 'number' || type.dataType !== 'number' || type.multiple) return invalid('El perfil v2 solo admite destino y expresión calculada numéricos compatibles.', type.diagnostics);
   }
   const reads = collectExpressionReads(source, { report: snapshot.content, binding: input.binding, ...(equality.scope ? { scope: equality.scope } : {}), ...(options.budget ? { budget: options.budget } : {}) });
-  if (reads.diagnostics.length) return invalid('El lado calculado contiene referencias no resueltas.', reads.diagnostics);
+  if (reads.diagnostics.length) return inconclusive('El lado calculado contiene referencias no resueltas.', reads.diagnostics);
   if (reads.readKeys.includes(target.factKey)) return invalid('El lado calculado lee su propio destino.');
   const id = stableId([input.instanceId, input.targetSide, target.factKey]);
   if (input.targetKey !== undefined && input.targetKey !== target.factKey || input.id !== undefined && input.id !== id) return invalid('La dirección no coincide con su destino canónico.');
