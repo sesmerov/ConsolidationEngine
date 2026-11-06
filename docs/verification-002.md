@@ -679,7 +679,7 @@ y corpus, no una garantía para cualquier conjunto. **T072 / SC-007 completos**.
 | SC-005 / FR-020–023 | Versiones/bindings y roundtrip del 100 % de ambos corpus; T063–071 y descargas reales de navegador. |
 | SC-006 / FR-024–029,036,038 | Tipos, ramas, exclusión en todas las entradas, Kahn, conflictos, cuotas, cancelación, atomicidad y regresión v1; motor/integración/HTTP/E2E. |
 | SC-007 / FR-037–038 | Cohorte nueva 10/10 ≤30 s, máximo 15,778 s, todas auditadas; carga y CA1 medidas aparte. T072 completo. |
-| SC-008 / FR-038 | Pendiente T075: todavía no se ha recibido una prueba humana de la interfaz nueva con los datos requeridos. |
+| SC-008 / FR-038 | Valoración global favorable recibida el 2026-11-06. T075 sigue pendiente de los detalles del recorrido. |
 
 La cobertura operativa es COREP CA1 y el perfil didáctico propio de texto/fechas.
 No se declara soporte general FINREP/COREP, conformidad completa DPM-XL ni fichero
@@ -691,9 +691,12 @@ como aceptación de esta iteración. Recibos de desarrollo: `disabled/unmanaged`
 Se inició una sesión propia de la versión verificada en `http://127.0.0.1:3320`
 (HTTP 200), sin detener ni reutilizar el servidor/conjunto anterior del usuario.
 Se solicitó completar la demo COREP, identificar dos cambios antes/después,
-indicar la versión descargada y comunicar ayuda e incidencias. La solicitud está
-pendiente de respuesta: no se atribuyen pasos, tiempos ni observaciones al analista.
-T075 permanece sin marcar. La aceptación global de 001 no cubre esta ampliación.
+indicar la versión descargada y comunicar ayuda e incidencias.
+
+El 2026-11-06, Diego respondió «Todo me cuadra» a la solicitud sobre la demo COREP
+de esta iteración. Se registra su valoración global favorable. Para cerrar T075
+queda por recoger hasta qué paso llegó, qué dos valores vio cambiar (antes → después),
+qué versión descargó y si necesitó ayuda o encontró alguna incidencia.
 
 ### Entrega documental — T076
 
