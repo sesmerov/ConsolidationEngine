@@ -7,6 +7,7 @@ import { RetainedSize } from './retained-size.js';
 import type { InspectionRecord, StateRecord, WorkerOutput } from '../workers/protocol.js';
 import { activeReviewKey, releasedReview, reviewKey } from '../recalculation/direction-review-record.js';
 import type { ReviewRecord } from '../recalculation/direction-review-record.js';
+import { terminalSelection, type ProposalSelectionRecord } from '../recalculation/proposal-selection-record.js';
 /** Reserved version identifiers are supplied only by main-thread publication preparation. */
 export interface PublicationOutput extends WorkerOutput { readonly snapshotVersionId?: string }
 
@@ -107,6 +108,14 @@ export class WorkspaceStore {
       if (bundle.preview?.state === 'ready' && bundle.preview.baseVersionId !== versionId) records.set(key, immutable({ ...bundle,
         preview: { ...bundle.preview, state: 'obsolete' }, proposals: bundle.proposals.map(proposal => proposal.state === 'available' ? { ...proposal, state: 'obsolete' } : proposal) }));
     }
+    for (const [key, value] of records) if (key.startsWith('proposal-selection:')) {
+      const selection = value as ProposalSelectionRecord;
+      if (selection.summary.baseVersionId !== versionId && !['applied', 'discarded', 'obsolete'].includes(selection.summary.state)) {
+        const { pendingJobId: _pending, ...summary } = selection.summary;
+        records.set(key, immutable(selection.projection ? terminalSelection(selection, 'obsolete') : { summary: { ...summary, state: 'failed' } }));
+      }
+    }
+    for (const key of records.keys()) if (key.startsWith('proposal-selection-cache:')) records.delete(key);
     return records;
   }
   private invalidateInspections(records: Map<string, unknown>, versionId: string): Map<string, unknown> {

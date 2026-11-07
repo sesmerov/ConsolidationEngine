@@ -1,6 +1,6 @@
 import type { Diagnostic, ImportContextInputDTO, ImportInspectionContextDTO, ImportInspectionDTO, ImportInspectionProfileDTO, ImportInspectionReportDTO, JobDTO, JsonValue, ResultRef, Snapshot, SnapshotContent } from '@ce/contracts';
 import type { StagedFile } from '../import/multipart-staging.js';
-import type { ApplicationCandidate, DirectionReviewProjection, ReviewSeed, WorkLimits } from '@ce/engine';
+import type { ApplicationCandidate, DirectionReviewProjection, ProposalSelectionProjection, ReviewSeed, WorkLimits } from '@ce/engine';
 import type { DirectionDecisionState, DirectionDTO } from '@ce/contracts';
 export interface StateRecord { readonly key: string; readonly value: JsonValue }
 export interface WorkerOutput {
@@ -12,6 +12,9 @@ export interface WorkerOutput {
   readonly verifiedInspectionHash?: string;
   readonly directionReviewProjection?: DirectionReviewProjection;
   readonly directionCompilation?: DirectionCompilation;
+  readonly selectionProjection?: ProposalSelectionProjection;
+  /** Worker-only resolved identities; never returned by the compact HTTP selection routes. */
+  readonly applicationSelectedIds?: readonly string[];
 }
 export interface DirectionCompilation { readonly directions: readonly DirectionDTO[]; readonly decisionState: DirectionDecisionState }
 export interface PrepareDirectionsInput { readonly reviewId: string; readonly seeds: readonly ReviewSeed[]; readonly limits?: Partial<WorkLimits> }

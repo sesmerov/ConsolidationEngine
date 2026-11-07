@@ -31,11 +31,13 @@ import { DirectionReviewService } from './recalculation/direction-review-service
 import { registerPreviews } from './routes/previews.js';
 import { registerHistory } from './routes/history.js';
 import { registerApplications } from './routes/applications.js';
+import { registerProposalSelections } from './routes/proposal-selections.js';
+import { ProposalSelectionService } from './recalculation/proposal-selection-service.js';
 import type { WorkLimits } from '@ce/engine';
 import { registerExports } from './routes/exports.js';
 import type { ExportLimits } from './export/results-export.js';
 import type { ReportExportLimits } from './export/recalculated-report.js';
-export interface AppServices { readonly store: WorkspaceStore; readonly idempotency: IdempotencyStore; readonly jobs: JobManager; readonly files: SessionFiles; readonly uploads: UploadManager; readonly preparations: PreparationManager; readonly inspections: ImportInspectionService; readonly directionReviews: DirectionReviewService }
+export interface AppServices { readonly store: WorkspaceStore; readonly idempotency: IdempotencyStore; readonly jobs: JobManager; readonly files: SessionFiles; readonly uploads: UploadManager; readonly preparations: PreparationManager; readonly inspections: ImportInspectionService; readonly directionReviews: DirectionReviewService; readonly proposalSelections: ProposalSelectionService }
 declare module 'fastify' { interface FastifyInstance { ce: AppServices } }
 export interface AppOptions extends JobManagerOptions {
   mode?: 'development' | 'production'; apiPort?: number; webPort?: number;
@@ -50,6 +52,7 @@ export interface AppOptions extends JobManagerOptions {
   inspectionNow?: () => number;
   directionReviewNow?: () => number;
   directionReviewLimits?: Partial<WorkLimits>;
+  proposalSelectionLimits?: Partial<WorkLimits>;
 }
 export async function createApp(options: AppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: false, requestIdHeader: false, genReqId: () => randomUUID(), bodyLimit: 1024 * 1024,
@@ -58,7 +61,7 @@ export async function createApp(options: AppOptions = {}): Promise<FastifyInstan
   const store = options.store ?? new WorkspaceStore();
   const files = options.files ?? await SessionFiles.create(store.sessionId, undefined, options.fileLimitBytes);
   const jobs = options.jobs ?? new JobManager(store, { ...options, workerModules: { import: new URL('./workers/import.worker.js', import.meta.url), 'inspect-import': new URL('./workers/inspect-import.worker.js', import.meta.url), validate: new URL('./workers/validate.worker.js', import.meta.url), preview: new URL('./workers/preview.worker.js', import.meta.url), apply: new URL('./workers/apply.worker.js', import.meta.url), export: new URL('./workers/export.worker.js', import.meta.url),
-    'prepare-directions': new URL('./workers/prepare-directions.worker.js', import.meta.url), 'commit-directions': new URL('./workers/commit-directions.worker.js', import.meta.url), ...options.workerModules } });
+    'prepare-directions': new URL('./workers/prepare-directions.worker.js', import.meta.url), 'commit-directions': new URL('./workers/commit-directions.worker.js', import.meta.url), 'select-proposals': new URL('./workers/select-proposals.worker.js', import.meta.url), ...options.workerModules } });
   const uploads = new UploadManager(store);
   const preparations = new PreparationManager(store);
   const inspections = new ImportInspectionService(store, files, options.inspectionNow ? { now: options.inspectionNow } : {});
@@ -66,7 +69,8 @@ export async function createApp(options: AppOptions = {}): Promise<FastifyInstan
     ...(options.directionReviewNow ? { now: options.directionReviewNow } : {}),
     ...(options.directionReviewLimits ? { limits: options.directionReviewLimits } : {}),
   });
-  app.decorate('ce', { store, files, jobs, uploads, preparations, inspections, directionReviews, idempotency: new IdempotencyStore(store) });
+  const proposalSelections = new ProposalSelectionService(store, options.proposalSelectionLimits);
+  app.decorate('ce', { store, files, jobs, uploads, preparations, inspections, directionReviews, proposalSelections, idempotency: new IdempotencyStore(store) });
   const token = randomBytes(32).toString('base64url');
   installLocalSession(app, { token, mode: options.mode ?? 'production', apiPort: options.apiPort ?? 3000, webPort: options.webPort ?? 4200 });
   app.setErrorHandler((error, request, reply) => {
@@ -89,11 +93,12 @@ export async function createApp(options: AppOptions = {}): Promise<FastifyInstan
   registerDirectionReviews(app);
   registerPreviews(app, options.previewLimits); registerHistory(app);
   registerApplications(app, options.applicationLimits);
+  registerProposalSelections(app);
   registerExports(app, options.exportLimits, options.reportExportLimits);
   app.addHook('preClose', async () => {
     const id = store.currentWorkspaceId; if (id) store.beginClose(id);
     await uploads.dispose(); if (id) await preparations.settle(id);
   });
-  app.addHook('onClose', async () => { await jobs.dispose(); directionReviews.close(); await inspections.dispose(); await files.close(); const id = store.currentWorkspaceId; if (id) store.close(id); });
+  app.addHook('onClose', async () => { await jobs.dispose(); directionReviews.close(); proposalSelections.close(); await inspections.dispose(); await files.close(); const id = store.currentWorkspaceId; if (id) store.close(id); });
   return app;
 }

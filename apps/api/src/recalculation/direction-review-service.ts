@@ -2,14 +2,15 @@ import { randomUUID } from 'node:crypto';
 import { setImmediate as yieldToLoop } from 'node:timers/promises';
 import { directionReviewDecisions } from '@ce/contracts';
 import type {
-  DirectionReviewActiveDTO, DirectionReviewCommitDTO, DirectionReviewDecision, DirectionReviewMutationResponseDTO,
+  DirectionConflictCandidateDTO, DirectionConflictCandidateDetailDTO, DirectionReviewActiveDTO, DirectionReviewCommitDTO, DirectionReviewDecision, DirectionReviewMutationResponseDTO,
   DirectionReviewPatchDTO, DirectionReviewPrepareDTO, DirectionReviewReceiptDTO, DirectionReviewSummaryDTO, JsonValue,
 } from '@ce/contracts';
 import {
-  DirectionReviewError, editDirectionProjection, readDirectionRows, verifyDirectionCompilation, WorkBudget, WorkLimitError,
+  DirectionReviewError, editDirectionProjection, readDirectionRows, readDirectionGroups, readDirectionCandidates, readDirectionCandidate, verifyDirectionCompilation, WorkBudget, WorkLimitError,
 } from '@ce/engine';
 import type { DirectionReviewProjection, ReviewSeed, WorkLimits } from '@ce/engine';
 import { ApiError } from '../errors.js';
+import { ruleSourceDetails } from '../presentation/rule-presentation.js';
 import type { JobAcceptance } from '../jobs/job-manager.js';
 import { canonicalHash, canonicalStringify, directionConfigurationVersion, immutable } from '../session/canonical-state.js';
 import type { WorkspaceStore } from '../session/workspace-store.js';
@@ -95,6 +96,37 @@ export class DirectionReviewService {
       throw error;
     }
   }
+  private readResource<T>(read: () => T): T {
+    try { return read(); } catch (error) {
+      if (error instanceof DirectionReviewError && ['UNKNOWN_GROUP', 'UNKNOWN_CANDIDATE', 'UNKNOWN_INSTANCE'].includes(error.reason)) throw new ApiError('RESOURCE_NOT_FOUND');
+      throw error;
+    }
+  }
+  groups(w: string, id: string, page: { offset: number; limit: number }) {
+    const record = this.ready(w, id);
+    return { reviewId: id, revision: record.summary.revision, ...this.readResource(() => readDirectionGroups(record.projection, page)) };
+  }
+  private candidatePresentation(record: Ready, identity: ReturnType<typeof readDirectionCandidate>, source: ReturnType<typeof ruleSourceDetails>) {
+    const row = record.projection.rows[record.projection.byInstance[identity.instanceId]!]!;
+    const details = source(row.seed.variantIds), description = details.descriptions[0]?.description;
+    const candidate: DirectionConflictCandidateDTO = { ...identity, expressionPreview: details.expression.slice(0, 512),
+      expressionTruncated: details.expression.length > 512, descriptionTruncated: (description?.length ?? 0) > 512,
+      ...(description === undefined ? {} : { descriptionPreview: description.slice(0, 512) }) };
+    return { candidate, ...details };
+  }
+  candidates(w: string, id: string, groupId: string, page: { offset: number; limit: number }) {
+    const record = this.ready(w, id);
+    const result = this.readResource(() => readDirectionCandidates(record.projection, groupId, page));
+    const source = ruleSourceDetails(this.store.snapshot(w, record.summary.baseVersionId).content);
+    return { reviewId: id, revision: record.summary.revision, ...result,
+      items: result.items.map(identity => this.candidatePresentation(record, identity, source).candidate) };
+  }
+  candidate(w: string, id: string, groupId: string, instanceId: string): DirectionConflictCandidateDetailDTO {
+    const record = this.ready(w, id);
+    const identity = this.readResource(() => readDirectionCandidate(record.projection, groupId, instanceId));
+    const source = ruleSourceDetails(this.store.snapshot(w, record.summary.baseVersionId).content);
+    return { reviewId: id, revision: record.summary.revision, ...this.candidatePresentation(record, identity, source) };
+  }
   discard(w: string, id: string): DirectionReviewSummaryDTO {
     if (this.get(w, id).state === 'discarded') return this.record(w, id).summary;
     const discarded = releasedReview(this.ready(w, id), 'discarded');
@@ -116,6 +148,8 @@ export class DirectionReviewService {
     try {
       projection = editDirectionProjection(old.projection, body.operations, { budget: this.budget() });
     } catch (error) {
+      if (error instanceof DirectionReviewError && error.reason === 'GROUP_CANDIDATE_ASSIGNED_ELSEWHERE') throw new ApiError('GROUP_CANDIDATE_ASSIGNED_ELSEWHERE');
+      if (error instanceof DirectionReviewError && ['UNKNOWN_GROUP', 'UNKNOWN_INSTANCE'].includes(error.reason)) throw new ApiError('RESOURCE_NOT_FOUND');
       if (error instanceof DirectionReviewError) throw new ApiError('INVALID_DIRECTION', { reason: error.reason });
       if (error instanceof WorkLimitError) throw new ApiError('INVALID_DIRECTION', { reason: error.code });
       throw error;
@@ -185,6 +219,7 @@ export class DirectionReviewService {
         const p = output.directionReviewProjection!, now = this.now();
         if (p.reviewId !== id || p.baseVersionId !== body.baseVersionId || !Array.isArray(p.rows) || p.rows.length !== seeds.length ||
           !Array.isArray(p.groups) || !Array.isArray(p.decisions) || !Array.isArray(p.blockCounts) || !Array.isArray(p.members) ||
+          !Array.isArray(p.candidates) || !Array.isArray(p.observedGroups) || !Array.isArray(p.observedFlags) || !Array.isArray(p.omittedFlags) ||
           !Number.isSafeInteger(p.conflictGroupCount) || p.conflictGroupCount < 0 || p.conflictGroupCount > p.groups.length ||
           p.counts.totalRows !== seeds.length ||
           directionReviewDecisions.some(state => !Number.isSafeInteger(p.counts[state]) || p.counts[state] < 0) ||

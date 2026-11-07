@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import { setImmediate as yieldTurn } from 'node:timers/promises';
 import { RECALCULATION_POLICY_ID } from '@ce/contracts';
 import type { ApplicationBundle, ApplicationRequestDTO, ApplyChangeDTO, ApplyReceiptDTO, JsonValue, PreviewBundle, ProposalDTO, ReportedFact, RuleResultDTO, Snapshot, ValidationBundle } from '@ce/contracts';
-import { sameReportedValue } from '@ce/engine';
+import { sameReportedValue, selectionMaskReader } from '@ce/engine';
 import type { WorkLimits } from '@ce/engine';
 import { ApiError } from '../errors.js';
 import type { JobAcceptance } from '../jobs/job-manager.js';
@@ -10,6 +11,7 @@ import type { WorkspaceStore } from '../session/workspace-store.js';
 import { validationKey } from '../validation/validation-service.js';
 import { getPreview, markPreviewApplied, previewKey, selectPreview } from './preview-store.js';
 import { assertDirectionsAllowed, assertSelectedProposalsAllowed } from './directions-service.js';
+import { proposalSelectionKey, terminalSelection, type ProposalSelectionRecord } from './proposal-selection-record.js';
 export const applicationKey = (workspaceId: string, receiptId: string) => 'application:' + workspaceId + ':' + receiptId;
 export function getApplication(store: WorkspaceStore, workspaceId: string, receiptId: string): ApplicationBundle {
   store.get(workspaceId); const bundle = store.getRecord<ApplicationBundle>(applicationKey(workspaceId, receiptId)); if (!bundle) throw new ApiError('RESOURCE_NOT_FOUND'); return bundle;
@@ -28,7 +30,7 @@ function existingValidation(store: WorkspaceStore, workspaceId: string, snapshot
     try { assertValidation(bundle, bundle.run.id, snapshot.versionId, snapshot); return true; } catch { return false; }
   }).sort((a, b) => b.run.startedAt.localeCompare(a.run.startedAt) || b.run.id.localeCompare(a.run.id))[0];
 }
-function selectedProposals(bundle: PreviewBundle, body: ApplicationRequestDTO): readonly ProposalDTO[] {
+function selectedProposals(bundle: PreviewBundle, body: Extract<ApplicationRequestDTO, { selectedIds: readonly string[] }>): readonly ProposalDTO[] {
   if (body.baseVersionId !== bundle.preview.baseVersionId) throw new ApiError('STALE_VERSION');
   if (bundle.preview.state !== 'ready') throw new ApiError('PREVIEW_NOT_APPLICABLE');
   const selection = selectPreview(bundle, body.selectedIds);
@@ -38,31 +40,56 @@ function selectedProposals(bundle: PreviewBundle, body: ApplicationRequestDTO): 
   if (proposals.some(proposal => !proposal.before || !proposal.after) || new Set(proposals.map(row => row.targetKey)).size !== proposals.length) throw new ApiError('PREVIEW_NOT_APPLICABLE');
   return proposals;
 }
-export function prepareApplication(store: WorkspaceStore, workspaceId: string, body: ApplicationRequestDTO, limits?: Partial<WorkLimits>): JobAcceptance {
+export function prepareApplication(store: WorkspaceStore, workspaceId: string, body: ApplicationRequestDTO, limits?: Partial<WorkLimits>, jobId: string = randomUUID()): JobAcceptance {
   store.assertAccepting(workspaceId); store.assertIdle(workspaceId); store.assertBase(workspaceId, body.baseVersionId);
-  const snapshot = store.snapshot(workspaceId, body.baseVersionId), preview = getPreview(store, workspaceId, body.previewId), proposals = selectedProposals(preview, body);
+  const snapshot = store.snapshot(workspaceId, body.baseVersionId), preview = getPreview(store, workspaceId, body.previewId);
+  const selectionKey = proposalSelectionKey(workspaceId, body.previewId), selectionRecord = store.getRecord<ProposalSelectionRecord>(selectionKey);
+  const selectionRef = body.selectionRef;
+  if (selectionRef) {
+    if (preview.preview.baseVersionId !== body.baseVersionId) throw new ApiError('STALE_VERSION');
+    if (!selectionRecord || selectionRecord.summary.id !== selectionRef.id || selectionRecord.summary.workspaceId !== workspaceId || selectionRecord.summary.previewId !== body.previewId) throw new ApiError('RESOURCE_NOT_FOUND');
+    if (selectionRecord.summary.revision !== selectionRef.revision) throw new ApiError('STALE_PROPOSAL_SELECTION');
+    if (selectionRecord.summary.state !== 'ready' || !selectionRecord.projection || preview.preview.state !== 'ready') throw new ApiError('PROPOSAL_SELECTION_NOT_APPLICABLE');
+    if (!selectionRecord.projection.complete || selectionRecord.projection.closureHash !== body.closureHash) throw new ApiError('SELECTION_NOT_CLOSED');
+    if (!selectionRecord.projection.selectedCount) throw new ApiError('INVALID_REQUEST');
+  }
+  const legacyProposals = selectionRef ? undefined : selectedProposals(preview, body as Extract<ApplicationRequestDTO, { selectedIds: readonly string[] }>);
   if (preview.preview.profileId !== snapshot.content.profileId || preview.preview.policyId !== RECALCULATION_POLICY_ID) throw new ApiError('PREVIEW_NOT_APPLICABLE');
-  assertDirectionsAllowed(snapshot, limits);
-  assertSelectedProposalsAllowed(snapshot, proposals, limits);
-  const before = existingValidation(store, workspaceId, snapshot);
+  if (legacyProposals) { assertDirectionsAllowed(snapshot, limits); assertSelectedProposalsAllowed(snapshot, legacyProposals, limits); }
+  const before = selectionRef ? undefined : existingValidation(store, workspaceId, snapshot);
   const intent = immutable({ receiptId: randomUUID(), newVersionId: randomUUID(), beforeRunId: before?.run.id ?? randomUUID(), runId: randomUUID(), startedAt: new Date().toISOString(),
-    previewId: body.previewId, baseVersionId: body.baseVersionId, selectedIds: [...body.selectedIds].sort(), closureHash: body.closureHash });
+    previewId: body.previewId, baseVersionId: body.baseVersionId, ...(selectionRef ? { selectionRef } : { selectedIds: [...body.selectedIds!].sort() }), closureHash: body.closureHash });
   const assertPreview = () => {
     store.assertBase(workspaceId, intent.baseVersionId); const current = getPreview(store, workspaceId, intent.previewId);
     if (current !== preview || current.preview.state !== 'ready') throw new ApiError('PREVIEW_NOT_APPLICABLE');
     if (current.preview.profileId !== snapshot.content.profileId || current.preview.policyId !== RECALCULATION_POLICY_ID) throw new ApiError('PREVIEW_NOT_APPLICABLE');
-    const currentSnapshot = store.snapshot(workspaceId, intent.baseVersionId);
-    assertDirectionsAllowed(currentSnapshot, limits); assertSelectedProposalsAllowed(currentSnapshot, proposals, limits);
+    if (selectionRef) {
+      const currentSelection = store.getRecord<ProposalSelectionRecord>(selectionKey);
+      if (currentSelection?.summary.state !== 'applying' || currentSelection.summary.pendingJobId !== jobId || currentSelection.summary.revision !== selectionRef.revision || currentSelection.summary.id !== selectionRef.id) throw new ApiError('STALE_PROPOSAL_SELECTION');
+    } else { const currentSnapshot = store.snapshot(workspaceId, intent.baseVersionId); assertDirectionsAllowed(currentSnapshot, limits); assertSelectedProposalsAllowed(currentSnapshot, legacyProposals!, limits); }
   };
-  return { retainedState: intent, input: { ...intent, preview: preview as unknown as JsonValue, ...(before ? { beforeValidation: before as unknown as JsonValue } : {}), ...(limits ? { limits: limits as unknown as JsonValue } : {}) },
+  return { retainedState: intent as unknown as JsonValue,
+    ...(selectionRef ? { initialRecords: [{ key: selectionKey, value: { ...selectionRecord!, summary: { ...selectionRecord!.summary, state: 'applying', pendingJobId: jobId } } as unknown as JsonValue }],
+      assertStart: () => { if (store.getRecord(selectionKey) !== selectionRecord) throw new ApiError('STALE_PROPOSAL_SELECTION'); } } : {}),
+    input: { ...intent, preview, ...(selectionRef ? { selectionProjection: selectionRecord!.projection } : {}), ...(before ? { beforeValidation: before } : {}), ...(limits ? { limits } : {}) } as unknown as JsonValue,
     preparePublication: (_job, output) => {
+      function* buildPublication() {
       assertPreview(); const candidate = output.applicationCandidate;
       if (!candidate || output.snapshotContent || output.resultRef?.type !== 'application' || output.resultRef.id !== intent.receiptId || !Array.isArray(candidate.factPatches)) throw new ApiError('INTERNAL_ERROR');
+      const acceptedIds = selectionRef ? output.applicationSelectedIds : 'selectedIds' in intent ? intent.selectedIds : undefined;
+      if (!acceptedIds || !acceptedIds.length) throw new ApiError('INTERNAL_ERROR');
+      const proposals: ProposalDTO[] = [];
+      if (selectionRef) {
+        const selected = selectionMaskReader(selectionRecord!.projection!.selected), acceptedSet = new Set(acceptedIds);
+        if (acceptedSet.size !== acceptedIds.length || acceptedIds.length !== selectionRecord!.projection!.selectedCount) throw new ApiError('INTERNAL_ERROR');
+        for (let n = 0; n < preview.proposals.length; n++) { const proposal = preview.proposals[n]!; if (selected(n)) { if (!acceptedSet.has(proposal.id)) throw new ApiError('INTERNAL_ERROR'); proposals.push(proposal); } if ((n & 1023) === 1023) { yield; assertPreview(); } }
+      } else proposals.push(...legacyProposals!);
       assertValidation(candidate.beforeValidation, intent.beforeRunId, intent.baseVersionId, snapshot); assertValidation(candidate.validation, intent.runId, intent.newVersionId, snapshot);
       const baseFacts = new Map(snapshot.content.facts.map(fact => [fact.factKey, fact])), coordinates = new Map(snapshot.content.coordinates.map(cell => [cell.factKey, cell]));
       const supplied = new Map(candidate.factPatches.map(fact => [fact.factKey, fact])); if (supplied.size !== candidate.factPatches.length) throw new ApiError('INTERNAL_ERROR');
       const patches = new Map<string, ReportedFact>(), changes: ApplyChangeDTO[] = [];
-      for (const proposal of proposals) {
+      for (const [ordinal, proposal] of proposals.entries()) {
+        if (selectionRef && (ordinal & 1023) === 1023) { yield; assertPreview(); }
         const previous = baseFacts.get(proposal.targetKey), coordinate = coordinates.get(proposal.targetKey), after = proposal.after!;
         if (!coordinate) throw new ApiError('INTERNAL_ERROR');
         const changed = previous?.presence !== 'value' || !sameReportedValue(previous.normalizedValue, after.normalizedValue);
@@ -86,16 +113,26 @@ export function prepareApplication(store: WorkspaceStore, workspaceId: string, b
       // Restore ownership/sharing with the original main-thread snapshot after structuredClone transport.
       const facts = patches.size ? [...snapshot.content.facts.map(fact => patches.get(fact.factKey) ?? fact), ...[...patches.values()].filter(fact => !baseFacts.has(fact.factKey))] : snapshot.content.facts;
       const content = patches.size ? { ...snapshot.content, facts, reportVersion: canonicalHash(facts) } : snapshot.content;
-      const receipt: ApplyReceiptDTO = { id: intent.receiptId, previewId: intent.previewId, acceptedIds: intent.selectedIds, closureHash: intent.closureHash,
+      const receipt: ApplyReceiptDTO = { id: intent.receiptId, previewId: intent.previewId, acceptedIds, ...(selectionRef ? { selectionRef } : {}), closureHash: intent.closureHash,
         baseVersionId: intent.baseVersionId, newVersionId: intent.newVersionId, beforeValidationRunId: intent.beforeRunId, validationRunId: intent.runId, appliedAt: new Date().toISOString() };
-      const applied = markPreviewApplied(preview, receipt.id, intent.selectedIds);
+      const applied = markPreviewApplied(preview, receipt.id, acceptedIds);
       const application: ApplicationBundle = { receipt, changes };
       return { assertCommit: assertPreview, output: { ...output, snapshotContent: content, snapshotVersionId: intent.newVersionId, records: [...(output.records ?? []),
         { key: validationKey(workspaceId, intent.beforeRunId), value: (before ?? candidate.beforeValidation) as unknown as JsonValue },
         { key: validationKey(workspaceId, intent.runId), value: candidate.validation as unknown as JsonValue },
         { key: previewKey(workspaceId, intent.previewId), value: applied as unknown as JsonValue },
         { key: applicationKey(workspaceId, receipt.id), value: application as unknown as JsonValue },
+        ...(selectionRecord ? [{ key: selectionKey, value: terminalSelection(selectionRecord, selectionRef ? 'applied' : 'obsolete') as unknown as JsonValue }] : []),
       ] } };
+      }
+      const preparation = buildPublication();
+      if (!selectionRef) { const result = preparation.next(); if (!result.done) throw new ApiError('INTERNAL_ERROR'); return result.value; }
+      return (async () => { let result = preparation.next(); while (!result.done) { await yieldTurn(); result = preparation.next(); } return result.value; })();
     },
+    ...(selectionRef ? { onTerminal: () => {
+      const current = store.getRecord<ProposalSelectionRecord>(selectionKey); if (current?.summary.pendingJobId !== jobId) return [];
+      const applicable = store.current(workspaceId)?.versionId === body.baseVersionId && getPreview(store, workspaceId, body.previewId).preview.state === 'ready';
+      return [{ key: selectionKey, value: (applicable ? selectionRecord! : terminalSelection(selectionRecord!, 'obsolete')) as unknown as JsonValue }];
+    } } : {}),
   };
 }

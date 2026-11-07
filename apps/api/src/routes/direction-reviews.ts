@@ -4,6 +4,8 @@ import {
   directionReviewActiveSchema, directionReviewCollectionParamsSchema, directionReviewCommitSchema,
   directionReviewMutationResponseSchema, directionReviewPageSchema, directionReviewParamsSchema, directionReviewPatchSchema,
   directionReviewPrepareSchema, directionReviewRowsQuerySchema, directionReviewSummarySchema, emptyQuerySchema,
+  directionConflictGroupParamsSchema, directionConflictCandidateParamsSchema, directionConflictPageQuerySchema,
+  directionConflictGroupsPageSchema, directionConflictCandidatesPageSchema, directionConflictCandidateDetailSchema,
 } from '@ce/contracts';
 import type { DirectionReviewCommitDTO, DirectionReviewDecision, DirectionReviewPatchDTO, DirectionReviewPrepareDTO, JsonValue } from '@ce/contracts';
 import { ApiError } from '../errors.js';
@@ -13,6 +15,7 @@ import { registerJobRoute } from './jobs.js';
 
 interface Params { workspaceId: string; reviewId: string }
 interface RowsQuery { limit?: string; cursor?: string; state?: DirectionReviewDecision; groupId?: string }
+interface PageQuery { limit?: string; cursor?: string }
 export function registerDirectionReviews(app: FastifyInstance): void {
   const path = '/workspaces/:workspaceId/direction-reviews', collection = '/api/v1' + path, member = collection + '/:reviewId';
   const reviews = app.ce.directionReviews;
@@ -54,6 +57,35 @@ export function registerDirectionReviews(app: FastifyInstance): void {
     const nextOffset = offset + page.items.length;
     const payload = Buffer.from(JSON.stringify({ fingerprint: scope, offset: nextOffset })).toString('base64url');
     return { ...page, nextCursor: nextOffset < page.total ? payload + '.' + signature(payload) : null };
+  });
+  function withCursor<T extends { items: readonly unknown[]; total: number }>(page: T, offset: number, scope: string) {
+    const nextOffset = offset + page.items.length;
+    const payload = Buffer.from(JSON.stringify({ fingerprint: scope, offset: nextOffset })).toString('base64url');
+    return { ...page, nextCursor: nextOffset < page.total ? payload + '.' + signature(payload) : null };
+  }
+  app.get<{ Params: Params; Querystring: PageQuery }>(member + '/groups', {
+    schema: { params: directionReviewParamsSchema, querystring: directionConflictPageQuerySchema, response: { 200: directionConflictGroupsPageSchema } },
+  }, request => {
+    const { workspaceId, reviewId } = request.params, { cursor, limit } = request.query;
+    const { revision } = reviews.get(workspaceId, reviewId);
+    const scope = canonicalHash({ resource: 'direction-conflict-groups', workspaceId, reviewId, revision });
+    const offset = cursorOffset(cursor, scope);
+    return withCursor(reviews.groups(workspaceId, reviewId, { offset, limit: Number(limit ?? 50) }), offset, scope);
+  });
+  app.get<{ Params: Params & { groupId: string }; Querystring: PageQuery }>(member + '/groups/:groupId/candidates', {
+    schema: { params: directionConflictGroupParamsSchema, querystring: directionConflictPageQuerySchema, response: { 200: directionConflictCandidatesPageSchema } },
+  }, request => {
+    const { workspaceId, reviewId, groupId } = request.params, { cursor, limit } = request.query;
+    const { revision } = reviews.get(workspaceId, reviewId);
+    const scope = canonicalHash({ resource: 'direction-conflict-candidates', workspaceId, reviewId, revision, groupId });
+    const offset = cursorOffset(cursor, scope);
+    return withCursor(reviews.candidates(workspaceId, reviewId, groupId, { offset, limit: Number(limit ?? 50) }), offset, scope);
+  });
+  app.get<{ Params: Params & { groupId: string; instanceId: string } }>(member + '/groups/:groupId/candidates/:instanceId', {
+    schema: { params: directionConflictCandidateParamsSchema, querystring: emptyQuerySchema, response: { 200: directionConflictCandidateDetailSchema } },
+  }, request => {
+    const { workspaceId, reviewId, groupId, instanceId } = request.params;
+    return reviews.candidate(workspaceId, reviewId, groupId, instanceId);
   });
   app.patch<{ Params: Params; Body: DirectionReviewPatchDTO }>(member, {
     schema: { params: directionReviewParamsSchema, body: directionReviewPatchSchema, querystring: emptyQuerySchema, response: { 200: directionReviewMutationResponseSchema } },

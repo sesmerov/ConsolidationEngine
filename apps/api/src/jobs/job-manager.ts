@@ -17,10 +17,10 @@ export interface JobAcceptance { input?: JsonValue; initialRecords?: readonly St
   retainedState?: JsonValue;
   /** Final synchronous resource CAS after asynchronous acceptance and before publishing initial records. */
   assertStart?: () => void;
-  preparePublication?: (job: JobDTO, output: WorkerOutput) => { output: PublicationOutput; assertCommit?: () => void };
+  preparePublication?: (job: JobDTO, output: WorkerOutput) => { output: PublicationOutput; assertCommit?: () => void } | Promise<{ output: PublicationOutput; assertCommit?: () => void }>;
   onTerminal?: (job: JobDTO) => readonly StateRecord[]; finalize?: () => Promise<void> }
 export interface StartJob extends JobAcceptance { workspaceId: string; kind: JobKind; baseVersionId?: string; input: JsonValue; jobId?: string }
-interface Running extends Pick<JobAcceptance, 'onTerminal' | 'includeSnapshot' | 'finalize' | 'preparePublication'> { cancellation: Int32Array; worker?: WorkerHandle; timer?: NodeJS.Timeout; expiresAt: number; stopping: boolean; stopPromise?: Promise<JobDTO> }
+interface Running extends Pick<JobAcceptance, 'onTerminal' | 'includeSnapshot' | 'finalize' | 'preparePublication'> { cancellation: Int32Array; worker?: WorkerHandle; timer?: NodeJS.Timeout; expiresAt: number; stopping: boolean; publishing?: boolean; stopPromise?: Promise<JobDTO> }
 class DeadlineElapsed extends Error {}
 export class JobManager {
   private readonly running = new Map<string, Running>();
@@ -65,15 +65,15 @@ export class JobManager {
         ...(snapshot ? { snapshot } : {}), ...(moduleUrl ? { moduleUrl } : {}) };
       const worker = this.factory(request); running.worker = worker;
       running.timer = setTimeout(() => { void this.stop(job, 'timed_out'); }, this.deadlineMs);
-      worker.on('message', (message: unknown) => this.message(job, running, message));
+      worker.on('message', (message: unknown) => { void this.message(job, running, message); });
       worker.on('error', () => { this.fail(job, new ApiError('INTERNAL_ERROR')); });
       worker.on('exit', () => {
-        if (!running.stopping && !isTerminalJob(this.get(job.workspaceId, job.jobId).status)) this.fail(job, new ApiError('INTERNAL_ERROR'));
+        if (!running.stopping && !running.publishing && !isTerminalJob(this.get(job.workspaceId, job.jobId).status)) this.fail(job, new ApiError('INTERNAL_ERROR'));
       });
     } catch (error) { this.fail(queued, error); }
   }
-  private message(original: JobDTO, running: Running, value: unknown): void {
-    if (running.stopping || Atomics.load(running.cancellation, 0) || isTerminalJob(this.get(original.workspaceId, original.jobId).status)) return;
+  private async message(original: JobDTO, running: Running, value: unknown): Promise<void> {
+    if (running.stopping || running.publishing || Atomics.load(running.cancellation, 0) || isTerminalJob(this.get(original.workspaceId, original.jobId).status)) return;
     if (Date.now() >= running.expiresAt) { void this.stop(original, 'timed_out'); return; }
     try {
       if (!value || typeof value !== 'object' || !('type' in value)) throw new ApiError('INTERNAL_ERROR');
@@ -91,7 +91,11 @@ export class JobManager {
         this.store.assertBase(job.workspaceId, job.baseVersionId);
         if (Atomics.load(running.cancellation, 0)) return;
         if (Date.now() >= running.expiresAt) { void this.stop(job, 'timed_out'); return; }
-        const publication: { output: PublicationOutput; assertCommit?: () => void } = running.preparePublication?.(job, message.output) ?? { output: message.output };
+        running.publishing = true;
+        const prepared = running.preparePublication?.(job, message.output) ?? { output: message.output };
+        // Keep the legacy synchronous publication boundary; only cooperative preparation yields.
+        const publication: { output: PublicationOutput; assertCommit?: () => void } = prepared instanceof Promise ? await prepared : prepared;
+        if (running.stopping || Atomics.load(running.cancellation, 0) || isTerminalJob(this.get(original.workspaceId, original.jobId).status)) return;
         this.store.publishJobResult(job, publication.output, () => {
           this.store.assertBase(job.workspaceId, job.baseVersionId);
           if (Date.now() >= running.expiresAt) throw new DeadlineElapsed();

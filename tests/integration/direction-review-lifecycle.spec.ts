@@ -118,3 +118,44 @@ it('retains the previous version and no receipt if the new snapshot exceeds the 
   expect(h.store.get(h.workspace.id).versionIds).toEqual([h.snapshot.versionId]);
   expect(h.store.listRecords('reserve:')).toEqual([]);
 });
+
+it('accounts for persistent candidate indexes and rolls a failed conflict edit back without losing its catalog', async () => {
+  const capacity = 2 * 1024 * 1024;
+  const h = await reviewHarness({ store: new WorkspaceStore({ maxBytes: capacity }), controlled: true });
+  const view = await h.ready(), base = '/' + view.id + '/groups';
+  const before = (await h.get(base)).json();
+  const group = before.items[0], path = base + '/' + group.groupId + '/candidates';
+  const candidates = (await h.get(path)).json();
+  const operation = { op: 'resolveGroup', groupId: group.groupId, winnerInstanceId: candidates.items[0].instanceId };
+  h.store.putInternalRecord('test-pressure', '');
+  h.store.putInternalRecord('test-pressure', 'x'.repeat(capacity - h.store.bytes));
+  expect((await h.edit(view.id, 1, [operation])).json().error.code).toBe('SESSION_LIMIT');
+  h.store.deleteInternalRecord('test-pressure');
+  expect((await h.get(base)).json()).toEqual(before);
+  expect((await h.get(path)).json()).toEqual(candidates);
+  expect(h.store.current(h.workspace.id)).toBe(h.snapshot);
+  expect((await h.edit(view.id, 1, [operation])).json().appliedRevision).toBe(2);
+  expect((await h.get(base)).json().items[0]).toMatchObject({ candidateCount: candidates.total, state: 'resolved' });
+});
+
+it('restores edited groups after commit cancellation and makes all new reads unavailable after base replacement', async () => {
+  const h = await reviewHarness({ controlled: true }), view = await h.ready(), base = '/' + view.id + '/groups';
+  const groups = (await h.get(base)).json().items;
+  await h.edit(view.id, 1, [{ op: 'omitAll' }]);
+  const candidatesPath = base + '/' + groups[0].groupId + '/candidates';
+  const candidate = (await h.get(candidatesPath)).json().items[0];
+  await h.edit(view.id, 2, [{ op: 'resolveGroup', groupId: groups[0].groupId, winnerInstanceId: candidate.instanceId }]);
+  const confirmed = (await h.get(base)).json();
+  const pending = await h.commit(view.id, 3);
+  expect(pending.statusCode).toBe(202);
+  expect((await h.get(base)).json().error.code).toBe('DIRECTION_REVIEW_NOT_APPLICABLE');
+  await h.cancel(pending.json().jobId);
+  expect((await h.get(base)).json()).toEqual(confirmed);
+  expect((await h.get(candidatesPath)).json().total).toBe(groups[0].candidateCount);
+  const replaced = await h.app.inject({ method: 'PUT', url: h.base + '/directions', headers: { ...h.headers, 'if-match': h.etag() }, payload: { directions: [] } });
+  expect(replaced.statusCode).toBe(200);
+  for (const suffix of [base, candidatesPath, candidatesPath + '/' + candidate.instanceId]) {
+    expect((await h.get(suffix)).json().error.code).toBe('DIRECTION_REVIEW_NOT_APPLICABLE');
+  }
+  expect(h.store.current(h.workspace.id)!.content.facts).toEqual(h.snapshot.content.facts);
+});
