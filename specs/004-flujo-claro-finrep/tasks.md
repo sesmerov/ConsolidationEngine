@@ -2,7 +2,7 @@
 
 **Input**: [spec.md](spec.md), [plan.md](plan.md), [research.md](research.md), [data-model.md](data-model.md), [contracts/](contracts/) y [quickstart.md](quickstart.md).
 
-**Branch**: `codex/004-flujo-claro-finrep` · **Fecha**: 2026-11-07 · **Estado**: 83 tareas pendientes; no se ha iniciado implementación.
+**Branch**: `codex/004-flujo-claro-finrep` · **Fecha**: 2026-11-07 · **Estado**: Implementación en curso; casillas actualizadas según evidencia.
 
 **Tests**: La especificación solicita pruebas verificables SC-001–010 y el plan define contratos, integración, navegador y volumen. Se incluyen antes de los cambios que comprueban; el fallo inicial debe corresponder al comportamiento ausente, no a archivos corruptos, fixtures erróneos o un entorno sin preparar.
 
@@ -22,14 +22,14 @@
 
 **Objetivo**: Comprobar el checkout y preparar solo lo que falte; no reinicializar el proyecto ni actualizar versiones.
 
-- [ ] T001 Verificar rama, árbol de trabajo, versiones fijadas y disponibilidad de la toolchain mediante `package.json`, `scripts/bootstrap-toolchain.ps1` y `scripts/run-with-toolchain.ps1`; registrar commit y entorno en `docs/verification-004.md` (nuevo). Preparar dependencias solo si faltan y conservar los procesos/conjuntos del analista.
-- [ ] T002 Contrastar las huellas de originales con `tests/fixtures/eba/source-manifest.json` y de demos actuales con `assets/demos/manifest.json`; registrar la base y las limitaciones FINREP actuales en `docs/verification-004.md`. Reservar pruebas en 3318/3317 y un puerto manual libre, sin reutilizar 3330 ni sobrescribir evidencias anteriores. (Depende de T001).
+- [X] T001 Verificar rama, árbol de trabajo, versiones fijadas y disponibilidad de la toolchain mediante `package.json`, `scripts/bootstrap-toolchain.ps1` y `scripts/run-with-toolchain.ps1`; registrar commit y entorno en `docs/verification-004.md` (nuevo). Preparar dependencias solo si faltan y conservar los procesos/conjuntos del analista.
+- [X] T002 Contrastar las huellas de originales con `tests/fixtures/eba/source-manifest.json` y de demos actuales con `assets/demos/manifest.json`; registrar la base y las limitaciones FINREP actuales en `docs/verification-004.md`. Reservar pruebas en 3318/3317 y un puerto manual libre, sin reutilizar 3330 ni sobrescribir evidencias anteriores. (Depende de T001).
 
 ## Phase 2: Foundational — soporte común de pruebas
 
 **Objetivo**: El motor, sesión, jobs y snapshots ya existen. No se añade infraestructura de producto antes de las historias; solo se prepara soporte de aceptación compartido.
 
-- [ ] T003 Preparar los escenarios comunes y el aislamiento de workspace en `tests/helpers/iteration004-fixtures.ts` (nuevo), reutilizando `tests/helpers/xlsx-fixtures.ts`, `tests/helpers/corep-fixtures.ts` y `tests/e2e/workflow-helpers.ts`; definir casos de 2/3/51 productores, 51 propuestas y contextos distinguibles, sin depender de la futura API de selección. En API/UI, los contextos comparten entidad/fecha y se distinguen por otros atributos admitidos; comprobar entidades/periodos diferentes entre conjuntos o como rechazo del lote. Mantener separados fixtures sembrados y recorridos integrales. (Depende de T002).
+- [X] T003 Preparar los escenarios comunes y el aislamiento de workspace en `tests/helpers/iteration004-fixtures.ts` (nuevo), reutilizando `tests/helpers/xlsx-fixtures.ts`, `tests/helpers/corep-fixtures.ts` y `tests/e2e/workflow-helpers.ts`; definir casos de 2/3/51 productores, 51 propuestas y contextos distinguibles, sin depender de la futura API de selección. En API/UI, los contextos comparten entidad/fecha y se distinguen por otros atributos admitidos; comprobar entidades/periodos diferentes entre conjuntos o como rechazo del lote. Mantener separados fixtures sembrados y recorridos integrales. (Depende de T002).
 
 ## Phase 3: US1 — acción principal y etapa recomendada (P1, MVP)
 
