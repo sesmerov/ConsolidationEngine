@@ -44,6 +44,7 @@ export interface CapabilitiesDTO { readonly profileId: string; readonly grammarV
 const text = { type: 'string' } as const;
 const sha256 = { type: 'string', pattern: '^[0-9a-f]{64}$' } as const;
 export const diagnosticSchema = { type: 'object', additionalProperties: false, required: ['code', 'message'], properties: {
+  profileChoice: { type:'object',additionalProperties:false,required:['reportIndex','sha256','candidates'],properties:{ reportIndex:{type:'integer',minimum:0,maximum:19},sha256:{type:'string',pattern:'^[0-9a-f]{64}$'},candidates:{type:'array',minItems:1,maxItems:3,items:{type:'object',additionalProperties:false,required:['profileId','label','tableCode'],properties:{profileId:{enum:['eba-corep-of-4.0-ca1-v1','eba-finrep-4.0-f0101-v1','ce-demo-types-1']},label:{type:'string',maxLength:128},tableCode:{type:'string',maxLength:64}}}}} },
   code: text, message: text, locator: sourceLocatorSchema, fileName: { type: 'string', maxLength: 200 }, severity: { enum: ['error', 'warning', 'info'] },
   line: { type: 'integer', minimum: 1 }, column: { type: 'integer', minimum: 0 }, start: { type: 'integer', minimum: 0 }, end: { type: 'integer', minimum: 0 },
 } } as const;

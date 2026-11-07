@@ -16,7 +16,7 @@ export const versionExportSummarySchema = { type: 'object', additionalProperties
   versionId: uuidSchema, profileId: { type: 'string' }, createdAt: { type: 'string', format: 'date-time' },
   reports: { type: 'array', maxItems: 20, items: { type: 'object', additionalProperties: false,
     required: ['sourceFileId', 'displayName', 'profileId', 'contextCount', 'contextOrigin', 'selectedSheets', 'excludedSheets'], properties: {
-      sourceFileId: uuidSchema, displayName: { type: 'string', maxLength: 200 }, profileId: { enum: ['ce-report-1', 'eba-corep-of-4.0-ca1-v1', 'ce-demo-types-1'] },
+      sourceFileId: uuidSchema, displayName: { type: 'string', maxLength: 200 }, profileId: { enum: ['ce-report-1', 'eba-corep-of-4.0-ca1-v1', 'eba-finrep-4.0-f0101-v1', 'ce-demo-types-1'] },
       contextCount: { type: 'integer', minimum: 1, maximum: 200_000 }, commonEntityId: { type: 'string', maxLength: 32_767 }, commonReferenceDate: civilDateSchema,
       contextOrigin: { enum: ['form', 'workbook'] }, selectedSheets: sheets, excludedSheets: sheets, scaleExponent: { enum: [0, 3, 6] },
       displayDecimals: { anyOf: [{ type: 'integer', minimum: -18, maximum: 18 }, { const: 'INF' }] },

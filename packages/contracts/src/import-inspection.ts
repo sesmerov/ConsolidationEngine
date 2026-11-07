@@ -4,7 +4,8 @@ import type { ReportProfileId } from './profiles.js';
 import { civilDateV2Schema, sourceLocatorSchema, uuidSchema } from './common.schemas.js';
 import { diagnosticSchema } from './catalog.js';
 export const IMPORT_INSPECTION_TTL_MS = 900_000;
-export type ImportContextInputDTO = { readonly source: 'workbook' } | { readonly source: 'form'; readonly declaration: ImportContextFormDTO };
+export interface ReportProfileChoiceDTO { readonly reportIndex: number; readonly sha256: string; readonly profileId: 'eba-corep-of-4.0-ca1-v1' | 'eba-finrep-4.0-f0101-v1' | 'ce-demo-types-1' }
+export type ImportContextInputDTO = ({ readonly source: 'workbook' } | { readonly source: 'form'; readonly declaration: ImportContextFormDTO }) & { readonly reportProfiles?: readonly ReportProfileChoiceDTO[] };
 export type ImportInspectionState = 'ready' | 'committing' | 'committed' | 'invalidated' | 'expired' | 'discarded';
 export interface ImportInspectionProfileDTO { readonly profileId: ReportProfileId; readonly languageProfileId: string; readonly mappingSha256: string }
 export interface ImportInspectionContextDTO {
@@ -29,7 +30,7 @@ export interface ActiveImportInspectionDTO { readonly active: ImportInspectionDT
 const text = { type: 'string' } as const, hash = { type: 'string', pattern: '^[0-9a-f]{64}$' } as const;
 const dateTime = { type: 'string', format: 'date-time' } as const;
 const sheets = { type: 'array', maxItems: 256, uniqueItems: true, items: { type: 'string', minLength: 1, maxLength: 31 } } as const;
-const profiles = { enum: ['ce-report-1', 'eba-corep-of-4.0-ca1-v1', 'ce-demo-types-1'] } as const;
+const profiles = { enum: ['ce-report-1', 'eba-corep-of-4.0-ca1-v1', 'eba-finrep-4.0-f0101-v1', 'ce-demo-types-1'] } as const;
 const declarationProperties = {
   entityId: { type: 'string', minLength: 1, maxLength: 200, pattern: '\\S' }, referenceDate: civilDateV2Schema, submissionDate: civilDateV2Schema,
   filingIndicators: { type: 'object', minProperties: 1, maxProperties: 256, propertyNames: { pattern: '^(?!v_)[A-Za-z][A-Za-z0-9_.-]*$' }, additionalProperties: { type: 'boolean' } },
@@ -40,9 +41,12 @@ export const importContextFormSchema = { type: 'object', additionalProperties: f
 export const importContextDeclarationSchema = { type: 'object', additionalProperties: false, required: [...importContextFormSchema.required, 'contextId', 'framework', 'moduleVersion'], properties: {
   ...declarationProperties, contextId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,64}$' }, framework: text, moduleVersion: text,
 } } as const;
+export const reportProfileChoicesSchema = { type: 'array', maxItems: 20, uniqueItems: true, items: { type: 'object', additionalProperties: false, required: ['reportIndex','sha256','profileId'], properties: {
+  reportIndex: { type: 'integer', minimum: 0, maximum: 19 }, sha256: hash, profileId: { enum: ['eba-corep-of-4.0-ca1-v1','eba-finrep-4.0-f0101-v1','ce-demo-types-1'] },
+} } } as const;
 export const importContextInputSchema = { oneOf: [
-  { type: 'object', additionalProperties: false, required: ['source'], properties: { source: { const: 'workbook' } } },
-  { type: 'object', additionalProperties: false, required: ['source', 'declaration'], properties: { source: { const: 'form' }, declaration: importContextFormSchema } },
+  { type: 'object', additionalProperties: false, required: ['source'], properties: { source: { const: 'workbook' }, reportProfiles: reportProfileChoicesSchema } },
+  { type: 'object', additionalProperties: false, required: ['source', 'declaration'], properties: { source: { const: 'form' }, declaration: importContextFormSchema, reportProfiles: reportProfileChoicesSchema } },
 ] } as const;
 export const importInspectionSchema = { type: 'object', additionalProperties: false,
   required: ['id', 'workspaceId', 'createdAt', 'expiresAt', 'state', 'inspectionHash', 'profiles', 'context', 'reports', 'diagnostics', 'requiresPartialCoverageAcceptance'], properties: {

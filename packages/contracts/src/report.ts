@@ -80,7 +80,7 @@ export const reportedFactSchema = { type: 'object', additionalProperties: false,
 export const reportSourceBindingSchema = { type: 'object', additionalProperties: false,
   required: ['sourceFileId', 'contextIds', 'profileId', 'mappingSha256', 'selectedSheets', 'excludedSheets', 'contextOrigin'], properties: {
     sourceFileId: uuidSchema, contextIds: { type: 'array', minItems: 1, maxItems: 100_000, uniqueItems: true, items: contextId },
-    profileId: { enum: ['ce-report-1', 'eba-corep-of-4.0-ca1-v1', 'ce-demo-types-1'] }, mappingSha256: { type: 'string', pattern: '^[0-9a-f]{64}$' },
+    profileId: { enum: ['ce-report-1', 'eba-corep-of-4.0-ca1-v1', 'eba-finrep-4.0-f0101-v1', 'ce-demo-types-1'] }, mappingSha256: { type: 'string', pattern: '^[0-9a-f]{64}$' },
     selectedSheets: { type: 'array', minItems: 1, maxItems: 256, uniqueItems: true, items: { type: 'string', minLength: 1, maxLength: 31 } },
     excludedSheets: { type: 'array', maxItems: 256, uniqueItems: true, items: { type: 'string', minLength: 1, maxLength: 31 } },
     scaleExponent: { enum: [0, 3, 6] }, displayDecimals: { anyOf: [{ type: 'integer', minimum: -18, maximum: 18 }, { const: 'INF' }] },

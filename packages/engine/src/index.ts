@@ -47,8 +47,9 @@ export type { LanguageProfile } from './profiles/registry.js';
 export { getRecalculationPolicy } from './recalculation/policy.js';
 export type { PolicyInput, PolicyResult } from './recalculation/policy.js';
 export {
-  prepareDirectionProjection, editDirectionProjection, readDirectionRows, compileDirectionConfiguration,
+  prepareDirectionProjection, editDirectionProjection, readDirectionRows, readDirectionGroups, readDirectionCandidates, readDirectionCandidate, compileDirectionConfiguration,
   verifyDirectionCompilation, replacedDirectionDecisionState, DirectionReviewError,
 } from './recalculation/direction-review.js';
 export type { DirectionReviewProjection, ReviewSeed } from './recalculation/direction-review.js';
 export { assertRecalculationConfiguration, RecalculationConfigurationError } from './recalculation/configuration.js';
+export * from './recalculation/proposal-selection.js';

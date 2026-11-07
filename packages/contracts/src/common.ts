@@ -21,6 +21,7 @@ export interface SourceLocator {
   readonly column?: string; readonly ruleCode?: string;
 }
 export interface Diagnostic { readonly code: string; readonly message: string; readonly locator?: SourceLocator;
+  readonly profileChoice?: { readonly reportIndex: number; readonly sha256: string; readonly candidates: readonly { readonly profileId: 'eba-corep-of-4.0-ca1-v1' | 'eba-finrep-4.0-f0101-v1'; readonly label: string; readonly tableCode: string }[] };
   readonly fileName?: string; readonly severity?: 'error' | 'warning' | 'info'; readonly line?: number; readonly column?: number; readonly start?: number; readonly end?: number }
 export interface SnapshotContent {
   readonly catalogVersion: string; readonly reportVersion: string; readonly configVersion: string;
@@ -36,7 +37,7 @@ export interface Snapshot {
   readonly versionId: UUID; readonly parentVersionId?: UUID; readonly contentHash: string;
   readonly createdAt: string; readonly content: SnapshotContent;
 }
-export const JOB_KINDS = ['import','inspect-import','prepare-directions','commit-directions','validate','preview','apply','export'] as const;
+export const JOB_KINDS = ['import','inspect-import','prepare-directions','commit-directions','validate','preview','select-proposals','apply','export'] as const;
 export type JobKind = typeof JOB_KINDS[number];
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'timed_out';
 export interface ResultRef { readonly type: string; readonly id: string }

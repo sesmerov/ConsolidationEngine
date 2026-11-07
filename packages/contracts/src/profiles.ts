@@ -5,7 +5,7 @@ import type { Coordinate } from './report.js';
 export const LANGUAGE_PROFILE_V1 = 'ce-dpmxl-0.9-closed-v1' as const;
 export const LANGUAGE_PROFILE_V2 = 'ce-dpmxl-0.9-closed-v2' as const;
 export type LanguageProfileId = typeof LANGUAGE_PROFILE_V1 | typeof LANGUAGE_PROFILE_V2;
-export type ReportProfileId = 'ce-report-1' | 'eba-corep-of-4.0-ca1-v1' | 'ce-demo-types-1';
+export type ReportProfileId = 'ce-report-1' | 'eba-corep-of-4.0-ca1-v1' | 'eba-finrep-4.0-f0101-v1' | 'ce-demo-types-1';
 export type RecalculationPolicyReason = 'CONDITIONAL' | 'TEXT' | 'DATE';
 export interface RecalculationPolicyDTO {
   readonly mode: 'standard' | 'validation_only' | 'undetermined';

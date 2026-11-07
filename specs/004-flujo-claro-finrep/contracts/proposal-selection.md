@@ -166,6 +166,10 @@ El resumen y cada página de explicación tienen además un máximo de 1 MiB de 
 
 La UI presenta «Cómo se obtiene», «Datos utilizados» y «Archivos y celdas de origen», con efecto de redondeo/intervalo cuando sea relevante. No ofrece «Detalle técnico», un volcado JSON ni un listado de huellas o identificadores internos. El resumen inicial y sus secciones reemplazan el uso del DTO legado completo en este recorrido.
 
+### Resumen compacto de la simulación
+
+Precisión de implementación (2026-11-07): el GET/DELETE legado de preview también devuelve `proposalIds` y arrays del grafo. Para satisfacer la garantía existente de no transportar listas globales, la UI nueva solicita `compact=true` en ambas rutas. La proyección `CompactPreviewDTO` conserva identidad, base, estado, fecha y recibo, y devuelve únicamente `graphSummary:{nodes,edges,blocked,conflictCount,cycleCount}` y `diagnosticCount`. No incluye listas de propuestas, orden, ciclos, conflictos ni diagnósticos. Los detalles se consultan en las rutas paginadas de propuestas/explicación. Omitir el parámetro o usar `false` conserva el contrato anterior. Esta precisión no amplía la semántica de cálculo ni modifica el alcance funcional.
+
 ## Aplicación por referencia inmutable
 
 POST `/api/v1/workspaces/{w}/applications` mantiene sesión, `If-Match`, clave de idempotencia y respuesta 202 JobDTO. El esquema es una unión cerrada y exclusiva:

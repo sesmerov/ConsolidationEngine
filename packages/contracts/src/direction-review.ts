@@ -52,6 +52,32 @@ export interface DirectionReviewPageDTO {
   readonly total: number; readonly nextCursor: string | null;
 }
 
+export type DirectionConflictState = 'conflicted' | 'resolved' | 'omitted' | 'pending';
+export interface DirectionConflictGroupDTO {
+  readonly groupId: string; readonly targetLabel: string; readonly contextLabel: string; readonly conceptLabel?: string;
+  readonly candidateCount: number; readonly activeCount: number; readonly state: DirectionConflictState;
+  readonly selectedCandidate?: { readonly instanceId: string; readonly code: string; readonly targetSide: TargetSide };
+}
+export interface DirectionConflictCandidateDTO {
+  readonly instanceId: string; readonly rowId: string; readonly code: string; readonly targetSide: TargetSide;
+  readonly descriptionPreview?: string; readonly expressionPreview: string;
+  readonly descriptionTruncated: boolean; readonly expressionTruncated: boolean;
+  readonly availability: 'selectable' | 'assignedElsewhere'; readonly assignedTargetLabel?: string; readonly selected: boolean;
+}
+export interface DirectionConflictGroupsPageDTO {
+  readonly reviewId: string; readonly revision: number; readonly items: readonly DirectionConflictGroupDTO[];
+  readonly total: number; readonly nextCursor: string | null;
+}
+export interface DirectionConflictCandidatesPageDTO {
+  readonly reviewId: string; readonly revision: number; readonly group: DirectionConflictGroupDTO;
+  readonly items: readonly DirectionConflictCandidateDTO[]; readonly total: number; readonly nextCursor: string | null;
+}
+export interface DirectionConflictCandidateDetailDTO {
+  readonly reviewId: string; readonly revision: number; readonly candidate: DirectionConflictCandidateDTO;
+  readonly expression: string; readonly precondition?: string;
+  readonly descriptions: readonly { readonly description: string; readonly sourceLabel: string }[];
+}
+
 const closed = (properties: Record<string, unknown>, required: readonly string[] = Object.keys(properties)) => ({
   type: 'object', additionalProperties: false, properties, required,
 });
@@ -101,3 +127,33 @@ export const directionReviewActiveSchema = closed({
   active: { anyOf: [directionReviewSummarySchema, { type: 'null' }] }, latestCommit: receipt,
 }, ['active']);
 export const directionReviewMutationResponseSchema = closed({ summary: directionReviewSummarySchema, appliedRevision: revision });
+
+const conflictGroup = closed({
+  groupId: digest, targetLabel: label, contextLabel: label, conceptLabel: label, candidateCount: count, activeCount: count,
+  state: { enum: ['conflicted', 'resolved', 'omitted', 'pending'] },
+  selectedCandidate: closed({ instanceId: digest, code: { type: 'string', maxLength: 32767 }, targetSide: side }),
+}, ['groupId', 'targetLabel', 'contextLabel', 'candidateCount', 'activeCount', 'state']);
+const conflictCandidate = closed({
+  instanceId: digest, rowId: digest, code: { type: 'string', maxLength: 32767 }, targetSide: side,
+  descriptionPreview: { type: 'string', maxLength: 512 }, expressionPreview: { type: 'string', maxLength: 512 },
+  descriptionTruncated: { type: 'boolean' }, expressionTruncated: { type: 'boolean' },
+  availability: { enum: ['selectable', 'assignedElsewhere'] }, assignedTargetLabel: label, selected: { type: 'boolean' },
+}, ['instanceId', 'rowId', 'code', 'targetSide', 'expressionPreview', 'descriptionTruncated', 'expressionTruncated', 'availability', 'selected']);
+const nextCursor = { anyOf: [{ type: 'string', maxLength: 8192 }, { type: 'null' }] };
+export const directionConflictGroupParamsSchema = closed({ workspaceId: uuidSchema, reviewId: uuidSchema, groupId: digest });
+export const directionConflictCandidateParamsSchema = closed({ workspaceId: uuidSchema, reviewId: uuidSchema, groupId: digest, instanceId: digest });
+export const directionConflictPageQuerySchema = closed({
+  limit: { type: 'string', pattern: '^(?:[1-9]|[1-9][0-9]|1[0-9]{2}|200)$' },
+  cursor: { type: 'string', minLength: 1, maxLength: 8192 },
+}, []);
+export const directionConflictGroupsPageSchema = closed({
+  reviewId: uuidSchema, revision, items: { type: 'array', maxItems: 200, items: conflictGroup }, total: count, nextCursor,
+});
+export const directionConflictCandidatesPageSchema = closed({
+  reviewId: uuidSchema, revision, group: conflictGroup, items: { type: 'array', maxItems: 200, items: conflictCandidate }, total: count, nextCursor,
+});
+export const directionConflictCandidateDetailSchema = closed({
+  reviewId: uuidSchema, revision, candidate: conflictCandidate, expression: { type: 'string', maxLength: 32767 },
+  precondition: { type: 'string', maxLength: 32767 }, descriptions: { type: 'array', maxItems: 500,
+    items: closed({ description: { type: 'string', maxLength: 32767 }, sourceLabel: label }) },
+}, ['reviewId', 'revision', 'candidate', 'expression', 'descriptions']);

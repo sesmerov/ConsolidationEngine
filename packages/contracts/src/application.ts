@@ -8,13 +8,20 @@ import { recalculationPolicySchema } from './profiles.js';
 import { coordinateSchema, sourceFileSchema } from './report.js';
 import { bindingSchema, directionChoiceSchema, factReadSchema, metadataReadsSchema, proposalSchema } from './recalculation.js';
 import { diagnosticSchema } from './catalog.js';
+import type { ProposalSelectionRefDTO } from './proposal-selection.js';
+import { proposalSelectionRefSchema } from './proposal-selection.js';
 
-export interface ApplicationRequestDTO { readonly baseVersionId: string; readonly previewId: string; readonly selectedIds: readonly string[]; readonly closureHash: string }
+export type ApplicationRequestDTO = { readonly baseVersionId: string; readonly previewId: string; readonly closureHash: string } & (
+  | { readonly selectedIds: readonly string[]; readonly selectionRef?: never }
+  | { readonly selectionRef: ProposalSelectionRefDTO; readonly selectedIds?: never }
+);
 /** A functional receipt exists only after one atomic publication, never while a candidate is being accepted. */
 export interface ApplyReceiptDTO {
   readonly id: string; readonly previewId: string; readonly acceptedIds: readonly string[]; readonly closureHash: string;
   readonly baseVersionId: string; readonly newVersionId: string; readonly beforeValidationRunId: string; readonly validationRunId: string; readonly appliedAt: string;
+  readonly selectionRef?: ProposalSelectionRefDTO;
 }
+export interface CompactApplyReceiptDTO extends Omit<ApplyReceiptDTO, 'acceptedIds'> { readonly acceptedCount: number }
 interface ApplyChangeBase {
   readonly changed: boolean;
   readonly receiptId: string; readonly proposalId: string; readonly directionId: string; readonly instanceId: string; readonly variantIds: readonly string[];
@@ -28,22 +35,29 @@ export type ApplyChangeDTO = ApplyChangeBase & (
 /** Stored separately from the two validation bundles to retain shared immutable data. */
 export interface ApplicationBundle { readonly receipt: ApplyReceiptDTO; readonly changes: readonly ApplyChangeDTO[] }
 export interface ApplicationDetailDTO { readonly receipt: ApplyReceiptDTO; readonly changeCount: number; readonly beforeSummary: ValidationSummary; readonly afterSummary: ValidationSummary }
+export interface CompactApplicationDetailDTO extends Omit<ApplicationDetailDTO, 'receipt'> { readonly receipt: CompactApplyReceiptDTO }
 export interface ComparisonRowDTO { readonly key: string; readonly before?: RuleResultDTO; readonly after?: RuleResultDTO }
 export interface ComparisonPageDTO {
   readonly items: readonly ComparisonRowDTO[]; readonly total: number; readonly nextCursor: string | null;
   readonly receipt: ApplyReceiptDTO; readonly beforeSummary: ValidationSummary; readonly afterSummary: ValidationSummary; readonly sourceFiles?: readonly SourceFile[];
 }
+export interface CompactComparisonPageDTO extends Omit<ComparisonPageDTO, 'receipt'> { readonly receipt: CompactApplyReceiptDTO }
 const text = { type: 'string' } as const, hash = { type: 'string', pattern: '^[0-9a-f]{64}$' } as const, count = { type: 'integer', minimum: 0 } as const;
 const texts = { type: 'array', items: text, uniqueItems: true } as const, hashes = { type: 'array', items: hash, uniqueItems: true } as const;
 const uuids = { type: 'array', items: uuidSchema, uniqueItems: true } as const, accepted = { ...uuids, minItems: 1, maxItems: 1_000_000 } as const;
 const diagnostics = { type: 'array', items: diagnosticSchema } as const;
-export const applicationRequestSchema = { type: 'object', additionalProperties: false, required: ['baseVersionId', 'previewId', 'selectedIds', 'closureHash'], properties: {
-  baseVersionId: uuidSchema, previewId: uuidSchema, selectedIds: accepted, closureHash: hash,
-} } as const;
+export const applicationRequestSchema = { oneOf: [
+  { type: 'object', additionalProperties: false, required: ['baseVersionId', 'previewId', 'selectedIds', 'closureHash'], properties: { baseVersionId: uuidSchema, previewId: uuidSchema, selectedIds: accepted, closureHash: hash } },
+  { type: 'object', additionalProperties: false, required: ['baseVersionId', 'previewId', 'selectionRef', 'closureHash'], properties: { baseVersionId: uuidSchema, previewId: uuidSchema, selectionRef: proposalSelectionRefSchema, closureHash: hash } },
+] } as const;
 export const applyReceiptSchema = { type: 'object', additionalProperties: false, required: ['id', 'previewId', 'acceptedIds', 'closureHash', 'baseVersionId', 'newVersionId', 'beforeValidationRunId', 'validationRunId', 'appliedAt'], properties: {
   id: uuidSchema, previewId: uuidSchema, acceptedIds: accepted, closureHash: hash, baseVersionId: uuidSchema, newVersionId: uuidSchema,
   beforeValidationRunId: uuidSchema, validationRunId: uuidSchema, appliedAt: { type: 'string', format: 'date-time' },
+  selectionRef: proposalSelectionRefSchema,
 } } as const;
+const { acceptedIds: _acceptedIds, ...compactReceiptProperties } = applyReceiptSchema.properties;
+export const compactApplyReceiptSchema = { ...applyReceiptSchema, required: [...applyReceiptSchema.required.filter(field => field !== 'acceptedIds'), 'acceptedCount'], properties: { ...compactReceiptProperties, acceptedCount: { type: 'integer', minimum: 1 } } } as const;
+const publicReceiptSchema = { anyOf: [applyReceiptSchema, compactApplyReceiptSchema] } as const;
 export const applyChangeSchema = { type: 'object', additionalProperties: false,
   required: ['changed', 'receiptId', 'proposalId', 'directionId', 'instanceId', 'variantIds', 'code', 'targetKey', 'before', 'after', 'readKeys', 'predecessorIds', 'metadataReads', 'sources'], properties: {
     changed: { type: 'boolean' },
@@ -58,7 +72,7 @@ export const completedValidationSummarySchema = { type: 'object', additionalProp
   byStatus: { type: 'object', additionalProperties: false, required: ['pass', 'fail', 'not_applicable', 'not_evaluable', 'error'], properties: { pass: count, fail: count, not_applicable: count, not_evaluable: count, error: count } },
 } } as const;
 export const applicationDetailSchema = { type: 'object', additionalProperties: false, required: ['receipt', 'changeCount', 'beforeSummary', 'afterSummary'], properties: {
-  receipt: applyReceiptSchema, changeCount: count, beforeSummary: completedValidationSummarySchema, afterSummary: completedValidationSummarySchema,
+  receipt: publicReceiptSchema, changeCount: count, beforeSummary: completedValidationSummarySchema, afterSummary: completedValidationSummarySchema,
 } } as const;
 const eligibilitySchema = { type: 'object', additionalProperties: false, required: ['eligible', 'diagnostics'], properties: { eligible: { type: 'boolean' }, target: coordinateSchema, diagnostics } } as const;
 export const ruleResultSchema = { type: 'object', additionalProperties: false,
@@ -85,7 +99,7 @@ export const validationResultsPageSchema = { type: 'object', additionalPropertie
     configuredDirections: { type: 'array', items: directionChoiceSchema },
   } } as const;
 export const comparisonPageSchema = { type: 'object', additionalProperties: false, required: ['items', 'total', 'nextCursor', 'receipt', 'beforeSummary', 'afterSummary'], properties: {
-  items: { type: 'array', items: comparisonRowSchema }, total: count, nextCursor: { type: ['string', 'null'] }, receipt: applyReceiptSchema,
+  items: { type: 'array', items: comparisonRowSchema }, total: count, nextCursor: { type: ['string', 'null'] }, receipt: publicReceiptSchema,
   beforeSummary: completedValidationSummarySchema, afterSummary: completedValidationSummarySchema, sourceFiles: { type: 'array', items: sourceFileSchema },
 } } as const;
 export const changedOnlyQuerySchema = { type: 'string', enum: ['true', 'false'] } as const;

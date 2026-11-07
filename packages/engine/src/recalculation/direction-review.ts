@@ -13,7 +13,7 @@ import {
   type DirectionReviewProjection, type ReviewGroup, type ReviewOption, type ReviewRow, type ReviewSeed,
 } from './direction-review-index.js';
 
-export { DirectionReviewError, editDirectionProjection, readDirectionRows } from './direction-review-index.js';
+export { DirectionReviewError, editDirectionProjection, readDirectionRows, readDirectionGroups, readDirectionCandidates, readDirectionCandidate } from './direction-review-index.js';
 export type { DirectionReviewProjection, ReviewSeed } from './direction-review-index.js';
 
 type ReviewedState = Extract<DirectionDecisionState, { mode: 'reviewed' }>;
@@ -119,7 +119,7 @@ export function prepareDirectionProjection(snapshot: Snapshot, input: readonly R
   const unselected = new Set(reviewed?.unselectedExceptions);
   const savedDirections = new Map(snapshot.content.directions.map(item => [item.instanceId, item]));
   const contexts = new Map(snapshot.content.contexts.map(ctx => [ctx.contextId,
-  [ctx.entityId, ctx.referenceDate, ctx.moduleVersion, ctx.contextId].join(' · ').slice(0, 2048)]));
+  [ctx.entityId, ctx.referenceDate, ctx.framework, ctx.moduleVersion].join(' · ').slice(0, 2048)]));
   const index: TargetIndex = { groups: [], keys: new Map() };
   const byInstance: Record<string, number> = Object.create(null), byGroup: Record<string, number> = Object.create(null);
   const rows: ReviewRow[] = [], choices: string[] = [], resultIds = new Set<string>();

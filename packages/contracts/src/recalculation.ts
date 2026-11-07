@@ -29,6 +29,10 @@ export interface PreviewDTO {
   readonly state: PreviewState; readonly proposalIds: readonly string[]; readonly graphSummary: GraphSummaryDTO;
   readonly diagnostics: readonly Diagnostic[];
 }
+export interface CompactPreviewDTO extends Omit<PreviewDTO, 'proposalIds' | 'graphSummary' | 'diagnostics'> {
+  readonly graphSummary: { readonly nodes: number; readonly edges: number; readonly blocked: number; readonly conflictCount: number; readonly cycleCount: number };
+  readonly diagnosticCount: number;
+}
 /** Consumers read this quantized value and its destination precision, never exactNominal. */
 export type ProposalAfterDTO =
   | { readonly normalizedValue: Rational; readonly originalText: string; readonly decimals: string; readonly unit: string }
@@ -87,6 +91,10 @@ export const directionSchema = { type: 'object', additionalProperties: false, re
   id: hash, instanceId: hash, variantIds: hashes, binding: bindingSchema, targetSide: { enum: ['left', 'right'] }, targetKey: text,
 } } as const;
 const previewStates = { enum: ['ready', 'applied', 'discarded', 'obsolete'] } as const;
+export const compactPreviewSchema = { type: 'object', additionalProperties: false, required: ['id', 'baseVersionId', 'profileId', 'policyId', 'createdAt', 'state', 'graphSummary', 'diagnosticCount'], properties: {
+  id: uuidSchema, baseVersionId: uuidSchema, profileId: text, policyId: text, createdAt: { type: 'string', format: 'date-time' }, appliedReceiptId: uuidSchema, state: previewStates, diagnosticCount: count,
+  graphSummary: { type: 'object', additionalProperties: false, required: ['nodes', 'edges', 'blocked', 'conflictCount', 'cycleCount'], properties: { nodes: count, edges: count, blocked: count, conflictCount: count, cycleCount: count } },
+} } as const;
 export const previewSchema = { type: 'object', additionalProperties: false,
   required: ['id', 'baseVersionId', 'profileId', 'policyId', 'createdAt', 'state', 'proposalIds', 'graphSummary', 'diagnostics'], properties: {
     id: uuidSchema, baseVersionId: uuidSchema, profileId: text, policyId: text, createdAt: { type: 'string', format: 'date-time' }, appliedReceiptId: uuidSchema, state: previewStates, proposalIds: uuids, diagnostics,
