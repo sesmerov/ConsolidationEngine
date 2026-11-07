@@ -149,7 +149,7 @@ test('a cancelled job notification and rejected publication keep the current sta
 for (const width of [320, 390, 1440]) {
   test.describe(`viewport ${width}`, () => {
   test.use({ hasTouch: width === 390, reducedMotion: 'reduce' });
-  test(`COREP demo ${width}px: real downloads, 16 rule oracle and five explicit dependent changes`, async ({ page }, info) => {
+  test(`COREP demo ${width}px: real downloads, 16 rule oracle and five preselected dependent changes`, async ({ page }, info) => {
     test.setTimeout(180_000); await page.setViewportSize({ width, height: 1000 });
     await page.getByLabel('Nombre del conjunto').fill(`Demo COREP ${width} SYNTHETIC`);
     await page.getByRole('button', { name: 'Crear conjunto', exact: true }).click();
@@ -177,12 +177,15 @@ for (const width of [320, 390, 1440]) {
     const positions = new Map(proposals.items.map((item: any, index: number) => [item.code, index]));
     for (const [producer, consumer] of corpus.corep.expectedEdges) expect(positions.get(producer)).toBeLessThan(positions.get(consumer) as number);
     const table = page.getByRole('table', { name: 'Propuestas de recálculo', exact: true }); await expect(table.getByRole('row')).toHaveCount(6);
-    await table.getByLabel('Seleccionar v0172_m', { exact: true }).check(); await expect(page.getByText(/Faltan 4 predecesores/)).toBeVisible();
+    for (const code of officialCodes) await expect(table.getByLabel(`Seleccionar ${code}`, { exact: true })).toBeChecked();
+    await page.getByRole('button', { name: 'Limpiar selección', exact: true }).click();
+    for (const code of officialCodes) await expect(table.getByLabel(`Seleccionar ${code}`, { exact: true })).not.toBeChecked();
+    await table.getByLabel('Seleccionar v0172_m', { exact: true }).check(); await expect(page.getByText(/Faltan 4 antecedentes/)).toBeVisible();
     const acknowledgement = page.getByLabel('He revisado cada propuesta y acepto aplicar el conjunto completo mostrado.'); await expect(acknowledgement).toBeDisabled();
     for (const code of officialCodes.slice(1)) { const checkbox = table.getByLabel(`Seleccionar ${code}`, { exact: true }); await expect(checkbox).not.toBeChecked(); await checkbox.check(); }
     await stage(page, '2. Validar', '#validation-title'); await stage(page, '3. Recalcular', '#preview-title');
     for (const code of officialCodes) await expect(table.getByLabel(`Seleccionar ${code}`, { exact: true })).toBeChecked();
-    await expect(page.getByText(/La selección contiene todos sus predecesores/)).toBeVisible(); await expect(acknowledgement).toBeEnabled();
+    await expect(page.getByText(/La selección contiene todos sus antecedentes/)).toBeVisible(); await expect(acknowledgement).toBeEnabled();
     await expect(table).not.toContainText('["'); await expect(table).toContainText('→'); await noPageOverflow(page);
     await table.scrollIntoViewIfNeeded(); await page.screenshot({ path: info.outputPath(`demo-corep-proposals-${width}.png`) });
     await acknowledgement.focus(); await page.keyboard.press('Space');

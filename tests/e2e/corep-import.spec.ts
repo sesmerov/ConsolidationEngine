@@ -58,12 +58,18 @@ async function inspect(page: Page, expected = 'succeeded') {
   const response = await posting; expect(response.status()).toBe(202);
   return jobDone(page, (await response.json()).jobId, expected);
 }
+async function inspectFullCorep(page: Page) {
+  const ambiguous = await inspect(page, 'failed');
+  expect(ambiguous.diagnostics).toContainEqual(expect.objectContaining({ code: 'REPORT_PROFILE_REQUIRED' }));
+  await page.locator('[data-profile-choice]').selectOption('eba-corep-of-4.0-ca1-v1');
+  return inspect(page);
+}
 async function readyInspection(page: Page, id: string) {
   const session = await connection(page);
   const response = await page.request.get(`/api/v1/workspaces/${session.id}/import-inspections/${id}`, { headers: session.headers });
   expect(response.status()).toBe(200); return response.json();
 }
-/** Test-only patching of trusted fixtures; production never copies a user package. */
+/** Test-only fixture editing; formulas are deliberately invalid input. */
 function sheetPart(parts: readonly ZipPart[], name: string) {
   const attr = (tag: string, key: string) => new RegExp('\\b' + key + '="([^"]+)"').exec(tag)?.[1];
   const workbook = parts.find(part => part.name === 'xl/workbook.xml')!.data.toString('utf8');
@@ -123,7 +129,7 @@ test('full COREP: review is recoverable, explicit exclusions and edits precede a
   test.setTimeout(180_000); const previous = await seedPreviousVersion(page);
   await page.getByLabel('Catálogo de reglas (.xlsx)').setInputFiles(path.join(generated, 'eba-subset.xlsx'));
   await page.getByLabel('Informes (.xlsx)', { exact: true }).setInputFiles(official); await manualContext(page);
-  const inspected = await inspect(page), id = inspected.resultRef.id, dto = await readyInspection(page, id);
+  const inspected = await inspectFullCorep(page), id = inspected.resultRef.id, dto = await readyInspection(page, id);
   expect(dto.state).toBe('ready'); expect(dto.requiresPartialCoverageAcceptance).toBe(true);
   expect(dto.reports).toHaveLength(1); expect(dto.reports[0].excludedSheets).toHaveLength(190);
   expect((await current(page)).etag).toBe(previous.etag);
@@ -147,7 +153,7 @@ test('full COREP: review is recoverable, explicit exclusions and edits precede a
   await expect(page.locator('#context-entity')).toHaveValue('SYNTHETIC_EDITED');
   await page.getByLabel('Catálogo de reglas (.xlsx)').setInputFiles(path.join(generated, 'eba-subset.xlsx'));
   await page.getByLabel('Informes (.xlsx)', { exact: true }).setInputFiles(official); await manualContext(page);
-  const second = await inspect(page); await expect(review.getByLabel(acceptanceLabel)).not.toBeChecked();
+  const second = await inspectFullCorep(page); await expect(review.getByLabel(acceptanceLabel)).not.toBeChecked();
   await review.getByLabel(acceptanceLabel).check(); await page.screenshot({ path: testInfo.outputPath('corep-full-review.png'), fullPage: true });
   const posting = page.waitForResponse(response => response.url().endsWith(`/import-inspections/${second.resultRef.id}/commit`) && response.request().method() === 'POST');
   await review.getByRole('button', { name: 'Confirmar carga', exact: true }).click();

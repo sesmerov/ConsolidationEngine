@@ -89,9 +89,11 @@ test('COREP analyst journey by keyboard: inspect, confirm, validate, apply five 
   await stage(/^3\. Recalcular\b/, '#preview-title');
   const preview = await action('/previews', 'Simular recálculos');
   await expect(page.locator('#preview-history')).toHaveValue(preview.resultRef.id);
+  for (const code of official) await expect(page.getByRole('checkbox', { name: 'Seleccionar ' + code, exact: true })).toBeChecked();
+  await activate(page, page.getByRole('button', { name: 'Limpiar selección', exact: true }));
   await expect(page.getByRole('heading', { name: 'Confirmar la aplicación' })).toHaveCount(0);
   await selectProposal('v0172_m');
-  await expect(page.getByText(/Faltan 4 predecesores/)).toBeVisible();
+  await expect(page.getByText(/Faltan 4 antecedentes/)).toBeVisible();
   const acknowledgement = page.getByRole('checkbox', { name: 'He revisado cada propuesta y acepto aplicar el conjunto completo mostrado.' });
   await expect(acknowledgement).toBeDisabled();
   for (const code of official.slice(1)) await selectProposal(code);

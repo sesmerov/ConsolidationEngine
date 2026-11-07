@@ -80,3 +80,13 @@ Se contrastaron rutas existentes y registros transversales de jobs, serializers 
 La validación documental comprueba IDs T001–T083 consecutivos, 83 casillas pendientes, etiquetas de historia, rutas concretas y dependencias anteriores sin ciclos. La matriz relaciona los 23 requisitos y los 10 criterios con sus tareas; cada historia tiene una prueba independiente y un checkpoint. No se han ejecutado pruebas del producto ni implementado funcionalidades durante esta fase.
 
 La observación humana SC-010 es independiente de la evidencia técnica. El cierre documental y los commits técnicos pueden completarse si falta esa observación, conservando su tarea pendiente. La siguiente fase es `$speckit-implement`.
+
+## Implementación — 2026-11-07
+
+La fase `$speckit-implement` incorpora el realce de etapas y acción principal verde, retirada de información interna, conflictos persistentes con elección/confirmación local y selección múltiple por revisión guardada en el servidor. La aceptación para escribir sigue siendo explícita y se invalida al cambiar la selección. Las explicaciones muestran las lecturas registradas por la simulación, incluidas las procedentes de un antecedente recalculado.
+
+FINREP F 01.01 pasa el recorrido visual completo en 320, 390 y 1440 px. La demo carga las 38 posiciones y cinco reglas, ofrece dos propuestas preseleccionadas (90→100 y 105→120), pasa de 2 reglas correctas/3 fallidas a 4/1 y conserva ese resultado tras descargar y volver a cargar el Excel. El catálogo es sintético, la plantilla se deriva de la fuente oficial fijada y el soporte se limita a ese layout. Esto acredita una compatibilidad que el ensayo histórico de 003 no tenía.
+
+La exportación FINREP conserva las partes del original y valida el resultado antes de publicarlo. El recorrido de navegador detectó una liberación prematura del original tras confirmar la inspección: se corrigió y se añadió la prueba desde el commit real hasta la exportación y el cierre del conjunto. No se sustituyó el original por una reconstrucción.
+
+Los comandos, resultados, hashes, mediciones y correcciones se registran en [verificación 004](../../docs/verification-004.md). [tasks.md](tasks.md) mantiene el estado efectivo de cada tarea. Las pruebas automáticas y capturas no constituyen observación humana SC-010, que permanece pendiente.

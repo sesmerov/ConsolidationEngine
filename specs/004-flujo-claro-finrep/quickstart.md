@@ -140,7 +140,9 @@ Cubre SC-007–008. Repetir COREP y Texto y fechas para SC-009.
 
 ## 5. Rendimiento y cierre
 
-Conservar el protocolo de validación de 003 como referencia, sin reutilizar sus tiempos como resultados de 004. Ejecutar el benchmark existente, con destino nuevo bajo `.cache/benchmark/004-reference/` y las opciones reales documentadas por `scripts/benchmark.mjs`. Registrar commit, entorno, hashes, carga auditada, muestras y resultados. La búsqueda mantiene el umbral de 1.000 ms desde la última entrada; la validación de referencia se mide con su protocolo de 500 reglas/100.000 lecturas y aceptación de al menos 9 de 10 ensayos ≤30 s, con los 10 ≤60 s.
+Conservar la carga, auditoría y umbrales del protocolo de validación de 003 como referencia, sin reutilizar sus tiempos como resultados de 004. Ejecutar el benchmark existente, con destino nuevo bajo `.cache/benchmark/004-reference/` y las opciones reales documentadas por `scripts/benchmark.mjs`. Registrar commit, entorno, hashes, carga auditada, muestras y resultados. La búsqueda mantiene el umbral de 1.000 ms desde la última entrada; la validación de referencia se mide con 500 reglas/100.000 lecturas y aceptación de al menos 9 de 10 ensayos ≤30 s, con los 10 ≤60 s.
+
+Adaptación de implementación: el criterio se identifica como `004-api-seeded-validation`. La cobertura 500 filas/500 variantes/500 instancias/0 duplicadas se verifica mediante una consulta autenticada antes de T1, incluyendo su latencia, porque el panel técnico anterior se retira de la interfaz. Se conservan T0, resultados visibles 250 pasa/250 falla, 50 filas DOM, dos frames y auditoría de las 100.000 lecturas. El manifiesto registra esta diferencia de presentación respecto a 003; no se reintroduce el panel para satisfacer un selector antiguo del benchmark.
 
 Desde el commit limpio de la implementación, usar una carpeta de referencia nueva:
 

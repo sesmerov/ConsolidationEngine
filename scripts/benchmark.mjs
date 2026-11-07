@@ -5,8 +5,8 @@ import { spawn, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 const root = process.cwd();
 const mode = '--' + (process.argv[2] ?? 'prepare').replace(/^--/, '');
-const location = path.resolve(process.argv[3] ?? '.cache/benchmark/003-reference');
-const criterionId = '003-api-seeded-validation';
+const location = path.resolve(process.argv[3] ?? '.cache/benchmark/004-reference');
+const criterionId = '004-api-seeded-validation';
 
 if (mode === '--server') {
   let phase = 'startup';
@@ -44,7 +44,8 @@ if (mode === '--server') {
     protocol: { criterionId, trials: 10, retries: 0, reportProfile: 'ce-report-1', workload: 'legacy 500 rules / 100000 facts; separate from the 110-position COREP CA1 measurement', freshApiPerTrial: true, freshBrowserContextPerTrial: true,
       setup: 'direct authenticated v1 multipart import through the owned API; browser page rehydrated after T0',
       t0: 'first API poll observes successful import, before page reload, coverage refresh, stage navigation and validation click',
-      t1: 'completed run, 250 pass/250 fail, open coverage details with 500 rows/variants/instances and zero duplicates, 50 DOM result rows, and two animation frames',
+      t1: 'completed run, visible 250 pass/250 fail, authenticated API coverage check of 500 rows/variants/instances and zero duplicates, 50 DOM result rows, and two animation frames',
+      presentationDifferenceFrom003: 'the removed technical coverage panel is replaced only in the harness by an authenticated GET results?limit=1&includeConfiguredDirections=false before T1; its latency is included; workload, T0, visible results, full audit and thresholds are unchanged',
       audit: 'all 500 paginated results; 250 pass, 250 fail; 100000 distinct fact reads, 200 per result',
       criterion: 'all 10 trials must pass the complete audit; at least 9 of 10 at most 30000 ms; every trial at most 60000 ms, without diagnostic exceptions', loadExcluded: true } };
   // Freeze the machine and protocol before even generating the workload.
@@ -76,7 +77,7 @@ if (mode === '--server') {
 } else if (mode === '--pilot' || mode === '--cohort') {
   await fs.access(path.join(location, 'reference.json')); await fs.access(path.join(location, 'manifest.json'));
   const reference = JSON.parse(await fs.readFile(path.join(location, 'reference.json'), 'utf8'));
-  if (reference.protocol?.criterionId !== criterionId) throw new Error('Reference does not use the 003 API-seeded protocol. Prepare a new reference directory.');
+  if (reference.protocol?.criterionId !== criterionId) throw new Error('Reference does not use the 004 API-seeded protocol. Prepare a new reference directory.');
   const manifest = JSON.parse(await fs.readFile(path.join(location, 'manifest.json'), 'utf8'));
   for (const [name, expected] of [['catalog.xlsx', manifest.catalogFile], ['report.xlsx', manifest.reportFile]]) {
     const buffer = await fs.readFile(path.join(location, name));

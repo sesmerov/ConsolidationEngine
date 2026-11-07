@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
-import { importLegacyFixture, navigateStage, openCalculation, openCalculationExplanation } from './workflow-helpers.js';
+import { importLegacyFixture, navigateStage, openCalculation } from './workflow-helpers.js';
 import { prepareDirections, saveDirections } from './direction-review-helpers.js';
 const root = path.resolve('tests/fixtures/generated');
 async function session(page: Page) { const bootstrap = await (await page.request.get('/api/v1/bootstrap')).json(); return { id: bootstrap.activeWorkspaceId as string, headers: { 'X-CE-Session': bootstrap.sessionToken as string } }; }
@@ -76,13 +76,17 @@ test('V06-preview/V09: topological simulation re-evaluates a false guard, requir
   expect(initial.run.items.find((row: { code: string }) => row.code === 'synthetic_guard').status).toBe('not_applicable');
   const simulation = await preview(page); expect(simulation.data.items.map((row: { code: string }) => row.code)).toEqual(['synthetic_Z_producer', 'synthetic_A_consumer', 'synthetic_guard']);
   expect(simulation.data.items.map((row: { after: { originalText: string } }) => row.after.originalText)).toEqual(['12.00', '24.00', '3.00']);
-  await page.getByLabel('Seleccionar synthetic_guard', { exact: true }).check(); await expect(page.getByText(/Faltan 2 predecesores/)).toBeVisible(); expect(await page.locator('ce-preview-page input[type="checkbox"]:checked').count()).toBe(1);
+  await expect(page.getByRole('heading', { name: 'Selección: 3 de 3 disponibles', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Limpiar selección', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Selección: 0 de 3 disponibles', exact: true })).toBeVisible();
+  await page.getByLabel('Seleccionar synthetic_guard', { exact: true }).check(); await expect(page.getByText(/Faltan 2 antecedentes/)).toBeVisible(); expect(await page.locator('.proposal-row input[type="checkbox"]:checked').count()).toBe(1);
   await page.getByLabel('Seleccionar synthetic_Z_producer', { exact: true }).check(); await page.getByLabel('Seleccionar synthetic_A_consumer', { exact: true }).check();
-  await expect(page.getByText('La selección contiene todos sus predecesores. Los datos del informe siguen sin cambios.')).toBeVisible();
+  await expect(page.getByText('La selección contiene todos sus antecedentes. Los datos del informe siguen sin cambios.')).toBeVisible();
   const unchanged = await (await page.request.get(`/api/v1/workspaces/${initial.connection.id}`, { headers: initial.connection.headers })).json(); expect(unchanged.currentVersionId).toBe(initial.workspace.currentVersionId); expect(unchanged.counts).toEqual(initial.workspace.counts);
   await page.locator('ce-preview-page').screenshot({ path: path.resolve('.cache/preview-ui.png') });
   await page.reload(); await navigateStage(page, 'recalculation'); await expect(page.locator('#preview-history')).toHaveValue(simulation.id); await expect(page.locator('.proposal-row')).toHaveCount(3);
-  expect(await page.locator('ce-preview-page input[type="checkbox"]:checked').count()).toBe(0); // An uncommitted selection is intentionally not persisted.
+  expect(await page.locator('.proposal-row input[type="checkbox"]:checked').count()).toBe(3); // Selection persists; application consent does not.
+  await expect(page.getByLabel('He revisado cada propuesta y acepto aplicar el conjunto completo mostrado.')).not.toBeChecked();
   await navigateStage(page, 'validation'); await expect(page.locator('#validation-run')).toHaveValue(initial.run.run.id);
   const after = await validate(page); expect(after.items.map((row: { code: string; status: string; factReads: unknown }) => [row.code, row.status, row.factReads])).toEqual(initial.run.items.map((row: { code: string; status: string; factReads: unknown }) => [row.code, row.status, row.factReads]));
   await navigateStage(page, 'recalculation');
@@ -98,7 +102,12 @@ test('V09: equal-valued conflicting producers and their dependent proposal are b
 test('V08: a cycle blocks its descendants while an independent direction remains available', async ({ page }) => {
   await configure(page, [['synthetic_A', '{tC_01.00,r0230,c0010}={tC_01.00,r0250,c0010}+1'], ['synthetic_B', '{tC_01.00,r0250,c0010}={tC_01.00,r0230,c0010}-1'], ['synthetic_D', '{tC_01.00,r0270,c0010}={tC_01.00,r0230,c0010}+5'], ['synthetic_free', '{tC_01.00,r0260,c0010}=4'], ['synthetic_self', '{tC_05.01,r0090,c0060}=4', '{tC_05.01,r0090,c0060}=10']]);
   const simulation = await preview(page); expect(simulation.data.items.filter((row: { state: string }) => row.state === 'blocked')).toHaveLength(4);
-  expect(simulation.data.items.find((row: { code: string }) => row.code === 'synthetic_free').state).toBe('available'); await expect(page.getByText(/^Ciclo de dependencias:/)).toHaveCount(2);
+  expect(simulation.data.items.find((row: { code: string }) => row.code === 'synthetic_free').state).toBe('available'); await expect(page.getByText('Hay ciclos de dependencias. Revisa los destinos configurados y las propuestas bloqueadas.', { exact: true })).toBeVisible();
+  const blocked = page.locator('.proposal-row').filter({ has: page.getByRole('button', { name: 'Ver cálculo y origen de synthetic_A', exact: true }) });
+  const cycleDetail = await openCalculation(page, blocked, 'synthetic_A');
+  await cycleDetail.getByRole('button', { name: /Motivos y avisos/ }).click();
+  await expect(cycleDetail).toContainText(/ciclo/i);
+  await cycleDetail.getByRole('button', { name: 'Cerrar detalle', exact: true }).click();
   await expect(page.getByLabel('Seleccionar synthetic_free', { exact: true })).toBeEnabled(); await expect(page.getByLabel('Seleccionar synthetic_D', { exact: true })).toBeDisabled();
 });
 test('V07: consumers read .33 at p2 and propose .99; a punctual 1/3 and its consumer stay blocked', async ({ page }) => {
@@ -113,7 +122,7 @@ test('V07: consumers read .33 at p2 and propose .99; a punctual 1/3 and its cons
   expect(find('synthetic_tripled').after.originalText).toBe('0.99'); expect(find('synthetic_tripled').exactNominal).toEqual({ numerator: '99', denominator: '100' });
   expect(find('synthetic_point').state).toBe('blocked'); expect(find('synthetic_point').diagnostics).toContainEqual(expect.objectContaining({ code: 'CANDIDATE_DOES_NOT_SATISFY_RULE' })); expect(find('synthetic_blocked_consumer').state).toBe('blocked');
   const fraction = page.locator('.proposal-row').filter({ has: page.getByRole('button', { name: 'Ver cálculo y origen de synthetic_fraction', exact: true }) }); await expect(fraction.getByText('Disponible', { exact: true })).toBeVisible();
-  const detail = await openCalculation(page, fraction, 'synthetic_fraction'); await openCalculationExplanation(detail); await expect(detail).toContainText('Resultado exacto antes del redondeo: 1/3');
+  const detail = await openCalculation(page, fraction, 'synthetic_fraction'); await expect(detail).toContainText('Resultado exacto antes del redondeo: 1/3');
   await detail.getByRole('button', { name: 'Cerrar detalle', exact: true }).click();
   await expect(page.locator('.proposal-row').filter({ has: page.getByRole('button', { name: 'Ver cálculo y origen de synthetic_tripled', exact: true }) })).toContainText('0,99');
 });

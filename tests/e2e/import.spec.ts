@@ -118,8 +118,9 @@ test('V01/V14: real visual template and demo downloads, explicit import, blank/z
   await expect(header.getByRole('combobox')).toHaveCount(0);
   const bootstrap = await (await page.request.get('/api/v1/bootstrap')).json();
   const version = await page.locator('.workspace-context .workspace-meta dd').first().textContent();
+  const current = await (await page.request.get(`/api/v1/workspaces/${bootstrap.activeWorkspaceId}`, { headers: { 'X-CE-Session': bootstrap.sessionToken } })).json();
   const published = await page.request.get(`/api/v1/workspaces/${bootstrap.activeWorkspaceId}/rules`, {
-    headers: { 'X-CE-Session': bootstrap.sessionToken }, params: { versionId: version! },
+    headers: { 'X-CE-Session': bootstrap.sessionToken }, params: { versionId: current.currentVersionId },
   });
   expect(published.status()).toBe(200);
   const pageOfRules = await published.json();

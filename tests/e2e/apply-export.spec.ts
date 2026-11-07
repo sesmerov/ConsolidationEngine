@@ -77,11 +77,14 @@ test.beforeEach(async ({ page }) => {
 });
 test('V06/V10/V14/V16: explicit application, complete comparison, historic exports, exact reimport and close preserve originals', async ({ page }) => {
   test.setTimeout(120_000); const prepared = await prepare(page), { connection } = prepared;
-  for (const code of selectedCodes) await page.getByLabel('Seleccionar ' + code, { exact: true }).check();
+  for (const code of selectedCodes) await expect(page.getByLabel('Seleccionar ' + code, { exact: true })).toBeChecked();
+  const selection = await (await page.request.get(`/api/v1/workspaces/${connection.id}/previews/${prepared.previewId}/selection-state`, { headers: connection.headers })).json();
+  expect(selection.selectedCount).toBe(4); expect(selection.complete).toBe(true);
   const confirmation = page.locator('ce-apply'); await expect(confirmation.getByRole('button', { name: 'Aplicar cambios seleccionados', exact: true })).toBeDisabled();
   await confirmation.getByLabel('He revisado cada propuesta y acepto aplicar el conjunto completo mostrado.').check();
   const applying = page.waitForResponse(response => response.url().endsWith('/applications') && response.request().method() === 'POST'); await confirmation.getByRole('button', { name: 'Aplicar cambios seleccionados', exact: true }).click();
-  const response = await applying, accepted = await response.json(), body = response.request().postDataJSON(), key = response.request().headers()['idempotency-key']!; expect(body.selectedIds.slice().sort()).toEqual(prepared.proposals.map((proposal: { id: string }) => proposal.id).sort());
+  const response = await applying, accepted = await response.json(), body = response.request().postDataJSON(), key = response.request().headers()['idempotency-key']!;
+  expect(body.selectionRef).toEqual({ id: selection.id, revision: selection.revision }); expect(body.closureHash).toBe(selection.closureHash); expect(body).not.toHaveProperty('selectedIds');
   const job = await poll(page, accepted.jobId); expect(job.status).toBe('succeeded'); const receipt = (await (await page.request.get(`/api/v1/workspaces/${connection.id}/applications/${job.resultRef.id}`, { headers: connection.headers })).json()).receipt;
   const comparison = page.locator('ce-comparison'); await expect(comparison).toContainText('Valores modificados: 4');
   await comparison.getByRole('button', { name: 'Ver todos los resultados', exact: true }).click();

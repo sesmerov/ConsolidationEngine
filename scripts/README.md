@@ -105,8 +105,9 @@ $benchmarkDirectory = Join-Path '.cache/benchmark' ('manual-' + (Get-Date -Forma
 Prepare congela equipo/protocolo/hashes y rechaza sobrescribir una referencia. Pilot no cuenta
 como ejecución formal. Cohort realiza diez mediciones seriales con procesos propios; no ejecutar
 otros builds o pruebas del proyecto a la vez. La evidencia y el alcance del cronómetro están en
-[performance.md](../docs/performance.md); el recorrido completo está en
-[quickstart](../specs/001-regulatory-validation/quickstart.md).
+[verificación 004](../docs/verification-004.md); el recorrido actual está en
+[quickstart 004](../specs/004-flujo-claro-finrep/quickstart.md). Las mediciones anteriores permanecen en
+[performance.md](../docs/performance.md) y en los registros de cada iteración; no se sobrescriben.
 
 ## Dependencias fijadas
 

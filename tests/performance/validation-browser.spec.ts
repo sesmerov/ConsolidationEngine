@@ -7,7 +7,7 @@ import type { APIResponse } from '@playwright/test';
 import type { JobDTO, WorkspaceDTO } from '@ce/contracts';
 const directory = process.env['BENCH_DIR']!, output = process.env['BENCH_OUTPUT']!;
 const count = process.env['BENCH_PILOT'] === '1' ? 1 : 10;
-for (let trial = 1; trial <= count; trial++) test(`003 API-seeded validation trial ${trial}`, async ({ page }, testInfo) => {
+for (let trial = 1; trial <= count; trial++) test(`004 API-seeded validation trial ${trial}`, async ({ page }, testInfo) => {
   const manifest = JSON.parse(await fs.readFile(path.join(directory, 'manifest.json'), 'utf8'));
   const samples: unknown[] = [], errors: string[] = []; let t0: number | undefined, elapsedMs: number | undefined, auditPassed = false, diagnosticVisible = false;
   const server = fork(path.resolve('scripts/benchmark.mjs'), ['--server'], { execPath: process.execPath, silent: true, env: { ...process.env, PORT: '3317', NODE_ENV: 'production' } });
@@ -40,7 +40,7 @@ for (let trial = 1; trial <= count; trial++) test(`003 API-seeded validation tri
     await ownServerReady;
     await expect.poll(async () => { try { return (await page.request.get('/api/v1/bootstrap')).status(); } catch { return 0; } }, { timeout: 30000 }).toBe(200);
     await page.goto('/');
-    await page.getByLabel('Nombre del conjunto').fill('SYNTHETIC 003 ' + trial);
+    await page.getByLabel('Nombre del conjunto').fill('SYNTHETIC 004 ' + trial);
     const created = page.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith('/workspaces'));
     await page.getByRole('button', { name: 'Crear conjunto', exact: true }).click();
     const creation = await created;
@@ -94,9 +94,17 @@ for (let trial = 1; trial <= count; trial++) test(`003 API-seeded validation tri
     const summary = page.locator('.validation-summary');
     for (const label of ['Pasa', 'Falla']) await expect(summary.locator('div').filter({ has: page.getByText(label, { exact: true }) }).locator('dd')).toHaveText('250');
     for (const label of ['No aplica', 'No evaluable', 'Error']) await expect(summary.locator('div').filter({ has: page.getByText(label, { exact: true }) }).locator('dd')).toHaveText('0');
-    const coverageDetails = page.locator('details').filter({ has: page.locator('summary').filter({ hasText: /^Cobertura y trazabilidad de la ejecución$/ }) });
-    await coverageDetails.locator('summary').click();
-    await expect(coverageDetails).toContainText('500 filas · 500 variantes · 500 instancias · 0 duplicadas');
+    // Iteration 004 removes the technical coverage panel. Keep the same coverage
+    // assertions via the authenticated API and include this extra round trip in T1.
+    const completedRun = await page.request.get(`${base}/runs/${accepted.resultRef.id}/results?limit=1&includeConfiguredDirections=false`, { headers });
+    expect(completedRun.status()).toBe(200);
+    const completed = await completedRun.json();
+    expect(completed.run.id).toBe(accepted.resultRef.id);
+    expect(completed.run.status).toBe('completed');
+    expect(completed.run.summary).toMatchObject({ complete: true, rows: 500, variants: 500, instances: 500, duplicateRows: 0,
+      byStatus: { pass: 250, fail: 250, error: 0, not_evaluable: 0, not_applicable: 0 } });
+    expect(completed.total).toBe(500);
+    stages['coverageVerifiedMs'] = performance.now() - t0!;
     await expect(page.locator('.result-row')).toHaveCount(50);
     await expect(page.getByText('50 de 500 resultados', { exact: true })).toBeVisible();
     await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))); elapsedMs = performance.now() - t0!;

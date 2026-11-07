@@ -6,12 +6,7 @@ ANTLR JavaScript, aritmética exacta y ordenamiento topológico de Kahn. El anal
 destinos, selecciona los cambios y confirma su aplicación. El sistema conserva versiones
 anteriores y vuelve a validar después de aplicar.
 
-Las funcionalidades US1–US4 de la iteración 002 están implementadas y tienen evidencia por
-incrementos en [verificación 002](docs/verification-002.md). Pasan **1.430 pruebas**, incluidos
-33 recorridos de navegador, además de typecheck, build y generación ANTLR reproducible. La nueva
-medición de rendimiento cumple SC-007; la aceptación humana SC-008 sigue pendiente. Los resultados y la
-aceptación global de la iteración 001 se conservan como [evidencia histórica](docs/verification.md);
-no acreditan por sí solos la interfaz ni los perfiles nuevos.
+La iteración 004 incorpora guía visual de etapas, acciones principales verdes, decisiones de conflictos editables, selección múltiple persistente y FINREP F 01.01. Su [registro de verificación](docs/verification-004.md) distingue pruebas ejecutadas, medidas y observación humana SC-010. Los resultados de [002](docs/verification-002.md), [003](docs/verification-003.md) y la [aceptación global de 001](docs/verification.md) se conservan como evidencia histórica; no acreditan por sí solos la interfaz ni los perfiles nuevos.
 
 ## Instalación y arranque
 
@@ -48,13 +43,10 @@ reiniciar el comando. No detener un proceso con datos de otra sesión para ejecu
 
 1. En **Cargar**, seleccionar catálogo e informes, revisar su contexto y confirmar las hojas que se importarán. La cabecera muestra el contexto único como texto y permite elegir cuando hay varios. La búsqueda por código alcanza todo el catálogo.
 2. En **Validar**, consultar el resultado y abrir **Ver cálculo y origen** para revisar las entradas. **Preparar revisión de destinos** sugiere la celda cuando solo hay un lado elegible. El analista puede omitirla. Cuando hay dos lados posibles, elige el lado o la omisión. Si varias reglas apuntan a la misma celda, decide cuál conservar o si omitir el grupo. **Guardar configuración** publica esas decisiones.
-3. En **Recalcular**, simular, comparar **Anterior → Propuesto** y seleccionar cada cambio y sus predecesores. La confirmación aparece con la primera selección y cuenta las propuestas de todas las páginas. Aplicar publica una versión con los valores elegidos y vuelve a validar el conjunto.
-4. En **Descargar**, guardar resultados o informes de una versión. **Siguiente paso** señala la etapa disponible tras publicar la carga, guardar destinos utilizables o aplicar cambios. La descarga de informes aplicados toma la versión del recibo y respeta la elección del selector histórico.
+3. En **Recalcular**, simular y comparar **Anterior → Propuesto**. Las propuestas disponibles comienzan seleccionadas; se pueden desmarcar, seleccionar todas las disponibles del filtro o limpiar la selección completa. La selección se conserva al navegar y recargar. Si faltan antecedentes, se muestran para que el analista decida. La aceptación comienza desmarcada y se invalida al editar la selección. Aplicar publica una versión y vuelve a validar el conjunto.
+4. En **Descargar**, guardar resultados o informes de una versión. El realce de la etapa completa indica dónde continuar tras confirmar la carga, guardar destinos utilizables o aplicar cambios: tres pulsos suaves de 1,5 segundos, o realce estático con movimiento reducido. Las acciones principales son verdes. La descarga de informes aplicados toma la versión del recibo y respeta la elección del selector histórico.
 
-La cobertura regulatoria visual es **COREP de fondos propios 4.0, C_01.00 / CA1**: 110 posiciones.
-Se admite el extracto saneado o el libro oficial completo reconocido. En este último se incluye
-CA1 y se muestran **190 hojas excluidas**, cuya cobertura parcial hay que aceptar. No se importan
-las otras tablas. FINREP, tablas abiertas y cobertura general de COREP/DPM-XL quedan fuera del alcance.
+La cobertura regulatoria visual fijada es **COREP de fondos propios 4.0, C_01.00 / CA1** (110 posiciones) y **FINREP 4.0, F_01.01 / hoja 1.1** (38 posiciones). Se admiten los extractos empaquetados y el libro oficial reconocido. Si contiene varias plantillas compatibles, se pide elegir una por archivo. Las hojas excluidas requieren aceptación explícita; no se importan ni validan sus datos. Las demás tablas, tablas abiertas y cobertura general COREP/FINREP/DPM-XL quedan fuera del alcance. `FINREP_F0101_4.0` es un alias local de este layout, no un módulo XBRL oficial.
 
 ## Demostraciones
 
@@ -64,9 +56,10 @@ datos son sintéticos. Descargar una guía o cambiar de ejemplo no importa datos
 | Ejemplo | Reglas | Resultado inicial | Recálculo |
 |---|---:|---|---|
 | COREP CA1 | Cinco procedentes del catálogo EBA y once sintéticas | 7 pasan, 8 fallan y 1 no aplica | Conservar `v0174_m` en r0070 y omitir el grupo r0200 deja cinco productores oficiales. Después pasan 14 reglas, falla 1 y 1 no aplica. |
+| FINREP F 01.01 | 5 sintéticas | 2 pasan y 3 fallan | Dos cambios encadenados: 90 → 100 y 105 → 120. Después pasan 4 y falla 1 deliberadamente. |
 | Texto y fechas | 8 sintéticas | 6 pasan y 2 fallan | Sólo validación, sin destinos ni propuestas. |
 
-Son **24 reglas: cinco de origen EBA y diecinueve sintéticas**. El ejemplo COREP muestra dos ramas
+Son **29 reglas: cinco de origen EBA y veinticuatro sintéticas**. El ejemplo COREP muestra dos ramas
 de dependencias con tres niveles. Los fallos deliberados se explican en la
 [guía de demos](docs/visual-demos.md), que contiene los pasos, cinco cambios y resultados por regla.
 
@@ -74,17 +67,17 @@ En el perfil nuevo, las reglas que contienen condicionales, texto o fechas son *
 incluso si su resultado es numérico o el tipo aparece en una rama no ejecutada. Las desigualdades
 tampoco ofrecen destino porque no son igualdades. Las comprobaciones se repiten en API y motor.
 
-La interfaz de carga ofrece el perfil visual COREP y el ejemplo tipado. La API de compatibilidad conserva `ce-report-1` para pruebas y consumidores existentes. En la prueba FINREP, la inspección del extracto F_01.01 terminó con `INVALID_WORKBOOK`. Sobre las mismas cuatro cifras en el formato de compatibilidad, el motor evaluó las dos reglas del catálogo propio y obtuvo los resultados previstos. [Ensayo FINREP](specs/003-simplificar-flujo/evidencia.md)
+La interfaz ofrece COREP, FINREP F 01.01 y el ejemplo tipado. Los conflictos se resuelven con opciones excluyentes y confirmación local; las decisiones pueden reabrirse y cambiarse. La API de compatibilidad conserva `ce-report-1` para pruebas y consumidores existentes. El rechazo FINREP registrado en 003 es evidencia histórica del punto de partida; el soporte y las comprobaciones actuales se documentan en [verificación de 004](docs/verification-004.md).
 
 ## Exportación, límites y sesión
 
 `report.zip` contiene un libro por informe de la versión elegida y `changes.json`/`changes.xlsx`.
-Los perfiles visuales usan plantillas saneadas: CA1 para COREP y Datos para el ejemplo tipado.
+COREP y el ejemplo tipado usan plantillas saneadas: CA1 y Datos respectivamente. FINREP conserva el libro original, modifica solo los importes seleccionados y su contexto, y verifica la salida antes de publicarla. Sus hojas excluidas se conservan sin considerarlas validadas; si falta el original o ha cambiado, la exportación falla sin sustituirlo por una reconstrucción.
 Los importes conservan su valor exacto y escala; una cifra que no pueda representarse con seguridad
 como número Excel se escribe como texto decimal exacto. Texto, fechas civiles, vacío informado y
 sin dato permanecen diferenciados. La salida anterior sigue usando `ce-report-1`.
 
-Las hojas excluidas no se reconstruyen. Son extractos de trabajo local reimportables, no ficheros
+En COREP las hojas excluidas no se reconstruyen. Son archivos de trabajo local reimportables, no ficheros
 oficiales de remisión. Para reimportarlos, extraer los informes y cargarlos con su catálogo;
 se crean nuevas fuentes y localizadores, sin restaurar recibos históricos. `results.zip` contiene
 los resultados de la ejecución elegida en JSON y XLSX, incluido su estado si quedó incompleta.
@@ -110,6 +103,7 @@ el [rendimiento de 001](docs/performance.md) se conserva como evidencia históri
 
 ## Documentos y desarrollo
 
+- [Especificación 004](specs/004-flujo-claro-finrep/spec.md), [plan](specs/004-flujo-claro-finrep/plan.md), [tareas](specs/004-flujo-claro-finrep/tasks.md), [recorrido de comprobación](specs/004-flujo-claro-finrep/quickstart.md) y [verificación](docs/verification-004.md).
 - [Recorrido y comprobaciones de la iteración 003](specs/003-simplificar-flujo/quickstart.md), [revisión de destinos](specs/003-simplificar-flujo/contracts/direction-review.md) y [registro de verificación 003](docs/verification-003.md).
 - [Inicio y comprobaciones 002](specs/002-ui-eba-demo/quickstart.md), [demos](docs/visual-demos.md)
   y [evidencia ejecutada](docs/verification-002.md).
