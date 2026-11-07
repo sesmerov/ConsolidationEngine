@@ -7,13 +7,13 @@ import { COREP_MAPPING, COREP_MAPPING_SHA256, COREP_PROFILE_ID, recognizeCorepSt
 import { resolveCorepContext } from './context.js';
 export { COREP_MAPPING, COREP_MAPPING_SHA256, COREP_PROFILE_ID, COREP_LANGUAGE_PROFILE_ID } from './corep-structure.js';
 
-function ambiguousFormat(format: string | undefined): boolean {
+export function ambiguousFormat(format: string | undefined): boolean {
   if (!format) return false;
   if (format.startsWith('builtin:')) { const id = Number(format.slice(8)); return [9, 10, 45, 46, 47].includes(id) || id >= 14 && id <= 22 || id >= 27 && id <= 36 || id >= 50 && id <= 58; }
   const tokens = format.replace(/"(?:[^"]|"")*"|\\.|_.|\*./g, '').replace(/\[(?![hms]+\])[^\]]*\]/gi, '');
   return /[%ymdhs]/i.test(tokens);
 }
-function decimalLexeme(cell: RawCell): string {
+export function decimalLexeme(cell: RawCell): string {
   if (cell.xmlType !== 'n') return cell.text;
   const match = /^([+-]?)([0-9]+)(?:\.([0-9]*))?(?:[eE]([+-]?[0-9]+))?$/.exec(cell.lexeme);
   if (!match || (match[4]?.replace(/^[+-]/, '').length ?? 0) > 3) throw new DecimalInputError('INVALID_DECIMAL');

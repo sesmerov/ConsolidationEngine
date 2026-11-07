@@ -8,7 +8,7 @@ export interface RawWorkbook { readonly date1904: boolean; readonly sheets: read
 /** Only a completed, bounded preflight can authorize materialization. Raw cell metadata remains authoritative for types/dates. */
 export async function readWorkbook(filePath: string, preflight: PreflightWorkbook): Promise<RawWorkbook> {
   // Visual profiles are read from selected, verified raw cells. Never allocate 191 rectangular sheets.
-  if (preflight.profile === 'corep-ca1') throw new ApiError('INVALID_WORKBOOK', { reason: 'SELECTED_SHEET_READER_REQUIRED' });
+  if (preflight.profile) throw new ApiError('INVALID_WORKBOOK', { reason: 'SELECTED_SHEET_READER_REQUIRED' });
   try {
     const read = await readXlsxFile<string>(filePath, { parseNumber: (text) => text, trim: false });
     if (read.length !== preflight.sheets.length) throw new ApiError('INVALID_WORKBOOK');

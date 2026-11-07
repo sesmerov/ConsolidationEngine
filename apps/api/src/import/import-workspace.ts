@@ -22,10 +22,13 @@ async function buildWorkspace(files: readonly StagedFile[], operation: Operation
   const expansionBySource = new Map<string, number>();
   const reportSourceBindings: ReportSourceBinding[] = [], inspectionContexts: ImportInspectionContextDTO[] = [], reports: ImportInspectionReportDTO[] = [], profiles: ImportInspectionProfileDTO[] = [];
   const profileId = declaration ? LANGUAGE_PROFILE_V2 : ENGINE_PROFILE_ID;
+  const reportFiles=files.filter(file=>file.kind==='report'), choices=declaration?.reportProfiles??[], seenChoices=new Set<number>();
+  for(const choice of choices){if(seenChoices.has(choice.reportIndex)||!reportFiles[choice.reportIndex]||reportFiles[choice.reportIndex]!.sha256!==choice.sha256)throw new ApiError('INVALID_REQUEST');seenChoices.add(choice.reportIndex);}
   let importedCatalog: ReturnType<typeof importCatalog> | undefined;
   for (const [index, file] of files.entries()) {
     try {
-    check(); const inspected = declaration && file.kind === 'report' ? await inspectReportWorkbook(file.path, { budget, check }) : undefined;
+    const reportIndex=reportFiles.indexOf(file), choice=choices.find(item=>item.reportIndex===reportIndex);
+    check(); const inspected = declaration && file.kind === 'report' ? await inspectReportWorkbook(file.path, { budget, check,reportIndex,sha256:file.sha256,...(choice?{profileId:choice.profileId}:{}),...(declaration.source==='form'?{formDeclaration:declaration.declaration}:{}) }) : undefined;
     const preflight = inspected?.preflight ?? await preflightXlsx(file.path, { budget, retainCells: file.kind === 'catalog', check }); expansionBySource.set(file.id, preflight.expandedBytes); check();
     if (file.kind === 'catalog') { const workbook = await readWorkbook(file.path, preflight); check(); importedCatalog = importCatalog(workbook, file); }
     else {

@@ -62,6 +62,8 @@ export async function stageMultipart(request: FastifyRequest, storage: SessionFi
       active = part.file; work = consume(part); await work; active = undefined; work = undefined;
     }
     if (catalogs !== 1 || reports < 1 || mode === 'inspection' && context === undefined) throw new ApiError('INVALID_REQUEST');
+    const reportFiles=files.filter(file=>file.kind==='report'), seen=new Set<number>();
+    for(const choice of context?.reportProfiles??[]){if(seen.has(choice.reportIndex)||reportFiles[choice.reportIndex]?.sha256!==choice.sha256)throw new ApiError('INVALID_REQUEST');seen.add(choice.reportIndex);}
   })();
   // Consume rejection even if the deadline wins while the iterator waits for a new part.
   void processing.catch(() => undefined);

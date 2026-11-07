@@ -84,13 +84,13 @@ test('versioned product inputs and reproducible assets match the independent fro
   const mapping = JSON.parse(await readFile('apps/api/src/import/profiles/demo-types-mapping.json', 'utf8'));
   expect(mapping.fields).toEqual(demoOracle.typed.fields.map(({ unit: _unit, decimals: _decimals, value: _value, state: _state, ...field }: Record<string, unknown>) => field));
   const templates = JSON.parse(await readFile('assets/templates/manifest.json', 'utf8'));
-  for (const [file, profileId] of [['corep-ca1-mapping.json', 'eba-corep-of-4.0-ca1-v1'], ['demo-types-mapping.json', 'ce-demo-types-1']]) {
+  for (const [file, profileId] of [['corep-ca1-mapping.json', 'eba-corep-of-4.0-ca1-v1'], ['demo-types-mapping.json', 'ce-demo-types-1'],['finrep-f0101-mapping.json','eba-finrep-4.0-f0101-v1']]) {
     const bytes = await readFile(path.join('apps/api/src/import/profiles', file!)); expect(bytes.includes(13), file).toBe(false);
     expect(templates.profiles.find((item: { profileId: string }) => item.profileId === profileId).mappingSha256).toBe(hash(bytes));
   }
   const before = await readFile('assets/demos/manifest.json', 'utf8'); execFileSync(process.execPath, ['scripts/create-visual-demos.mjs'], { stdio: 'pipe' });
   expect(await readFile('assets/demos/manifest.json', 'utf8')).toBe(before);
-  const manifest = JSON.parse(before); expect(manifest.files).toHaveLength(4);
+  const manifest = JSON.parse(before); expect(manifest.files).toHaveLength(6);
   for (const file of manifest.files) {
     const bytes = await readFile(path.join('assets/demos', file.file)); expect(hash(bytes)).toBe(file.sha256); expect(bytes.length).toBe(file.size);
     expect(hash(await readFile(path.join('tests/fixtures/generated', file.file)))).toBe(file.sha256);

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { lstat, readFile } from 'node:fs/promises';
 import { ApiError } from '../errors.js';
 
-export type VisualDemo = 'corep' | 'types';
+export type VisualDemo = 'corep' | 'types' | 'finrep';
 export type VisualDemoArtifact = 'catalog' | 'report';
 const maxWorkbookBytes = 10 * 1024 * 1024, maxManifestBytes = 16 * 1024;
 // Source tests use versioned assets. Built applications use only their packaged assets.
@@ -15,9 +15,9 @@ async function boundedFile(url: URL, maximum: number): Promise<Buffer> {
 /** Fixed product assets, with no runtime dependency on planning documents or original source files. */
 export async function visualDemo(demo: VisualDemo, kind: VisualDemoArtifact): Promise<Buffer> {
   const file = `demo-${demo}-${kind}.xlsx`;
-  if (!['corep', 'types'].includes(demo) || !['catalog', 'report'].includes(kind)) throw new ApiError('RESOURCE_NOT_FOUND');
+  if (!['corep', 'types','finrep'].includes(demo) || !['catalog', 'report'].includes(kind)) throw new ApiError('RESOURCE_NOT_FOUND');
   const manifest = JSON.parse((await boundedFile(new URL('manifest.json', directory), maxManifestBytes)).toString('utf8')) as { version?: unknown; files?: unknown };
-  if (manifest.version !== 1 || !Array.isArray(manifest.files) || manifest.files.length !== 4) throw new ApiError('INTERNAL_ERROR');
+  if (manifest.version !== 1 || !Array.isArray(manifest.files) || manifest.files.length !== 6) throw new ApiError('INTERNAL_ERROR');
   const matches = manifest.files.filter((entry: unknown) => entry && typeof entry === 'object' && 'demo' in entry && entry.demo === demo && 'kind' in entry && entry.kind === kind);
   if (matches.length !== 1) throw new ApiError('INTERNAL_ERROR');
   const entry = matches[0] as { file?: unknown; sha256?: unknown; size?: unknown };

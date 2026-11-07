@@ -1,5 +1,16 @@
 {
   "version": 1,
+  "finrep": {
+    "context": {"entityId":"SYNTHETIC","referenceDate":"2025-12-31","submissionDate":"2025-12-31","framework":"FINREP","moduleVersion":"FINREP_F0101_4.0","filingIndicators":{"F_01.01":true},"unit":"EUR","scale":0,"decimals":"2"},
+    "values": {"0010":"90","0020":"40","0030":"35","0040":"25","0050":"20","0380":"105"},
+    "rules": [
+      {"code":"FIN_TOTAL_CASH","origin":"synthetic","expression":"with {tF_01.01,c0010,interval:false}: {r0010}={r0020}+{r0030}+{r0040}","description":"El efectivo y los saldos en bancos centrales coinciden con sus tres componentes."},
+      {"code":"FIN_TOTAL_ASSETS_DEMO","origin":"synthetic","expression":"with {tF_01.01,c0010,interval:false}: {r0380}={r0010}+{r0050}","description":"El total simplificado de la demo suma el efectivo recalculado y los activos mantenidos para negociar."},
+      {"code":"FIN_GREATER_PASS","origin":"synthetic","expression":"with {tF_01.01,c0010,interval:false}: {r0020}>{r0030}","description":"El efectivo supera los saldos en bancos centrales: comprobación que pasa."},
+      {"code":"FIN_GREATER_FAIL","origin":"synthetic","expression":"with {tF_01.01,c0010,interval:false}: {r0040}>{r0020}","description":"Los depósitos a la vista superan el efectivo: fallo intencionado de la demo."},
+      {"code":"FIN_CONDITIONAL","origin":"synthetic","expression":"with {tF_01.01,c0010,interval:false}: if {r0020}>0 then {r0030}>=0 else {r0040}=0 endif","description":"Con efectivo positivo, el saldo en bancos centrales no es negativo. Solo validación."}
+    ]
+  },
   "sourceSha256": "36636afe42b2ef2247822a31ad710afe1128b5b65a250b657e1f20d5a75bba79",
   "sourceName": "(from 4.0) EBA_Validation_rules_2025-12-12.xlsx",
   "corep": {

@@ -12,7 +12,7 @@ export async function* readSheetRows(filePath: string, preflight: PreflightWorkb
   const invalid = (): never => { throw new ApiError('INVALID_WORKBOOK'); };
   const limits = preflight.limits ?? PREFLIGHT_LIMITS;
   const sheet = preflight.sheets.find(item => item.name === name); if (!sheet?.part) invalid();
-  if (preflight.profile === 'corep-ca1' && !['CA1', 'Contexto', 'Instrucciones'].includes(name)) invalid();
+  if (preflight.profile && !['CA1', '1.1', 'Contexto', 'Instrucciones'].includes(name)) invalid();
   options.check?.();
   const zip = await new Promise<yauzl.ZipFile>((resolve, reject) => yauzl.open(filePath, { lazyEntries: true, strictFileNames: true, validateEntrySizes: true, autoClose: false }, (error, file) => error ? reject(error) : resolve(file)));
   let active: Readable | undefined;

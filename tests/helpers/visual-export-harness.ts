@@ -33,12 +33,12 @@ export async function visualFile(parts: readonly ZipPart[], name = 'source.xlsx'
   const location = path.join(await visualDirectory(), name); await writeFile(location, zipBytes(parts)); return visualStaged(location, 'report');
 }
 export function visualSnapshot(content: SnapshotContent): Snapshot { return { versionId: randomUUID(), contentHash: canonicalHash(content), createdAt: visualStartedAt, content }; }
-export async function importVisual(report: StagedFile, kind: 'corep' | 'types', declaration: ImportContextInputDTO = { source: 'workbook' }) {
+export async function importVisual(report: StagedFile, kind: 'corep' | 'types' | 'finrep', declaration: ImportContextInputDTO = { source: 'workbook' }) {
   const catalog = await visualStaged(path.resolve(`assets/demos/demo-${kind}-catalog.xlsx`), 'catalog');
   const candidate = await inspectWorkspace([catalog, report], visualOperation, declaration);
   return { snapshot: visualSnapshot(candidate.content), files: [catalog, report], candidate };
 }
-export async function visualDemo(kind: 'corep' | 'types') { return importVisual(await visualStaged(path.resolve(`assets/demos/demo-${kind}-report.xlsx`), 'report'), kind); }
+export async function visualDemo(kind: 'corep' | 'types' | 'finrep') { return importVisual(await visualStaged(path.resolve(`assets/demos/demo-${kind}-report.xlsx`), 'report'), kind); }
 export async function visualLegacy() {
   const files = await Promise.all([visualStaged(path.resolve('tests/fixtures/generated/eba-subset.xlsx'), 'catalog'), visualStaged(path.resolve('tests/fixtures/generated/report-42.xlsx'), 'report')]);
   return { files, snapshot: visualSnapshot(await importWorkspace(files, visualOperation)) };

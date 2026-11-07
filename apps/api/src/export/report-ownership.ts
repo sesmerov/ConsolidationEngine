@@ -2,6 +2,7 @@ import { LANGUAGE_PROFILE_V1, LANGUAGE_PROFILE_V2, REPORT_SHEETS } from '@ce/con
 import type { ReportSourceBinding, Snapshot, VersionExportSummaryDTO } from '@ce/contracts';
 import { COREP_MAPPING_SHA256, COREP_PROFILE_ID } from '../import/profiles/corep-ca1.js';
 import { DEMO_TYPES_MAPPING, DEMO_TYPES_MAPPING_SHA256, DEMO_TYPES_PROFILE_ID } from '../import/profiles/demo-types.js';
+import { FINREP_MAPPING_SHA256,FINREP_PROFILE_ID } from '../import/profiles/finrep-f0101.js';
 import { unavailable, sourceSignature } from './change-log.js';
 
 /** Bindings are persisted import authority; a manual context never acquires a fabricated locator. */
@@ -12,7 +13,7 @@ export function reportOwnership(snapshot: Snapshot, check: () => void = () => {}
   if (content.profileId === LANGUAGE_PROFILE_V2) {
     if (content.reportSourceBindings?.length !== reports.length) return unavailable('INVALID_REPORT_SOURCE');
     for (const binding of content.reportSourceBindings) {
-      check(); const expected = binding.profileId === COREP_PROFILE_ID ? [COREP_MAPPING_SHA256, 'CA1'] : binding.profileId === DEMO_TYPES_PROFILE_ID ? [DEMO_TYPES_MAPPING_SHA256, DEMO_TYPES_MAPPING.sheet] : undefined;
+      check(); const expected = binding.profileId === COREP_PROFILE_ID ? [COREP_MAPPING_SHA256, 'CA1'] : binding.profileId === DEMO_TYPES_PROFILE_ID ? [DEMO_TYPES_MAPPING_SHA256, DEMO_TYPES_MAPPING.sheet] : binding.profileId===FINREP_PROFILE_ID?[FINREP_MAPPING_SHA256,'1.1']:undefined;
       if (!expected || !sources.has(binding.sourceFileId) || bindings.has(binding.sourceFileId) || binding.mappingSha256 !== expected[0]
         || binding.contextIds.length !== 1 || binding.selectedSheets.length !== 1 || binding.selectedSheets[0] !== expected[1]
         || binding.excludedSheets.length > 256 || new Set(binding.excludedSheets).size !== binding.excludedSheets.length

@@ -37,7 +37,7 @@ test('110 exact mappings agree between complete source and safe extract; identit
   const original = await preflightXlsx(official, { profile: 'corep-ca1' });
   const complete = await corepFile(corepChange(await corepParts('tests/fixtures/eba/official-annexes-4.0.xlsx'), replace, original.sheets.find(sheet => sheet.name === 'CA1')!.part!.name), 'full.xlsx');
   const extract = await corepFile(corepChange(await corepParts(), replace), 'extract.xlsx');
-  const a = normalizeCorepCa1((await inspectReportWorkbook(complete.path)).preflight, complete.source, form);
+  const a = normalizeCorepCa1((await inspectReportWorkbook(complete.path,{profileId:'eba-corep-of-4.0-ca1-v1'})).preflight, complete.source, form);
   const inspected = await inspectReportWorkbook(extract.path), b = normalizeCorepCa1(inspected.preflight, extract.source, form);
   expect(a.report.coordinates).toHaveLength(110); expect(a.report.facts).toHaveLength(110); expect(a.binding.excludedSheets).toHaveLength(190); expect(b.binding.excludedSheets).toEqual([]);
   expect(a.declaration).toMatchObject({ contextId: 'corep', framework: 'COREP', moduleVersion: 'COREP_OF_4.0' });

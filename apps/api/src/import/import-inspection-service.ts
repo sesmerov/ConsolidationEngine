@@ -114,7 +114,12 @@ export class ImportInspectionService {
       preparePublication: (_job, output) => {
         const current = this.record(workspaceId, id);
         if (current.inspection.state !== 'committing' || current.inspection.commitJobId !== jobId || current.candidate !== initial.candidate || output.verifiedInspectionHash !== inspection.inspectionHash || output.snapshotContent) throw new ApiError('IMPORT_INSPECTION_NOT_APPLICABLE');
-        return { output: { complete: true, snapshotContent: initial.candidate!, records: [asState(key, released(current, 'committed'))], resultRef: { type: 'import', id } },
+        // FINREP exports patch the verified original. Its retained upload remains charged
+        // to this workspace until closure; only successfully published bindings qualify.
+        const preserved = new Set(initial.candidate!.reportSourceBindings?.filter(binding => binding.profileId === 'eba-finrep-4.0-f0101-v1').map(binding => binding.sourceFileId));
+        const committed = released(current, 'committed'), cleanupFileIds = committed.cleanupFileIds?.filter(fileId => !preserved.has(fileId));
+        const committedRecord: InspectionRecord = { inspection: committed.inspection, ...(cleanupFileIds?.length ? { cleanupFileIds } : {}) };
+        return { output: { complete: true, snapshotContent: initial.candidate!, records: [asState(key, committedRecord)], resultRef: { type: 'import', id } },
           assertCommit: () => { this.store.assertBase(workspaceId, inspection.baseVersionId); this.store.assertAccepting(workspaceId); } };
       }, finalize: async () => {
         const current = this.record(workspaceId, id);

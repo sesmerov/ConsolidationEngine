@@ -44,13 +44,16 @@ export function registerExports(app: FastifyInstance, overrides?: Partial<Export
           synthetic: snapshot.content.contexts.some((context) => context.entityId === 'SYNTHETIC') };
         checkExportData(data, resultsLimits); return { kind: 'results' as const, data, limits: resultsLimits, reportCount: 0 };
       })();
+      const originalReports=prepared.kind==='report'?await Promise.all(prepared.data.partitions.filter(report=>report.binding?.profileId==='eba-finrep-4.0-f0101-v1').map(report=>{
+        const source=prepared.data.sources.find(source=>source.id===report.sourceFileId&&source.kind==='report');if(!source)throw new ApiError('EXPORT_NOT_AVAILABLE');return app.ce.files.retainedSource(workspaceId,source);
+      })):[];
       // Reject before structuredClone transfers the chosen resource to a worker; no current-snapshot clone is needed.
       const lease = app.ce.files.reserve(workspaceId, 2 * prepared.limits.maxTotalBytes); const allocated: { id: string; path: string }[] = [];
       try {
         for (let i = 0; i < prepared.reportCount + 3; i++) { const file = await app.ce.files.openFile(workspaceId, lease); allocated.push({ id: file.id, path: file.path }); await file.handle.close(); }
         const id = randomUUID(), [json, xlsx, zip] = allocated.slice(-3), paths = { json: json!.path, xlsx: xlsx!.path, zip: zip!.path }; let finalized = false;
         return { includeSnapshot: false, input: { exportId: id, fileId: zip!.id, kind: prepared.kind, data: prepared.data,
-          paths: prepared.kind === 'report' ? { ...paths, reports: allocated.slice(0, prepared.reportCount).map(file => file.path) } : paths, limits: prepared.limits } as unknown as JsonValue,
+          paths: prepared.kind === 'report' ? { ...paths, reports: allocated.slice(0, prepared.reportCount).map(file => file.path) } : paths, limits: prepared.limits,...(prepared.kind==='report'?{originalReports}:{}) } as unknown as JsonValue,
           finalize: async () => { if (finalized) return;
             const published = app.ce.store.getRecord<ExportArtifact>(exportKey(workspaceId, id));
             await app.ce.files.removeFiles(workspaceId, allocated.filter(file => !published || file.id !== zip!.id).map(file => file.id));

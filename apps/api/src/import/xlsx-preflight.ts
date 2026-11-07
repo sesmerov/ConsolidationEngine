@@ -10,13 +10,14 @@ import { ApiError } from '../errors.js';
 import { decodeSpreadsheetText } from './ooxml-text.js';
 import { readSheetRows } from './xlsx-row-reader.js';
 import { recognizeCorepStructure } from './profiles/corep-structure.js';
+import { recognizeFinrepStructure } from './profiles/finrep-f0101-structure.js';
 
 export interface RawCell { readonly address: string; readonly row: number; readonly column: number; readonly xmlType: string; readonly lexeme: string; readonly text: string; readonly style?: string }
 export interface VerifiedSheetPart { readonly name: string; readonly crc32: number; readonly expandedBytes: number }
 export interface RawSheet { readonly name: string; readonly cells: Readonly<Record<string, RawCell>>; readonly maxRow: number; readonly maxColumn: number; readonly merged: boolean; readonly part?: VerifiedSheetPart; readonly fragmentedRows?: Readonly<Record<number, number>>;
   readonly mergeRanges?: readonly string[]; readonly formulaCount?: number; readonly firstFormulaCell?: string; readonly physicalCellCount?: number }
 export interface PreflightWorkbook { readonly date1904: boolean; readonly sheets: readonly RawSheet[]; readonly expandedBytes: number; readonly compressedBytes: number; readonly sharedStrings?: readonly string[]; readonly styleCount?: number;
-  readonly profile?: 'corep-ca1'; readonly limits?: PreflightLimits; readonly numberFormats?: readonly string[];
+  readonly profile?: 'corep-ca1' | 'finrep-f0101'; readonly visualCandidates?: readonly ('corep-ca1'|'finrep-f0101')[]; readonly writerCompatibleParts?:boolean; readonly limits?: PreflightLimits; readonly numberFormats?: readonly string[];
   readonly scan?: { readonly physicalCells: number; readonly externalLinkXmlParts: number; readonly externalRelations: number; readonly formulas: number } }
 export const PREFLIGHT_LIMITS = { maxCompressedBytes: 10 * 1024 * 1024, maxEntryBytes: 64 * 1024 * 1024, maxExpandedBytes: 100 * 1024 * 1024,
   maxEntries: 2048, maxSheets: 64, maxSharedStrings: 500_000, maxCellChars: 32_767, maxXmlDepth: 64, maxRows: 200_001, maxColumns: 64,
@@ -25,7 +26,7 @@ export const COREP_PREFLIGHT_LIMITS = { ...PREFLIGHT_LIMITS, maxSheets: 256, max
 export type PreflightLimits = { [K in keyof typeof PREFLIGHT_LIMITS]: number };
 export interface PreflightOptions { readonly limits?: Partial<PreflightLimits>; readonly budget?: { expandedBytes: number }; readonly retainCells?: boolean; readonly check?: () => void;
   /** Internal registry modes. COREP exceptions require recognition; typed candidates repeat strict scanning. Never client-selected. */
-  readonly profile?: 'corep-ca1' | 'visual-report' | 'demo-types' }
+  readonly profile?: 'corep-ca1' | 'finrep-f0101' | 'visual-report' | 'demo-types' }
 const MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 const STRICT_MAIN = 'http://purl.oclc.org/ooxml/spreadsheetml/main';
 const REL = 'http://schemas.openxmlformats.org/package/2006/relationships';
@@ -60,7 +61,7 @@ function resolvePart(source: string, target: string): string {
 }
 export async function preflightXlsx(filePath: string, options: PreflightOptions = {}): Promise<PreflightWorkbook> {
   options.check?.();
-  const corep = options.profile === 'corep-ca1' || options.profile === 'visual-report', caps = corep ? COREP_PREFLIGHT_LIMITS : PREFLIGHT_LIMITS;
+  const corep = options.profile === 'corep-ca1' || options.profile === 'finrep-f0101' || options.profile === 'visual-report', caps = corep ? COREP_PREFLIGHT_LIMITS : PREFLIGHT_LIMITS;
   const limits: PreflightLimits = { ...caps, ...options.limits };
   for (const key of Object.keys(limits) as (keyof PreflightLimits)[]) if (!Number.isSafeInteger(limits[key]) || limits[key] <= 0 || limits[key] > caps[key]) throw new ApiError('INTERNAL_ERROR');
   const compressedBytes = (await stat(filePath)).size; if (compressedBytes > limits.maxCompressedBytes) throw new ApiError('UPLOAD_LIMIT');
@@ -68,7 +69,7 @@ export async function preflightXlsx(filePath: string, options: PreflightOptions 
   const names = new Set<string>(); const parts = new Map<string, SheetPart>(); const strings: string[] = [];
   const relationships: Relationship[] = []; const sheets: { name: string; relationId: string }[] = [];
   const contentTypes = new Map<string, string>(), verifiedParts = new Map<string, VerifiedSheetPart>(); let date1904 = false; let workbookPart: string | undefined; let styleCount = 0; let entries = 0;
-  const customFormats = new Map<number, string>(), styleFormats: number[] = []; let physicalCells = 0, externalLinkXmlParts = 0, externalRelations = 0, formulas = 0;
+  const customFormats = new Map<number, string>(), styleFormats: number[] = []; let physicalCells = 0, externalLinkXmlParts = 0, externalRelations = 0, formulas = 0,writerCompatibleParts=true;
   let active: Readable | undefined; let zip: ZipFile | undefined;
   function xmlParser(name: string) {
     const xmlOptions = { xmlns: true, strictEntities: true, trim: false, normalize: false };
@@ -170,6 +171,7 @@ export async function preflightXlsx(filePath: string, options: PreflightOptions 
     } };
   }
   async function consume(entry: Entry): Promise<void> {
+    if(entry.fileName.length>512||!/^[A-Za-z0-9_.\[\]-]+(?:\/[A-Za-z0-9_.\[\]-]+)*$/.test(entry.fileName))writerCompatibleParts=false;
     if (++entries > limits.maxEntries) expansion(); const name = normalizedName(entry.fileName);
     if (names.has(name)) invalid(); names.add(name);
     const unixType = (entry.externalFileAttributes >>> 16) & 0xf000;
@@ -228,7 +230,7 @@ export async function preflightXlsx(filePath: string, options: PreflightOptions 
         mergeRanges: part!.mergeRanges, formulaCount: part!.formulaCount, ...(part!.firstFormulaCell ? { firstFormulaCell: part!.firstFormulaCell } : {}), physicalCellCount: part!.physicalCellCount,
         ...(Object.keys(part!.fragmentedRows).length ? { fragmentedRows: part!.fragmentedRows } : {}) });
     }
-    const workbook: PreflightWorkbook = { date1904, sheets: result, expandedBytes: budget.expandedBytes - initialBytes, compressedBytes, sharedStrings: strings, styleCount,
+    const workbook: PreflightWorkbook = { date1904, sheets: result, expandedBytes: budget.expandedBytes - initialBytes, compressedBytes, sharedStrings: strings, styleCount,writerCompatibleParts,
       numberFormats: styleFormats.map(id => customFormats.get(id) ?? 'builtin:' + id), limits, scan: { physicalCells, externalLinkXmlParts, externalRelations, formulas }, ...(corep ? { profile: 'corep-ca1' as const } : {}) };
     if (options.profile === 'visual-report' && result.length === 3 && ['Instrucciones', 'Datos', 'Contexto'].every(name => result.some(sheet => sheet.name === name))) {
       // Candidate bytes are never published. A typed report must pass the complete strict scanner;
@@ -239,13 +241,22 @@ export async function preflightXlsx(filePath: string, options: PreflightOptions 
     if (corep) {
       // The first pass verifies every byte but keeps only bounded metadata. The second resolves selected
       // sheets by verified relationships, regardless of ZIP order, and never reads excluded cached values.
-      for (const sheet of result.filter(item => ['CA1', 'Contexto', 'Instrucciones'].includes(item.name))) {
-        if (sheet.formulaCount) throw new ApiError('INVALID_WORKBOOK', { reason: 'FORMULA_IN_SELECTED_SHEET' }, { sheet: sheet.name, ...(sheet.firstFormulaCell ? { column: sheet.firstFormulaCell.replace(/\d+$/, ''), row: Number(sheet.firstFormulaCell.replace(/^[A-Z]+/, '')) } : {}) });
-        if (sheet.name !== 'CA1' && relationships.some(relation => relation.source === sheet.part!.name && relation.external)) invalid();
+      const candidateSheets=options.profile==='corep-ca1'?['CA1']:options.profile==='finrep-f0101'?['1.1']:['CA1','1.1'];
+      for (const sheet of result.filter(item => [...candidateSheets, 'Contexto', 'Instrucciones'].includes(item.name))) {
+        if (sheet.formulaCount && (options.profile!=='visual-report'||!candidateSheets.includes(sheet.name))) throw new ApiError('INVALID_WORKBOOK', { reason: 'FORMULA_IN_SELECTED_SHEET' }, { sheet: sheet.name, ...(sheet.firstFormulaCell ? { column: sheet.firstFormulaCell.replace(/\d+$/, ''), row: Number(sheet.firstFormulaCell.replace(/^[A-Z]+/, '')) } : {}) });
+        if (!candidateSheets.includes(sheet.name) && relationships.some(relation => relation.source === sheet.part!.name && relation.external)) invalid();
+        if(sheet.formulaCount && options.profile==='visual-report' && candidateSheets.includes(sheet.name))continue;
         const cells = sheet.cells as Record<string, RawCell>;
         for await (const row of readSheetRows(filePath, workbook, sheet.name, { ...(options.check ? { check: options.check } : {}) })) for (const cell of row.cells) cells[cell.address] = cell;
       }
-      recognizeCorepStructure(workbook);
+      if(options.profile==='corep-ca1') recognizeCorepStructure(workbook);
+      else if(options.profile==='finrep-f0101'){recognizeFinrepStructure(workbook);return {...workbook,profile:'finrep-f0101',visualCandidates:['finrep-f0101']};}
+      else {
+        const candidates:('corep-ca1'|'finrep-f0101')[]=[];
+        for(const [id,recognize] of [['corep-ca1',recognizeCorepStructure],['finrep-f0101',recognizeFinrepStructure]] as const){try{recognize(workbook);candidates.push(id);}catch(error){if(!(error instanceof ApiError))throw error;}}
+        if(!candidates.length)throw new ApiError('INVALID_WORKBOOK',{reason:'UNKNOWN_REPORT_PROFILE'});
+        return {...workbook,profile:candidates[0]!,visualCandidates:candidates};
+      }
     }
     options.check?.(); return workbook;
   } catch (error) { if (error instanceof ApiError) throw error; throw new ApiError('INVALID_WORKBOOK'); }

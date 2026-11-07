@@ -9,7 +9,7 @@ import { assertVisualCoordinate, instructionsSheet, invalidVisualReport, literal
 import type { VisualReportPartition } from './visual-report-shared.js';
 
 /** Preserve every template style attribute while adding right alignment for exact decimal text. */
-function rightAlignedStyles(styles: string) {
+export function rightAlignedStyles(styles: string) {
   const section = /<cellXfs\b([^>]*)>([\s\S]*?)<\/cellXfs>/.exec(styles); if (!section) throw new ApiError('INTERNAL_ERROR');
   const xfs = section[2]!.match(/<xf\b(?:[^>]*\/>|[^>]*>[\s\S]*?<\/xf>)/g) ?? [], declared = /\bcount="([0-9]+)"/.exec(section[1]!);
   if (!declared || Number(declared[1]) !== xfs.length) throw new ApiError('INTERNAL_ERROR');

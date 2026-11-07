@@ -13,7 +13,7 @@ async function setup() {
   const headers = { host, 'x-ce-session': (await app.inject({ url: '/api/v1/bootstrap', headers: { host } })).json().sessionToken as string };
   return { app, headers };
 }
-it.each([['corep', 'catalog'], ['corep', 'report'], ['types', 'catalog'], ['types', 'report']] as const)('downloads the authenticated packaged %s %s workbook with its declared content hash', async (demo, kind) => {
+it.each([['corep', 'catalog'], ['corep', 'report'], ['types', 'catalog'], ['types', 'report'], ['finrep', 'catalog'], ['finrep', 'report']] as const)('downloads the authenticated packaged %s %s workbook with its declared content hash', async (demo, kind) => {
   const { app, headers } = await setup(), url = `/api/v1/templates/demos/${demo}/${kind}`;
   expect((await app.inject({ url, headers: { host: headers.host } })).statusCode).toBe(403);
   expect((await app.inject({ url, headers: { ...headers, origin: 'https://untrusted.example' } })).statusCode).toBe(403);
@@ -32,7 +32,7 @@ it('does not expose arbitrary demo names, file paths or write actions', async ()
   for (const url of ['/api/v1/templates/demos/unknown/report', '/api/v1/templates/demos/corep/secrets']) expect((await app.inject({ url, headers })).statusCode).toBe(404);
   expect((await app.inject({ method: 'POST', url: '/api/v1/templates/demos/corep/report', headers })).statusCode).toBe(404);
 });
-it('serves and exports both visual profiles from the relocated compiled package with source/cache access and network blocked', async () => {
+it('serves and exports all three visual profiles from the relocated compiled package with source/cache access and network blocked', async () => {
   const scratch = path.resolve(fileURLToPath(new URL('../../.cache/', import.meta.url))); await mkdir(scratch, { recursive: true });
   const directory = await mkdtemp(path.join(scratch, 'packaged-template-'));
   try {
@@ -102,9 +102,9 @@ const setup = path.join(root, 'probe-inputs'); await mkdir(setup);
 async function staged(location, kind) { const bytes = await readFile(location); return { id: randomUUID(), path: location, kind, sha256: hash(bytes), size: bytes.length, importedAt: '2026-11-04T00:00:00.000Z', displayName: path.basename(location) }; }
 const operation = { cancelled: () => false, progress: () => {} };
 function business(content) {
-  return { contexts: content.contexts.map(({ filingIndicatorsLocator, ...context }) => context),
-    coordinates: content.coordinates.map(({ sourceLocator, ...coordinate }) => coordinate).sort((a, b) => a.factKey.localeCompare(b.factKey)),
-    facts: content.facts.map(({ sourceLocator, originalText, derivation, ...fact }) => fact).sort((a, b) => a.factKey.localeCompare(b.factKey)) };
+  return { contexts: content.contexts.map(({ filingIndicatorsLocator, contextId, ...context }) => context),
+    coordinates: content.coordinates.map(({ sourceLocator, contextId, ...coordinate }) => coordinate).sort((a, b) => a.factKey.localeCompare(b.factKey)),
+    facts: content.facts.map(({ sourceLocator, originalText, derivation, contextId, ...fact }) => fact).sort((a, b) => a.factKey.localeCompare(b.factKey)) };
 }
 const app = await createApp();
 try {
@@ -116,13 +116,14 @@ try {
     assert.equal(response.statusCode, 200, response.body); assert.equal(hash(response.rawPayload), entry.sha256); assert.equal(response.rawPayload.length, entry.size);
     await writeFile(path.join(setup, entry.file), response.rawPayload);
   }
-  for (const demo of ['corep', 'types']) {
+  for (const demo of ['corep', 'types', 'finrep']) {
     // Fixture setup imports the actual downloaded workbooks using relocated compiled code.
     const catalog = await staged(path.join(setup, 'demo-' + demo + '-catalog.xlsx'), 'catalog');
     const report = await staged(path.join(setup, 'demo-' + demo + '-report.xlsx'), 'report');
-    const candidate = await inspectWorkspace([catalog, report], operation, { source: 'workbook' });
     const created = await app.inject({ method: 'POST', url: '/api/v1/workspaces', headers, payload: { name: 'Packaged ' + demo } });
     assert.equal(created.statusCode, 201, created.body); const workspace = created.json();
+    if (demo === 'finrep') Object.assign(report, await app.ce.files.write(workspace.id, await readFile(report.path)));
+    const candidate = await inspectWorkspace([catalog, report], operation, { source: 'workbook' });
     const snapshot = app.ce.store.publish(workspace.id, undefined, candidate.content), base = '/api/v1/workspaces/' + workspace.id;
     const bundle = runValidation(snapshot, { runId: randomUUID(), startedAt: snapshot.createdAt });
     app.ce.store.putRecords([{ key: 'validation:' + workspace.id + ':' + bundle.run.id, value: bundle }]);
@@ -141,7 +142,7 @@ try {
       const location = path.join(setup, 'exported-' + demo + '.xlsx'); await writeFile(location, entries.get(name));
       const restored = await inspectWorkspace([await staged(catalog.path, 'catalog'), await staged(location, 'report')], operation, { source: 'workbook' });
       assert.deepEqual(business(restored.content), business(snapshot.content));
-      assert.equal(restored.content.coordinates.length, demo === 'corep' ? 110 : 6);
+      assert.equal(restored.content.coordinates.length, demo === 'corep' ? 110 : demo === 'finrep' ? 38 : 6);
       assert.ok(restored.content.facts.every(fact => !fact.derivation));
     }
     const closed = await app.inject({ method: 'DELETE', url: base, headers: { ...headers, 'if-match': app.ce.store.etag(workspace.id) } }); assert.equal(closed.statusCode, 204, closed.body);
@@ -150,13 +151,13 @@ try {
 const audit = (await readFile(path.join(root, 'guard-audit.jsonl'), 'utf8')).trim().split('\n').map(line => JSON.parse(line));
 assert.equal(audit.filter(event => event.kind === 'blocked-network').length, 1);
 assert.equal(audit.filter(event => event.kind === 'blocked-source').length, 1);
-assert.equal(new Set(audit.filter(event => event.kind === 'guard-active').map(event => event.threadId)).size, 5);
-process.stdout.write(JSON.stringify({ templates: templates.profiles.length, demos: demos.files.length, exports: 4, realWorkers: 4, isolatedSources: true, networkBlocked: true }));
+assert.equal(new Set(audit.filter(event => event.kind === 'guard-active').map(event => event.threadId)).size, 7);
+process.stdout.write(JSON.stringify({ templates: templates.profiles.length, demos: demos.files.length, exports: 6, realWorkers: 6, isolatedSources: true, networkBlocked: true }));
 `);
     const result = spawnSync(process.execPath, ['--import', pathToFileURL(guard).href, probe], { cwd: directory, encoding: 'utf8', windowsHide: true, timeout: 40_000,
       env: { ...process.env, CE_PACKAGED_RUNTIME: directory, CE_PACKAGED_CHECKOUT: path.resolve('.') } });
     expect(result.error).toBeUndefined(); expect(result.status, result.stderr || result.stdout).toBe(0);
-    expect(JSON.parse(result.stdout)).toEqual({ templates: 2, demos: 4, exports: 4, realWorkers: 4, isolatedSources: true, networkBlocked: true });
+    expect(JSON.parse(result.stdout)).toEqual({ templates: 3, demos: 6, exports: 6, realWorkers: 6, isolatedSources: true, networkBlocked: true });
   } finally {
     const resolved = path.resolve(directory); if (!resolved.startsWith(scratch + path.sep)) throw new Error('Unexpected test cleanup directory');
     await rm(resolved, { recursive: true, force: true });

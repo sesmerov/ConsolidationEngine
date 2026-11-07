@@ -41,6 +41,27 @@
         "Datos"
       ],
       "sources": []
+    },
+    {
+      "profileId": "eba-finrep-4.0-f0101-v1",
+      "languageProfileId": "ce-dpmxl-0.9-closed-v2",
+      "mappingSha256": "446123bd6de88b82a837b5ed2497d3f805c7a6808a4e2bf1c2f2b240c4cb85d5",
+      "file": "finrep-f0101.xlsx",
+      "sha256": "e1552769c2fb7d0a9f6a00cba7d62eee64a1d7f5d01420a2514e7edf9b75d358",
+      "size": 68458,
+      "selectedSheets": [
+        "1.1"
+      ],
+      "sources": [
+        {
+          "file": "official-annexes-4.0.xlsx",
+          "purpose": "presentation",
+          "url": "https://www.eba.europa.eu/sites/default/files/2025-02/1b4c4008-4224-450f-aa7b-c6fe5284872a/ITS%20on%20supervisory%20reporting.zip",
+          "originalWorkbookEntry": "C_2024_8389_1_ANNEX_EN_V3_P1_3682615.XLSX",
+          "sha256": "f3c4aad1a313e3568ba56d62124c554300c94caee444e837531725b543f4cfa7",
+          "bytes": 1335372
+        }
+      ]
     }
   ]
 }

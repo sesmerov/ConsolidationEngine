@@ -11,6 +11,7 @@ import { FILE_SESSION_LIMIT } from '../storage/session-files.js';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { ApiError } from '../errors.js';
+import { visualTemplateBytes } from '../export/visual-template.js';
 export function registerCapabilities(app: FastifyInstance): void {
   app.get('/api/v1/capabilities', { schema: { querystring: emptyQuerySchema } }, async () => ({ profileId: ENGINE_PROFILE_ID, grammarVersion: GRAMMAR_VERSION,
     languageProfiles: [
@@ -18,6 +19,7 @@ export function registerCapabilities(app: FastifyInstance): void {
       { id: 'ce-dpmxl-0.9-closed-v2', support: ['number', 'boolean', 'text', 'date', 'if'], recalculationPolicy: 'Solo igualdades numéricas elegibles. Las reglas con texto, fechas o condicionales solo admiten validación.' },
     ], reportProfiles: [{ id: 'ce-report-1', name: 'Formato avanzado de coordenadas', moduleVersion: 'declarado en el libro', supportedTables: [], languageProfileId: 'ce-dpmxl-0.9-closed-v1', forms: ['ce-report-1'], contextFields: ['workbook'] },
       { id: 'eba-corep-of-4.0-ca1-v1', name: 'COREP 4.0 · Fondos propios CA1', moduleVersion: 'COREP_OF_4.0', supportedTables: ['C_01.00'], languageProfileId: 'ce-dpmxl-0.9-closed-v2', forms: ['official-full', 'CA1-extract'], contextFields: ['entityId', 'referenceDate', 'submissionDate', 'currency', 'scaleExponent', 'displayDecimals', 'filingIndicators'] },
+      { id:'eba-finrep-4.0-f0101-v1',name:'FINREP · F 01.01 · plantilla 4.0',moduleVersion:'FINREP_F0101_4.0',supportedTables:['F_01.01'],languageProfileId:'ce-dpmxl-0.9-closed-v2',forms:['official-full','F_01.01-extract'],contextFields:['entityId','referenceDate','submissionDate','currency','scaleExponent','displayDecimals','filingIndicators'] },
       { id: 'ce-demo-types-1', name: 'Demostración sintética de texto y fechas', moduleVersion: 'DEMO_TYPES_1', supportedTables: ['DEMO_TYPES'], languageProfileId: 'ce-dpmxl-0.9-closed-v2', forms: ['ce-demo-types-1'], contextFields: ['entityId', 'referenceDate', 'submissionDate', 'filingIndicators'] }],
     importInspection: { ttlSeconds: 900, maxActive: 1 },
     support: ['Referencias a celdas de tablas cerradas', 'Ámbitos with, rangos y hojas finitas', 'Indicadores de presentación explícitos', 'Aritmética y comparaciones', 'and, or, not, isnull, nvl y sum'],
@@ -37,6 +39,7 @@ export function registerCapabilities(app: FastifyInstance): void {
   });
   for (const kind of ['catalog', 'report'] as const) app.get('/api/v1/templates/guided-' + kind, { schema: { querystring: emptyQuerySchema } }, async (_request, reply) => reply
     .header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').header('Content-Disposition', 'attachment; filename="' + (kind === 'catalog' ? 'ejemplo-catalogo.xlsx' : 'ejemplo-informe.xlsx') + '"').send(await guidedExample(kind)));
-  for (const demo of ['corep', 'types'] as const) for (const kind of ['catalog', 'report'] as const) app.get(`/api/v1/templates/demos/${demo}/${kind}`, { schema: { querystring: emptyQuerySchema } }, async (_request, reply) => reply
+  app.get('/api/v1/templates/finrep-f0101',{schema:{querystring:emptyQuerySchema}},async(_request,reply)=>reply.header('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').header('Content-Disposition','attachment; filename="finrep-f0101.xlsx"').send(await visualTemplateBytes('eba-finrep-4.0-f0101-v1')));
+  for (const demo of ['corep', 'types','finrep'] as const) for (const kind of ['catalog', 'report'] as const) app.get(`/api/v1/templates/demos/${demo}/${kind}`, { schema: { querystring: emptyQuerySchema } }, async (_request, reply) => reply
     .header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').header('Content-Disposition', `attachment; filename="demo-${demo}-${kind}.xlsx"`).send(await visualDemo(demo, kind)));
 }

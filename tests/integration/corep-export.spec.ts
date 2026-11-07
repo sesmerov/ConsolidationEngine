@@ -85,7 +85,8 @@ test('chooses exact numeric XML versus right-aligned decimal text at importable 
   expect(visualBusiness(await reimportVisual(fixture.files[0]!, output.paths.reports))).toEqual(visualBusiness(fixture.snapshot.content));
 });
 test('exports only CA1 from the real complete EBA workbook and preserves excluded-sheet provenance separately', async () => {
-  const fixture = await importVisual(await visualStaged(path.resolve('tests/fixtures/eba/official-annexes-4.0.xlsx'), 'report'), 'corep', { source: 'form', declaration: form });
+  const report=await visualStaged(path.resolve('tests/fixtures/eba/official-annexes-4.0.xlsx'),'report');
+  const fixture = await importVisual(report, 'corep', { source: 'form', declaration: form,reportProfiles:[{reportIndex:0,sha256:report.sha256,profileId:'eba-corep-of-4.0-ca1-v1'}] });
   expect(fixture.snapshot.content.reportSourceBindings![0]!.excludedSheets).toHaveLength(190);
   const output = await exportVisual(fixture.snapshot), inspected = await inspectReportWorkbook(output.paths.reports[0]!);
   expect(inspected.preflight.sheets.map(sheet => sheet.name).sort()).toEqual(['CA1', 'Contexto', 'Instrucciones']);

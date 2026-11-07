@@ -8,6 +8,8 @@ import type { ChangeLogData, ReportExportHistory, ReportManifestEntry } from './
 import { reportOwnership } from './report-ownership.js';
 import { writeCorepReport } from './corep-report.js';
 import { writeTypedReport } from './typed-report.js';
+import { writeFinrepReport } from './finrep-report.js';
+import type { RetainedReportSource } from './finrep-report.js';
 
 export const REPORT_EXPORT_LIMITS = Object.freeze({ maxContentBytes: 64 * 1024 * 1024, maxTotalBytes: 100 * 1024 * 1024,
   maxXmlWorkloadBytes: 64 * 1024 * 1024, maxReportBytes: 10 * 1024 * 1024, maxImportBatchBytes: 50 * 1024 * 1024, maxExpandedBytes: 100 * 1024 * 1024 });
@@ -92,7 +94,7 @@ function reportSheets(partition: ReportPartition, data: ReportExportData) {
   ] }, { name: 'Contexts', rows: contexts() }, { name: 'Coordinates', rows: coordinates() }, { name: 'Facts', rows: facts() }];
 }
 /** The worker writes the reports first so changes.json describes measured, final XLSX artifacts. */
-export async function writeReportExport(data: ReportExportData, paths: ReportExportPaths, limits: ReportExportLimits, check: () => void, progress: (completed: number, total: number) => void): Promise<{ size: number; sha256: string }> {
+export async function writeReportExport(data: ReportExportData, paths: ReportExportPaths, limits: ReportExportLimits, check: () => void, progress: (completed: number, total: number) => void,originalReports:readonly RetainedReportSource[]=[]): Promise<{ size: number; sha256: string }> {
   const catalog = catalogSource(data.sources); check();
   if (paths.reports.length !== data.partitions.length || !paths.reports.length || new Set([...paths.reports, paths.json, paths.xlsx, paths.zip]).size !== paths.reports.length + 3) throw new ApiError('INTERNAL_ERROR');
   const expansion = { expandedBytes: catalog.expandedBytes }, manifest: ReportManifestEntry[] = [], entries: StoredZipEntry[] = [];
@@ -106,6 +108,8 @@ export async function writeReportExport(data: ReportExportData, paths: ReportExp
         ? await writeCorepReport(paths.reports[index]!, { ...report, binding: report.binding }, data, maximum, expansion, limits.maxExpandedBytes, check)
         : data.profileId === LANGUAGE_PROFILE_V2 && report.binding?.profileId === 'ce-demo-types-1'
           ? await writeTypedReport(paths.reports[index]!, { ...report, binding: report.binding }, data, maximum, expansion, limits.maxExpandedBytes, check)
+          : data.profileId===LANGUAGE_PROFILE_V2 && report.binding?.profileId==='eba-finrep-4.0-f0101-v1'
+            ? await writeFinrepReport(paths.reports[index]!,{...report,binding:report.binding},data,originalReports.find(source=>source.id===report.sourceFileId)!,maximum,expansion,limits.maxExpandedBytes,check)
           : unavailable('INVALID_REPORT_SOURCE');
     compressedBatch += output.size; contentBytes += output.size;
     manifest.push({ entryName: report.entryName, sourceFileId: report.sourceFileId, contextIds: report.contextIds, size: output.size, sha256: output.sha256, expandedBytes: output.expandedBytes });

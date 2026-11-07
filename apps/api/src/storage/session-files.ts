@@ -1,9 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile, lstat, open, stat } from 'node:fs/promises';
 import type { FileHandle } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { UUID_PATTERN } from '@ce/contracts';
+import type { SourceFile } from '@ce/contracts';
 import { ApiError } from '../errors.js';
 export const FILE_SESSION_LIMIT = 512 * 1024 * 1024;
 export interface FileLease { readonly workspaceId: string; readonly id: string; resize(bytes: number): void; release(): void }
@@ -54,6 +56,14 @@ export class SessionFiles {
     await this.verify(); if (!UUID_PATTERN.test(id)) throw new ApiError('INVALID_REQUEST'); const directory = this.workspacePath(workspaceId);
     if ((await lstat(directory)).isSymbolicLink() || await realpath(directory) !== directory) throw new ApiError('INTERNAL_ERROR');
     const location = path.join(directory, id); if ((await lstat(location)).isSymbolicLink() || await realpath(location) !== location) throw new ApiError('INTERNAL_ERROR'); return location;
+  }
+  /** Only retained files in this workspace may be passed to an export worker as originals. */
+  async retainedSource(workspaceId:string,source:SourceFile):Promise<SourceFile&{readonly path:string}>{
+    try{if(this.budgets.get(workspaceId)?.retained.get(source.id)!==source.size)throw new ApiError('EXPORT_NOT_AVAILABLE');
+      const location=await this.filePath(workspaceId,source.id),info=await lstat(location);if(!info.isFile()||info.size!==source.size)throw new ApiError('EXPORT_NOT_AVAILABLE');
+      const hash=createHash('sha256');let size=0;for await(const bytes of createReadStream(location,{highWaterMark:64*1024})){size+=bytes.length;if(size>source.size)throw new ApiError('EXPORT_NOT_AVAILABLE');hash.update(bytes);}if(size!==source.size||hash.digest('hex')!==source.sha256)throw new ApiError('EXPORT_NOT_AVAILABLE');
+      return {...source,path:location};
+    }catch{throw new ApiError('EXPORT_NOT_AVAILABLE',{reason:'INVALID_REPORT_SOURCE'});}
   }
   async write(workspaceId: string, bytes: Uint8Array): Promise<{ id: string; sha256: string; path: string; size: number }> {
     const lease = this.reserve(workspaceId, bytes.byteLength); let allocated: { id: string; path: string; handle: FileHandle } | undefined;

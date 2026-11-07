@@ -109,11 +109,32 @@ if (typedMappingBytes.includes(13) || typedMappingBytes.subarray(0, 3).equals(Bu
 const typedMapping = JSON.parse(typedMappingBytes.toString('utf8')), typed = typedWorkbook(typedMapping);
 await writeFile(path.join(directory, 'demo-types.xlsx'), typed);
 manifest.profiles.push({ profileId: typedMapping.profileId, languageProfileId: typedMapping.languageProfileId, mappingSha256: digest(typedMappingBytes), file: 'demo-types.xlsx', sha256: digest(typed), size: typed.length, selectedSheets: ['Datos'], sources: [] });
+// FINREP identity comes from the pinned official presentation grid, not COREP annotations.
+const finrepXml = official.get(sheetPart(official, '1.1')).toString('utf8'), finrep = cells(finrepXml, strings(official));
+const finrepRows = ['0010','0020','0030','0040','0050','0060','0070','0080','0090','0096','0097','0098','0099','0100','0120','0130','0141','0142','0143','0144','0181','0182','0183','0240','0250','0260','0270','0280','0290','0300','0310','0320','0330','0340','0350','0360','0370','0380'];
+const finrepMapping = finrepRows.map((rowCode,index) => {
+  const row=index+8; if(finrep.values.get('B'+row)!==rowCode) throw new Error('FINREP source code mismatch');
+  return {rowCode,columnCode:'0010',tableCode:'F_01.01',sheetCode:'',sheet:'1.1',codeCell:'B'+row,labelCell:'C'+row,amountCell:'F'+row,label:finrep.values.get('C'+row),dataType:'number',unitKind:'currency'};
+});
+const amountCells=new Set(finrepMapping.map(c=>c.amountCell)), anchors=[...finrep.values].filter(([address,value])=>value!==''&&!amountCells.has(address)).sort(([a],[b])=>a<b?-1:a>b?1:0);
+if(anchors.length!==144 || /<mergeCell\b/.test(finrepXml))throw new Error('FINREP source structure mismatch');
+const finrepManifest={profileId:'eba-finrep-4.0-f0101-v1',structureSignature:digest(Buffer.from(JSON.stringify(anchors))),structureAnchors:anchors,expectedMerges:[],official:{sha256:digest(officialBytes)},mapping:finrepMapping};
+const finrepMappingBytes=Buffer.from(JSON.stringify(finrepManifest,null,2)+'\n');
+await writeFile(path.join(root,'apps/api/src/import/profiles/finrep-f0101-mapping.json'),finrepMappingBytes);
+const finrepSheet=XML+`<worksheet xmlns="${MAIN}">`+(finrepXml.match(/<sheetFormatPr\b[^>]*\/>/)?.[0]??'')+(finrepXml.match(/<cols>[\s\S]*?<\/cols>/)?.[0]??'')+'<sheetData>'+finrep.rows.map(row=>`<row ${Object.entries(row.attributes).map(([k,v])=>`${k}="${esc(v)}"`).join(' ')}>`+row.cells.map(c=>c.text===''?`<c r="${c.address}"${c.style===undefined?'':` s="${c.style}"`}/>`:literal(c.address,c.text,c.style)).join('')+'</row>').join('')+'</sheetData></worksheet>';
+const finrepParts=new Map(parts);
+finrepParts.set('xl/workbook.xml',String(parts.get('xl/workbook.xml')).replace('name="CA1"','name="1.1"'));
+finrepParts.set('xl/worksheets/sheet1.xml',finrepSheet);
+finrepParts.set('xl/worksheets/sheet2.xml',ownSheet([['Campo','Valor'],['Perfil',finrepManifest.profileId],['Framework','FINREP'],['Módulo','FINREP_F0101_4.0'],['Entidad',''],['Fecha de referencia',''],['Fecha de envío',''],['Divisa',''],['Escala',''],['Decimales del importe',''],['Tabla presentada','']]));
+finrepParts.set('xl/worksheets/sheet3.xml',ownSheet([['FINREP · F 01.01 · plantilla 4.0'],['Completa los importes de la columna F sin mover códigos ni conceptos.'],['Contexto: entidad, fecha AAAA-MM-DD, divisa, escala 0/3/6, precisión -18..18 o INF, tabla presentada true/false.'],['Perfil local de presentación; no es un módulo XBRL ni un fichero oficial de remisión.']]));
+const finrepOutput=deterministicZip(finrepParts); await writeFile(path.join(directory,'finrep-f0101.xlsx'),finrepOutput);
+manifest.profiles.push({profileId:finrepManifest.profileId,languageProfileId:'ce-dpmxl-0.9-closed-v2',mappingSha256:digest(finrepMappingBytes),file:'finrep-f0101.xlsx',sha256:digest(finrepOutput),size:finrepOutput.length,selectedSheets:['1.1'],sources:[sourceManifest.sources.find(s=>s.purpose==='presentation')]});
 await writeFile(path.join(directory, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 if (process.argv.includes('--package')) {
   const profileDirectory = path.join(root, 'apps/api/dist/import/profiles'); await mkdir(profileDirectory, { recursive: true }); await copyFile(path.join(root, 'apps/api/src/import/profiles/corep-ca1-mapping.json'), path.join(profileDirectory, 'corep-ca1-mapping.json'));
   await copyFile(path.join(root, 'apps/api/src/import/profiles/demo-types-mapping.json'), path.join(profileDirectory, 'demo-types-mapping.json'));
+  await copyFile(path.join(root, 'apps/api/src/import/profiles/finrep-f0101-mapping.json'), path.join(profileDirectory, 'finrep-f0101-mapping.json'));
   const assetsDirectory = path.join(root, 'apps/api/dist/assets/templates'); await mkdir(assetsDirectory, { recursive: true });
-  for (const name of ['corep-ca1.xlsx', 'demo-types.xlsx', 'manifest.json']) await copyFile(path.join(directory, name), path.join(assetsDirectory, name));
+  for (const name of ['corep-ca1.xlsx', 'demo-types.xlsx', 'finrep-f0101.xlsx', 'manifest.json']) await copyFile(path.join(directory, name), path.join(assetsDirectory, name));
 }
 process.stdout.write(`COREP CA1: ${output.length} bytes, SHA-256 ${digest(output)}\n`);

@@ -7,10 +7,11 @@ import type { Entry, ZipFile } from 'yauzl';
 import { ApiError } from '../errors.js';
 import { COREP_MAPPING_SHA256, COREP_PROFILE_ID } from '../import/profiles/corep-ca1.js';
 import { DEMO_TYPES_MAPPING_SHA256, DEMO_TYPES_PROFILE_ID } from '../import/profiles/demo-types.js';
+import { FINREP_MAPPING_SHA256,FINREP_PROFILE_ID } from '../import/profiles/finrep-f0101.js';
 
-export type VisualReportProfile = typeof COREP_PROFILE_ID | typeof DEMO_TYPES_PROFILE_ID;
+export type VisualReportProfile = typeof COREP_PROFILE_ID | typeof DEMO_TYPES_PROFILE_ID | typeof FINREP_PROFILE_ID;
 const directory = new URL(import.meta.url.endsWith('.ts') ? '../../../../assets/templates/' : '../assets/templates/', import.meta.url);
-const profiles = { [COREP_PROFILE_ID]: { file: 'corep-ca1.xlsx', mappingSha256: COREP_MAPPING_SHA256 }, [DEMO_TYPES_PROFILE_ID]: { file: 'demo-types.xlsx', mappingSha256: DEMO_TYPES_MAPPING_SHA256 } } as const;
+const profiles = { [COREP_PROFILE_ID]: { file: 'corep-ca1.xlsx', mappingSha256: COREP_MAPPING_SHA256 }, [DEMO_TYPES_PROFILE_ID]: { file: 'demo-types.xlsx', mappingSha256: DEMO_TYPES_MAPPING_SHA256 },[FINREP_PROFILE_ID]:{file:'finrep-f0101.xlsx',mappingSha256:FINREP_MAPPING_SHA256} } as const;
 const maximumWorkbook = 10 * 1024 * 1024, maximumExpanded = 4 * 1024 * 1024, maximumManifest = 64 * 1024;
 const invalid = (): never => { throw new ApiError('INTERNAL_ERROR'); };
 async function boundedRead(file: URL, maximum: number, check: () => void): Promise<Buffer> {
@@ -22,7 +23,7 @@ async function boundedRead(file: URL, maximum: number, check: () => void): Promi
 export async function visualTemplateBytes(profileId: VisualReportProfile, check: () => void = () => {}): Promise<Buffer> {
   if (!Object.hasOwn(profiles, profileId)) return invalid();
   const expected = profiles[profileId], manifest = JSON.parse((await boundedRead(new URL('manifest.json', directory), maximumManifest, check)).toString('utf8')) as { version?: unknown; profiles?: unknown };
-  if (manifest.version !== 1 || !Array.isArray(manifest.profiles) || manifest.profiles.length !== 2) return invalid();
+  if (manifest.version !== 1 || !Array.isArray(manifest.profiles) || manifest.profiles.length !== 3) return invalid();
   const matches = manifest.profiles.filter((entry: unknown) => entry && typeof entry === 'object' && 'profileId' in entry && entry.profileId === profileId);
   if (matches.length !== 1) return invalid();
   const entry = matches[0] as { file?: unknown; sha256?: unknown; size?: unknown; mappingSha256?: unknown; languageProfileId?: unknown };
@@ -34,7 +35,7 @@ export async function visualTemplateBytes(profileId: VisualReportProfile, check:
 /** A small, fixed product package is materialized within its own hard bound; no uploaded ZIP is read here. */
 export async function visualTemplateParts(profileId: VisualReportProfile, check: () => void): Promise<Map<string, Buffer>> {
   const bytes = await visualTemplateBytes(profileId, check);
-  const allowed = new Set(['[Content_Types].xml', '_rels/.rels', 'xl/workbook.xml', 'xl/_rels/workbook.xml.rels', 'xl/worksheets/sheet1.xml', 'xl/worksheets/sheet2.xml', 'xl/worksheets/sheet3.xml', ...(profileId === COREP_PROFILE_ID ? ['xl/styles.xml', 'xl/theme/theme1.xml'] : [])]);
+  const allowed = new Set(['[Content_Types].xml', '_rels/.rels', 'xl/workbook.xml', 'xl/_rels/workbook.xml.rels', 'xl/worksheets/sheet1.xml', 'xl/worksheets/sheet2.xml', 'xl/worksheets/sheet3.xml', ...(profileId !== DEMO_TYPES_PROFILE_ID ? ['xl/styles.xml', 'xl/theme/theme1.xml'] : [])]);
   const parts = new Map<string, Buffer>(); let expanded = 0, active: Readable | undefined, zip: ZipFile | undefined;
   try {
     zip = await new Promise<ZipFile>((resolve, reject) => yauzl.fromBuffer(bytes, { lazyEntries: true, strictFileNames: true, validateEntrySizes: true }, (error, value) => error ? reject(error) : resolve(value)));

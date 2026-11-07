@@ -22,10 +22,11 @@ async function setup(options: AppOptions = {}) {
 }
 it('describes the exact historical report profile without exposing facts, contexts or private metadata', async () => {
   const { app, headers, workspace, base } = await setup();
-  const corep = await visualDemo('corep'), types = await visualDemo('types');
+  const corep = await visualDemo('corep'), types = await visualDemo('types'), finrep = await visualDemo('finrep');
   const first = app.ce.store.publish(workspace.id, undefined, corep.snapshot.content);
   const second = app.ce.store.publish(workspace.id, first.versionId, types.snapshot.content);
-  for (const [snapshot, profileId, selectedSheets] of [[first, 'eba-corep-of-4.0-ca1-v1', ['CA1']], [second, 'ce-demo-types-1', ['Datos']]] as const) {
+  const third = app.ce.store.publish(workspace.id, second.versionId, finrep.snapshot.content);
+  for (const [snapshot, profileId, selectedSheets] of [[first, 'eba-corep-of-4.0-ca1-v1', ['CA1']], [second, 'ce-demo-types-1', ['Datos']], [third, 'eba-finrep-4.0-f0101-v1', ['1.1']]] as const) {
     const response = await app.inject({ url: `${base}/versions/${snapshot.versionId}/export-summary`, headers });
     expect(response.statusCode, response.body).toBe(200);
     const summary = response.json(), source = snapshot.content.sources.find(source => source.kind === 'report')!;
@@ -35,7 +36,7 @@ it('describes the exact historical report profile without exposing facts, contex
     expect(Object.keys(summary.reports[0]).every(key => ['sourceFileId', 'displayName', 'profileId', 'contextCount', 'contextOrigin', 'selectedSheets', 'excludedSheets', 'commonEntityId', 'commonReferenceDate', 'scaleExponent', 'displayDecimals'].includes(key))).toBe(true);
     expect(response.body).not.toContain('mappingSha256'); expect(response.body).not.toContain('contextIds');
   }
-  expect(app.ce.store.current(workspace.id)?.versionId).toBe(second.versionId);
+  expect(app.ce.store.current(workspace.id)?.versionId).toBe(third.versionId);
 });
 function transport() {
   const requests: WorkerRequest[] = [], workers: ControlledWorker[] = [];

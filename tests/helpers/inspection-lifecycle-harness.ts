@@ -19,7 +19,8 @@ export interface InspectionView {
   commitJobId?: string; committedVersionId?: string;
 }
 export const lifecycleContext = { source: 'form', declaration: { entityId: 'SYNTHETIC_LIFECYCLE', referenceDate: '2025-12-31',
-  submissionDate: '2025-12-31', currency: 'EUR', scaleExponent: 0, displayDecimals: 2, filingIndicators: { 'C_01.00': true } } };
+  submissionDate: '2025-12-31', currency: 'EUR', scaleExponent: 0, displayDecimals: 2, filingIndicators: { 'C_01.00': true } },
+  reportProfiles:[{reportIndex:0,sha256:'f3c4aad1a313e3568ba56d62124c554300c94caee444e837531725b543f4cfa7',profileId:'eba-corep-of-4.0-ca1-v1'}] };
 const fixtures = Promise.all([
   readFile(new URL('../fixtures/generated/eba-subset.xlsx', import.meta.url)),
   readFile(new URL('../fixtures/eba/official-annexes-4.0.xlsx', import.meta.url)),

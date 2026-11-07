@@ -16,11 +16,18 @@
       "size": 4165
     },
     {
+      "demo": "finrep",
+      "kind": "catalog",
+      "file": "demo-finrep-catalog.xlsx",
+      "sha256": "65286b1bedb55d421d834e4b4bb8154aad25520a633c5a574ddaba10b6d81309",
+      "size": 3895
+    },
+    {
       "demo": "corep",
       "kind": "report",
       "file": "demo-corep-report.xlsx",
-      "sha256": "64840d2e6443956f41e0acb3944701cfff12fbb6bde20cc22aba22e1aeaf29f3",
-      "size": 71723
+      "sha256": "8c60befa54628ef90c414f8f17cf235846de2abe578ee9c83cf1fc8d016431e9",
+      "size": 71712
     },
     {
       "demo": "types",
@@ -28,6 +35,13 @@
       "file": "demo-types-report.xlsx",
       "sha256": "7b7fcdc4a3e73b94facd18910b9d55bccf5ba6273b036ab5e0d8596b2f09bb82",
       "size": 3274
+    },
+    {
+      "demo": "finrep",
+      "kind": "report",
+      "file": "demo-finrep-report.xlsx",
+      "sha256": "4d400b7579d15cd2b1f2e7dd584b511cbe96fd1b923497d103600cbba497e6de",
+      "size": 68697
     }
   ]
 }
