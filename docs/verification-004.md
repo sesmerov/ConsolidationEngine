@@ -2,7 +2,7 @@
 
 ## Estado
 
-Implementación en curso desde `d4d98f8`, rama `codex/004-flujo-claro-finrep`. Las tareas solo se marcan al completar su comprobación. La observación humana SC-010 permanece pendiente y separada de la automatización.
+Implementación técnica terminada desde `d4d98f8`, rama `codex/004-flujo-claro-finrep`: **82/83 tareas completadas**. SC-001–009, build, tipos, regresiones y rendimiento están verificados. Solo permanece pendiente T081 / observación humana SC-010, separada de la automatización. Código medido: `894131bdffce0eaf17091bc78e803fa44e1ba18d`; los commits posteriores de cierre solo actualizan documentación.
 
 ## Preparación — 2026-11-07
 
@@ -12,7 +12,7 @@ Implementación en curso desde `d4d98f8`, rama `codex/004-flujo-claro-finrep`. L
 - Se contrastaron SHA-256 de los dos originales de `tests/fixtures/eba/source-manifest.json` y los cuatro archivos de `assets/demos/manifest.json`: todos coinciden. La fuente FINREP es el original oficial `f3c4aad1a313e3568ba56d62124c554300c94caee444e837531725b543f4cfa7`.
 - Puertos 3318 (E2E), 3317 (benchmark) y 3340 (prueba manual) libres al inicio. El proceso del usuario en 3330 se conserva.
 - CodeGraph sin índice y `gentle-ai` no disponible; se emplean lecturas directas. Recibos de revisión: disabled/unmanaged.
-- Base FINREP: la compatibilidad visual, exportación conservando original y recorrido positivo todavía no están implementados ni acreditados. El probe de coordenadas anterior no demuestra ese soporte.
+- Situación de partida FINREP: entonces la compatibilidad visual, exportación conservando original y recorrido positivo no estaban implementados ni acreditados. El probe de coordenadas anterior no demostraba ese soporte; esta iteración incorpora y verifica el recorrido completo.
 
 ## Resultados de implementación
 
@@ -20,7 +20,9 @@ T003: escenarios sintéticos 2/3/51 productores, 51 destinos y contextos compati
 
 ## Aceptación humana
 
-SC-010 pendiente de observación con la versión de esta iteración. Una valoración global no sustituye el detalle de las acciones observadas.
+SC-010 pendiente de observación con la versión de esta iteración. Una valoración global no sustituye el detalle de las acciones observadas. Se dejó una instancia propia en **http://127.0.0.1:3340**, verificada con HTTP 200 y proceso Node 560; no se reutilizó el servidor del analista. Metadatos y logs en `.cache/verification-004/manual-server.*`.
+
+Se pidió a Diego identificar las etapas recomendadas tras carga/guardado/aplicación, elegir y cambiar un conflicto, desmarcar una propuesta y explicar su aviso, y comunicar qué versión descargó y qué ayuda necesitó. A fecha del cierre técnico no se había recibido esa observación; T081 se mantiene sin marcar. No se atribuye aceptación humana a las capturas o acciones de Playwright.
 
 ## Primer incremento de interfaz
 
@@ -28,13 +30,13 @@ US1/2: acciones principales verdes, realce de etapa durante tres ciclos de 1,5 s
 
 Pruebas Angular focales: 47 casos en cuatro suites. Build web: 690,75 kB iniciales, por debajo del aviso de 700 kB. Playwright: 4 casos iniciales (información útil y anchos 320/390/1440) pasan; el caso de movimiento reducido pasa tras ajustar su matcher de respuesta. Contraste de texto renderizado ≥4,5:1, foco conservado y pulso limitado a 4,5 s. Las capturas se regenerarán en la verificación integrada porque Playwright limpia salidas al reejecutarse.
 
-El recorrido de los tres hitos, los detalles de comparación y todos los negativos se cerrarán después de integrar conflictos/selección. T010/T019 y los SC completos no se marcan todavía.
+En este primer incremento aún faltaba integrar los tres hitos, comparación y negativos. T010/T019 y sus criterios se cerraron después, con las pruebas integradas descritas más abajo.
 
 ## Selección y explicación compactas
 
 La selección se publica junto con la simulación, conserva una revisión propia y se edita con control de base/idempotencia. La aplicación nueva envía una referencia a esa revisión. Se mantienen las APIs compatibles por arrays. El resumen de simulación también tiene proyección compacta: el navegador no descarga proposalIds ni los arrays completos del grafo al entrar en Recalcular.
 
-Las pruebas focales de aplicación y explicación pasan (5/5): equivalencia entre arrays y referencia, unión mixta rechazada, revisión antigua, repetición de una aplicación publicada, cadena A→B→C con lecturas registradas de importes recalculados y 51 antecedentes paginados. Las pruebas de límites y lifecycle amplían estos casos; sus resultados finales se consolidarán tras el barrido completo.
+Las pruebas focales de aplicación y explicación pasan (5/5): equivalencia entre arrays y referencia, unión mixta rechazada, revisión antigua, repetición de una aplicación publicada, cadena A→B→C con lecturas registradas de importes recalculados y 51 antecedentes paginados. Las pruebas de límites y lifecycle amplían estos casos y forman parte del barrido completo.
 
 Medición aislada de volumen (`.cache/verification-004/selection-volume-1794081230373.json`): bundle sintético sembrado de 100.000 propuestas, no recorrido de importación/simulación. Consulta 143 ms; edición en worker 965 ms; respuesta 33.018 bytes; petición 105 bytes; estado retenido 105.411.319 bytes; 72 ticks del event loop durante la operación. La cancelación conserva la revisión anterior sin publicar un prefijo. Se comprueba además la representación mínima de un millón de posiciones y rechazo del exceso. RSS final del proceso de pruebas: 1.152.897.024 bytes, incluyendo fixtures/copias y workers; no es medida del pico del worker ni de la cuota de estado de producto.
 
@@ -55,7 +57,7 @@ Se contrastaron nuevamente los dos originales, seis demos y tres plantillas cont
 - La inspección visual de `guidance-320.png` detectó el anuncio accesible visible por falta de CSS global de CDK. Se añade estilo local de ocultación visual y comprobación de dimensiones/recorte reales en navegador, manteniendo `aria-live`.
 - El recorrido FINREP por navegador detectó que el commit de inspección liberaba el original necesario para exportar. Se añadió una prueba roja de retención desde el commit real y se corrigió para conservar exclusivamente los originales FINREP publicados, contabilizados en la cuota hasta cerrar el conjunto. Las pruebas aisladas anteriores proporcionaban la fuente directamente y no acreditaban este enlace; se repiten los lifecycle afectados y el recorrido integral.
 
-Commits incrementales ya registrados: `2cf74d5` (preparación), `bbca1f6` (jerarquía/guía visual), `4b9bfe5` (contratos/motor), `e96db6b` (API de decisiones y selección) y `19f100d` (FINREP, preservación y demos). La verificación integrada y el benchmark permanecen en curso.
+Commits incrementales: `2cf74d5` (preparación), `bbca1f6` (jerarquía/guía visual), `4b9bfe5` (contratos/motor), `e96db6b` (API de decisiones y selección), `19f100d` (FINREP, preservación y demos), `1f0b339` (interfaz integrada), `a2c129d` (caducidad/diagnósticos) y `894131b` (recorridos y protocolo de rendimiento). El cierre documental conserva por separado el pendiente humano.
 
 FINREP después de corregir la retención: 42/42 pruebas focales (`finrep-source-retention`, `import-inspection-lifecycle`, `finrep-export-lifecycle`, `finrep-demo-roundtrip`). El recorrido Playwright `finrep-journey.spec.ts` pasa 3/3 en 320, 390 y 1440 px: descarga de ambos archivos de demo, 38 posiciones cargadas, dos propuestas preseleccionadas, lectura 100+20=120, aceptación explícita, aplicación por referencia, descarga de la versión aplicada aun con selector histórico y reimportación con resultado 4 pasa/1 falla. Evidencias en `.cache/verification-004/finrep/run-02/`. Se inspeccionaron las capturas de 320 y 1440; la suite integrada regenerará las definitivas tras los últimos ajustes visuales.
 
@@ -87,6 +89,32 @@ Revalidación: **20/20** pasan en 3,1 minutos (`corep-import`, `import`, `useful
 | SC-009 / FR-021, FR-023 | COREP y ocho reglas tipadas, exactitud/Kahn, contextos, búsqueda y recorridos en 320/390/1440 px. | Verificado |
 | SC-010 | Observación de Diego en esta versión. Las capturas y acciones Playwright no la sustituyen. | Pendiente |
 
-Rendimiento de referencia pendiente de ejecutar tras congelar el código. Se usará `004-api-seeded-validation`: misma carga 500 reglas/100.000 lecturas y umbrales 30/60 s; al retirar el panel técnico, su cobertura se consulta por API antes de T1, con esa latencia incluida. El manifiesto explicita esta diferencia respecto a 003.
+Rendimiento de referencia ejecutado tras congelar el código: `004-api-seeded-validation`, con la misma carga de 500 reglas/100.000 lecturas y umbrales 30/60 s. Al retirar el panel técnico, su cobertura se consulta por API antes de T1, con esa latencia incluida. El manifiesto explicita esta diferencia respecto a 003.
 
 Búsqueda automática sobre 500 reglas, Chromium 156.0.8078.4: escritura con 10 coincidencias **313,0 ms**, pegado con una **313,1 ms**, cero coincidencias **303,6 ms** y borrado para recuperar 500 **310,7 ms**. Las cuatro cumplen ≤1.000 ms desde la última entrada e incluyen dos frames; el foco permanece. SHA-256 del catálogo sintético: `6fd3ba45a853c9d588ca066b0df11b7efd6a89eed7bc72b142156fb39c4a0849`. El prefijo `SC-002` de ese test pertenece a la regresión de 003, no al criterio de contraste de 004.
+
+## Rendimiento de validación — T080
+
+Se ejecutaron `npm run bench -- prepare`, `pilot` y `cohort`, mediante `run-with-toolchain.ps1`, sobre la carpeta nueva `.cache/benchmark/004-reference/`. La referencia se congeló con árbol limpio en `894131b`; el código y los archivos de carga no cambiaron durante las mediciones. Sin otros builds o pruebas del proyecto simultáneos, sin reintentos y con API/navegador nuevos por ensayo. Puerto propio 3317 liberado al terminar.
+
+Equipo: Ryzen 5 3600X, 12 procesadores lógicos, 34.277.588.992 bytes de RAM, Windows 11 Pro y plan de alto rendimiento; Node 24.22.2, Chromium 156.0.8078.4 y Playwright 1.64.1. El piloto válido obtuvo **14,806 s** de T0 a T1 y **28,682 s** de carga aparte; no cuenta como ensayo formal.
+
+| Medida de la cohorte | Resultado |
+| --- | ---: |
+| Ensayos auditados / previstos | 10 / 10 |
+| Ensayos ≤30 s / ≤60 s | 10 / 10 en ambos umbrales |
+| Mínimo / máximo T0→T1 | 14,280 / 15,798 s |
+| Mediana / media T0→T1 | 15,049 / 15,166 s |
+| Carga excluida del intervalo | 28,499–30,541 s |
+
+Cada auditoría comprueba 500 reglas, 250 resultados positivos/250 negativos y 100.000 lecturas distintas; cero ejecuciones incompletas o diagnósticos de producto. El único stderr corresponde al aviso de entorno NO_COLOR/FORCE_COLOR. Este benchmark usa el perfil sintético de compatibilidad `ce-report-1`, separado de las pruebas visuales FINREP y del bundle sembrado de selección masiva.
+
+Máximos muestreados del proceso API completo: RSS 1.349.857.280 bytes y heap 1.025.062.104 bytes. No son el pico exclusivo de un worker ni la cuota de estado retenido. Permanecen las cuotas fijadas (256 MiB de generación antigua del worker, 512 MiB de estado, 60 s por trabajo).
+
+Evidencias bajo `.cache/benchmark/004-reference/cohort-2026-11-07T20-37-15-626Z/`: diez resultados, diez capturas, `summary.json` y `code.json`. Resumen compacto en `.cache/verification-004/benchmark-final-metrics.json`; logs `benchmark-prepare.log`, `benchmark-pilot.log` y `benchmark-cohort.log`. SHA-256 de `summary.json`: `eb7c25670420e4177f2f80d01635d92240a26980718f0f4b553047b366453018`.
+
+Hashes de entrada congelados: catálogo `d76eaad8a4e2a06659163df996bb2c3fbe69e25f1c3fb941ca20ba50bf7c73bd` (30.802 bytes) e informe `e893027a81ec189be87b3f98022be69c5e9ca06ac8982f6153dbe18ce9c31f00` (5.476.198 bytes).
+
+## Cierre
+
+Se conserva la advertencia de bundle de 707,00 kB frente a 700 kB orientativos. El soporte FINREP se limita a F 01.01 del layout 4.0 fijado; el catálogo de demo es sintético y la prueba no afirma cobertura FINREP general. T081 queda pendiente de observación humana concreta. Los demás trabajos y sus comprobaciones están terminados; checklists documentales intactos y sin hooks de extensión registrados.

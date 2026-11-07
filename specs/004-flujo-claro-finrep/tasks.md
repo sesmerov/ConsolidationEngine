@@ -2,7 +2,7 @@
 
 **Input**: [spec.md](spec.md), [plan.md](plan.md), [research.md](research.md), [data-model.md](data-model.md), [contracts/](contracts/) y [quickstart.md](quickstart.md).
 
-**Branch**: `codex/004-flujo-claro-finrep` · **Fecha**: 2026-11-07 · **Estado**: Implementación en curso; casillas actualizadas según evidencia.
+**Branch**: `codex/004-flujo-claro-finrep` · **Fecha**: 2026-11-07 · **Estado**: Implementación técnica terminada, 82/83 tareas; T081 / observación humana SC-010 pendiente.
 
 **Tests**: La especificación solicita pruebas verificables SC-001–010 y el plan define contratos, integración, navegador y volumen. Se incluyen antes de los cambios que comprueban; el fallo inicial debe corresponder al comportamiento ausente, no a archivos corruptos, fixtures erróneos o un entorno sin preparar.
 
@@ -178,10 +178,10 @@
 
 - [X] T078 Ejecutar suites pertinentes finales, typecheck y build según `specs/004-flujo-claro-finrep/quickstart.md`/`package.json`; comprobar hashes de parser, fuentes originales y bundle inicial (aviso 700 kB/error 1 MB en `apps/web/angular.json`). Corregir fallos y repetir solo lo afectado, registrando comandos/resultados en `docs/verification-004.md`. (Depende de T010, T019, T031, T056, T077).
 - [X] T079 Completar el recorrido integrado a 320/390/1440 px y medir búsqueda automática en `tests/e2e/catalog-search.spec.ts`; verificar foco/movimiento/contraste, cero contenido técnico incluso en errores, 0/1/varios contextos y descarga por recibo aun con otra versión histórica elegida. Registrar SC-001–009 en `docs/verification-004.md`. (Depende de T078).
-- [ ] T080 Ejecutar piloto y cohorte de `scripts/benchmark.mjs` en una carpeta nueva `.cache/benchmark/004-reference/`, conservando el protocolo de regresión y los diez ensayos: 9/10 ≤30 s y 10/10 ≤60 s; búsqueda ≤1 s. Separar medición de selección/explicación masiva de validación y registrar entorno/hashes/cuotas en `docs/verification-004.md`. (Depende de T079).
+- [X] T080 Ejecutar piloto y cohorte de `scripts/benchmark.mjs` en una carpeta nueva `.cache/benchmark/004-reference/`, conservando el protocolo de regresión y los diez ensayos: 9/10 ≤30 s y 10/10 ≤60 s; búsqueda ≤1 s. Separar medición de selección/explicación masiva de validación y registrar entorno/hashes/cuotas en `docs/verification-004.md`. (Depende de T079).
 - [ ] T081 Preparar una instancia de prueba propia y realizar con Diego la observación SC-010 de `specs/004-flujo-claro-finrep/quickstart.md`; registrar en `docs/verification-004.md` qué etapas identifica, cómo cambia un conflicto, desmarca una propuesta y encuentra la descarga, incluyendo ayudas/incidencias. Mantener esta tarea pendiente si falta evidencia humana concreta; una aprobación global no acredita los pasos. Cuando se obtenga, actualizar la evidencia y su commit correspondiente. (Depende de T080).
-- [ ] T082 Cerrar `docs/verification-004.md`, `specs/004-flujo-claro-finrep/evidencia.md` y `README.md` con correspondencia FR/SC, versiones/hashes, resultados ejecutados, límites y aceptación humana real o su pendiente explícito; no esperar a SC-010 para documentar el trabajo técnico ya completado. Revisar `specs/004-flujo-claro-finrep/tasks.md` para marcar solo tareas efectivamente completadas y conservar visibles los pendientes. (Depende de T080).
-- [ ] T083 Comprobar diff, enlaces de documentos y estado Git, registrar el commit final de implementación con la validación y comunicar resultado/limitaciones usando `docs/verification-004.md` y `specs/004-flujo-claro-finrep/tasks.md`; mantener los commits incrementales anteriores y no publicar un remoto sin autorización. (Depende de T082).
+- [X] T082 Cerrar `docs/verification-004.md`, `specs/004-flujo-claro-finrep/evidencia.md` y `README.md` con correspondencia FR/SC, versiones/hashes, resultados ejecutados, límites y aceptación humana real o su pendiente explícito; no esperar a SC-010 para documentar el trabajo técnico ya completado. Revisar `specs/004-flujo-claro-finrep/tasks.md` para marcar solo tareas efectivamente completadas y conservar visibles los pendientes. (Depende de T080).
+- [X] T083 Comprobar diff, enlaces de documentos y estado Git, registrar el commit final de implementación con la validación y comunicar resultado/limitaciones usando `docs/verification-004.md` y `specs/004-flujo-claro-finrep/tasks.md`; mantener los commits incrementales anteriores y no publicar un remoto sin autorización. (Depende de T082).
 
 ## Dependencies & Execution Order
 

@@ -90,3 +90,11 @@ FINREP F 01.01 pasa el recorrido visual completo en 320, 390 y 1440 px. La demo 
 La exportación FINREP conserva las partes del original y valida el resultado antes de publicarlo. El recorrido de navegador detectó una liberación prematura del original tras confirmar la inspección: se corrigió y se añadió la prueba desde el commit real hasta la exportación y el cierre del conjunto. No se sustituyó el original por una reconstrucción.
 
 Los comandos, resultados, hashes, mediciones y correcciones se registran en [verificación 004](../../docs/verification-004.md). [tasks.md](tasks.md) mantiene el estado efectivo de cada tarea. Las pruebas automáticas y capturas no constituyen observación humana SC-010, que permanece pendiente.
+
+### Cierre técnico
+
+Build y typecheck pasan; Angular 169/169 y ocho salidas ANTLR reproducibles. Los 52 escenarios E2E están cubiertos mediante 43 verdes de la pasada completa inicial y 20 verdes después de las correcciones, con 11 repetidos. La evidencia conserva los fallos iniciales y sus causas, sin presentarlos como una única pasada limpia.
+
+El benchmark congelado en `894131b` pasa las diez auditorías y las diez mediciones bajo 30 s (14,280–15,798 s; mediana 15,049 s). El árbol estaba limpio al congelar y al terminar. La cobertura que antes mostraba un panel técnico se verifica por API antes de T1, incluida su latencia; el protocolo se identifica como `004-api-seeded-validation` y conserva carga y umbrales.
+
+Se completan **82/83 tareas**. Solo T081 / SC-010 permanece abierta: la instancia de revisión está en http://127.0.0.1:3340 y se solicitó a Diego evidencia concreta de navegación, cambio de conflicto, deselección y descarga. No se ha recibido todavía esa observación. El aviso de bundle inicial de 707,00 kB frente a 700 kB orientativos se documenta sin elevar el límite de error de 1 MB.

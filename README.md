@@ -94,12 +94,7 @@ los resultados de la ejecución elegida en JSON y XLSX, incluido su estado si qu
 - Un fallo o cancelación anterior a publicar conserva la versión vigente. Cancelar después no
   deshace una aplicación publicada. Una aceptación sin cambio se audita con `changed:false`.
 
-La medición de la iteración 002 de 500 reglas y 100.000 datos pasó **10/10 ejecuciones ≤30 s**, con máximo
-**15,78 s** desde fin de carga hasta resultados visibles; las diez auditorías completas pasan. La carga se mide
-aparte: media **30,20 s**. Equipo Ryzen 5 3600X/32 GB, Windows 11. CA1, con 110 posiciones,
-se mide por API de forma independiente: **0,84 s** para el extracto y **2,47 s** para el libro
-completo hasta publicar. [Protocolo y límites](docs/verification-002.md) explican ambas medidas;
-el [rendimiento de 001](docs/performance.md) se conserva como evidencia histórica.
+La medición de **004** con 500 reglas y 100.000 lecturas pasa **10/10 auditorías y ejecuciones ≤30 s**: rango **14,28–15,80 s**, mediana **15,05 s**, desde fin de carga hasta resultados visibles y cobertura comprobada. La carga se mide aparte: **28,50–30,54 s**. Es una referencia sintética `ce-report-1`, distinta de los recorridos visuales FINREP. La búsqueda automática de 500 reglas tarda **304–313 ms** en las cuatro comprobaciones. [Verificación y límites de 004](docs/verification-004.md) describe el protocolo, equipo, memoria, aviso de bundle y pendiente humano SC-010. Las mediciones de [002](docs/verification-002.md) y [001](docs/performance.md) se conservan como evidencia histórica.
 
 ## Documentos y desarrollo
 
