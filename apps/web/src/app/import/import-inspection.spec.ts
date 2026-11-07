@@ -105,8 +105,10 @@ describe('visual workbook inspection before publication', () => {
     api.workspace.mockResolvedValue(new HttpResponse({ body: { ...workspace, currentVersionId: 'v2', versionIds: ['v1', 'v2'] }, headers: new HttpHeaders({ ETag: '"v-v2"' }) }));
     const fixture = await render(), store = fixture.componentInstance.store; store.acceptedExcludedSheets.set(true); await store.commit(); fixture.detectChanges(); expect(store.inspection()?.state).toBe(status === 410 ? 'expired' : 'invalidated'); expect(store.contextForm()).toEqual(form); expect(store.canCommit()).toBe(false); expect(store.acceptedExcludedSheets()).toBe(false); expect(api.importFiles).not.toHaveBeenCalled();
   });
-  it('does not enable an inspection whose TTL has passed, even before a server response', async () => {
+  it('blocks committing an expired inspection but lets retained files be inspected again before a server response', async () => {
     api.activeImportInspection.mockResolvedValue({ active: ready({ expiresAt: new Date(Date.now() - 1).toISOString() }) }); const fixture = await render(), store = fixture.componentInstance.store; store.acceptedExcludedSheets.set(true); expect(store.locallyExpired()).toBe(true); expect(store.canCommit()).toBe(false); expect(store.contextForm()).toEqual(form); await store.commit(); expect(api.commitImportInspection).not.toHaveBeenCalled();
+    store.catalog.set(new File(['rules'], 'rules.xlsx')); store.reports.set([new File(['report'], 'report.xlsx')]);
+    fixture.detectChanges(); await fixture.whenStable(); expect(store.canInspect()).toBe(true);
   });
   it('replays an uncertain commit with the original hash, acceptance, key and CAS after navigation/base changes', async () => {
     api.activeImportInspection.mockResolvedValue({ active: ready() }); api.commitImportInspection.mockRejectedValueOnce(new HttpErrorResponse({ status: 0 })); const fixture = await render(), store = fixture.componentInstance.store; store.acceptedExcludedSheets.set(true); await store.commit(); const original = [...api.commitImportInspection.mock.calls[0]!]; expect(store.uncertainCommit()).toBe(true);

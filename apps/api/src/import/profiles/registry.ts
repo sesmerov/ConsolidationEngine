@@ -22,8 +22,16 @@ export async function inspectReportWorkbook(filePath: string, options: ReportIns
     return { profileId: DEMO_TYPES_PROFILE_ID, languageProfileId: DEMO_TYPES_LANGUAGE_PROFILE_ID, preflight, mappingSha256: DEMO_TYPES_MAPPING_SHA256, selectedSheets: ['Datos'], excludedSheets: [], ...(workbookContext ? { workbookContext } : {}) };
   }
   const candidates=(preflight.visualCandidates??[preflight.profile]).map(id=>id==='corep-ca1'?{profileId:COREP_PROFILE_ID,label:'COREP · C 01.00 · plantilla 4.0',tableCode:'C_01.00'}:{profileId:FINREP_PROFILE_ID,label:'FINREP · F 01.01 · plantilla 4.0',tableCode:'F_01.01'});
-  if(options.profileId&&!candidates.some(c=>c.profileId===options.profileId))throw new ApiError('PROFILE_NOT_RECOGNIZED');
   const rawProfile=preflight.sheets.find(s=>s.name==='Contexto')?.cells.B2?.text;
+  // A failed profile probe is not an alternative candidate. Preserve its actionable
+  // diagnostic when the supplied context targets it, instead of silently trying
+  // another framework and reporting an unrelated missing-context error.
+  const filingTables=Object.keys(options.formDeclaration?.filingIndicators??{});
+  const formProfile=filingTables.length===1?(filingTables[0]==='C_01.00'?COREP_PROFILE_ID:filingTables[0]==='F_01.01'?FINREP_PROFILE_ID:undefined):undefined;
+  const requestedProfile=options.profileId??(rawProfile===COREP_PROFILE_ID||rawProfile===FINREP_PROFILE_ID?rawProfile:undefined)??formProfile;
+  const rejected=preflight.visualProfileErrors?.find(item=>(item.profile==='corep-ca1'?COREP_PROFILE_ID:FINREP_PROFILE_ID)===requestedProfile);
+  if(rejected)throw rejected.error;
+  if(options.profileId&&!candidates.some(c=>c.profileId===options.profileId))throw new ApiError('PROFILE_NOT_RECOGNIZED');
   let workbookContext:ImportContextDeclaration|undefined;
   if(rawProfile===COREP_PROFILE_ID)workbookContext=readCorepWorkbookContext(preflight)?.declaration;
   else if(rawProfile===FINREP_PROFILE_ID)workbookContext=readFinrepWorkbookContext(preflight)?.declaration;

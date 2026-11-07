@@ -41,7 +41,7 @@ export class ImportStore {
   readonly inspection = signal<ImportInspectionDTO | null>(null); readonly inspectionPending = signal(false); readonly acceptedExcludedSheets = signal(false);
   readonly reviewDirty = signal(false); readonly locallyExpired = signal(false); readonly uncertainCommit = signal(false);
   readonly contextError = computed(() => this.contextSource() === 'workbook' ? null : this.validateContext());
-  readonly liveInspection = computed(() => this.inspection()?.state === 'ready' || this.inspection()?.state === 'committing');
+  readonly liveInspection = computed(() => this.inspection()?.state === 'ready' && !this.locallyExpired() || this.inspection()?.state === 'committing');
   readonly staleInspection = computed(() => !!this.inspection() && this.inspection()!.baseVersionId !== (this.session.versionId() ?? undefined));
   readonly canInspect = computed(() => !!this.catalog() && this.reports().length > 0 && !this.contextError() && !this.liveInspection() && !this.uploading() && !this.inspectionPending() && !this.uncertainCommit() && !this.session.jobActive() && !this.session.pending() && this.profileChoices().every(choice => this.reportProfiles().some(selected => selected.reportIndex === choice.reportIndex && selected.sha256 === choice.sha256)));
   readonly canCommit = computed(() => this.inspection()?.state === 'ready' && !this.reviewDirty() && !this.locallyExpired() && !this.staleInspection() && !this.inspectionPending() && !this.uploading() && !this.session.jobActive() && !this.session.pending() && !this.uncertainCommit() && (!this.inspection()!.requiresPartialCoverageAcceptance || this.acceptedExcludedSheets()));

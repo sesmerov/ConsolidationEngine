@@ -19,6 +19,26 @@ const oracle = JSON.parse(await readFile(path.resolve('specs/002-ui-eba-demo/con
 const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 afterAll(cleanupCorepFiles);
 
+test('visual registry preserves the formula location in a COREP extract', async () => {
+  const file = await corepFile(corepChange(await corepParts(), xml => corepReplaceCell(xml, 'E7', '<c r="E7"><f>1+1</f><v>2</v></c>')));
+  await expect(inspectReportWorkbook(file.path)).rejects.toMatchObject({ code: 'INVALID_WORKBOOK', details: { reason: 'FORMULA_IN_SELECTED_SHEET' }, locator: { sheet: 'CA1', row: 7, column: 'E' } });
+});
+
+test('visual registry reports a rejected requested COREP profile without rejecting FINREP over its excluded formula', async () => {
+  const source = await preflightXlsx(official, { profile: 'corep-ca1' });
+  const file = await corepFile(corepChange(await corepParts('tests/fixtures/eba/official-annexes-4.0.xlsx'), xml => corepReplaceCell(xml, 'E5', '<c r="E5"><f>1+1</f><v>2</v></c>'), source.sheets.find(sheet => sheet.name === 'CA1')!.part!.name));
+  for (const options of [{ formDeclaration: form }, { profileId: 'eba-corep-of-4.0-ca1-v1' }]) {
+    const diagnostic = await inspectReportWorkbook(file.path, options).then(() => null, error => ({ code: error.code, details: error.details, locator: error.locator }));
+    expect(diagnostic).toMatchObject({ code: 'INVALID_WORKBOOK', details: { reason: 'FORMULA_IN_SELECTED_SHEET' }, locator: { sheet: 'CA1', row: 5, column: 'E' } });
+  }
+  expect((await inspectReportWorkbook(file.path, { profileId: 'eba-finrep-4.0-f0101-v1' })).profileId).toBe('eba-finrep-4.0-f0101-v1');
+});
+
+test('visual registry keeps a concrete COREP anchor diagnostic instead of replacing it with an unknown-profile message', async () => {
+  const file = await corepFile(corepChange(await corepParts(), xml => corepReplaceCell(xml, 'D5', textCell('D5', 'ALTERED'))));
+  await expect(inspectReportWorkbook(file.path)).rejects.toMatchObject({ code: 'INVALID_WORKBOOK', details: { reason: 'ALTERED_CA1_ANCHOR' }, locator: { sheet: 'CA1', row: 5, column: 'D' } });
+});
+
 test('COREP official source recognizes 191 sheets and retains CA1 without relaxing legacy import', async () => {
   const workbook = await preflightXlsx(official, { profile: 'corep-ca1' });
   expect(workbook.sheets).toHaveLength(191);

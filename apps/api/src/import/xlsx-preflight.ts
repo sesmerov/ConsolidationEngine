@@ -17,7 +17,10 @@ export interface VerifiedSheetPart { readonly name: string; readonly crc32: numb
 export interface RawSheet { readonly name: string; readonly cells: Readonly<Record<string, RawCell>>; readonly maxRow: number; readonly maxColumn: number; readonly merged: boolean; readonly part?: VerifiedSheetPart; readonly fragmentedRows?: Readonly<Record<number, number>>;
   readonly mergeRanges?: readonly string[]; readonly formulaCount?: number; readonly firstFormulaCell?: string; readonly physicalCellCount?: number }
 export interface PreflightWorkbook { readonly date1904: boolean; readonly sheets: readonly RawSheet[]; readonly expandedBytes: number; readonly compressedBytes: number; readonly sharedStrings?: readonly string[]; readonly styleCount?: number;
-  readonly profile?: 'corep-ca1' | 'finrep-f0101'; readonly visualCandidates?: readonly ('corep-ca1'|'finrep-f0101')[]; readonly writerCompatibleParts?:boolean; readonly limits?: PreflightLimits; readonly numberFormats?: readonly string[];
+  readonly profile?: 'corep-ca1' | 'finrep-f0101'; readonly visualCandidates?: readonly ('corep-ca1'|'finrep-f0101')[];
+  /** Internal rejection evidence; never a recognized candidate or a public profile choice. */
+  readonly visualProfileErrors?: readonly { readonly profile: 'corep-ca1' | 'finrep-f0101'; readonly error: ApiError }[];
+  readonly writerCompatibleParts?:boolean; readonly limits?: PreflightLimits; readonly numberFormats?: readonly string[];
   readonly scan?: { readonly physicalCells: number; readonly externalLinkXmlParts: number; readonly externalRelations: number; readonly formulas: number } }
 export const PREFLIGHT_LIMITS = { maxCompressedBytes: 10 * 1024 * 1024, maxEntryBytes: 64 * 1024 * 1024, maxExpandedBytes: 100 * 1024 * 1024,
   maxEntries: 2048, maxSheets: 64, maxSharedStrings: 500_000, maxCellChars: 32_767, maxXmlDepth: 64, maxRows: 200_001, maxColumns: 64,
@@ -253,9 +256,16 @@ export async function preflightXlsx(filePath: string, options: PreflightOptions 
       else if(options.profile==='finrep-f0101'){recognizeFinrepStructure(workbook);return {...workbook,profile:'finrep-f0101',visualCandidates:['finrep-f0101']};}
       else {
         const candidates:('corep-ca1'|'finrep-f0101')[]=[];
-        for(const [id,recognize] of [['corep-ca1',recognizeCorepStructure],['finrep-f0101',recognizeFinrepStructure]] as const){try{recognize(workbook);candidates.push(id);}catch(error){if(!(error instanceof ApiError))throw error;}}
-        if(!candidates.length)throw new ApiError('INVALID_WORKBOOK',{reason:'UNKNOWN_REPORT_PROFILE'});
-        return {...workbook,profile:candidates[0]!,visualCandidates:candidates};
+        const errors:{profile:'corep-ca1'|'finrep-f0101';error:ApiError}[]=[];
+        for(const [id,recognize] of [['corep-ca1',recognizeCorepStructure],['finrep-f0101',recognizeFinrepStructure]] as const){
+          const sheet=result.find(item=>item.name===(id==='corep-ca1'?'CA1':'1.1'));
+          try{
+            if(sheet?.formulaCount)throw new ApiError('INVALID_WORKBOOK',{reason:'FORMULA_IN_SELECTED_SHEET'},{sheet:sheet.name,...(sheet.firstFormulaCell?{column:sheet.firstFormulaCell.replace(/\d+$/,''),row:Number(sheet.firstFormulaCell.replace(/^[A-Z]+/,''))}:{})});
+            recognize(workbook);candidates.push(id);
+          }catch(error){if(!(error instanceof ApiError))throw error;if(sheet)errors.push({profile:id,error});}
+        }
+        if(!candidates.length)throw errors[0]?.error??new ApiError('INVALID_WORKBOOK',{reason:'UNKNOWN_REPORT_PROFILE'});
+        return {...workbook,profile:candidates[0]!,visualCandidates:candidates,...(errors.length?{visualProfileErrors:errors}:{})};
       }
     }
     options.check?.(); return workbook;
