@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-07
 
-**Status**: Especificación lista para planificar; comportamiento propuesto, pendiente de implementación y pruebas.
+**Status**: Planificación completada el 2026-11-07; lista para desglosar tareas. Comportamiento propuesto, pendiente de implementación y pruebas. Véase [plan.md](plan.md).
 
 **Input**: Nueva iteración solicitada por Diego: destacar la siguiente etapa sin el rótulo «Siguiente paso», dar un color distintivo a las acciones principales, eliminar información técnica innecesaria, mejorar la resolución de conflictos, seleccionar varios recálculos con preselección de los que tienen destino único y confirmar el funcionamiento de FINREP F 01.01.
 
@@ -23,7 +23,7 @@ Como analista, quiero reconocer la acción que permite avanzar y localizar la et
 **Acceptance Scenarios**:
 
 1. Al confirmar una carga y publicarse sus datos, el elemento completo «2. Validar» recibe un realce visible. Al guardar destinos utilizables se realza «3. Recalcular»; al aplicar y publicarse la nueva versión, «4. Descargar». No aparece texto visible «Siguiente paso» debajo, al lado ni dentro de las etapas.
-2. La etapa recomendada presenta borde, fondo y un indicador direccional que la distinguen de la etapa abierta. Realiza tres pulsos suaves en seis segundos, una vez por operación confirmada, y después mantiene su realce estático hasta visitarla o quedar sustituida por un hito vigente. Con movimiento reducido, el realce es estático desde el principio.
+2. La etapa recomendada presenta borde, fondo y un indicador direccional que la distinguen de la etapa abierta. Realiza tres pulsos suaves en 4,5 segundos, una vez por operación confirmada, y después mantiene su realce estático hasta visitarla o quedar sustituida por un hito vigente. Con movimiento reducido, el realce es estático desde el principio.
 3. La indicación no cambia de pantalla ni mueve el foco por sí sola. Un lector de pantalla recibe una única descripción de la etapa recomendada. Consultar resultados, repintar la pantalla o recuperar una respuesta repetida no reinicia el pulso.
 4. En cada estado existe como máximo una acción principal habilitada de color verde sólido. Su texto expresa lo que hará. Las acciones de consulta, cancelar, descartar u omitir son secundarias; cerrar y descartar datos nunca adopta el verde de avance.
 5. Un trabajo pendiente, fallido, cancelado, incompleto o perteneciente a otra versión no recomienda avanzar como si hubiera terminado. Descargar desde el resultado aplicado identifica la versión recién publicada aunque hubiera otra histórica elegida.
@@ -125,7 +125,7 @@ Datos sintéticos en EUR, precisión declarada de dos decimales: r0010=90, r0020
 ### Functional Requirements
 
 - **FR-001** — Señalar una única etapa recomendada mediante el realce del propio elemento de navegación y sin el rótulo visible «Siguiente paso». Distinguirla de la etapa abierta; conservar el control de navegación y foco en manos del usuario.
-- **FR-002** — Aplicar tres pulsos suaves de dos segundos al nuevo hito confirmado y después conservar un realce estático. No producir destellos ni alternancias bruscas. Respetar movimiento reducido y anunciar de forma accesible una sola recomendación por operación.
+- **FR-002** — Aplicar tres pulsos suaves de 1,5 segundos al nuevo hito confirmado y después conservar un realce estático. No producir destellos ni alternancias bruscas. Respetar movimiento reducido y anunciar de forma accesible una sola recomendación por operación.
 - **FR-003** — Activar las recomendaciones tras carga publicada, destinos utilizables guardados y aplicación publicada; ignorar trabajos pendientes, fallidos, cancelados, incompletos, duplicados o ajenos a la versión vigente. Cuando solo proceda validar, permitir descargar resultados.
 - **FR-004** — Usar verde sólido para la acción principal de avance según el estado de la etapa y jerarquía de la tabla inferior. Diferenciar controles secundarios y destructivos. Mantener texto, foco y contraste legibles en reposo, interacción y deshabilitado.
 - **FR-005** — Eliminar los apartados y datos técnicos enumerados en el alcance de simplificación. Conservar internamente la trazabilidad necesaria para reproducir decisiones y resultados; la retirada visual no altera los cálculos ni sus registros.
@@ -192,7 +192,7 @@ El verde indica la acción principal disponible, no que las reglas se cumplan. U
 
 | ID | Resultado verificable | Cobertura |
 | --- | --- | --- |
-| **SC-001** | Los tres hitos señalan la etapa correcta sin texto visible «Siguiente paso», sin navegación automática y con como máximo tres pulsos durante seis segundos. Con movimiento reducido hay cero pulsos. Fallo, cancelación, duplicación y respuesta tardía no generan una nueva recomendación. | FR-001–003 |
+| **SC-001** | Los tres hitos señalan la etapa correcta sin texto visible «Siguiente paso», sin navegación automática y con como máximo tres pulsos durante 4,5 segundos. Con movimiento reducido hay cero pulsos. Fallo, cancelación, duplicación y respuesta tardía no generan una nueva recomendación. | FR-001–003 |
 | **SC-002** | En todos los estados de la tabla de acciones hay como máximo una acción principal verde habilitada. Se cumplen los contrastes 4,5:1 y 3:1 y el foco es visible a 320, 390 y 1440 píxeles; el recorrido completo se puede operar con teclado. | FR-004, FR-022 |
 | **SC-003** | En las cuatro etapas y los detalles hay cero controles «Información técnica», «Detalle técnico» e «Identificadores y política de cálculo», y cero huellas, identificadores internos o volcados técnicos visibles. Los casos de exclusión, límite, caducidad, redondeo y cierre mantienen explicación y acción pertinentes. | FR-005–007 |
 | **SC-004** | Se resuelven y se pueden cambiar grupos de 2, 3 y más de 50 productores con una única elección por celda/contexto, incluidos candidatos de la segunda página. Se observan cero botones «Conservar…» y cero escrituras de valores antes de aplicar. | FR-008–009 |

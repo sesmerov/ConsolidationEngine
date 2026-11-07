@@ -56,8 +56,17 @@ El plan deberá fijar el módulo y metadatos FINREP que correspondan a la fuente
 
 US5 define un nuevo catálogo de cinco reglas sintéticas y valores conocidos. Se exige reconocer las 38 posiciones aunque las reglas de ejemplo solo lean algunas. Sus dos igualdades producen 90 → 100 y 105 → 120 en orden de dependencia; las desigualdades y el condicional solo validan. Se comprobarán por separado ausencia frente a cero, precisión, estructura alterada y conservación del libro exportado.
 
-## Límites de esta entrega
+## Límites de la entrega inicial (specify)
 
 - Se entregan especificación, esta evidencia de partida y checklist de calidad documental.
 - No hay cambios de código, nuevos archivos de demo, migración de datos, despliegue ni prueba positiva FINREP en esta fase.
-- No se han iniciado plan ni tareas de 004. La siguiente fase es `$speckit-plan`.
+- En esa entrega todavía no se habían iniciado plan ni tareas de 004.
+## Actualización de planificación — 2026-11-07
+
+Se completó `$speckit-plan`: [plan](plan.md), [investigación](research.md), [modelo](data-model.md), [guía de validación](quickstart.md) y contratos de [interfaz](contracts/ui.md), [selección](contracts/proposal-selection.md) y [FINREP](contracts/finrep-f0101.md).
+
+La investigación cerró la identificación FINREP con un alias local del layout, la preservación del original para exportación, los grupos de conflicto editables y la selección compacta por revisión. Se ajustó el pulso diseñado inicialmente a tres ciclos de 1,5 s (4,5 s), documentado en D2 de investigación. Es un refinamiento técnico de una duración propuesta por nosotros, sin cambio del objetivo solicitado.
+
+Se verificaron las versiones instaladas, las rutas y contratos actuales, el mapping completo de 38 posiciones y las fuentes de metadatos. Una comprobación exploratoria de las cinco expresiones de demo con el parser compilado disponible devolvió cero diagnósticos; no acredita interpretación integral, carga visual ni exportación FINREP. Esas pruebas quedan definidas para implementación.
+
+Se comprobó la resolución de artefactos mediante check-prerequisites, enlaces locales, bloques de documentación y ausencia de marcadores pendientes. La evaluación de la constitución es satisfactoria antes y después del diseño. No se ha creado tasks.md ni modificado la aplicación; la siguiente fase es `$speckit-tasks`.
