@@ -2,7 +2,7 @@
 
 ## Estado
 
-Implementación técnica terminada desde `d4d98f8`, rama `codex/004-flujo-claro-finrep`: **82/83 tareas completadas**. SC-001–009, build, tipos, regresiones y rendimiento están verificados. Solo permanece pendiente T081 / observación humana SC-010, separada de la automatización. Código medido: `894131bdffce0eaf17091bc78e803fa44e1ba18d`; los commits posteriores de cierre solo actualizan documentación.
+Entrega técnica del 2026-11-07 desde `d4d98f8`, rama `codex/004-flujo-claro-finrep`: **82/83 tareas marcadas**. Se conservan abajo los resultados de build, tipos, regresiones y rendimiento. La revisión humana del 2026-11-08 señala problemas de presentación del foco/pulso y dificultad para comprender los destinos de recálculo; su investigación se documenta al final y las correcciones siguen pendientes. T081 / SC-010 permanece abierta. Código medido: `894131bdffce0eaf17091bc78e803fa44e1ba18d`; los commits posteriores de cierre e investigación solo actualizan documentación.
 
 ## Preparación — 2026-11-07
 
@@ -22,7 +22,7 @@ T003: escenarios sintéticos 2/3/51 productores, 51 destinos y contextos compati
 
 SC-010 pendiente de observación con la versión de esta iteración. Una valoración global no sustituye el detalle de las acciones observadas. Se dejó una instancia propia en **http://127.0.0.1:3340**, verificada con HTTP 200 y proceso Node 560; no se reutilizó el servidor del analista. Metadatos y logs en `.cache/verification-004/manual-server.*`.
 
-Se pidió a Diego identificar las etapas recomendadas tras carga/guardado/aplicación, elegir y cambiar un conflicto, desmarcar una propuesta y explicar su aviso, y comunicar qué versión descargó y qué ayuda necesitó. A fecha del cierre técnico no se había recibido esa observación; T081 se mantiene sin marcar. No se atribuye aceptación humana a las capturas o acciones de Playwright.
+Se pidió a Diego identificar las etapas recomendadas tras carga/guardado/aplicación, elegir y cambiar un conflicto, desmarcar una propuesta y explicar su aviso, y comunicar qué versión descargó y qué ayuda necesitó. El 2026-11-08 respondió «En general, todo bien» y señaló los rectángulos de los títulos/pulso y la dificultad para comprender «Configurar destinos de recálculo». Es una valoración global con incidencias concretas, no evidencia de todas las acciones solicitadas. T081 se mantiene sin marcar. No se atribuye aceptación humana a las capturas o acciones de Playwright.
 
 ## Primer incremento de interfaz
 
@@ -81,7 +81,7 @@ Revalidación: **20/20** pasan en 3,1 minutos (`corep-import`, `import`, `useful
 
 | Criterios | Evidencia | Estado |
 | --- | --- | --- |
-| SC-001–002 / FR-001–004, FR-022 | Tres hitos reales; verde único; contraste renderizado ≥4,5:1; pulso de 4,5 s; foco, reduced-motion y forced-colors; anuncio oculto con dimensiones 1 px. | Verificado |
+| SC-001–002 / FR-001–004, FR-022 | Tres hitos reales; verde único; contraste renderizado ≥4,5:1; pulso de 4,5 s; foco, reduced-motion y forced-colors; anuncio oculto con dimensiones 1 px. La revisión del 08-11 detecta geometría incorrecta del halo y contorno innecesario al usar ratón. | Pruebas anteriores pasan; incidencias visuales abiertas |
 | SC-003 / FR-005–007 | Carga, validación, detalle, propuesta, comparación y descarga sin identificadores internos; se conservan errores localizados, caducidad y exclusiones. | Verificado |
 | SC-004 / FR-008–009 | Grupos 2/3/51; elección, cambio y omisión; borrador local, teclado, página posterior y aislamiento. | Verificado |
 | SC-005–006 / FR-010–015 | Preselección persistente, edición/filtro global, 51 propuestas, cierre de dependencias, revisión y consentimiento, incertidumbre y aplicación compacta. | Verificado |
@@ -117,4 +117,16 @@ Hashes de entrada congelados: catálogo `d76eaad8a4e2a06659163df996bb2c3fbe69e25
 
 ## Cierre
 
-Se conserva la advertencia de bundle de 707,00 kB frente a 700 kB orientativos. El soporte FINREP se limita a F 01.01 del layout 4.0 fijado; el catálogo de demo es sintético y la prueba no afirma cobertura FINREP general. T081 queda pendiente de observación humana concreta. Los demás trabajos y sus comprobaciones están terminados; checklists documentales intactos y sin hooks de extensión registrados.
+Se conserva la advertencia de bundle de 707,00 kB frente a 700 kB orientativos. El soporte FINREP se limita a F 01.01 del layout 4.0 fijado; el catálogo de demo es sintético y la prueba no afirma cobertura FINREP general. La entrega técnica y sus comprobaciones se cerraron el 07-11, con checklists documentales intactos y sin hooks de extensión registrados. La revisión siguiente identifica trabajo visual pendiente; no se declara aceptada la iteración.
+
+## Investigación de la revisión humana — 2026-11-08
+
+Se reprodujeron los dos rectángulos en Chromium 156.0.8078.4, 1440×1000, mediante un servidor de prueba aislado en 3318. No se modificó el producto ni la sesión del analista en 3340. El arnés temporal se retiró después de ejecutar la comprobación.
+
+- **Título de etapa:** `StageFocus.fulfill` mueve el foco al título para orientar la navegación. El título tiene `tabindex="-1"` y `styles.scss` fuerza un contorno con `:focus`, también al usar ratón. Medición tras ratón: `focus=true`, `focus-visible=false`, contorno de 2 px y separación de 4 px. Tras navegación por teclado: `focus-visible=true`, con el mismo contorno. Propuesta: conservar el foco programático y su señal con teclado, suprimiendo el contorno solo para títulos de etapa sin foco visible; no retirar globalmente los contornos de controles o errores.
+- **Pulso de navegación:** el adorno `.stage-pulse` queda proyectado dentro de la etiqueta de texto que crea Material. Esa etiqueta es su contenedor de posicionamiento. Botón: 168×40 px y radio 9999 px; etiqueta/adorno: 87,17×22 px y radio 0 px. El rectángulo interior es el borde del adorno, no un indicador de foco. Propuesta: situar el halo como hermano del botón dentro de un envoltorio propio, manteniendo estable el botón, el pulso finito y las alternativas de accesibilidad. No depender de clases privadas de Material.
+- **Comprensión de destinos:** la función define qué celda puede modificar cada regla y qué productor conservar ante un conflicto; guardar configuración todavía no modifica importes. `Total=A+B` permite sugerir automáticamente Total; `A=B` requiere decidir entre A y B cuando ambos sean elegibles. Para limitarse a validar no hace falta configurar recálculos. Propuesta de UX para revisar: llevar esta decisión al inicio de Recalcular, titularla «Elegir qué celdas recalcular» y concentrar la intervención en ambigüedades/conflictos.
+
+Las pruebas previas de guía comprobaban duración, foco y contraste, pero no la correspondencia geométrica entre halo y botón ni la ausencia de contorno del título tras ratón. Las propuestas anteriores son recomendaciones de esta investigación; todavía no están implementadas.
+
+Mediciones y capturas en `.cache/verification-004/focus-investigation/focus-investigation.tmp-re-df5bc-metry-on-isolated-port-3318-chromium/`: `measurements.json`, `heading-after-mouse.png`, `heading-after-keyboard.png` y `pulse-navigation.png`. Copia del arnés en `.cache/verification-004/focus-investigation/harness-source.txt`.
