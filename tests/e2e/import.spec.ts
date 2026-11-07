@@ -117,7 +117,7 @@ test('V01/V14: real visual template and demo downloads, explicit import, blank/z
   await expect(header).toContainText('COREP_OF_4.0');
   await expect(header.getByRole('combobox')).toHaveCount(0);
   const bootstrap = await (await page.request.get('/api/v1/bootstrap')).json();
-  const version = await page.getByTestId('current-version-id').textContent();
+  const version = await page.locator('.workspace-context .workspace-meta dd').first().textContent();
   const published = await page.request.get(`/api/v1/workspaces/${bootstrap.activeWorkspaceId}/rules`, {
     headers: { 'X-CE-Session': bootstrap.sessionToken }, params: { versionId: version! },
   });
@@ -132,7 +132,7 @@ test('V01/V14: real visual template and demo downloads, explicit import, blank/z
   await page.screenshot({ path: info.outputPath('import-ui.png'), fullPage: true });
   expect(await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length }))).toEqual({ local: 0, session: 0 });
   await page.reload();
-  await expect(page.getByTestId('current-version-id')).toHaveText(version!);
+  await expect(page.locator('.workspace-context .workspace-meta dd').first()).toHaveText(version!);
   await expect(page.getByText('16 de 16 registros', { exact: true })).toBeVisible();
 });
 
@@ -159,7 +159,7 @@ test('V04/V13: invalid and duplicate rules remain visible; an invalid COREP repl
   await expect(page.getByText('1 de 1 registros', { exact: true })).toBeVisible();
   await page.locator('summary').filter({ hasText: 'SYNTHETIC_INVALID' }).click();
   await expect(page.getByText(/SYNTAX_ERROR:/).first()).toBeVisible();
-  const version = await page.getByTestId('current-version-id').textContent();
+  const version = await page.locator('.workspace-context .workspace-meta dd').first().textContent();
   const bad = zipBytes(changeXml(await readZipParts(report), 'xl/worksheets/sheet1.xml', xml =>
     replaceCell(xml, 'E7', '<c r="E7"><f>1+1</f><v>2</v></c>')));
   await page.getByLabel('Informes (.xlsx)', { exact: true }).setInputFiles({ name: 'importe-invalido.xlsx', mimeType, buffer: bad });
@@ -169,7 +169,7 @@ test('V04/V13: invalid and duplicate rules remain visible; an invalid COREP repl
   await expect(error).toBeFocused();
   await expect(page.getByLabel('Informes (.xlsx)', { exact: true })).toHaveAttribute('aria-invalid', 'true');
   await expect(page.locator('#reports-server-errors')).toContainText('CA1 E7');
-  await expect(page.getByTestId('current-version-id')).toHaveText(version!);
+  await expect(page.locator('.workspace-context .workspace-meta dd').first()).toHaveText(version!);
   await expect(page.getByText('1 de 1 registros', { exact: true })).toBeVisible();
 });
 test('production serves only the Angular build, protects API routes and supports SPA fallback', async ({ page }) => {

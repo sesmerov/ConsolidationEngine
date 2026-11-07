@@ -8,13 +8,14 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { MatButtonHarness } from '@angular/material/button/testing';
 import { WorkspaceShellComponent } from './workspace-shell.component';
+import { WorkspaceViewStore } from './workspace-view.store';
 import { ImportStore } from '../import/import.store';
 import { ResultsStore } from '../validation/results.store';
 import { PreviewStore } from '../recalculation/preview.store';
 import { DirectionsStore } from '../recalculation/directions.store';
 import { ApplyStore } from '../recalculation/apply.store';
 import { ExportStore } from '../recalculation/export.store';
-import type { PreviewDTO, ReportContext, ValidationResultsPageDTO } from '@ce/contracts';
+import type { JobDTO, PreviewDTO, ReportContext, ValidationResultsPageDTO } from '@ce/contracts';
 
 const workspace = { id: 'workspace', name: 'Cierre de prueba', state: 'ready' as const, currentVersionId: 'v1', versionIds: ['v0', 'v1'], contexts: [], counts: { snapshots: 1, coordinates: 2, facts: 2, sources: 2 }, sessionBytes: 1 };
 const domesticContext: ReportContext = {
@@ -40,6 +41,31 @@ describe('workspace navigation keeps one active stage', () => {
     const session = TestBed.inject(SessionStore); vi.spyOn(session, 'connect').mockResolvedValue(); session.connected.set(true); session.workspace.set(workspace); session.etag.set('"v-v1"');
   });
   afterEach(() => TestBed.resetTestingModule());
+  it('does not expose internal session/version IDs or technical controls in the rendered workspace', async () => {
+    const fixture = TestBed.createComponent(AppComponent); fixture.detectChanges(); await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('[data-testid=current-version-id]')).toBeNull();
+    expect(element.textContent).not.toContain('Información de la sesión');
+    expect(element.textContent).not.toContain('Información técnica');
+    expect(element.querySelector('.workspace-context')?.textContent).toContain('Versión 2');
+  });
+  it('hides successful progress only after the matching result is rendered, retaining later failures and incomplete work', async () => {
+    const fixture = TestBed.createComponent(AppComponent); fixture.detectChanges(); await fixture.whenStable();
+    const injector = fixture.debugElement.query(By.directive(WorkspaceShellComponent)).injector;
+    const view = injector.get(WorkspaceViewStore), results = injector.get(ResultsStore), session = TestBed.inject(SessionStore);
+    const job: JobDTO = { jobId: 'validation-job', workspaceId: workspace.id, baseVersionId: 'v1', kind: 'validate', status: 'succeeded',
+      progress: { completed: 1, total: 1, complete: true }, diagnostics: [], resultRef: { type: 'validation', id: 'run' }, pollAfterMs: 500 };
+    session.job.set(job); results.page.set(page); fixture.detectChanges(); await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('.job-progress')).not.toBeNull();
+    view.visit('validation'); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.job-progress')).toBeNull();
+    session.job.set({ ...job, jobId: 'later', resultRef: { type: 'validation', id: 'later-run' } }); fixture.detectChanges(); await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('.job-progress')).not.toBeNull();
+    session.job.set({ ...job, status: 'failed', diagnostics: [{ code: 'FAILED', message: 'Revisa el archivo.' }] }); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.job-progress')?.textContent).toContain('Revisa el archivo.');
+    session.job.set({ ...job, progress: { completed: 0, total: 1, complete: false } }); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.job-progress')?.textContent).toContain('Progreso incompleto');
+  });
   it('shows one context as entity, civil date and module once and removes those values when the context list empties', async () => {
     const session = TestBed.inject(SessionStore);
     session.workspace.set({ ...workspace, contexts: [domesticContext] });

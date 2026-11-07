@@ -19,6 +19,13 @@ export class PreviewStore {
   readonly selected = signal<readonly string[]>([]); readonly selection = signal<PreviewSelectionDTO | null>(null); readonly selecting = signal(false);
   readonly selectedProposals = computed(() => [...this.selectedDetails().values()].filter(row => this.selected().includes(row.id)));
   readonly application = signal<ApplicationDetailDTO | null>(null); readonly comparison = signal<ComparisonPageDTO | null>(null); readonly applicationLoading = signal(false);
+  readonly resultPresentation = computed(() => {
+    const job = this.session.job(), preview = this.preview();
+    if (!job || job.status !== 'succeeded' || job.workspaceId !== this.session.workspace()?.id) return null;
+    const visible = job.kind === 'preview' ? job.resultRef?.id === preview?.id && this.page()?.versionId === preview?.baseVersionId
+      : job.kind === 'apply' && this.comparison()?.receipt.id === job.resultRef?.id && this.comparison()?.receipt.newVersionId === job.newVersionId;
+    return visible ? { jobId: job.jobId, workspaceId: job.workspaceId, versionId: job.newVersionId ?? job.baseVersionId ?? null } : null;
+  });
   readonly loading = signal(false); readonly pending = signal(false); readonly error = signal<string | null>(null); readonly confirmDiscard = signal(false);
   readonly status = signal(''); readonly code = signal(''); readonly table = signal('');
   readonly pagination = new CursorPage(); readonly comparisonPagination = new CursorPage(); readonly changedOnly = signal(true);

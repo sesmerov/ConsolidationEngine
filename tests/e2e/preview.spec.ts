@@ -1,9 +1,10 @@
+import { expectPublishedVersion } from './workflow-helpers.js';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
-import { importLegacyFixture, navigateStage, openCalculation, openTechnical } from './workflow-helpers.js';
+import { importLegacyFixture, navigateStage, openCalculation, openCalculationExplanation } from './workflow-helpers.js';
 import { prepareDirections, saveDirections } from './direction-review-helpers.js';
 const root = path.resolve('tests/fixtures/generated');
 async function session(page: Page) { const bootstrap = await (await page.request.get('/api/v1/bootstrap')).json(); return { id: bootstrap.activeWorkspaceId as string, headers: { 'X-CE-Session': bootstrap.sessionToken as string } }; }
@@ -44,7 +45,7 @@ async function configure(page: Page, expressions: readonly (readonly [string, st
     const configured = await page.request.put(base + '/directions', { headers: { ...connection.headers, 'If-Match': current.headers()['etag']! }, data: { directions } });
     expect(configured.status()).toBe(200);
     await page.reload();
-    await expect(page.getByTestId('current-version-id')).toHaveText((await configured.json()).versionId);
+    await expectPublishedVersion(page, (await configured.json()).versionId);
   } else {
     const reviewId = await prepareDirections(page);
     await saveDirections(page, reviewId, expressions.length);
@@ -112,7 +113,7 @@ test('V07: consumers read .33 at p2 and propose .99; a punctual 1/3 and its cons
   expect(find('synthetic_tripled').after.originalText).toBe('0.99'); expect(find('synthetic_tripled').exactNominal).toEqual({ numerator: '99', denominator: '100' });
   expect(find('synthetic_point').state).toBe('blocked'); expect(find('synthetic_point').diagnostics).toContainEqual(expect.objectContaining({ code: 'CANDIDATE_DOES_NOT_SATISFY_RULE' })); expect(find('synthetic_blocked_consumer').state).toBe('blocked');
   const fraction = page.locator('.proposal-row').filter({ has: page.getByRole('button', { name: 'Ver cálculo y origen de synthetic_fraction', exact: true }) }); await expect(fraction.getByText('Disponible', { exact: true })).toBeVisible();
-  const detail = await openCalculation(page, fraction, 'synthetic_fraction'); await openTechnical(detail); await expect(detail).toContainText('Resultado exacto antes del redondeo: 1/3');
+  const detail = await openCalculation(page, fraction, 'synthetic_fraction'); await openCalculationExplanation(detail); await expect(detail).toContainText('Resultado exacto antes del redondeo: 1/3');
   await detail.getByRole('button', { name: 'Cerrar detalle', exact: true }).click();
   await expect(page.locator('.proposal-row').filter({ has: page.getByRole('button', { name: 'Ver cálculo y origen de synthetic_tripled', exact: true }) })).toContainText('0,99');
 });

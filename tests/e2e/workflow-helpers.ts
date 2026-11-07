@@ -19,6 +19,18 @@ export async function navigateStage(page: Page, stage: keyof typeof stages): Pro
   await expect(page.locator(stages[stage].component)).toBeVisible();
 }
 
+/** Verify the internal identity through the API and its public numbered label through the UI. */
+export async function expectPublishedVersion(page: Page, versionId: string): Promise<void> {
+  const bootstrap = await (await page.request.get('/api/v1/bootstrap')).json() as BootstrapDTO;
+  const url = '/api/v1/workspaces/' + bootstrap.activeWorkspaceId;
+  let workspace!: WorkspaceDTO;
+  await expect.poll(async () => {
+    const response = await page.request.get(url, { headers: { 'X-CE-Session': bootstrap.sessionToken } });
+    expect(response.status()).toBe(200); workspace = await response.json(); return workspace.currentVersionId;
+  }).toBe(versionId);
+  await expect(page.locator('.workspace-context')).toContainText('Versión ' + (workspace.versionIds.indexOf(versionId) + 1));
+}
+
 type FixtureWorkbook = string | { name: string; buffer: Buffer };
 
 /** Seed a v1-only scenario through the production API in Playwright's private server. */
@@ -69,7 +81,7 @@ export async function importLegacyFixture(page: Page, catalog: FixtureWorkbook, 
   expect(workspace.currentVersionId).toBe(newVersionId);
   expect(workspace.versionIds).toEqual([...previous.versionIds, newVersionId]);
   await page.reload();
-  await expect(page.getByTestId('current-version-id')).toHaveText(newVersionId);
+  await expectPublishedVersion(page, newVersionId);
   return { newVersionId, workspace, jobId };
 }
 
@@ -81,9 +93,9 @@ export async function openCalculation(page: Page, row: Locator, code: string, co
   return detail;
 }
 
-export async function openTechnical(detail: Locator): Promise<Locator> {
-  await detail.locator('summary').filter({ hasText: /^Detalle técnico$/ }).click();
-  const technical = detail.locator('[data-technical] pre');
-  await expect(technical).toBeVisible();
-  return technical;
+export async function openCalculationExplanation(detail: Locator): Promise<Locator> {
+  await detail.locator('summary').filter({ hasText: /^Cómo se obtiene este importe$/ }).click();
+  const explanation = detail.locator('.calculation-explanation');
+  await expect(explanation).toBeVisible();
+  return explanation;
 }

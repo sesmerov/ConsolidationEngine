@@ -1,4 +1,9 @@
 @use '@angular/material' as mat;
+.ce-primary-action {
+  @include mat.button-overrides((filled-container-color: #146c43, filled-label-text-color: #ffffff, filled-disabled-container-color: #e3e8e5, filled-disabled-label-text-color: #405447));
+  &:not(:disabled):hover, &:not(:disabled):active { @include mat.button-overrides((filled-container-color: #105835, filled-label-text-color: #ffffff)); }
+  &:focus-visible { outline: 3px solid #175caa; outline-offset: 3px; }
+}
 html { @include mat.theme((color: (primary: mat.$azure-palette, tertiary: mat.$blue-palette), typography: 'Segoe UI', density: 0)); color-scheme: light; }
 * { box-sizing: border-box; }
 body { margin: 0; background: #f4f6fa; color: #1b283b; font-family: 'Segoe UI', system-ui, sans-serif; }

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { afterEveryRender, ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import type { DoCheck } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -28,11 +28,16 @@ imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatP
 providers: [WorkspaceViewStore, StageFocus, ImportStore, ResultsStore, PreviewStore, DirectionsStore, ApplyStore, ExportStore, { provide: MatPaginatorIntl, useFactory: spanishPaginator }], templateUrl: './workspace-shell.component.html', styleUrl: './workspace-shell.component.scss' })
 export class WorkspaceShellComponent implements DoCheck {
 readonly session = inject(SessionStore); readonly view = inject(WorkspaceViewStore); readonly confirmClose = signal(false);
+private readonly imports = inject(ImportStore); private readonly results = inject(ResultsStore); private readonly proposals = inject(PreviewStore);
+readonly visibleJob = computed(() => { const job = this.session.job(); return job && !this.view.resultWasPresented(job) ? job : null; });
 readonly stages = [
   { id: 'import', label: '1. Cargar' }, { id: 'validation', label: '2. Validar' },
   { id: 'preview', label: '3. Recalcular' }, { id: 'exports', label: '4. Descargar' },
 ] as const;
 readonly nextLabel = computed(() => this.stages.find(item => item.id === this.view.recommended())?.label.slice(3));
+readonly announcement = signal('');
+readonly pulse = signal<{ id: string; delay: number } | null>(null);
+private pulseTimer?: ReturnType<typeof setTimeout>;
 private readonly stageFocus = inject(StageFocus);
 private readonly workspaceName = viewChild<ElementRef<HTMLElement>>('workspaceName');
 private readonly contextSelector = viewChild('contextSelector', { read: ElementRef<HTMLSelectElement> });
@@ -44,15 +49,33 @@ readonly contextOptions = computed(() => {
     labelCounts.set(label, (labelCounts.get(label) ?? 0) + 1);
     return { id: context.contextId, label };
   });
-  return options.map(option => labelCounts.get(option.label) === 1
+  return options.map((option, index) => labelCounts.get(option.label) === 1
     ? option
-    : { id: option.id, label: option.label + ' · ' + option.id });
+    : { id: option.id, label: option.label + ' · Contexto ' + (index + 1) });
 });
 readonly civilDate = civilDate; readonly versionLabel = versionLabel;
 readonly stageArea = viewChild<ElementRef<HTMLElement>>('stageArea'); readonly closeTrigger = viewChild('closeTrigger', { read: ElementRef<HTMLButtonElement> }); readonly closeConfirm = viewChild('closeConfirm', { read: ElementRef<HTMLButtonElement> });
 readonly jobFeedback = viewChild<ElementRef<HTMLElement>>('jobFeedback');
 readonly jobStatus: Record<JobStatus, string> = { queued: 'Trabajo pendiente', running: 'Trabajo en curso', succeeded: 'Trabajo terminado', failed: 'No se pudo completar', cancelled: 'Trabajo cancelado', timed_out: 'Plazo de ejecución agotado' };
 constructor() {
+  afterEveryRender(() => {
+    const result = this.view.stage() === 'import' ? this.imports.resultPresentation()
+      : this.view.stage() === 'validation' ? this.results.resultPresentation()
+      : this.view.stage() === 'preview' ? this.proposals.resultPresentation() : null;
+    if (result) this.view.resultPresented(result);
+  });
+  effect(() => {
+    const highlight = this.view.highlight();
+    untracked(() => {
+      clearTimeout(this.pulseTimer);
+      const elapsed = highlight ? Math.max(0, Date.now() - highlight.startedAt) : 4_500;
+      this.pulse.set(highlight && elapsed < 4_500 ? { id: highlight.id, delay: -elapsed } : null);
+      if (highlight && elapsed < 4_500) this.pulseTimer = setTimeout(() => this.pulse.set(null), 4_500 - elapsed);
+      const label = this.view.claimAnnouncement();
+      if (label) { this.announcement.set(''); queueMicrotask(() => this.announcement.set('Etapa recomendada: ' + label)); }
+    });
+  });
+  inject(DestroyRef).onDestroy(() => clearTimeout(this.pulseTimer));
   effect(() => {
     const workspace = this.session.workspace();
     untracked(() => this.view.reconcile(workspace?.id ?? null, workspace?.currentVersionId ?? null));

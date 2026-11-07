@@ -81,11 +81,13 @@ describe('calculation and source detail', () => {
     const { root } = render(row); expect(root.textContent).toContain(text); expect(root.textContent).toContain('Texto vacío'); expect(root.textContent).toContain('29/02/2024'); expect(root.textContent).toContain('Sin dato');
     expect(root.querySelector('img,b')).toBeNull();
   });
-  it('keeps exact nominal and intervals in expandable technical detail', () => {
+  it('keeps exact nominal and intervals in a readable explanation without technical dumps', () => {
     const row = { ...proposal(), exactNominal: rational('1', '3'), after: { normalizedValue: rational('33', '100'), originalText: '0.33', decimals: '2', unit: 'EUR' }, derivedInterval: { lo: rational('1', '4'), hi: rational('1', '2') } };
     const { fixture, root } = render(row, 'proposal'); expect(mainText(root)).toContain('Redondeado'); expect(mainText(root)).not.toContain('1/3');
-    const detail = root.querySelector<HTMLDetailsElement>('details[data-technical]')!; expect(detail.open).toBe(false); detail.open = true; detail.dispatchEvent(new Event('toggle')); fixture.detectChanges();
+    expect(root.textContent).not.toContain('Detalle técnico'); expect(root.querySelector('pre')).toBeNull();
+    const detail = root.querySelector<HTMLDetailsElement>('details.calculation-explanation')!; expect(detail.open).toBe(false); detail.open = true; fixture.detectChanges();
     expect(detail.textContent).toContain('1/3'); expect(detail.textContent).toContain('0,25'); expect(detail.textContent).toContain('0,5');
+    expect(root.textContent).not.toContain(hash); expect(root.textContent).not.toContain(producerId); expect(root.textContent).not.toContain(coordinate.factKey);
   });
   it('loads all catalog alternatives on demand and filters exact variant IDs across pages', async () => {
     api.rules.mockResolvedValueOnce(page([{ variantId: 'c'.repeat(64), originalFields: { Description: { value: 'Wrong variant' } }, sourceLocator: {} }, { variantId: hash, originalFields: { Description: { value: 'Primera <b>literal</b>' } }, sourceLocator: coordinate.sourceLocator }], 'cursor'))

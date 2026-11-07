@@ -18,7 +18,7 @@
 <details class="trace-details"><summary>Ver pasos y resultados esperados</summary>
 <ol><li>Descarga el catálogo y el informe de la misma demostración. Usa un conjunto distinto para cada ejemplo.</li><li>Selecciona ambos archivos en los campos de abajo y conserva «Usar Contexto del libro». Ya incluyen entidad SYNTHETIC y fecha de referencia 31/12/2025.</li><li>Pulsa «Inspeccionar archivos», revisa los datos y después «Confirmar carga».</li><li>En Validar, pulsa «Validar informes» y consulta el resultado de cada regla.</li>
 @if (store.selectedDemo() === 'corep') {
-<li>Pulsa «Preparar revisión de destinos». En la fila 0070 conserva <strong>v0174_m</strong> frente a DEMO_RANGE y DEMO_PRECONDITION. En la fila 0200 omite el grupo de DEMO_ZERO y DEMO_INTERVAL.</li><li>Comprueba el resumen de las 16 reglas: <strong>5 incluidas, 4 omitidas y 7 excluidas</strong>. Pulsa «Guardar configuración» para usar esos cinco destinos al simular.</li><li>En Recalcular, pulsa «Simular recálculos». Selecciona primero v0172_m y después sus cuatro antecedentes.</li><li>Revisa los cinco cambios, marca la confirmación y aplícalos. La versión resultante tendrá 14 reglas que pasan, 1 que falla y 1 que no aplica. Sigue «Siguiente paso» para descargarla.</li>
+<li>Pulsa «Preparar revisión de destinos». En la fila 0070 conserva <strong>v0174_m</strong> frente a DEMO_RANGE y DEMO_PRECONDITION. En la fila 0200 omite el grupo de DEMO_ZERO y DEMO_INTERVAL.</li><li>Comprueba el resumen de las 16 reglas: <strong>5 incluidas, 4 omitidas y 7 excluidas</strong>. Pulsa «Guardar configuración» para usar esos cinco destinos al simular.</li><li>En Recalcular, pulsa «Simular recálculos». Selecciona primero v0172_m y después sus cuatro antecedentes.</li><li>Revisa los cinco cambios, marca la confirmación y aplícalos. La versión resultante tendrá 14 reglas que pasan, 1 que falla y 1 que no aplica. La etapa Descargar destacada te permite conservarla.</li>
 } @else { <li>Revisa los dos fallos de texto. No hay destinos ni propuestas: las ocho reglas se validan sin cambiar los datos.</li> }
 </ol>
 @if (store.selectedDemo() === 'corep') {
@@ -36,7 +36,7 @@
 </section>
 <form class="form-stack" (ngSubmit)="upload()">
 <div class="file-field"><label for="catalog-file">Catálogo de reglas (.xlsx)</label><input id="catalog-file" type="file" accept=".xlsx" aria-required="true" aria-describedby="catalog-help catalog-error catalog-server-errors" [attr.aria-invalid]="!!catalogError() || catalogServerErrors().length > 0" (change)="chooseCatalog($event)" [disabled]="busy()"/><p id="catalog-help" class="muted field-help">Un catálogo con las cabeceras EBA.</p><p id="catalog-error" class="error field-help" role="alert" [hidden]="!catalogError()">{{ catalogError() }}</p><div id="catalog-server-errors">@for (error of catalogServerErrors(); track $index) { <p class="error">{{ error.message }} · {{ error.fileName }} · {{ error.locator?.sheet }} {{ error.locator?.column }}{{ error.locator?.row }}</p> }</div></div>
-<div class="file-field"><label for="report-files">Informes (.xlsx)</label><input id="report-files" type="file" accept=".xlsx" multiple aria-required="true" aria-describedby="reports-help reports-error reports-server-errors" [attr.aria-invalid]="!!reportsError() || reportsServerErrors().length > 0" (change)="chooseReports($event)" [disabled]="busy()"/><p id="reports-help" class="muted field-help">Libro COREP completo, extracto CA1 o informe de la demostración de texto y fechas.</p><p id="reports-error" class="error field-help" role="alert" [hidden]="!reportsError()">{{ reportsError() }}</p><div id="reports-server-errors">@for (error of reportsServerErrors(); track $index) { <p class="error">{{ error.message }} · {{ error.fileName }} · {{ error.locator?.sheet }} {{ error.locator?.column }}{{ error.locator?.row }}</p> }</div></div>
+<div class="file-field"><label for="report-files">Informes (.xlsx)</label><input id="report-files" type="file" accept=".xlsx" multiple aria-required="true" aria-describedby="reports-help reports-error reports-server-errors" [attr.aria-invalid]="!!reportsError() || reportsServerErrors().length > 0" (change)="chooseReports($event)" [disabled]="busy()"/><p id="reports-help" class="muted field-help">Hasta 20 informes .xlsx: 10 MiB por archivo y 50 MiB en total, incluido el catálogo.</p><p id="reports-error" class="error field-help" role="alert" [hidden]="!reportsError()">{{ reportsError() }}</p><div id="reports-server-errors">@for (error of reportsServerErrors(); track $index) { <p class="error">{{ error.message }} · {{ error.fileName }} · {{ error.locator?.sheet }} {{ error.locator?.column }}{{ error.locator?.row }}</p> }</div></div>
 <p class="muted">{{ catalog()?.name || 'Ningún catálogo seleccionado' }} · {{ reports().length }} {{ reports().length === 1 ? 'informe seleccionado' : 'informes seleccionados' }}</p>@if (reports().length) { <ul class="selected-files">@for (file of reports(); track $index) { <li>{{ file.name }}</li> }</ul> }
 <mat-form-field appearance="outline"><mat-label>Origen del contexto</mat-label><select matNativeControl id="context-source" name="context-source" [ngModel]="store.contextSource()" (ngModelChange)="store.setContextSource($event)" [disabled]="busy()"><option value="workbook">Usar Contexto del libro</option><option value="form">Declarar contexto</option></select></mat-form-field>
 @if (store.contextSource() === 'workbook') { <p class="muted">Se leerá la hoja Contexto de cada informe. La revisión mostrará sus datos antes de confirmar; si falta, declara el contexto en pantalla.</p> }
@@ -51,7 +51,7 @@
 <mat-form-field appearance="outline"><mat-label>¿Se presenta la tabla C_01.00?</mat-label><select matNativeControl id="context-filing" name="filing" [ngModel]="store.contextForm().presented" (ngModelChange)="store.updateContext('presented', $event)" required [disabled]="busy()"><option value="">Elige una opción</option><option value="true">Sí, presentada</option><option value="false">No presentada</option></select></mat-form-field>
 </div><p class="muted">La escala y la precisión se declaran expresamente. No se deducen del formato visual de las celdas. Si el libro ya incluye Contexto, sus datos deberán coincidir.</p>@if (store.contextError(); as error) { <p class="notice" id="context-error">{{ error }}</p> }</fieldset>
 }
-<button mat-flat-button type="submit" [disabled]="!store.canInspect() || !!catalogError() || !!reportsError()">{{ store.uploading() ? 'Recibiendo archivos…' : 'Inspeccionar archivos' }}</button>
+<button mat-flat-button [class.ce-primary-action]="!store.liveInspection()" type="submit" [disabled]="!store.canInspect() || !!catalogError() || !!reportsError()">{{ store.uploading() ? 'Recibiendo archivos…' : 'Inspeccionar archivos' }}</button>
 @if (store.uploading()) { <button mat-stroked-button type="button" (click)="store.cancelUpload()">Cancelar carga</button> }
 </form>
 @if (store.inspectionPending()) { <p role="status">Consultando la revisión de la carga…</p> }
@@ -76,37 +76,11 @@
 }
 @for (diagnostic of inspection.diagnostics; track $index) { <p class="notice">{{ diagnostic.message }} {{ diagnostic.fileName }} {{ diagnostic.locator?.sheet }} {{ diagnostic.locator?.column }}{{ diagnostic.locator?.row }}</p> }
 @if (inspection.requiresPartialCoverageAcceptance && inspection.state === 'ready') { <mat-checkbox [checked]="store.acceptedExcludedSheets()" [disabled]="store.reviewDirty() || store.locallyExpired() || store.staleInspection() || busy()" (change)="store.acceptedExcludedSheets.set($event.checked)">Acepto importar únicamente las hojas incluidas y excluir las demás</mat-checkbox> }
-@if (inspection.state === 'ready') { <div class="direction-actions"><button mat-flat-button (click)="store.commit()" [disabled]="!store.canCommit()">Confirmar carga</button><button mat-stroked-button (click)="store.discardInspection()" [disabled]="busy()">Descartar inspección</button></div> }
+@if (inspection.state === 'ready') { <div class="direction-actions"><button mat-flat-button class="ce-primary-action" (click)="store.commit()" [disabled]="!store.canCommit()">Confirmar carga</button><button mat-stroked-button (click)="store.discardInspection()" [disabled]="busy()">Descartar inspección</button></div> }
 <button mat-button (click)="store.loadInspection()" [disabled]="store.inspectionPending()">Actualizar revisión</button>
 </section>
 }
-<div class="trace-details" (keydown.escape)="closeHelp()">
-  <button #helpTrigger mat-button type="button" aria-controls="import-technical-information" [attr.aria-expanded]="technicalHelpOpen()" (click)="technicalHelpOpen.set(!technicalHelpOpen())">Información técnica</button>
-  @if (technicalHelpOpen()) {
-    <section id="import-technical-information" role="region" aria-label="Información técnica de la carga">
-      <p>Se admite un catálogo y entre 1 y 20 informes Excel. El límite es de 10 MiB por archivo y 50 MiB por lote.</p>
-      @if (store.inspection(); as inspection) {
-        <dl>
-          @for (profile of inspection.profiles; track profile.profileId) {
-            <dt>Perfil de informe y de cálculo</dt><dd>{{ profile.profileId }} · {{ profile.languageProfileId }}</dd>
-          }
-          <dt>Inspección</dt><dd><code>{{ inspection.id }}</code></dd>
-          <dt>Huella de la inspección</dt><dd class="exact-value"><code>{{ inspection.inspectionHash }}</code></dd>
-          <dt>Caducidad</dt><dd>{{ inspection.expiresAt }}</dd>
-        </dl>
-      }
-      @if (store.capabilities(); as capabilities) {
-        <p>El cálculo utiliza racionales exactos e intervalos conservadores. Los resultados de cumplimiento se consultan en Validar.</p>
-        @if (capabilities.limits; as limits) {
-          @if (limits['jobDeadlineMs']; as deadlineMs) {
-            <p>Hasta {{ limits['maxRules'] }} filas de reglas, {{ limits['maxCoordinates'] }} coordenadas y {{ limits['maxFacts'] }} hechos por conjunto. Plazo por trabajo: {{ deadlineMs / 1000 }} segundos.</p>
-          }
-        }
-      }
-      <button mat-button type="button" (click)="closeHelp()">Cerrar ayuda</button>
-    </section>
-  }
-</div>
+
 </section>
 @if (session.versionId(); as version) {
   <section class="workspace-card" aria-labelledby="coverage-title">

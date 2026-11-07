@@ -17,6 +17,13 @@ export class ImportStore {
   readonly uploading = signal(false); readonly error = signal<string | null>(null);
   readonly page = signal<RulesPageDTO | null>(null); readonly capabilities = signal<CapabilitiesDTO | null>(null);
   readonly published = signal<Pick<RulesPageDTO, 'versionId' | 'coverage' | 'dataSummary'> | null>(null);
+  readonly resultPresentation = computed(() => {
+    const job = this.session.job();
+    if (!job || job.status !== 'succeeded' || job.workspaceId !== this.session.workspace()?.id) return null;
+    const visible = job.kind === 'inspect-import' ? job.resultRef?.id === this.inspection()?.id && this.inspection()?.state === 'ready'
+      : job.kind === 'import' && !!job.newVersionId && this.published()?.versionId === job.newVersionId;
+    return visible ? { jobId: job.jobId, workspaceId: job.workspaceId, versionId: job.newVersionId ?? job.baseVersionId ?? null } : null;
+  });
   readonly code = signal(''); readonly status = signal(''); readonly table = signal('');
   readonly queryState = signal<'idle' | 'waiting' | 'loading'>('idle');
   readonly queryError = signal<string | null>(null);

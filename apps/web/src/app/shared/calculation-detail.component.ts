@@ -50,8 +50,6 @@ export class CalculationDetailComponent {
   readonly alternativesLoaded = signal(false);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
-  readonly technicalOpen = signal(false);
-  readonly technical = computed(() => this.technicalOpen() ? JSON.stringify(this.row(), null, 2) : '');
   readonly coordinateText = coordinateText;
   readonly decimalText = decimalText;
   readonly factText = factText;
@@ -63,7 +61,7 @@ export class CalculationDetailComponent {
   constructor() {
     effect(() => {
       this.row(); this.session.workspace()?.id;
-      this.generation++; this.alternatives.set([]); this.alternativesLoaded.set(false); this.loading.set(false); this.error.set(null); this.technicalOpen.set(false);
+      this.generation++; this.alternatives.set([]); this.alternativesLoaded.set(false); this.loading.set(false); this.error.set(null);
     });
     afterEveryRender(() => {
       const heading = this.heading();
@@ -72,7 +70,6 @@ export class CalculationDetailComponent {
     inject(DestroyRef).onDestroy(() => { this.generation++; });
   }
   close(): void { this.generation++; this.closed.emit(); }
-  toggleTechnical(event: Event): void { this.technicalOpen.set((event.target as HTMLDetailsElement).open); }
   originLabel(read: ReadRow): string {
     return read.fromProposalId ? 'Calculado por una propuesta antecesora'
       : read.fact.derivation ? 'Recalculado en una aplicación anterior'

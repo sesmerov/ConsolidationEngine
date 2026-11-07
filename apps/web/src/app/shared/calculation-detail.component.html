@@ -16,8 +16,8 @@
         <span><span class="value-label">Propuesto</span><span class="exact-value">{{ normalizedText(proposed.after?.normalizedValue, proposed.before?.coordinate?.decimals ?? '') }}</span></span>
         @if (proposed.before?.coordinate?.unit; as unit) { <span class="unit-label">{{ unit }}</span> }
       </div>
-      @if (roundedProposal(proposed)) { <p class="value-marker">Redondeado a la precisión del destino. El valor exacto está en el detalle técnico.</p> }
-      @if (hasInterval(proposed)) { <p class="value-marker">El cálculo tiene un intervalo de incertidumbre; puedes consultarlo en el detalle técnico.</p> }
+      @if (roundedProposal(proposed)) { <p class="value-marker">Redondeado a la precisión del destino. Consulta cómo se obtiene este importe para ver el valor exacto.</p> }
+      @if (hasInterval(proposed)) { <p class="value-marker">El cálculo tiene un intervalo de incertidumbre que puedes consultar en la explicación del importe.</p> }
       @if (!proposed.calculation) { <p class="notice">Esta propuesta no conserva el cálculo detallado. No se reconstruyen sus entradas con los valores originales.</p> }
     }
     @if (expression(); as value) { <h4>Expresión</h4><p class="expression exact-value">{{ value }}</p> }
@@ -59,18 +59,14 @@
         } @empty { <p>No hay descripciones adicionales conservadas para esta variante.</p> }
       }
     </div>
-    <details class="trace-details" data-technical [open]="technicalOpen()" (toggle)="toggleTechnical($event)">
-      <summary>Detalle técnico</summary>
-      @if (technicalOpen()) {
+    <details class="trace-details calculation-explanation">
+      <summary>Cómo se obtiene este importe</summary>
         @if (proposal(); as proposed) {
           @if (proposed.before) { <p>Precisión del destino: {{ proposed.before.coordinate.decimals }}</p> }
           @if (proposed.exactNominal; as value) { <p>Resultado exacto antes del redondeo: <span class="exact-value">{{ decimalText(value) }}</span></p> }
           @if (proposed.derivedInterval; as value) { <p>Intervalo calculado: <span class="exact-value">[{{ decimalText(value.lo) }} → {{ decimalText(value.hi) }}]</span></p> }
         }
         @for (operand of operands(); track operand.label) { @if (interval(operand.value); as value) { <p>{{ operand.label }} · intervalo: <span class="exact-value">{{ value }}</span></p> } }
-        <p>Identificadores, valores originales y precisión conservados para la trazabilidad:</p>
-        <pre class="exact-value">{{ technical() }}</pre>
-      }
     </details>
   </section>
 }

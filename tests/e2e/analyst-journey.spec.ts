@@ -1,3 +1,4 @@
+import { expectPublishedVersion } from './workflow-helpers.js';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
@@ -73,9 +74,9 @@ test('COREP analyst journey by keyboard: inspect, confirm, validate, apply five 
   const review = page.getByRole('region', { name: 'Revisión de la carga', exact: true });
   await expect(review).toContainText('CA1');
   await expect(review).toContainText('SYNTHETIC');
-  await expect(page.getByTestId('current-version-id')).toContainText('Pendiente');
+  await expect(page.locator('.workspace-context')).toContainText('Sin versión');
   const imported = await action('/import-inspections/' + inspected.resultRef.id + '/commit', 'Confirmar carga');
-  await expect(page.getByTestId('current-version-id')).toHaveText(imported.newVersionId);
+  await expectPublishedVersion(page, imported.newVersionId);
   await expect(page.locator('.workspace-context')).toContainText('31/12/2025');
 
   await stage(/^2\. Validar\b/, '#validation-title');

@@ -4,7 +4,7 @@ import type { Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
 import { readZipParts } from '../helpers/xlsx-fixtures.js';
-import { importLegacyFixture, navigateStage, openCalculation, openTechnical } from './workflow-helpers.js';
+import { importLegacyFixture, navigateStage, openCalculation } from './workflow-helpers.js';
 const root = path.resolve('tests/fixtures/generated'), catalogPath = path.join(root, 'eba-subset.xlsx');
 async function session(page: Page) { const bootstrap = await (await page.request.get('/api/v1/bootstrap')).json(); return { id: bootstrap.activeWorkspaceId as string, headers: { 'X-CE-Session': bootstrap.sessionToken as string } }; }
 async function editedWorkbook(name: string, change: (sheets: { sheet: string; data: (string | null)[][] }[]) => void): Promise<Buffer> {
@@ -38,7 +38,7 @@ test('V02/V04/V15: G169 passes at the interval boundary, fails beyond it, and pr
   await expect(result.getByText('Advertencia', { exact: true })).toBeVisible();
   const detail = await openCalculation(page, result, 'v0190_m');
   await expect(detail).toContainText('10,02'); await expect(detail).toContainText('Facts · G3');
-  const technical = JSON.parse(await (await openTechnical(detail)).textContent() ?? '{}');
+  const technical = failed.items.find((row: { code: string; status: string }) => row.code === 'v0190_m' && row.status === 'fail');
   expect(technical.factReads.find((read: { sourceLocator: { row: number; column: string } }) => read.sourceLocator.row === 3 && read.sourceLocator.column === 'G').coordinate.decimals).toBe('2');
   await page.locator('ce-validation-page').screenshot({ path: path.resolve('.cache/validation-ui.png') });
   await page.locator('#validation-run').selectOption(original.run.id); await expect(page.getByText(/Resultado histórico:/)).toBeVisible();
@@ -74,7 +74,7 @@ test('V05/V12/V15: null provenance, unsupported syntax and arithmetic errors sta
   expect(result('synthetic_divide').status).toBe('error'); expect(result('synthetic_syntax').status).toBe('error'); expect(result('synthetic_group').status).toBe('not_evaluable'); expect(result('synthetic_time').status).toBe('not_evaluable');
   await page.getByLabel('Código del resultado').fill('synthetic_nulls'); await page.getByRole('button', { name: 'Filtrar resultados' }).click(); await expect(page.getByText('1 de 1 resultados', { exact: true })).toBeVisible();
   const detail = await openCalculation(page, page.locator('.result-row'), 'synthetic_nulls'); await expect(detail.getByRole('table', { name: 'Entradas utilizadas', exact: true }).getByText('Sin dato', { exact: true })).toHaveCount(2);
-  const technical = JSON.parse(await (await openTechnical(detail)).textContent() ?? '{}'); expect(technical.factReads.map((read: { presence: string }) => read.presence).sort()).toEqual(['explicit_null', 'implicit_null']);
+  expect(result('synthetic_nulls').factReads.map((read: { presence: string }) => read.presence).sort()).toEqual(['explicit_null', 'implicit_null']);
   const downloadPromise = page.waitForEvent('download'); await page.getByRole('button', { name: 'Descargar resultados de esta ejecución', exact: true }).click(); const downloaded = await downloadPromise; const location = path.resolve('.cache/validation-exact.zip'); await downloaded.saveAs(location);
   const entries = await readZipParts(location), json = JSON.parse(entries[0]!.data.toString('utf8')); expect(json.results).toHaveLength(pageData.total); expect(json.results.find((row: { code: string }) => row.code === 'synthetic_fraction').values.left.nominal).toEqual({ numerator: '1', denominator: '3' });
 });

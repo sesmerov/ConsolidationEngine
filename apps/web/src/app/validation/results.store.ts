@@ -12,6 +12,12 @@ export class ResultsStore {
   private generation = 0; private historyGeneration = 0; private observed = ''; private workspaceId: string | undefined;
   readonly pending = signal(false); readonly loading = signal(false); readonly error = signal<string | null>(null);
   readonly page = signal<ValidationResultsPageDTO | null>(null); readonly history = signal<readonly RunSummaryDTO[]>([]); readonly selectedRunId = signal<string | null>(null);
+  readonly resultPresentation = computed(() => {
+    const job = this.session.job(), page = this.page();
+    return job?.status === 'succeeded' && job.kind === 'validate' && job.workspaceId === this.session.workspace()?.id
+      && page?.run.status === 'completed' && page.run.summary.complete && page.run.id === job.resultRef?.id && page.versionId === job.baseVersionId
+      ? { jobId: job.jobId, workspaceId: job.workspaceId, versionId: page.versionId } : null;
+  });
   readonly historyCursor = signal<string | null>(null); readonly historyLoading = signal(false);
   readonly status = signal(''); readonly code = signal(''); readonly table = signal('');
   readonly pagination = new CursorPage();

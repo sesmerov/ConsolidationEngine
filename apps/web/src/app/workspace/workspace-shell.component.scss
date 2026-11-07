@@ -1,12 +1,8 @@
 :host { display: block; min-width: 0; }
-.next-stage-badge {
-  display: inline-block;
-  margin-inline-start: .35rem;
-  padding: .05rem .45rem;
-  border: 1px solid currentColor;
-  border-radius: .4rem;
-  color: var(--mat-sys-on-secondary-container);
-  background: var(--mat-sys-secondary-container);
-  font-size: .75rem;
-  line-height: 1.4;
-}
+.stage-nav button { position: relative; border: 2px solid transparent; }
+.stage-nav .stage-recommended { border-color: #146c43; background: #e9f5ee; color: #146c43; font-weight: 700; }
+.stage-arrow { margin-inline-start: .4rem; font-size: 1.2em; }
+.stage-pulse { position: absolute; pointer-events: none; inset: 0; border: 3px solid #146c43; border-radius: inherit; animation: stage-emphasis 1.5s ease-in-out 3; }
+@keyframes stage-emphasis { 0%, 100% { opacity: .12; box-shadow: 0 0 0 0 #146c4300; } 50% { opacity: 1; box-shadow: 0 0 0 5px #146c4333; } }
+@media (prefers-reduced-motion: reduce) { .stage-pulse { animation: none; display: none; } .stage-nav button { transition: none; } }
+@media (forced-colors: active) { .stage-nav .stage-recommended { border: 3px solid Highlight; color: ButtonText; background: Canvas; } .stage-pulse { display: none; } }

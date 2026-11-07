@@ -38,32 +38,16 @@ describe('visual workbook inspection before publication', () => {
     expect(element.textContent).not.toMatch(/Usar formato anterior|Descargar plantilla Excel anterior|Empezar con el ejemplo guiado/);
     expect(element.querySelector('#context-entity')).toBeNull();
   });
-  it('keeps exclusions visible while technical help is closed, allows selecting a hash and restores focus on close or Escape', async () => {
+  it('keeps exclusions and actionable limits without technical controls or identifiers', async () => {
     const inspection = ready();
     api.activeImportInspection.mockResolvedValue({ active: inspection });
     const fixture = await render(), element = fixture.nativeElement as HTMLElement;
-    const help = Array.from(element.querySelectorAll('button')).find(button => button.textContent?.trim() === 'Información técnica');
-    expect(help).toBeDefined();
-    expect(help!.getAttribute('aria-expanded')).toBe('false');
+    expect(element.textContent).not.toContain('Información técnica');
     expect(element.textContent).not.toContain(inspection.inspectionHash);
+    expect(element.textContent).not.toContain(inspection.id);
     expect(element.textContent).toContain('190 hojas excluidas');
     expect(element.textContent).toContain('Acepto importar únicamente las hojas incluidas');
-    const panel = () => element.querySelector<HTMLElement>('[aria-label="Información técnica de la carga"]')!;
-    for (const keyboard of [true, false]) {
-      help!.click(); fixture.detectChanges();
-      expect(help!.getAttribute('aria-expanded')).toBe('true');
-      const hash = Array.from(panel().querySelectorAll('code')).find(node => node.textContent === inspection.inspectionHash)!;
-      const range = document.createRange(); range.selectNodeContents(hash);
-      const selection = document.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
-      expect(selection.toString()).toBe(inspection.inspectionHash);
-      const close = panel().querySelector<HTMLButtonElement>('button')!;
-      close.focus();
-      if (keyboard) close.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-      else close.click();
-      fixture.detectChanges();
-      expect(panel()).toBeNull();
-      expect(document.activeElement).toBe(help);
-    }
+    expect(element.textContent).toContain('10 MiB por archivo');
   });
   it('recovers the active server inspection when the workspace opens', async () => {
     await render(); expect(api.activeImportInspection).toHaveBeenCalledWith(workspace.id);

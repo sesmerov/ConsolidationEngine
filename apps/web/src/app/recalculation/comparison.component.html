@@ -13,5 +13,5 @@
 <tr mat-header-row *matHeaderRowDef="['rule','status','severity','changes','detail']"></tr><tr mat-row class="comparison-row" *matRowDef="let row; columns: ['rule','status','severity','changes','detail'];"></tr><tr *matNoDataRow><td colspan="5">{{ changedOnly() ? 'No hay resultados con cambios en esta comparación.' : 'No hay resultados para comparar.' }}</td></tr></table></div>
 <mat-paginator aria-label="Páginas de comparación" [length]="page().total" [pageSize]="50" [pageIndex]="pageIndex()" [hidePageSize]="true" [showFirstLastButtons]="false" [disabled]="loading()" (page)="close(); pageChange.emit($event.pageIndex)"/>
 @if (opened(); as row) { <div class="comparison-columns two-columns">@for (side of sides(row); track side.label) { <section class="comparison-side" [attr.aria-label]="side.label"><h4>{{ side.label }}</h4>@if (side.result; as result) { <ce-calculation-detail [result]="result" [files]="page().sourceFiles || []" (closed)="close()"/> } @else { <p>No hay registro para esta versión.</p> } </section> }</div> }
-<details class="trace-details"><summary>Identificadores del recibo y las versiones</summary><p>Recibo: {{ page().receipt.id }}</p><p>Antes: {{ page().receipt.baseVersionId }} · Después: {{ page().receipt.newVersionId }}</p></details>
+
 </section>

@@ -1,5 +1,5 @@
 <section class="workspace-card" aria-labelledby="preview-title">
-<div class="section-heading"><div><p class="eyebrow">03 · RECALCULAR</p><h2 id="preview-title" tabindex="-1" ceStageTitle>Previsualización de recálculos</h2></div>@if (store.preview()?.state === 'applied') { <button mat-stroked-button (click)="store.execute()" [disabled]="store.pending() || session.pending() || session.jobActive()">Simular recálculos</button> } @else { <button mat-flat-button (click)="store.execute()" [disabled]="store.pending() || session.pending() || session.jobActive()">Simular recálculos</button> }</div>
+<div class="section-heading"><div><p class="eyebrow">03 · RECALCULAR</p><h2 id="preview-title" tabindex="-1" ceStageTitle>Previsualización de recálculos</h2></div>@if (store.preview()?.state === 'applied') { <button mat-stroked-button (click)="store.execute()" [disabled]="store.pending() || session.pending() || session.jobActive()">Simular recálculos</button> } @else { <button mat-flat-button [class.ce-primary-action]="!store.preview() || store.historical() || store.preview()?.state !== 'ready'" (click)="store.execute()" [disabled]="store.pending() || session.pending() || session.jobActive()">Simular recálculos</button> }</div>
 <p class="muted">Revisa los cambios en orden de dependencias. Los valores del informe no cambian hasta que confirmes la aplicación.</p>
 @if (session.jobActive() && session.job()?.kind === 'preview') { <p aria-live="polite">Simulación en curso.</p> } @if (store.error(); as error) { <p class="error" role="alert">{{ error }}</p> }
 <div class="history-controls">@if (store.history().length) { <mat-form-field appearance="outline"><mat-label>Previsualización conservada</mat-label><select matNativeControl id="preview-history" [value]="store.selectedPreviewId() || ''" (change)="closeDetail(); store.choose($any($event.target).value)">@for (preview of store.history(); track preview.id) { <option [value]="preview.id">{{ preview.createdAt | date:'dd/MM/yyyy HH:mm:ss' }} · {{ versionLabel(session.workspace(), preview.baseVersionId) }} · {{ store.labels[preview.state] }}</option> }</select></mat-form-field> }
@@ -15,7 +15,7 @@
 @if (preview.state === 'applied') { <button mat-button (click)="showApplied.update(invert)" [attr.aria-expanded]="showApplied()">{{ showApplied() ? 'Ocultar propuestas aplicadas' : 'Ver propuestas aplicadas' }}</button> }
 @if (preview.state !== 'applied' || showApplied()) {
 <p class="muted">Base: {{ versionLabel(session.workspace(), preview.baseVersionId) }} · {{ store.labels[preview.state] }}</p>
-<dl class="workspace-meta"><div><dt>Direcciones</dt><dd>{{ preview.graphSummary.nodes }}</dd></div><div><dt>Dependencias</dt><dd>{{ preview.graphSummary.edges }}</dd></div><div><dt>Bloqueadas</dt><dd>{{ preview.graphSummary.blocked }}</dd></div></dl>
+<dl class="workspace-meta"><div><dt>Propuestas disponibles</dt><dd>{{ preview.graphSummary.nodes - preview.graphSummary.blocked }}</dd></div><div><dt>Bloqueadas</dt><dd>{{ preview.graphSummary.blocked }}</dd></div></dl>
 @if (!preview.graphSummary.nodes) { <p class="notice">No hay direcciones guardadas. Elige los destinos en Validar y guarda la configuración.</p> }
 @for (conflict of preview.graphSummary.conflicts; track $index) { <p class="notice">Hay productores incompatibles para un mismo destino. Consulta el detalle de las propuestas bloqueadas.</p> } @for (cycle of preview.graphSummary.cycles; track $index) { <p class="notice">Ciclo de dependencias: {{ cycle.length }} direcciones se necesitan entre sí. Revisa los destinos configurados.</p> }
 @for (diagnostic of preview.diagnostics; track $index) { <p class="notice">{{ diagnostic.code }}: {{ diagnostic.message }}</p> }
@@ -49,6 +49,6 @@
 
 @if (store.canDiscard()) { <button mat-button (click)="store.confirmDiscard.set(true)">Descartar previsualización</button> }
 @if (store.confirmDiscard()) { <div class="confirmation"><p>Descartar conserva el historial y no modifica el informe.</p><button mat-stroked-button (click)="store.discard()" [disabled]="!store.canDiscard()">Confirmar descarte</button><button mat-button (click)="store.confirmDiscard.set(false)">Volver</button></div> }
-<details class="trace-details"><summary>Identificadores y política de cálculo</summary><p>{{ preview.id }} · {{ preview.baseVersionId }} · {{ preview.policyId }} · Redondeo al par</p></details>
+
 }
 </section>

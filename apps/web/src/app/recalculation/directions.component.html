@@ -19,7 +19,7 @@
   }
   @if (store.looking()) { <p role="status">Consultando la revisión…</p> }
   @if (!store.historical() && store.complete() && !store.otherReview() && (store.canPrepare() || !store.review())) {
-    <button mat-stroked-button [disabled]="!store.canPrepare()" (click)="store.prepare()">Preparar revisión de destinos</button>
+    <button mat-flat-button class="ce-primary-action" [disabled]="!store.canPrepare()" (click)="store.prepare()">Preparar revisión de destinos</button>
   }
   @if (store.review(); as review) {
     @if (store.expired()) { <p class="notice">La revisión ha caducado. Prepara una nueva para continuar.</p> }
@@ -99,7 +99,7 @@
         @if (store.needsPartial()) { <mat-checkbox [checked]="store.partialAccepted()" [disabled]="!store.editable()" (change)="store.partialAccepted.set($event.checked)">He revisado los pendientes y acepto guardar el subconjunto incluido</mat-checkbox> }
         @if (!counts.included) { <p>Sin destinos incluidos. Puedes descargar los resultados de esta ejecución.</p> }
         <div class="direction-actions">
-          <button mat-stroked-button [disabled]="!store.canSave()" (click)="store.save()">Guardar configuración</button>
+          <button mat-flat-button class="ce-primary-action" [disabled]="!store.canSave()" (click)="store.save()">Guardar configuración</button>
           <button mat-button [disabled]="!store.editable()" (click)="store.omitAll()">Omitir todos los destinos</button>
           <button mat-button [disabled]="store.busy() || store.uncertain()" (click)="store.discard()">Descartar revisión</button>
         </div>

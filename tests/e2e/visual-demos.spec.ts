@@ -1,3 +1,4 @@
+import { expectPublishedVersion } from './workflow-helpers.js';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
@@ -43,8 +44,8 @@ async function milestone<T>(page: Page, current: string, next: string, url: stri
   }, { times: 1 });
   const result = await action();
   await expect(currentStage).toHaveAttribute('aria-current', 'step');
-  await expect(page.locator('#next-stage-badge')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: next, exact: true }).locator('#next-stage-badge')).toHaveText('Siguiente paso');
+  await expect(page.locator('.stage-recommended')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: next, exact: true })).toHaveClass(/stage-recommended/);
   await expect(currentStage).toBeFocused();
   return result;
 }
@@ -76,14 +77,14 @@ async function inspectDemo(page: Page, kind: 'corep' | 'types', info: TestInfo) 
 }
 async function loadDemo(page: Page, kind: 'corep' | 'types', info: TestInfo) {
   const id = await inspectDemo(page, kind, info);
-  await expect(page.locator('#next-stage-badge')).toHaveCount(0);
+  await expect(page.locator('.stage-recommended')).toHaveCount(0);
   const imported = await milestone(page, '1. Cargar', '2. Validar', `**/import-inspections/${id}/commit`,
     () => runAction(page, `/import-inspections/${id}/commit`, 'Confirmar carga'));
-  await expect(page.getByTestId('current-version-id')).toHaveText(imported.newVersionId); return imported;
+  await expectPublishedVersion(page, imported.newVersionId); return imported;
 }
 async function validateDemo(page: Page, kind: 'corep' | 'types') {
   await stage(page, '2. Validar', '#validation-title');
-  await expect(page.locator('#next-stage-badge')).toHaveCount(0);
+  await expect(page.locator('.stage-recommended')).toHaveCount(0);
   const job = await runAction(page, '/validations', 'Validar informes');
   const results = await get(page, `/runs/${job.resultRef.id}/results?limit=200`), oracle = kind === 'corep' ? corpus.corep : corpus.typed;
   expect(results.total).toBe(oracle.rules.length);
@@ -133,7 +134,7 @@ test('a cancelled job notification and rejected publication keep the current sta
   await commit.click();
   await expect(page.getByText('Trabajo cancelado', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '1. Cargar', exact: true })).toHaveAttribute('aria-current', 'step');
-  await expect(page.locator('#next-stage-badge')).toHaveCount(0);
+  await expect(page.locator('.stage-recommended')).toHaveCount(0);
   await expect(commit).toBeEnabled();
   // A real stale If-Match is rejected by the server before a job or snapshot can be published.
   await page.route('**' + commitPath, route => route.continue({ headers: { ...route.request().headers(), 'if-match': '"v-00000000-0000-4000-8000-000000000000"' } }), { times: 1 });
@@ -141,7 +142,7 @@ test('a cancelled job notification and rejected publication keep the current sta
   await commit.click();
   expect((await rejected).status()).toBe(412);
   await expect(page.getByRole('alert').filter({ hasText: /versión/i }).first()).toBeVisible();
-  await expect(page.locator('#next-stage-badge')).toHaveCount(0);
+  await expect(page.locator('.stage-recommended')).toHaveCount(0);
   expect((await get(page, '')).versionIds).toHaveLength(0);
 });
 
@@ -164,7 +165,7 @@ for (const width of [320, 390, 1440]) {
       await page.getByRole('button', { name: '3. Recalcular', exact: true }).tap();
       await expect(page.locator('#preview-title')).toBeFocused();
     } else await stage(page, '3. Recalcular', '#preview-title');
-    await expect(page.locator('#next-stage-badge')).toHaveCount(0);
+    await expect(page.locator('.stage-recommended')).toHaveCount(0);
     const simulated = await runAction(page, '/previews', 'Simular recálculos');
     const proposals = await get(page, `/previews/${simulated.resultRef.id}/proposals?limit=200`);
     expect(proposals.items.map((item: any) => item.code).sort()).toEqual(officialCodes);
@@ -207,7 +208,7 @@ for (const width of [320, 390, 1440]) {
     const summary = await get(page, `/direction-reviews/${reviewId}`);
     expect(summary.counts).toMatchObject({ totalRows: 8, excluded: 8, included: 0 });
     await expect(page.locator('ce-directions').getByRole('combobox', { name: / · Destino$/ })).toHaveCount(0);
-    await expect(page.locator('#next-stage-badge')).toHaveCount(0);
+    await expect(page.locator('.stage-recommended')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Descargar resultados de esta ejecución', exact: true })).toBeEnabled();
     await page.getByRole('table', { name: 'Resultados de validación', exact: true }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: info.outputPath(`demo-types-results-${width}.png`) });

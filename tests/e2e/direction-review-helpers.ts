@@ -1,6 +1,7 @@
 import { expect } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import type { DirectionReviewMutationResponseDTO, DirectionReviewSummaryDTO, JobDTO } from '@ce/contracts';
+import { expectPublishedVersion } from './workflow-helpers.js';
 
 type Activate = (control: Locator) => Promise<void>;
 const click: Activate = control => control.click();
@@ -48,7 +49,7 @@ export async function saveDirections(page: Page, reviewId: string, expectedCount
   expect(response.status()).toBe(202);
   const job = await finishJob(page, (await response.json()).jobId);
   expect(job.newVersionId).toBeTruthy();
-  await expect(page.getByTestId('current-version-id')).toHaveText(job.newVersionId!);
+  await expectPublishedVersion(page, job.newVersionId!);
   const session = await getSession(page);
   const saved: DirectionReviewSummaryDTO = await (await page.request.get(`${session.base}/direction-reviews/${reviewId}`, { headers: session.headers })).json();
   expect(saved.receipt).toMatchObject({ reviewId, newVersionId: job.newVersionId, included: expectedCount });

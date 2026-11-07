@@ -21,3 +21,11 @@ T003: escenarios sintéticos 2/3/51 productores, 51 destinos y contextos compati
 ## Aceptación humana
 
 SC-010 pendiente de observación con la versión de esta iteración. Una valoración global no sustituye el detalle de las acciones observadas.
+
+## Primer incremento de interfaz
+
+US1/2: acciones principales verdes, realce de etapa durante tres ciclos de 1,5 s, movimiento reducido/foco, retirada de controles técnicos e identificadores visibles y progreso exitoso solo oculto tras presentar su resultado. Se conservan errores, temporalidad, exclusiones, valores exactos y origen legible.
+
+Pruebas Angular focales: 47 casos en cuatro suites. Build web: 690,75 kB iniciales, por debajo del aviso de 700 kB. Playwright: 4 casos iniciales (información útil y anchos 320/390/1440) pasan; el caso de movimiento reducido pasa tras ajustar su matcher de respuesta. Contraste de texto renderizado ≥4,5:1, foco conservado y pulso limitado a 4,5 s. Las capturas se regenerarán en la verificación integrada porque Playwright limpia salidas al reejecutarse.
+
+El recorrido de los tres hitos, los detalles de comparación y todos los negativos se cerrarán después de integrar conflictos/selección. T010/T019 y los SC completos no se marcan todavía.

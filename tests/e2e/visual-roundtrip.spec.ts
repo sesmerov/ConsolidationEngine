@@ -1,3 +1,4 @@
+import { expectPublishedVersion } from './workflow-helpers.js';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -54,7 +55,7 @@ async function upload(page: Page, catalog: Buffer, report: Buffer, prefix: strin
   await page.locator('#context-source').selectOption('workbook');
   const inspected = await action(page, '/import-inspections', 'Inspeccionar archivos');
   const imported = await action(page, `/import-inspections/${inspected.resultRef.id}/commit`, 'Confirmar carga');
-  await expect(page.getByTestId('current-version-id')).toHaveText(imported.newVersionId); return imported.newVersionId as string;
+  await expectPublishedVersion(page, imported.newVersionId); return imported.newVersionId as string;
 }
 async function validate(page: Page) {
   await navigateStage(page, 'validation'); const job = await action(page, '/validations', 'Validar informes');
@@ -114,10 +115,10 @@ test('COREP exports the receipt and historical version, preserves selection acro
   const applied = await action(page, '/applications', 'Aplicar cambios seleccionados'), comparison = await get(page, `/applications/${applied.resultRef.id}/comparison?limit=200`);
   await expect(page.getByRole('button', { name: 'Descargar esta versión', exact: true })).toBeVisible();
   const next = page.getByRole('button', { name: '4. Descargar', exact: true });
-  await expect(next.locator('#next-stage-badge')).toHaveText('Siguiente paso');
+  await expect(next).toHaveClass(/stage-recommended/);
   await next.focus(); await page.keyboard.press('Enter');
   await expect(page.locator('#exports-title')).toBeFocused();
-  await expect(page.locator('#next-stage-badge')).toHaveCount(0);
+  await expect(page.locator('.stage-recommended')).toHaveCount(0);
   await expect(page.locator('#export-version')).toHaveValue(originalVersion);
   const summary = page.getByRole('region', { name: 'Contenido de la versión elegida', exact: true }); await expect(summary).toContainText('COREP'); await expect(summary).toContainText('histórica');
   const appliedDownload = page.locator('button[data-applied-download]');
