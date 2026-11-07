@@ -69,4 +69,14 @@ La investigación cerró la identificación FINREP con un alias local del layout
 
 Se verificaron las versiones instaladas, las rutas y contratos actuales, el mapping completo de 38 posiciones y las fuentes de metadatos. Una comprobación exploratoria de las cinco expresiones de demo con el parser compilado disponible devolvió cero diagnósticos; no acredita interpretación integral, carga visual ni exportación FINREP. Esas pruebas quedan definidas para implementación.
 
-Se comprobó la resolución de artefactos mediante check-prerequisites, enlaces locales, bloques de documentación y ausencia de marcadores pendientes. La evaluación de la constitución es satisfactoria antes y después del diseño. No se ha creado tasks.md ni modificado la aplicación; la siguiente fase es `$speckit-tasks`.
+Se comprobó la resolución de artefactos mediante check-prerequisites, enlaces locales, bloques de documentación y ausencia de marcadores pendientes. La evaluación de la constitución es satisfactoria antes y después del diseño. Al cerrar esa fase todavía no se había creado tasks.md ni modificado la aplicación; la siguiente fase era `$speckit-tasks`.
+
+## Desglose de tareas — 2026-11-07
+
+Se generó [tasks.md](tasks.md) mediante speckit-tasks: 83 tareas pendientes, con 2 de setup, 1 de soporte común, 7 de US1, 9 de US2, 12 de US3, 25 de US4, 21 de US5 y 6 de cierre. Quince tareas de pruebas admiten autoría paralela sobre archivos separados; las ejecuciones que comparten puerto se serializan.
+
+Se contrastaron rutas existentes y registros transversales de jobs, serializers de diagnósticos, perfiles y demos. La lectura de import-workspace.ts precisó la restricción vigente de misma entidad/fecha por conjunto y rechazo de duplicados; el modelo y contrato FINREP ahora lo indican expresamente.
+
+La validación documental comprueba IDs T001–T083 consecutivos, 83 casillas pendientes, etiquetas de historia, rutas concretas y dependencias anteriores sin ciclos. La matriz relaciona los 23 requisitos y los 10 criterios con sus tareas; cada historia tiene una prueba independiente y un checkpoint. No se han ejecutado pruebas del producto ni implementado funcionalidades durante esta fase.
+
+La observación humana SC-010 es independiente de la evidencia técnica. El cierre documental y los commits técnicos pueden completarse si falta esa observación, conservando su tarea pendiente. La siguiente fase es `$speckit-implement`.

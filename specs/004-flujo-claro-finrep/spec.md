@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-07
 
-**Status**: Planificación completada el 2026-11-07; lista para desglosar tareas. Comportamiento propuesto, pendiente de implementación y pruebas. Véase [plan.md](plan.md).
+**Status**: Tareas generadas el 2026-11-07; lista para implementar. Comportamiento propuesto, pendiente de implementación y pruebas. Véanse [plan.md](plan.md) y [tasks.md](tasks.md).
 
 **Input**: Nueva iteración solicitada por Diego: destacar la siguiente etapa sin el rótulo «Siguiente paso», dar un color distintivo a las acciones principales, eliminar información técnica innecesaria, mejorar la resolución de conflictos, seleccionar varios recálculos con preselección de los que tienen destino único y confirmar el funcionamiento de FINREP F 01.01.
 
@@ -213,3 +213,4 @@ El verde indica la acción principal disponible, no que las reglas se cumplan. U
 - La selección masiva se aplica al filtro completo, nunca solo a las filas visibles; la etiqueta declara este alcance. «Limpiar selección» es global. Son decisiones de diseño adoptadas para evitar cambios ocultos.
 - Se conserva el diseño visual existente como base. Esta iteración ajusta jerarquía, información y controles; no incluye una nueva marca ni publicación en Internet.
 - Esta especificación sustituye para los aspectos afectados las decisiones de 003 sobre etiqueta estática de etapa, ayuda técnica y selección inicialmente vacía. Los artefactos anteriores conservan su valor histórico.
+- Se conserva la restricción vigente de misma entidad y fecha de referencia por conjunto. Los contextos incompatibles y las coordenadas de negocio duplicadas se rechazan; el límite de veinte archivos no implica admitir copias completas de la misma F_01.01.

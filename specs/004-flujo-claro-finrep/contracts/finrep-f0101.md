@@ -101,7 +101,7 @@ Para evitar colisiones entre archivos FINREP, el `contextId` normalizado es `fin
 
 El binding incluye sourceFileId, contextIds, perfil, mappingSha256, selectedSheets=[1.1], excludedSheets, escala, precisión y origen del contexto. Un archivo tiene un contexto y 38 coordenadas. Se mantiene la prohibición de coordenadas de negocio duplicadas entre archivos; distintos archivos/entidades o periodos no se confunden. La reimportación crea nuevos IDs internos y conserva el contexto de negocio.
 
-Las cargas mixtas de perfiles continúan fuera del alcance de 004; una carga contiene informes del mismo perfil. Se mantiene el máximo existente de veinte informes, sin inventar un contexto común cuando difieren los declarados en cada libro.
+Las cargas mixtas de perfiles continúan fuera del alcance de 004; una carga contiene informes del mismo perfil. Se mantiene la cota existente de veinte informes, con la restricción vigente de una misma entidad y fecha de referencia por conjunto. Un lote con entidad/fecha incompatibles se rechaza; no se inventa un contexto común. Dos F_01.01 completos del mismo contexto también se rechazan por coordenadas de negocio duplicadas aunque sus contextId sean distintos. La cota de veinte archivos no promete veinte copias válidas de esta tabla.
 
 ## 4. Inspección: candidatos, elección y reintento
 
@@ -222,7 +222,7 @@ La primera igualdad tiene destino izquierdo único. La segunda depende de la pri
 | --- | --- |
 | Fuente/mapping | Hash original inalterado; generación determinista; 38 posiciones y códigos exactos; 144 anchors; merges; relocalización de la parte por relaciones. |
 | Lectura numérica | Ausencia/cero; escalas 0/3/6; precisión INF y extremos válidos/invalidos; decimal largo/exponencial acotado; fechas/porcentajes/error Excel rechazados; ninguna inferencia desde formato. |
-| Contexto | Formulario; libro; coincidencia/conflicto; tabla false; hoja reservada incompatible; diferentes entidades/periodos sin colisión; coordenadas de negocio duplicadas rechazadas. |
+| Contexto | Formulario; libro; coincidencia/conflicto; tabla false; hoja reservada incompatible; entidades/periodos distintos aislados entre conjuntos y rechazados si se mezclan en un lote; coordenadas de negocio duplicadas rechazadas. |
 | Candidatos | Extracto único; libro completo COREP+FINREP; elección explícita; contexto decisivo; perfil no reconocido; hash/índice cambiado; idempotencia y respuesta obsoleta. |
 | Seguridad/recursos | Fórmula seleccionada; macros/conexiones/relaciones prohibidas también en excluidas; CRC/ZIP/XML inválido; entradas y expansión excesivas; cancelación; fuente cambiada o binding de otro informe. |
 | Recálculo | Cinco resultados iniciales/finales de la tabla; dos destinos; dependencia y orden estable; cambios solo tras aceptación; desigualdades/condicional solo validación. |

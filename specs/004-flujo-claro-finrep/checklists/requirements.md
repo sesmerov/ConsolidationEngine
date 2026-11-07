@@ -44,3 +44,5 @@ Validación documental: 16/16 criterios satisfechos. No representa aceptación d
 - Las decisiones de diseño están documentadas como supuestos. Los detalles de implementación y metadatos del perfil se concretarán en el plan.
 - La comparación de requisitos con los seis puntos solicitados no deja puntos pendientes. Se revisaron los totales de la demo: antes 2 pasa/3 falla, después 4 pasa/1 falla; dos cambios encadenados.
 Actualización tras planificación (2026-11-07): se conserva el resultado documental 16/16. El ajuste de duración a 4,5 s está trazado en research.md/D2 y en US1/FR-002/SC-001. Los contratos concretan las decisiones del alcance sin presentar la implementación o aceptación como completadas.
+
+Actualización tras tareas (2026-11-07): 16/16 criterios documentales mantenidos; el supuesto de una entidad/fecha por conjunto explicita una restricción existente, sin ampliar el alcance. Tasks cubre los 23 FR y 10 SC y conserva separada la aceptación humana.

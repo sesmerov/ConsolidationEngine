@@ -97,3 +97,7 @@ Fuentes: [manifiesto local](../../tests/fixtures/eba/source-manifest.json), [evi
 ## Cierre de investigación
 
 Las decisiones anteriores resuelven identificación FINREP, alcance de preservación, selección masiva, recuperación, conflictos editables y accesibilidad. No quedan decisiones de producto pendientes para preparar el modelo y los contratos. La capacidad y tiempos reales de las nuevas rutas se medirán durante implementación, con rechazo atómico al superar las cuotas. Las observaciones humanas de SC-010 siguen pendientes hasta disponer de la interfaz.
+
+## Precisión de alcance verificada al desglosar tareas
+
+La lectura de [import-workspace.ts](../../apps/api/src/import/import-workspace.ts) confirmó el rechazo INCOMPATIBLE_ENTITY_OR_DATE dentro de un mismo conjunto y la deduplicación por coordenada de negocio. Se mantiene esta restricción: los contextId por archivo no permiten mezclar entidades/periodos ni duplicar F_01.01. Las pruebas de separación se realizan entre conjuntos o con contextos compatibles en la misma entidad/fecha. Se precisan modelo, contrato y supuestos de la especificación para evitar atribuir a la cota de veinte archivos una capacidad que el producto no ofrece.

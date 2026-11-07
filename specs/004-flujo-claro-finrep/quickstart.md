@@ -105,7 +105,7 @@ La revalidación conserva 14 pasa, 1 falla y 1 no aplicable. La demo Texto y fec
 
 ### Paginación, concurrencia y volumen
 
-Preparar fixtures sintéticos identificados en las suites de contrato/integración: 51 disponibles más bloqueadas, antecedente fuera de página, filtros sin coincidencias y dos contextos con las mismas coordenadas visibles. Los fixtures de pruebas pueden usar las vías de compatibilidad de la API; no se reintroduce esa carga en la interfaz.
+Preparar fixtures sintéticos identificados en las suites de contrato/integración: 51 disponibles más bloqueadas, antecedente fuera de página, filtros sin coincidencias y dos contextos compatibles de la misma entidad/fecha con las mismas coordenadas visibles. Las entidades/periodos distintos se aíslan entre conjuntos o se prueban como lote rechazado. Los fixtures de pruebas pueden usar las vías de compatibilidad de la API; no se reintroduce esa carga en la interfaz.
 
 Comprobar recuentos y selección global, revisiones de cursor, respuesta antigua tras cambiar contexto, pérdida de respuesta, reintento de la misma operación, cancelación/timeout, cierre de workspace y cambio de base durante worker.
 

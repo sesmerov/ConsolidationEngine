@@ -39,7 +39,7 @@ La investigación detectó tres límites que el diseño resuelve: los grupos des
 | IV. Dependencias verificables | No resolver productores o ciclos mediante prioridad silenciosa. | Cumple: grupos editables sin trasladar candidatos desde otro destino; selección reconoce antecedentes; Kahn y diagnósticos existentes permanecen. |
 | V. Evidencia e incrementos | Separar diseño, automatización futura y observación humana. | Cumple: matriz de cobertura, protocolos de negativos/volumen y SC-010; commits por incremento, sin datos privados. |
 | Restricciones del proyecto | Mantener toolchain, procesamiento local y archivos como datos. | Cumple: ANTLR sin cambios de gramática, sin eval ni ejecución de fórmulas/macros; preflight global y fuentes verificadas antes de exportar. |
-| Gobierno | Planificar antes de crear tareas/implementar. | Cumple: se entregan artefactos de Phase 0/1; no se crea tasks.md ni se modifican fuentes de producto. Recibos de revisión: disabled/unmanaged. |
+| Gobierno | Planificar antes de crear tareas/implementar. | Cumple: el diseño de Phase 0/1 precede al desglose en tasks.md; no se modifican fuentes de producto. Recibos de revisión: disabled/unmanaged. |
 
 No se necesita excepción a la constitución. El cambio de 6 a 4,5 segundos se documenta en investigación y en la especificación; preserva el comportamiento pedido y reduce movimiento innecesario.
 
@@ -56,13 +56,14 @@ specs/004-flujo-claro-finrep/
 ├── research.md
 ├── data-model.md
 ├── quickstart.md
+├── tasks.md
 └── contracts/
     ├── ui.md
     ├── proposal-selection.md
     └── finrep-f0101.md
 ```
 
-`tasks.md` corresponde a la siguiente fase. `docs/verification-004.md` será evidencia de implementación, no un artefacto de pruebas ejecutadas en este plan.
+El desglose de implementación se encuentra en [tasks.md](tasks.md): 83 tareas de las cinco historias y sus comprobaciones. `docs/verification-004.md` será evidencia de implementación, no un artefacto de pruebas ejecutadas en este plan.
 
 ### Source Code (repository root)
 
@@ -102,7 +103,7 @@ La aplicación acepta una referencia inmutable a una revisión. El recibo compac
 
 ### FINREP y conservación del informe
 
-El reconocedor valida la cuadrícula contra la fuente fijada y mapea las 38 posiciones por sus códigos reales. Un libro ambiguo requiere elegir entre perfiles realmente reconocidos. La hoja Contexto y el formulario deben coincidir si ambos aportan datos.
+Se mantiene una misma entidad y fecha por conjunto y el rechazo de coordenadas de negocio duplicadas; la cota de veinte informes no autoriza copias de F_01.01. El reconocedor valida la cuadrícula contra la fuente fijada y mapea las 38 posiciones por sus códigos reales. Un libro ambiguo requiere elegir entre perfiles realmente reconocidos. La hoja Contexto y el formulario deben coincidir si ambos aportan datos.
 
 El exportador FINREP valida propiedad, fuente y mapping; parchea los importes de la versión elegida y escribe contexto reimportable. Las partes excluidas admitidas por el preflight conservan su contenido. La validación posterior compara datos, contexto, estructura y partes no modificadas, incluidos históricos y varias aplicaciones. [Contrato FINREP](contracts/finrep-f0101.md).
 

@@ -130,6 +130,8 @@ Entidad, fechas civiles, framework, módulo y `filingIndicators["F_01.01"]` iden
 
 Divisa de tres letras, escala s=0/3/6 y precisión p=−18…18 o INF se declaran en formulario o Contexto. El valor base es literal × 10^s; la precisión base es p−s dentro de los límites admitidos o INF. No se infieren de estilos. Vacío declara coordenada sin hecho, cero declara hecho numérico. Si libro y formulario declaran datos, deben coincidir.
 
+La importación vigente exige misma entidad y fecha de referencia por conjunto. El contextId derivado del archivo no elude esa comprobación ni la prohibición de coordenadas de negocio duplicadas; los contextos de entidades/periodos distintos se aíslan entre conjuntos o se rechazan en un lote incompatible. El límite de veinte informes es una cota, no una garantía de admitir copias completas de F_01.01.
+
 Al reimportar, se comparan los campos de negocio, valores, divisa, escala y precisión. Los identificadores transitorios de archivo, contexto y sesión pueden cambiar.
 
 ### Selección de perfil de informe
