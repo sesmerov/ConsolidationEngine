@@ -6,109 +6,78 @@ import { ApplyComponent } from './apply.component';
 import { ComparisonComponent } from './comparison.component';
 import { SessionStore } from '../core/session.store';
 import { ApiClient } from '../core/api-client';
-const workspaceId = '00000000-0000-4000-8000-000000000061', versionId = '00000000-0000-4000-8000-000000000062', previewId = '00000000-0000-4000-8000-000000000063';
-const nextVersion = '00000000-0000-4000-8000-000000000064', aId = '00000000-0000-4000-8000-000000000065', dId = '00000000-0000-4000-8000-000000000066';
-const workspace = { id: workspaceId, name: 'SYNTHETIC', state: 'ready' as const, currentVersionId: versionId, versionIds: [versionId], contexts: [], counts: { snapshots: 1, coordinates: 4, facts: 4, sources: 2 }, sessionBytes: 100 };
-const coordinate = { factKey: 'A', contextId: 'demo', tableCode: 'T', rowCode: '0010', columnCode: '0010', sheetCode: '', dataType: 'number', decimals: '2', unit: 'EUR', sourceLocator: {} };
-const a = { id: aId, previewId, directionId: 'a'.repeat(64), instanceId: 'a'.repeat(64), variantIds: [], binding: {}, code: 'SYNTHETIC_A', targetKey: 'A', state: 'available',
-  before: { factKey: 'A', coordinate, presence: 'value', normalizedValue: { numerator: '11', denominator: '1' }, originalText: '11', sourceLocator: {} },
-  after: { normalizedValue: { numerator: '12', denominator: '1' }, originalText: '12.00', unit: 'EUR', decimals: '2' }, readKeys: [], predecessorIds: [], metadataReads: [], sources: [], diagnostics: [] };
-const d = { ...a, id: dId, directionId: 'd'.repeat(64), instanceId: 'd'.repeat(64), code: 'SYNTHETIC_D', targetKey: 'D', before: { ...a.before, factKey: 'D', coordinate: { ...coordinate, factKey: 'D', rowCode: '0040' }, originalText: '22', normalizedValue: { numerator: '22', denominator: '1' } }, after: { ...a.after, originalText: '24.00', normalizedValue: { numerator: '24', denominator: '1' } }, predecessorIds: [aId] };
-const preview = { id: previewId, baseVersionId: versionId, profileId: 'profile', policyId: 'half-even-v1', createdAt: '2026-10-31T00:00:00.000Z', state: 'ready', proposalIds: [aId, dId], graphSummary: { nodes: 2, edges: 1, order: [], cycles: [], conflicts: [], blocked: 0 }, diagnostics: [] };
-const selection = { selectedIds: [aId, dId], requiredIds: [], closureHash: 'a'.repeat(64), complete: true, state: 'ready' };
-describe('explicit application acceptance and recovery', () => {
-  let http: HttpTestingController, session: SessionStore;
-  beforeEach(() => { TestBed.configureTestingModule({ imports: [ApplyComponent, ComparisonComponent], providers: [provideHttpClient(), provideHttpClientTesting()] }); http = TestBed.inject(HttpTestingController); session = TestBed.inject(SessionStore); TestBed.inject(ApiClient).setSessionToken('memory-only'); session.workspace.set(workspace); session.etag.set('"v-' + versionId + '"'); });
-  afterEach(() => { http.verify(); TestBed.resetTestingModule(); });
-  function render(options: { preview?: object; selection?: { selectedIds: readonly string[] }; proposals?: readonly object[] } = {}) {
-    const fixture = TestBed.createComponent(ApplyComponent);
-    const closure = options.selection ?? selection;
-    fixture.componentRef.setInput('preview', options.preview ?? preview);
-    fixture.componentRef.setInput('selectedIds', closure.selectedIds);
-    fixture.componentRef.setInput('selection', closure);
-    fixture.componentRef.setInput('proposals', options.proposals ?? [a, d]);
-    fixture.detectChanges(); TestBed.tick(); fixture.detectChanges(); return fixture;
-  }
-  function button(fixture: ReturnType<typeof render>, text: string) { return Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find(button => button.textContent?.includes(text))!; }
-  function acknowledge(fixture: ReturnType<typeof render>) { const checkbox = (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>('input[type="checkbox"]')!; checkbox.click(); fixture.detectChanges(); }
-  it('shows every selected change and ancestor, requiring express acceptance before posting the exact set', async () => {
-    const fixture = render(), element = fixture.nativeElement as HTMLElement;
-    const review = element.querySelector<HTMLDetailsElement>('details.selection-review')!; expect(review.open).toBe(false); review.querySelector('summary')!.click(); fixture.detectChanges(); expect(review.open).toBe(true);
-    for (const text of ['SYNTHETIC_A', 'SYNTHETIC_D', '11,00', '12,00', '22,00', '24,00']) expect(review.textContent).toContain(text);
-    expect(review.querySelectorAll('.selected-changes > li')).toHaveLength(2);
-    expect(button(fixture, 'Aplicar cambios seleccionados').disabled).toBe(true); http.expectNone(request => request.method === 'POST');
-    acknowledge(fixture); button(fixture, 'Aplicar cambios seleccionados').click(); fixture.detectChanges();
-    const request = http.expectOne(request => request.url.endsWith('/applications')); expect(request.request.method).toBe('POST');
-    expect(request.request.headers.get('If-Match')).toBe('"v-' + versionId + '"'); expect(request.request.headers.get('X-CE-Session')).toBe('memory-only'); expect(request.request.headers.get('Idempotency-Key')).toMatch(/^[0-9a-f-]{36}$/);
-    expect(request.request.body).toEqual({ baseVersionId: versionId, previewId, selectedIds: [aId, dId], closureHash: selection.closureHash });
-    request.flush({ jobId: 'accepted', workspaceId, kind: 'apply', status: 'queued', progress: { completed: 0, total: 2, complete: false }, diagnostics: [], pollAfterMs: 60000 }); await Promise.resolve();
-    expect(session.job()?.jobId).toBe('accepted'); expect(session.versionId()).toBe(versionId);
+const workspaceId='00000000-0000-4000-8000-000000000061',versionId='00000000-0000-4000-8000-000000000062',previewId='00000000-0000-4000-8000-000000000063',nextVersion='00000000-0000-4000-8000-000000000064';
+const selectionId='00000000-0000-4000-8000-000000000067';
+const workspace={id:workspaceId,name:'SYNTHETIC',state:'ready' as const,currentVersionId:versionId,versionIds:[versionId,nextVersion],contexts:[],counts:{snapshots:1,coordinates:4,facts:4,sources:2},sessionBytes:100};
+const preview={id:previewId,baseVersionId:versionId,state:'ready',createdAt:'2026-11-07T00:00:00Z',graphSummary:{nodes:2,edges:1,blocked:0,conflictCount:0,cycleCount:0},diagnosticCount:0};
+const selection={id:selectionId,workspaceId,previewId,baseVersionId:versionId,revision:1,state:'ready',availableCount:2,selectedCount:2,requiredCount:0,closureHash:'a'.repeat(64),complete:true};
+const a={id:'a',code:'SYNTHETIC_A',state:'available',target:{contextId:'demo',tableCode:'T',rowCode:'0010',columnCode:'0010',sheetCode:''},description:'',descriptionTruncated:false,selected:true,required:false,predecessorCount:0,requiredPredecessorCount:0,rounded:false,hasInterval:false,diagnosticCount:0,
+  before:{presence:'value',normalizedValue:{numerator:'11',denominator:'1'},decimals:'2',unit:'EUR'},after:{normalizedValue:{numerator:'12',denominator:'1'},originalText:'12.00',decimals:'2',unit:'EUR'}};
+const d={...a,id:'d',code:'SYNTHETIC_D',before:{...a.before,normalizedValue:{numerator:'22',denominator:'1'}},after:{...a.after,normalizedValue:{numerator:'24',denominator:'1'},originalText:'24.00'}};
+const page=(items=[a,d],s=selection)=>({selectionId,previewId,revision:s.revision,state:s.state,scope:'selected',items,total:items.length,nextCursor:null,summary:s,sourceFiles:[],filterCounts:{matched:2,available:2,selected:2,selectedOutsideFilter:0,selectedOutsidePage:0}});
+const settle=async()=>{await Promise.resolve();await Promise.resolve();};
+describe('revision-bound application acceptance and recovery',()=>{
+  let http:HttpTestingController,session:SessionStore;
+  beforeEach(()=>{TestBed.configureTestingModule({imports:[ApplyComponent,ComparisonComponent],providers:[provideHttpClient(),provideHttpClientTesting()]});http=TestBed.inject(HttpTestingController);session=TestBed.inject(SessionStore);TestBed.inject(ApiClient).setSessionToken('memory-only');session.workspace.set(workspace);session.etag.set('"v-'+versionId+'"');});
+  afterEach(()=>{http.verify();TestBed.resetTestingModule();});
+  function render(options:{preview?:object;selection?:object;busy?:boolean}={}){const f=TestBed.createComponent(ApplyComponent);f.componentRef.setInput('preview',options.preview??preview);f.componentRef.setInput('selection',options.selection??selection);f.componentRef.setInput('selectionBusy',options.busy??false);f.detectChanges();TestBed.tick();f.detectChanges();return f;}
+  const button=(f:ReturnType<typeof render>,text:string)=>Array.from((f.nativeElement as HTMLElement).querySelectorAll('button')).find(b=>b.textContent?.includes(text));
+  function acknowledge(f:ReturnType<typeof render>){(f.nativeElement as HTMLElement).querySelector<HTMLInputElement>('input[type=checkbox]')!.click();f.detectChanges();}
+  async function review(f:ReturnType<typeof render>,data=page()) { const details=(f.nativeElement as HTMLElement).querySelector<HTMLDetailsElement>('details.selection-review')!;details.open=true;details.dispatchEvent(new Event('toggle'));f.detectChanges();const req=http.expectOne(r=>r.url.endsWith('/selection-state/rows'));expect(req.request.params.get('scope')).toBe('selected');expect(req.request.params.has('contextId')).toBe(false);req.flush(data);await settle();f.detectChanges();return details; }
+  it('reviews paginated exact changes and requires express consent before posting only an immutable reference',async()=>{
+    const f=render(),details=await review(f);for(const text of ['SYNTHETIC_A','SYNTHETIC_D','11,00','12,00','22,00','24,00'])expect(details.textContent).toContain(text);
+    expect(details.querySelectorAll('.selected-changes > li')).toHaveLength(2);expect(button(f,'Aplicar cambios seleccionados')!.disabled).toBe(true);http.expectNone(r=>r.method==='POST');
+    acknowledge(f);button(f,'Aplicar cambios seleccionados')!.click();const req=http.expectOne(r=>r.url.endsWith('/applications'));
+    expect(req.request.body).toEqual({baseVersionId:versionId,previewId,selectionRef:{id:selectionId,revision:1},closureHash:selection.closureHash});expect(req.request.body).not.toHaveProperty('selectedIds');
+    expect(req.request.headers.get('If-Match')).toBe('"v-'+versionId+'"');expect(req.request.headers.get('X-CE-Session')).toBe('memory-only');expect(req.request.headers.get('Idempotency-Key')).toMatch(/^[0-9a-f-]{36}$/);
+    req.flush({jobId:'accepted',workspaceId,kind:'apply',status:'queued',progress:{completed:0,total:2,complete:false},diagnostics:[],pollAfterMs:60000});await settle();expect(session.job()?.jobId).toBe('accepted');expect(session.versionId()).toBe(versionId);
   });
   it.each([
-    { selection: { ...selection, selectedIds: [dId], requiredIds: [aId], complete: false }, proposals: [d] },
-    { selection: { ...selection, selectedIds: [], complete: true }, proposals: [] },
-    { selection, proposals: [d] }, // Details for A are absent; an opaque ID is not enough to confirm it.
-    { preview: { ...preview, state: 'obsolete' }, selection: { ...selection, state: 'obsolete' } },
-    { preview: { ...preview, state: 'discarded' } },
-  ])('never confirms incomplete, empty, missing-detail or unavailable selections (%#)', (options) => {
-    const fixture = render(options);
-    const action = button(fixture, 'Aplicar cambios seleccionados');
-    if (options.preview || options.selection.selectedIds.length === 0) expect(action).toBeUndefined();
-    else expect(action.disabled).toBe(true);
-    http.expectNone(request => request.method === 'POST');
+    {selection:{...selection,selectedCount:1,requiredCount:1,complete:false}},
+    {selection:{...selection,selectedCount:0}},
+    {selection:{...selection,workspaceId:'another-workspace'}},
+    {selection:{...selection,previewId:'another-preview'}},
+    {selection:{...selection,baseVersionId:'another-base'}},
+    {selection:{...selection,state:'updating'}},
+    {preview:{...preview,state:'obsolete'}},
+    {preview:{...preview,state:'discarded'}},
+    {busy:true},
+  ])('never confirms an incomplete, empty, foreign, busy or unavailable selection (%#)',options=>{
+    const f=render(options),action=button(f,'Aplicar cambios seleccionados');if(options.preview||('selection'in options&&options.selection.selectedCount===0))expect(action).toBeUndefined();else expect(action?.disabled).toBe(true);http.expectNone(r=>r.method==='POST');
   });
-  it('resets express acknowledgement when the selected set changes', () => {
-    const fixture = render(); acknowledge(fixture); expect(button(fixture, 'Aplicar cambios seleccionados').disabled).toBe(false);
-    fixture.componentRef.setInput('selectedIds', [aId]); fixture.componentRef.setInput('selection', { ...selection, selectedIds: [aId], closureHash: 'b'.repeat(64) }); fixture.componentRef.setInput('proposals', [a]); fixture.detectChanges(); TestBed.tick(); fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked).toBe(false); expect(button(fixture, 'Aplicar cambios seleccionados').disabled).toBe(true);
+  it('requires another acknowledgement for a later revision even when the closure hash is identical',()=>{
+    const f=render();acknowledge(f);expect(button(f,'Aplicar cambios seleccionados')!.disabled).toBe(false);
+    f.componentRef.setInput('selection',{...selection,revision:3});f.detectChanges();TestBed.tick();f.detectChanges();expect((f.nativeElement as HTMLElement).querySelector<HTMLInputElement>('input[type=checkbox]')!.checked).toBe(false);
   });
-  it('explains a no-op and preserves the existing calculated provenance in the confirmation', () => {
-    const fixture = render({ selection: { ...selection, selectedIds: [aId] }, proposals: [{ ...a, before: { ...a.before, originalText: '12', normalizedValue: { numerator: '12', denominator: '1' }, derivation: { receiptId: 'previous-receipt', previewId, proposalId: aId, baseVersionId: versionId } } }] });
-    const element = fixture.nativeElement as HTMLElement, review = element.querySelector<HTMLDetailsElement>('details.selection-review')!; review.querySelector('summary')!.click(); fixture.detectChanges();
-    expect(review.textContent).toContain('Sin cambio de valor'); expect(review.textContent).toContain('Recalculado'); expect(review.textContent).toContain('12,00');
-    const provenance = Array.from(review.querySelectorAll<HTMLDetailsElement>('details')).find(detail => detail.textContent?.includes('previous-receipt'))!;
-    expect(provenance).toBeDefined(); provenance.querySelector('summary')!.click(); expect(provenance.open).toBe(true); expect(provenance.textContent).toContain('previous-receipt');
+  it('explains no-op values without exposing internal provenance',async()=>{
+    const f=render({selection:{...selection,selectedCount:1}});const data=page([{...a,before:{...a.before,normalizedValue:{numerator:'12',denominator:'1'}}}],{...selection,selectedCount:1});const details=await review(f,data);
+    expect(details.textContent).toContain('Sin cambio de valor');expect(details.textContent).toContain('12,00');expect(details.textContent).not.toContain(selectionId);
   });
-  it('does not register an acceptance that arrives after the workspace closes', async () => {
-    const fixture = render(); acknowledge(fixture); button(fixture, 'Aplicar cambios seleccionados').click(); const request = http.expectOne(request => request.url.endsWith('/applications'));
-    session.workspace.set(null); TestBed.tick(); request.flush({ jobId: 'old', workspaceId, kind: 'apply', status: 'queued', progress: { completed: 0, total: 2, complete: false }, diagnostics: [] }); await Promise.resolve();
-    expect(session.job()).toBeNull();
+  it('blocks acknowledgement while requested changes are missing or their revision is stale',async()=>{
+    const f=render();f.componentInstance.store.toggleReview(true);f.detectChanges();expect(button(f,'Aplicar cambios seleccionados')!.disabled).toBe(true);
+    http.expectOne(r=>r.url.endsWith('/selection-state/rows')).flush({...page(),revision:2});await settle();f.detectChanges();expect(button(f,'Aplicar cambios seleccionados')!.disabled).toBe(true);expect((f.nativeElement as HTMLElement).textContent).toContain('La selección ha cambiado');
   });
-  it('reports stale rejection without pretending changes were applied', async () => {
-    const fixture = render(); acknowledge(fixture); button(fixture, 'Aplicar cambios seleccionados').click();
-    http.expectOne(request => request.url.endsWith('/applications')).flush({ error: { code: 'STALE_VERSION', message: 'La versión ha cambiado.' } }, { status: 412, statusText: 'Precondition Failed' }); await Promise.resolve(); fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('La versión ha cambiado.'); expect(session.versionId()).toBe(versionId); expect(button(fixture, 'Aplicar cambios seleccionados').disabled).toBe(true);
+  it('ignores an application acceptance that arrives after the workspace closes',async()=>{
+    const f=render();acknowledge(f);button(f,'Aplicar cambios seleccionados')!.click();const req=http.expectOne(r=>r.url.endsWith('/applications'));session.workspace.set(null);TestBed.tick();
+    req.flush({jobId:'late',workspaceId,kind:'apply',status:'queued',diagnostics:[],pollAfterMs:60000});await settle();expect(session.job()).toBeNull();
   });
-  it('retries an uncertain network response with the same key, body and original CAS even after a newer version is observed', async () => {
-    const fixture = render(); acknowledge(fixture); button(fixture, 'Aplicar cambios seleccionados').click();
-    const first = http.expectOne(request => request.url.endsWith('/applications')), body = first.request.body, key = first.request.headers.get('Idempotency-Key');
-    first.error(new ProgressEvent('error')); await Promise.resolve(); fixture.detectChanges();
-    session.workspace.set({ ...workspace, currentVersionId: nextVersion, versionIds: [versionId, nextVersion] }); session.etag.set('"v-' + nextVersion + '"'); TestBed.tick(); fixture.detectChanges();
-    fixture.componentRef.setInput('selection', null);
-    fixture.componentRef.setInput('selectedIds', []);
-    fixture.componentRef.setInput('proposals', []);
-    fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).querySelector('#apply-title')).toBeNull();
-    button(fixture, 'Reintentar misma aplicación').click(); const retry = http.expectOne(request => request.url.endsWith('/applications'));
-    expect(retry.request.body).toEqual(body); expect(retry.request.headers.get('Idempotency-Key')).toBe(key); expect(retry.request.headers.get('If-Match')).toBe('"v-' + versionId + '"');
-    retry.flush({ jobId: 'same-job', workspaceId, kind: 'apply', status: 'queued', progress: { completed: 0, total: 2, complete: false }, diagnostics: [], pollAfterMs: 60000 }); await Promise.resolve(); expect(session.job()?.jobId).toBe('same-job');
+  it('reports stale rejection without publishing and retries uncertainty with the original body, key and CAS',async()=>{
+    const f=render();acknowledge(f);button(f,'Aplicar cambios seleccionados')!.click();const first=http.expectOne(r=>r.url.endsWith('/applications'));const body=first.request.body,key=first.request.headers.get('Idempotency-Key');
+    first.error(new ProgressEvent('error'));await settle();f.detectChanges();session.workspace.set({...workspace,currentVersionId:nextVersion});session.etag.set('"v-'+nextVersion+'"');f.componentRef.setInput('selection',null);TestBed.tick();f.detectChanges();
+    expect((f.nativeElement as HTMLElement).querySelector('#apply-title')).toBeNull();button(f,'Reintentar misma aplicación')!.click();const retry=http.expectOne(r=>r.url.endsWith('/applications'));expect(retry.request.body).toEqual(body);expect(retry.request.headers.get('Idempotency-Key')).toBe(key);expect(retry.request.headers.get('If-Match')).toBe('"v-'+versionId+'"');
+    retry.flush({jobId:'same-job',workspaceId,kind:'apply',status:'queued',diagnostics:[],pollAfterMs:60000});await settle();expect(session.job()?.jobId).toBe('same-job');
   });
-  it('distinguishes remaining failures and arithmetic errors from the fact that an application completed', () => {
-    const fixture = TestBed.createComponent(ComparisonComponent);
-    const summary = { complete: true, rows: 3, variants: 3, applicableVariants: 3, duplicateRows: 0, instances: 3, byStatus: { pass: 1, fail: 1, error: 1, not_applicable: 0, not_evaluable: 0 } };
-    const result = { id: 'result', runId: 'before', versionId, code: 'SYNTHETIC_WARNING', severity: 'warning', status: 'fail', values: {}, factReads: [], metadataReads: [], sources: [], diagnostics: [], variantIds: [], sourceRecordIds: [], tables: [], coverageOnly: false, expression: '1=1' };
-    fixture.componentRef.setInput('page', { items: [{ key: 'warning', before: result, after: { ...result, runId: 'after', versionId: nextVersion, status: 'pass', factReads: [{ ...a.before, originalText: '12.00', derivation: { receiptId: 'calculated-receipt', previewId, proposalId: aId, baseVersionId: versionId } }] } },
-      { key: 'fail', before: { ...result, code: 'SYNTHETIC_STILL_FAIL' }, after: { ...result, code: 'SYNTHETIC_STILL_FAIL', versionId: nextVersion } },
-      { key: 'error', before: { ...result, code: 'SYNTHETIC_ARITHMETIC', status: 'error' }, after: { ...result, code: 'SYNTHETIC_ARITHMETIC', status: 'error', versionId: nextVersion, diagnostics: [{ code: 'DIVISION_BY_ZERO', message: 'División por cero.' }] } }],
-      total: 3, nextCursor: null, receipt: { baseVersionId: versionId, newVersionId: nextVersion, acceptedIds: [aId, dId] }, beforeSummary: summary, afterSummary: summary });
-    fixture.detectChanges(); for (const request of http.match(request => request.url.endsWith('/runs'))) request.flush({ items: [], total: 0, nextCursor: null, revision: 'rev' });
-    const element = fixture.nativeElement as HTMLElement, text = element.textContent!;
-    for (const value of ['SYNTHETIC_WARNING', 'Advertencia', 'SYNTHETIC_STILL_FAIL', 'Falla', 'SYNTHETIC_ARITHMETIC', 'Error', versionId, nextVersion]) expect(text).toContain(value);
-    expect(text.toLowerCase()).not.toMatch(/todo correcto|todas las reglas pasan|validación aprobada/);
-    element.querySelector<HTMLButtonElement>('button[aria-label="Ver cálculo y origen de SYNTHETIC_WARNING"]')!.click(); fixture.detectChanges();
-    const details = element.querySelectorAll('ce-calculation-detail'), after = details[1]!;
-    expect(after.textContent).toContain('Recalculado en una aplicación anterior'); expect(after.textContent).toContain('no estaba escrito en el informe original');
-    const technical = after.querySelector<HTMLDetailsElement>('details[data-technical]')!; technical.open = true; technical.dispatchEvent(new Event('toggle')); fixture.detectChanges(); expect(technical.textContent).toContain('calculated-receipt');
-    element.querySelector<HTMLButtonElement>('button[aria-label="Ver cálculo y origen de SYNTHETIC_ARITHMETIC"]')!.click(); fixture.detectChanges(); expect(element.textContent).toContain('División por cero.');
+  it('keeps a failed CAS visible and disables a new application until the selection is refreshed',async()=>{
+    const f=render();acknowledge(f);button(f,'Aplicar cambios seleccionados')!.click();http.expectOne(r=>r.url.endsWith('/applications')).flush({error:{code:'STALE_VERSION',message:'La versión ha cambiado.'}},{status:412,statusText:'Precondition Failed'});await settle();f.detectChanges();
+    expect((f.nativeElement as HTMLElement).textContent).toContain('La versión ha cambiado.');expect(session.versionId()).toBe(versionId);expect(button(f,'Aplicar cambios seleccionados')!.disabled).toBe(true);
+  });
+  it('distinguishes remaining failures and arithmetic errors from a completed application without UUIDs',()=>{
+    const f=TestBed.createComponent(ComparisonComponent),counts={complete:true,rows:3,variants:3,applicableVariants:3,duplicateRows:0,instances:3,byStatus:{pass:1,fail:1,error:1,not_applicable:0,not_evaluable:0}};
+    const result={id:'result',runId:'before',versionId,code:'SYNTHETIC_WARNING',severity:'warning',status:'fail',values:{},factReads:[],metadataReads:[],sources:[],diagnostics:[],variantIds:[],sourceRecordIds:[],tables:[],coverageOnly:false,expression:'1=1'};
+    f.componentRef.setInput('page',{items:[{key:'warning',before:result,after:{...result,status:'pass'}},{key:'fail',after:{...result,code:'SYNTHETIC_STILL_FAIL'}},{key:'error',after:{...result,code:'SYNTHETIC_ARITHMETIC',status:'error',diagnostics:[{code:'DIVISION_BY_ZERO',message:'División por cero.'}]}}],total:3,nextCursor:null,receipt:{baseVersionId:versionId,newVersionId:nextVersion,acceptedCount:2},beforeSummary:counts,afterSummary:counts});f.detectChanges();
+    for(const req of http.match(r=>r.url.endsWith('/runs')))req.flush({items:[],total:0,nextCursor:null});const element=f.nativeElement as HTMLElement;
+    for(const text of ['SYNTHETIC_WARNING','Advertencia','SYNTHETIC_STILL_FAIL','Falla','SYNTHETIC_ARITHMETIC','Error','Versión 1','Versión 2'])expect(element.textContent).toContain(text);
+    expect(element.textContent).not.toContain(versionId);expect(element.textContent).not.toContain(nextVersion);expect(element.textContent?.toLowerCase()).not.toMatch(/todo correcto|todas las reglas pasan|validación aprobada/);
+    element.querySelector<HTMLButtonElement>('button[aria-label="Ver cálculo y origen de SYNTHETIC_ARITHMETIC"]')!.click();f.detectChanges();expect(element.textContent).toContain('División por cero.');expect(element.querySelector('[data-technical]')).toBeNull();
   });
 });

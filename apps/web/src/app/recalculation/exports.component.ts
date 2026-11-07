@@ -31,8 +31,9 @@ readonly download = this.store.download.bind(this.store);
 readonly civilDate = civilDate;
 readonly profiles = computed(() => [...new Set((this.store.summary()?.reports ?? []).map(report => this.profileLabel(report.profileId)))]);
 readonly excludedCount = computed(() => this.store.summary()?.reports.reduce((total, report) => total + report.excludedSheets.length, 0) ?? 0);
+readonly preservedExcludedCount = computed(() => this.store.summary()?.reports.filter(report => report.profileId === 'eba-finrep-4.0-f0101-v1').reduce((total, report) => total + report.excludedSheets.length, 0) ?? 0);
 readonly chosenRun = computed(() => this.runs().find(run => run.id === this.selectedRunId()));
 readonly incompleteRun = computed(() => this.chosenRun()?.status === 'incomplete');
-profileLabel(profile: string): string { return profile === 'eba-corep-of-4.0-ca1-v1' ? 'COREP de fondos propios · CA1' : profile === 'ce-demo-types-1' ? 'Demostración de texto y fechas' : profile === 'ce-report-1' ? 'Formato anterior' : 'Perfil no reconocido'; }
+profileLabel(profile: string): string { return profile === 'eba-corep-of-4.0-ca1-v1' ? 'COREP de fondos propios · CA1' : profile === 'eba-finrep-4.0-f0101-v1' ? 'FINREP · F 01.01 · plantilla 4.0' : profile === 'ce-demo-types-1' ? 'Demostración de texto y fechas' : profile === 'ce-report-1' ? 'Formato anterior' : 'Perfil no reconocido'; }
 constructor() { effect(() => { this.session.workspace()?.id; this.session.exportVersionId(); untracked(() => { void this.store.loadSummary(); }); }); }
 }

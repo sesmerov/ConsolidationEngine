@@ -1,0 +1,40 @@
+@let detail = explanation();
+<section class="calculation-detail" role="region" [attr.aria-label]="title()">
+  <div class="section-heading"><h3 #heading [id]="headingId()" tabindex="-1">{{ title() }}</h3><button mat-button type="button" (click)="close()">Cerrar detalle</button></div>
+  <p><strong>{{ coordinate(detail.target) }}</strong>@if (detail.target.contextLabel) { · {{ detail.target.contextLabel }} }</p>
+  @if (detail.target.conceptLabel) { <p>{{ detail.target.conceptLabel }}</p> }
+  <div class="value-change"><span><span class="value-label">Anterior</span><span class="exact-value">{{ normalizedText(detail.before?.normalizedValue, detail.before?.decimals ?? '') }}</span></span><span aria-hidden="true">→</span><span><span class="value-label">Propuesto</span><span class="exact-value">{{ normalizedText(detail.after?.normalizedValue, detail.before?.decimals ?? '') }}</span></span><span class="unit-label">{{ detail.before?.unit }}</span></div>
+  <h4>Cómo se obtiene</h4>
+  @if (detail.evidenceState === 'unavailable') { <p class="notice">No hay detalle de cálculo conservado para esta propuesta.</p> }
+  @if (detail.expression) { <p class="expression exact-value">{{ detail.expression }}</p> }
+  @if (detail.precondition) { <p>Precondición: <span class="expression exact-value">{{ detail.precondition }}</span></p> }
+  @if (detail.sourceValue) { <p>Valor calculado: <strong class="exact-value">{{ validationText(detail.sourceValue) }}</strong></p> }
+  @if (detail.rounded) { <p>Redondeado a la precisión del destino. {{ detail.roundingLabel }}</p> }
+  @if (detail.exactNominal) { <p>Resultado exacto antes del redondeo: <strong class="exact-value">{{ decimalText(detail.exactNominal) }}</strong></p> }
+  @if (detail.interval) { <p>Intervalo calculado: <span class="exact-value">[{{ decimalText(detail.interval.lo) }} → {{ decimalText(detail.interval.hi) }}]</span></p> }
+  <div class="detail-sections" role="group" aria-label="Detalle del cálculo">
+    <button mat-button type="button" [attr.aria-pressed]="section() === 'operands'" (click)="selectSection('operands')">Datos utilizados ({{ detail.operandCount }})</button>
+    <button mat-button type="button" [attr.aria-pressed]="section() === 'origins'" (click)="selectSection('origins')">Archivos y celdas de origen ({{ detail.originCount }})</button>
+    @if (detail.diagnosticCount) { <button mat-button type="button" [attr.aria-pressed]="section() === 'diagnostics'" (click)="selectSection('diagnostics')">Motivos y avisos ({{ detail.diagnosticCount }})</button> }
+    @if (detail.descriptionCount) { <button mat-button type="button" [attr.aria-pressed]="section() === 'descriptions'" (click)="selectSection('descriptions')">Descripciones del catálogo ({{ detail.descriptionCount }})</button> }
+  </div>
+  @if (loading()) { <p role="status">Consultando detalle…</p> }
+  @if (error(); as message) { <p role="alert" class="error">{{ message }}</p><button mat-button type="button" (click)="load()">Reintentar detalle</button> }
+  @if (section() === 'operands' && page()) {
+    <div class="table-region" role="region" aria-label="Tabla de entradas utilizadas" tabindex="0">
+      <table mat-table class="data-table" [dataSource]="operandRows()" aria-label="Entradas utilizadas"><caption>Datos utilizados</caption>
+        <ng-container matColumnDef="coordinate"><th mat-header-cell *matHeaderCellDef>Celda</th><td mat-cell *matCellDef="let read">{{ coordinate(read) }}<span class="muted">{{ read.contextLabel }}</span></td></ng-container>
+        <ng-container matColumnDef="value"><th mat-header-cell *matHeaderCellDef>Valor leído</th><td mat-cell *matCellDef="let read"><span class="exact-value">{{ normalizedText(read.value, read.decimals) }}</span> {{ read.unit }}</td></ng-container>
+        <ng-container matColumnDef="origin"><th mat-header-cell *matHeaderCellDef>Origen</th><td mat-cell *matCellDef="let read">{{ origin(read) }}<span class="muted">{{ read.fileName }} · {{ read.sheet }} · {{ read.cell }}</span></td></ng-container>
+        <tr mat-header-row *matHeaderRowDef="columns"></tr><tr mat-row *matRowDef="let read; columns: columns"></tr>
+      </table>
+    </div>
+  }
+  @for (item of originRows(); track item.itemId) { <p data-source-location>{{ item.label }} · {{ item.fileName }}@if (item.sheet) { · {{ item.sheet }} }@if (item.cell) { · {{ item.cell }} }</p> }
+  @for (item of diagnosticRows(); track item.itemId) { <p>{{ item.message }}@if (item.messageTruncated) { <span class="muted"> (mensaje abreviado)</span> }@if (item.location) { · {{ item.location }} }</p> }
+  @for (item of descriptionRows(); track item.itemId) { <p>{{ item.description }}</p><p class="expression">{{ item.expression }}</p><p class="muted">{{ item.fileName }} · {{ item.sheet }}@if (item.row) { · fila {{ item.row }} }</p> }
+  @if (page(); as current) {
+    @if (!current.items.length && !loading()) { <p>No hay datos conservados en esta sección.</p> }
+    @if (current.total > current.items.length) { <div class="detail-nav"><button mat-button type="button" [disabled]="loading() || !canPrevious()" (click)="previous()">Anterior</button><span>{{ current.items.length }} de {{ current.total }} registros</span><button mat-button type="button" [disabled]="loading() || !current.nextCursor" (click)="next()">Siguiente</button></div> }
+  }
+</section>

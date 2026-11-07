@@ -5,197 +5,103 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PreviewPageComponent } from './preview-page.component';
 import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
-const workspaceId = 'a4a99ec0-bb65-41f5-90d1-b857f4ebefb2', versionId = 'bfda41bd-2a55-4a80-9f22-2fc1aa89894c', id = '5976e981-9b8d-4e80-af2a-b1ffeced4b55';
-const workspace = { id: workspaceId, name: 'SYNTHETIC', state: 'ready' as const, currentVersionId: versionId, versionIds: [versionId], contexts: [], counts: { snapshots: 1, coordinates: 6, facts: 5, sources: 2 }, sessionBytes: 100 };
-const preview = { id, baseVersionId: versionId, profileId: 'profile', policyId: 'half-even-v1', createdAt: '2026-10-31T00:00:00.000Z', state: 'ready', proposalIds: ['a', 'b'], graphSummary: { nodes: 2, edges: 1, order: ['da', 'db'], conflicts: [], cycles: [], blocked: 0 }, diagnostics: [] };
-const coordinate = { factKey: 'cell', contextId: 'demo', tableCode: 'T', rowCode: '0010', columnCode: '0010', sheetCode: '', dataType: 'number', decimals: '2', unit: 'EUR', sourceLocator: {} };
-const a = { id: 'a', previewId: id, directionId: 'da', instanceId: 'ia', variantIds: [], binding: {}, code: 'SYNTHETIC_A', targetKey: 'cell', state: 'available', before: { coordinate, presence: 'explicit_null', sourceLocator: { sheet: 'Facts', row: 2, column: 'G' } }, after: { normalizedValue: { numerator: '33', denominator: '100' }, originalText: '0.33', decimals: '2', unit: 'EUR' }, exactNominal: { numerator: '1', denominator: '3' }, derivedInterval: { lo: { numerator: '1', denominator: '3' }, hi: { numerator: '1', denominator: '3' } }, readKeys: [], predecessorIds: [], metadataReads: [], sources: [], diagnostics: [] };
-const b = { ...a, id: 'b', directionId: 'db', code: 'SYNTHETIC_B', predecessorIds: ['a'] };
-const page = { items: [a, b], total: 2, nextCursor: null, versionId };
-describe('preview explanation and explicit closure', () => {
-  let http: HttpTestingController, session: SessionStore;
-  beforeEach(() => { TestBed.configureTestingModule({ imports: [PreviewPageComponent], providers: [provideHttpClient(), provideHttpClientTesting()] }); http = TestBed.inject(HttpTestingController); session = TestBed.inject(SessionStore); TestBed.inject(ApiClient).setSessionToken('memory-only'); session.workspace.set(workspace); session.etag.set('"v-' + versionId + '"'); });
-  afterEach(() => { http.verify(); TestBed.resetTestingModule(); });
-  async function render(state = 'ready') {
-    const fixture = TestBed.createComponent(PreviewPageComponent); fixture.detectChanges();
-    http.expectOne(request => request.url.endsWith('/previews')).flush({ items: [{ ...preview, state }], total: 1, nextCursor: null, revision: 'rev' }); await Promise.resolve();
-    http.expectOne(request => request.url.endsWith('/previews/' + id)).flush({ ...preview, state });
-    http.expectOne(request => request.url.endsWith('/proposals')).flush(state === 'ready' ? page : { ...page, items: page.items.map(row => ({ ...row, state: 'obsolete' })) });
-    await Promise.resolve(); await Promise.resolve(); fixture.detectChanges(); return fixture;
+const workspaceId='a4a99ec0-bb65-41f5-90d1-b857f4ebefb2', versionId='bfda41bd-2a55-4a80-9f22-2fc1aa89894c', id='5976e981-9b8d-4e80-af2a-b1ffeced4b55', selectionId='5976e981-9b8d-4e80-af2a-b1ffeced4b56';
+const workspace={id:workspaceId,name:'SYNTHETIC',state:'ready' as const,currentVersionId:versionId,versionIds:[versionId],contexts:[],counts:{snapshots:1,coordinates:6,facts:5,sources:2},sessionBytes:100};
+const preview={id,baseVersionId:versionId,profileId:'profile',policyId:'half-even-v1',createdAt:'2026-10-31T00:00:00.000Z',state:'ready',graphSummary:{nodes:2,edges:1,conflictCount:0,cycleCount:0,blocked:0},diagnosticCount:0};
+const summary=(revision=1,selectedCount=2,requiredCount=0)=>({id:selectionId,workspaceId,previewId:id,baseVersionId:versionId,revision,state:'ready',availableCount:2,selectedCount,requiredCount,complete:requiredCount===0,closureHash:'a'.repeat(64)});
+const a={id:'a',code:'SYNTHETIC_A',state:'available',target:{contextId:'demo',tableCode:'T',rowCode:'0010',columnCode:'0010',sheetCode:''},description:'',descriptionTruncated:false,
+  before:{presence:'explicit_null',unit:'EUR',decimals:'2'},after:{normalizedValue:{numerator:'33',denominator:'100'},originalText:'0.33',decimals:'2',unit:'EUR'},selected:true,required:false,predecessorCount:0,requiredPredecessorCount:0,rounded:true,hasInterval:false,diagnosticCount:0};
+const b={...a,id:'b',code:'SYNTHETIC_B',target:{...a.target,rowCode:'0020'},predecessorCount:1};
+const rows=(s=summary(),items=[a,b],total=items.length)=>({selectionId,previewId:id,revision:s.revision,state:s.state,scope:'all',summary:s,items,total,nextCursor:null,sourceFiles:[],
+  filterCounts:{matched:total,available:total,selected:items.filter(x=>x.selected).length,selectedOutsideFilter:s.selectedCount-items.filter(x=>x.selected).length,selectedOutsidePage:s.selectedCount-items.filter(x=>x.selected).length}});
+const job=(status='succeeded')=>({jobId:'edit-job',workspaceId,kind:'select-proposals',status,progress:{completed:1,total:1,complete:status==='succeeded'},diagnostics:[],resultRef:{type:'proposal-selection',id:selectionId},pollAfterMs:60000});
+const settle=async()=>{await Promise.resolve();await Promise.resolve();await Promise.resolve();};
+describe('compact preview, persisted selection and explanation',()=>{
+  let http:HttpTestingController,session:SessionStore;
+  beforeEach(()=>{TestBed.configureTestingModule({imports:[PreviewPageComponent],providers:[provideHttpClient(),provideHttpClientTesting()]});http=TestBed.inject(HttpTestingController);session=TestBed.inject(SessionStore);TestBed.inject(ApiClient).setSessionToken('memory-only');session.workspace.set(workspace);session.etag.set('"v-'+versionId+'"');});
+  afterEach(()=>{http.verify();TestBed.resetTestingModule();});
+  function respond(p=preview,s=summary(),page=rows(s)){
+    const request=http.expectOne(r=>r.url.endsWith('/previews/'+id));expect(request.request.params.get('compact')).toBe('true');request.flush(p);
+    http.expectOne(r=>r.url.endsWith('/selection-state')).flush(s);http.expectOne(r=>r.url.endsWith('/selection-state/rows')).flush(page);
   }
-  it('shows the current global selection immediately and keeps off-page changes in the confirmation', async () => {
-    const fixture = await render();
-    const element = fixture.nativeElement as HTMLElement;
-    const store = fixture.componentInstance.store;
-    const panel = () => element.querySelector<HTMLElement>('[aria-labelledby="apply-title"]');
-    const trigger = element.querySelector<HTMLInputElement>('.proposal-row input[type="checkbox"]')!;
-    trigger.focus();
-    expect(panel()).toBeNull();
-
-    const first = store.toggle('b', true);
-    const pending = http.expectOne(request => request.url.endsWith('/selection'));
-    fixture.detectChanges();
-    expect(panel()?.textContent).toMatch(/1 propuesta/);
-    expect(panel()?.querySelector<HTMLButtonElement>('button')?.disabled).toBe(true);
-    expect(document.activeElement).toBe(trigger);
-    pending.flush({ selectedIds: ['b'], requiredIds: ['a'], complete: false, closureHash: 'partial', state: 'ready' });
-    await first;
-    const second = store.toggle('a', true);
-    http.expectOne(request => request.url.endsWith('/selection')).flush({ selectedIds: ['a', 'b'], requiredIds: [], complete: true, closureHash: 'both', state: 'ready' });
-    await second;
-
-    store.code.set('NO_MATCH');
-    const filtering = store.load();
-    http.expectOne(request => request.url.endsWith('/previews/' + id)).flush(preview);
-    http.expectOne(request => request.url.endsWith('/proposals') && request.params.get('code') === 'NO_MATCH').flush({ ...page, total: 0, items: [] });
-    await filtering;
-    fixture.detectChanges();
-    expect(store.hiddenSelectedCount()).toBe(2);
-    expect(panel()?.textContent).toMatch(/2 propuestas/);
-    expect(panel()?.textContent).toContain('SYNTHETIC_B');
-
-    const removingB = store.toggle('b', false);
-    const older = http.expectOne(request => request.url.endsWith('/selection'));
-    const removingA = store.toggle('a', false);
-    const latest = http.expectOne(request => request.url.endsWith('/selection'));
-    fixture.detectChanges();
-    expect(panel()).toBeNull();
-    latest.flush({ selectedIds: [], requiredIds: [], complete: true, closureHash: 'empty', state: 'ready' });
-    await removingA;
-    older.flush({ selectedIds: ['a'], requiredIds: [], complete: true, closureHash: 'old', state: 'ready' });
-    await removingB;
-    fixture.detectChanges();
-    expect(panel()).toBeNull();
-    http.expectNone(request => request.url.endsWith('/applications'));
+  async function render(state='ready'){
+    const f=TestBed.createComponent(PreviewPageComponent);f.detectChanges();http.expectOne(r=>r.url.endsWith('/previews')).flush({items:[{...preview,state}],total:1,nextCursor:null});await settle();
+    respond({...preview,state},{...summary(),state},rows({...summary(),state}));await settle();f.detectChanges();return f;
+  }
+  const button=(f:Awaited<ReturnType<typeof render>>,text:string)=>Array.from((f.nativeElement as HTMLElement).querySelectorAll('button')).find(x=>x.textContent?.includes(text))!;
+  async function finishEdit(promise:Promise<void>,s=summary(2),page=rows(s)){
+    const req=http.expectOne(r=>r.url.endsWith('/selection-state/edits'));req.flush(job());await settle();respond(preview,s,page);await promise;TestBed.tick();
+  }
+  it('starts preselected without acceptance and retains global counts through a filter with no matches',async()=>{
+    const f=await render(),store=f.componentInstance.store,element=f.nativeElement as HTMLElement;
+    expect(element.querySelectorAll('.proposal-row input:checked')).toHaveLength(2);expect(element.querySelector<HTMLInputElement>('#apply-title ~ mat-checkbox input')?.checked).toBe(false);
+    expect(button(f,'Aplicar cambios seleccionados').disabled).toBe(true);expect(element.textContent).toContain('Selección: 2');
+    store.code.set('NO_MATCH');const filtering=store.load();respond(preview,summary(),rows(summary(),[],0));await filtering;f.detectChanges();
+    expect(store.hiddenSelectedCount()).toBe(2);expect(element.textContent).toContain('2 seleccionadas fuera del filtro');expect(element.querySelector('#apply-title')).not.toBeNull();
+    http.expectNone(r=>r.url.endsWith('/selection')||r.url.endsWith('/proposals'));
   });
-  it('requires a new acknowledgement when the same selection and closure return after a rapid deselection', async () => {
-    const fixture = await render();
-    const store = fixture.componentInstance.store;
-    const element = fixture.nativeElement as HTMLElement;
-    const acknowledgement = () => element.querySelector<HTMLInputElement>('[aria-labelledby="apply-title"] input[type="checkbox"]')!;
-    const closure = { selectedIds: ['a'], requiredIds: [], complete: true, closureHash: 'same', state: 'ready' };
-    const first = store.toggle('a', true);
-    http.expectOne(request => request.url.endsWith('/selection')).flush(closure);
-    await first;
-    fixture.detectChanges();
-    acknowledgement().click();
-    fixture.detectChanges();
-    expect(acknowledgement().checked).toBe(true);
-
-    const removing = store.toggle('a', false);
-    const stale = http.expectOne(request => request.url.endsWith('/selection'));
-    const adding = store.toggle('a', true);
-    http.expectOne(request => request.url.endsWith('/selection')).flush(closure);
-    await adding;
-    stale.flush({ ...closure, selectedIds: [], closureHash: 'empty' });
-    await removing;
-    fixture.detectChanges();
-    expect(acknowledgement().checked).toBe(false);
-    http.expectNone(request => request.url.endsWith('/applications'));
+  it('removes an ancestor explicitly without restoring it and blocks applying an incomplete closure',async()=>{
+    const f=await render(),store=f.componentInstance.store;
+    const editing=store.toggle('a',false);const req=http.expectOne(r=>r.url.endsWith('/edits'));
+    expect(req.request.body).toEqual({selectionId,expectedRevision:1,operations:[{op:'set',proposalId:'a',selected:false}]});expect(req.request.headers.get('If-Match')).toBe('"v-'+versionId+'"');
+    req.flush(job());await settle();const s=summary(2,1,1);respond(preview,s,rows(s,[{...a,selected:false,required:true},{...b,requiredPredecessorCount:1}]));await editing;f.detectChanges();
+    expect((f.nativeElement as HTMLElement).textContent).toContain('Faltan 1 antecedentes');expect(button(f,'Aplicar cambios seleccionados').disabled).toBe(true);
+    http.expectNone(r=>r.method==='POST');
   });
-  it('restores retained preview and explains original null, exact and quantized values without implicitly selecting ancestors', async () => {
-    const fixture = await render(); const text = (fixture.nativeElement as HTMLElement).textContent!;
-    expect(text).toContain('Sin dato'); expect(text).toContain('0,33');
-    const opening = fixture.componentInstance.store.openDetail('a'); http.expectOne(request => request.url.endsWith('/proposals/a')).flush(a); await opening; fixture.detectChanges();
-    const technical = (fixture.nativeElement as HTMLElement).querySelector<HTMLDetailsElement>('[data-technical]')!; technical.open = true; technical.dispatchEvent(new Event('toggle')); fixture.detectChanges();
-    expect(technical.textContent).toContain('explicit_null'); expect(technical.textContent).toContain('1/3'); expect(text).toContain('half-even-v1'); expect(text).toContain('SYNTHETIC_A');
-    const selecting = fixture.componentInstance.store.toggle('b', true);
-    const request = http.expectOne(request => request.url.endsWith('/selection')); expect(request.request.body).toEqual({ selectedIds: ['b'] }); expect(request.request.headers.has('If-Match')).toBe(false);
-    request.flush({ selectedIds: ['b'], requiredIds: ['a'], complete: false, closureHash: 'hash', state: 'ready' }); await selecting; fixture.detectChanges();
-    expect(fixture.componentInstance.store.selected()).toEqual(['b']); expect((fixture.nativeElement as HTMLElement).textContent).toContain('Faltan 1');
-    http.expectNone(request => request.url.endsWith('/applications')); expect(Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find(button => button.textContent?.includes('Aplicar cambios seleccionados'))!.disabled).toBe(true);
+  it('clears globally, hides confirmation and invalidates acknowledgement when the same closure returns',async()=>{
+    const f=await render(),store=f.componentInstance.store,element=f.nativeElement as HTMLElement;
+    element.querySelector<HTMLInputElement>('ce-apply input[type=checkbox]')!.click();f.detectChanges();expect(button(f,'Aplicar cambios seleccionados').disabled).toBe(false);
+    await finishEdit(store.clearAll(),summary(2,0),rows(summary(2,0),[{...a,selected:false},{...b,selected:false}]));f.detectChanges();expect(element.querySelector('#apply-title')).toBeNull();
+    await finishEdit(store.selectMatching(),summary(3));f.detectChanges();expect(element.querySelector<HTMLInputElement>('ce-apply input[type=checkbox]')!.checked).toBe(false);
   });
-  it('ignores a late selection response after a newer explicit selection', async () => {
-    const fixture = await render(), store = fixture.componentInstance.store;
-    const first = store.toggle('b', true), older = http.expectOne(request => request.url.endsWith('/selection'));
-    const second = store.toggle('a', true), newer = http.expectOne(request => request.url.endsWith('/selection'));
-    newer.flush({ selectedIds: ['a', 'b'], requiredIds: [], complete: true, closureHash: 'new', state: 'ready' }); await second;
-    older.flush({ selectedIds: ['b'], requiredIds: ['a'], complete: false, closureHash: 'old', state: 'ready' }); await first;
-    expect(store.selection()?.closureHash).toBe('new'); expect(store.selected()).toEqual(['a', 'b']);
+  it('renders null, exact rounding and recorded recalculated operands without exposing technical fields',async()=>{
+    const f=await render(),store=f.componentInstance.store,element=f.nativeElement as HTMLElement;
+    expect(element.textContent).toContain('Sin dato');expect(element.textContent).toContain('0,33');expect(element.textContent).not.toContain('half-even-v1');
+    const opening=store.openDetail('b');http.expectOne(r=>r.url.endsWith('/proposals/b/explanation')).flush({selectionId,previewId:id,baseVersionId:versionId,revision:1,state:'ready',proposalId:'b',code:'SYNTHETIC_B',target:b.target,evidenceState:'recorded',expression:'100+20',exactNominal:{numerator:'120',denominator:'1'},rounded:false,operandCount:2,originCount:2,diagnosticCount:0,descriptionCount:0});await opening;f.detectChanges();
+    http.expectOne(r=>r.url.endsWith('/explanation/items')).flush({selectionId,previewId:id,baseVersionId:versionId,revision:1,state:'ready',proposalId:'b',section:'operands',total:2,nextCursor:null,items:[
+      {...a.target,itemId:'first',presence:'value',value:{numerator:'100',denominator:'1'},unit:'EUR',decimals:'2',fileName:'informe.xlsx',sheet:'1.1',cell:'F8',originKind:'proposal',fromProposalId:'internal-predecessor',fromProposalCode:'SYNTHETIC_A'},
+      {...b.target,itemId:'second',presence:'value',value:{numerator:'20',denominator:'1'},unit:'EUR',decimals:'2',fileName:'informe.xlsx',sheet:'1.1',cell:'F12',originKind:'report'}]});await settle();f.detectChanges();
+    expect(element.textContent).toContain('100,00');expect(element.textContent).toContain('20,00');expect(element.textContent).toContain('Valor recalculado por SYNTHETIC_A');
+    expect(element.textContent).not.toContain('internal-predecessor');expect(element.querySelector('[data-technical]')).toBeNull();http.expectNone(r=>r.url.endsWith('/proposals/b'));
   });
-  it('resolves an off-page predecessor by identity without selecting it and rejects a detail arriving after close', async () => {
-    const fixture = await render(), store = fixture.componentInstance.store;
-    store.page.set({ ...store.page()!, items: [store.page()!.items[1]!] });
-    const selecting = store.toggle('b', true); http.expectOne(request => request.url.endsWith('/selection')).flush({ selectedIds: ['b'], requiredIds: ['a'], complete: false, closureHash: 'pending', state: 'ready' }); await selecting;
-    const lookup = http.expectOne(request => request.url.endsWith('/proposals/a')); lookup.flush(a); await Promise.resolve();
-    expect(store.proposalName('a')).toBe('SYNTHETIC_A · T · r0010 · c0010'); expect(store.selected()).toEqual(['b']); expect(store.detail()).toBeNull();
-    const opening = store.openDetail('a'), detail = http.expectOne(request => request.url.endsWith('/proposals/a'));
-    session.workspace.set(null); TestBed.tick(); detail.flush(a); await opening;
-    expect(store.detail()).toBeNull(); expect(store.selected()).toEqual([]); expect(store.proposalName('a')).toBe('Dependencia fuera de esta página');
+  it('loads antecedents in one bounded page and rejects responses after the workspace closes',async()=>{
+    const f=await render(),store=f.componentInstance.store;const loading=store.openDependencies('b');
+    const request=http.expectOne(r=>r.url.endsWith('/proposals/b/dependencies'));expect(request.request.params.has('contextId')).toBe(false);
+    request.flush({selectionId,previewId:id,revision:1,state:'ready',proposalId:'b',scope:'all',items:[a],total:1,nextCursor:null,predecessorCount:1,requiredPredecessorCount:0});await loading;
+    expect(store.dependencies()?.items[0]?.code).toBe('SYNTHETIC_A');http.expectNone(r=>r.url.endsWith('/proposals/a'));
+    const opening=store.openDetail('a'),late=http.expectOne(r=>r.url.endsWith('/proposals/a/explanation'));session.workspace.set(null);TestBed.tick();late.flush({});await opening;
+    expect(store.detail()).toBeNull();expect(store.dependencies()).toBeNull();expect(store.selection()).toBeNull();
   });
-  it('bounds dependency lookups across rapid selections and ignores the earlier generation', async () => {
-    const fixture = await render(), store = fixture.componentInstance.store, requiredIds = Array.from({ length: 8 }, (_, index) => 'missing-' + index);
-    const first = store.toggle('b', true); http.expectOne(request => request.url.endsWith('/selection')).flush({ selectedIds: ['b'], requiredIds, complete: false, closureHash: 'older', state: 'ready' }); await first;
-    const inFlight = http.match(request => /\/proposals\/missing-/.test(request.url)); expect(inFlight).toHaveLength(4);
-    const second = store.toggle('a', true); http.expectOne(request => request.url.endsWith('/selection')).flush({ selectedIds: ['a','b'], requiredIds, complete: false, closureHash: 'newer', state: 'ready' }); await second;
-    http.expectNone(request => /\/proposals\/missing-/.test(request.url));
-    session.workspace.set(null); TestBed.tick(); for (const request of inFlight) request.flush({ ...a, id: request.request.url.split('/').at(-1), code: 'STALE' });
-    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
-    expect(store.proposalName(requiredIds[0]!)).toBe('Dependencia fuera de esta página'); http.expectNone(request => /\/proposals\/missing-/.test(request.url));
+  it('retains obsolete history without editable checkboxes, discard or confirmation',async()=>{
+    const f=await render('obsolete'),store=f.componentInstance.store;expect((f.nativeElement as HTMLElement).textContent).toContain('obsoleta');
+    expect((f.nativeElement as HTMLElement).querySelectorAll('.proposal-row input[type=checkbox]')).toHaveLength(0);expect((f.nativeElement as HTMLElement).querySelector('#apply-title')).toBeNull();
+    expect(store.canDiscard()).toBe(false);await store.discard();await store.toggle('a',false);http.expectNone(r=>r.method==='POST'||r.method==='DELETE');
   });
-  it('retains an obsolete preview as information and never enables discard or application', async () => {
-    const fixture = await render('obsolete'); expect((fixture.nativeElement as HTMLElement).textContent).toContain('obsoleta');
-    expect((fixture.nativeElement as HTMLElement).querySelector('#apply-title')).toBeNull();
-    expect(fixture.componentInstance.store.canDiscard()).toBe(false);
-    await fixture.componentInstance.store.discard(); http.expectNone(request => request.method === 'DELETE');
+  it('confirms discard with CAS and retains confirmed rows on a stale rejection',async()=>{
+    const f=await render();button(f,'Descartar previsualización').click();f.detectChanges();http.expectNone(r=>r.method==='DELETE');
+    const discard=f.componentInstance.store.discard(),request=http.expectOne(r=>r.method==='DELETE');expect(request.request.headers.get('If-Match')).toBe('"v-'+versionId+'"');expect(request.request.params.get('compact')).toBe('true');
+    request.flush({error:{message:'La versión ha cambiado.'}},{status:412,statusText:'Precondition Failed'});await discard;
+    expect(f.componentInstance.store.page()?.items).toHaveLength(2);expect(f.componentInstance.store.preview()?.state).toBe('ready');
   });
-  it('confirms discard explicitly, sends CAS and preserves values when the server rejects stale state', async () => {
-    const fixture = await render(); const buttons = () => Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'));
-    buttons().find(button => button.textContent === 'Descartar previsualización')!.click(); fixture.detectChanges(); http.expectNone(request => request.method === 'DELETE');
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Confirmar descarte');
-    const discarding = fixture.componentInstance.store.discard(), request = http.expectOne(request => request.method === 'DELETE');
-    expect(request.request.headers.get('If-Match')).toBe('"v-' + versionId + '"'); expect(request.request.body).toBeNull();
-    request.flush({ error: { message: 'La versión ha cambiado.' } }, { status: 412, statusText: 'Precondition Failed' }); await discarding;
-    expect(fixture.componentInstance.store.preview()?.state).toBe('ready'); expect(fixture.componentInstance.store.page()?.items).toHaveLength(2);
+  it('ignores late history after closing and never fabricates a preview from a cancelled job',async()=>{
+    const f=TestBed.createComponent(PreviewPageComponent);f.detectChanges();const history=http.expectOne(r=>r.url.endsWith('/previews'));session.workspace.set(null);TestBed.tick();history.flush({items:[preview],total:1,nextCursor:null});await settle();expect(f.componentInstance.store.history()).toEqual([]);http.expectNone(r=>r.url.endsWith('/previews/'+id));
+    session.workspace.set(workspace);TestBed.tick();http.expectOne(r=>r.url.endsWith('/previews')).flush({items:[],total:0,nextCursor:null});await settle();
+    const starting=f.componentInstance.store.execute(),request=http.expectOne(r=>r.method==='POST'&&r.url.endsWith('/previews'));expect(request.request.body).toEqual({baseVersionId:versionId});
+    request.flush({...job('cancelled'),kind:'preview',baseVersionId:versionId});await starting;TestBed.tick();expect(f.componentInstance.store.preview()).toBeNull();
   });
-  it('discards late responses from a previous workspace and clears its retained references', async () => {
-    const fixture = TestBed.createComponent(PreviewPageComponent); fixture.detectChanges(); const stale = http.expectOne(request => request.url.endsWith('/previews'));
-    session.workspace.set(null); TestBed.tick(); stale.flush({ items: [preview], total: 1, nextCursor: null, revision: 'old' }); await Promise.resolve();
-    expect(fixture.componentInstance.store.history()).toEqual([]); expect(fixture.componentInstance.store.preview()).toBeNull(); http.expectNone(request => request.url.endsWith('/previews/' + id));
-  });
-  it('keeps a selected proposal outside the current filter while selecting its predecessor explicitly', async () => {
-    const fixture = await render(), store = fixture.componentInstance.store;
-    const selecting = store.toggle('b', true); http.expectOne(request => request.url.endsWith('/selection')).flush({ selectedIds: ['b'], requiredIds: ['a'], complete: false, closureHash: 'old', state: 'ready' }); await selecting;
-    store.code.set('SYNTHETIC_A'); const loading = store.load(); http.expectOne(request => request.url.endsWith('/previews/' + id)).flush(preview);
-    http.expectOne(request => request.url.endsWith('/proposals') && request.params.get('code') === 'SYNTHETIC_A').flush({ ...page, items: [a], total: 1 }); await loading;
-    const completed = store.toggle('a', true), request = http.expectOne(request => request.url.endsWith('/selection')); expect(request.request.body).toEqual({ selectedIds: ['a', 'b'] });
-    request.flush({ selectedIds: ['a', 'b'], requiredIds: [], complete: true, closureHash: 'new', state: 'ready' }); await completed;
-    expect(store.selected()).toEqual(['a', 'b']); expect(store.selection()?.complete).toBe(true);
-    expect(store.selectedProposals()).toEqual([b, a]); fixture.detectChanges();
-    const confirmation = (fixture.nativeElement as HTMLElement).querySelector('ce-apply')!.textContent!; expect(confirmation).toContain('SYNTHETIC_A'); expect(confirmation).toContain('SYNTHETIC_B'); expect(confirmation).toContain('0,33');
-  });
-  it('starts against current CAS and shows no fabricated preview for a cancelled job', async () => {
-    const fixture = TestBed.createComponent(PreviewPageComponent); fixture.detectChanges(); http.expectOne(request => request.url.endsWith('/previews')).flush({ items: [], total: 0, nextCursor: null, revision: 'rev' }); await Promise.resolve();
-    const starting = fixture.componentInstance.store.execute(), request = http.expectOne(request => request.method === 'POST' && request.url.endsWith('/previews'));
-    expect(request.request.body).toEqual({ baseVersionId: versionId }); expect(request.request.headers.get('If-Match')).toBe('"v-' + versionId + '"'); expect(request.request.headers.has('Idempotency-Key')).toBe(true);
-    request.flush({ jobId: 'job', workspaceId, kind: 'preview', status: 'cancelled', progress: { completed: 0, total: 2, complete: false }, diagnostics: [] }); await starting; TestBed.tick();
-    expect(fixture.componentInstance.store.preview()).toBeNull(); expect(fixture.componentInstance.store.history()).toEqual([]);
-  });
-  it('restores an applied receipt after reload, keeps no-op counts and pages all comparisons without posting', async () => {
-    const receiptId = '789588af-2da5-4ef9-b2f6-f34d39e4e7ad', applied = { ...preview, state: 'applied', appliedReceiptId: receiptId };
-    const receipt = { id: receiptId, previewId: id, acceptedIds: ['a', 'b'], baseVersionId: versionId, newVersionId: 'next', beforeValidationRunId: 'before', validationRunId: 'after', appliedAt: preview.createdAt, closureHash: 'hash' };
-    const summary = { complete: true, rows: 2, variants: 2, applicableVariants: 2, duplicateRows: 0, instances: 2, byStatus: { pass: 0, fail: 1, error: 1, not_applicable: 0, not_evaluable: 0 } };
-    const row = { id: 'result', runId: 'after', versionId: 'next', code: 'SYNTHETIC_REMAINING', severity: 'error', status: 'fail', values: {}, factReads: [], metadataReads: [], sources: [], diagnostics: [], variantIds: [], sourceRecordIds: [], tables: [], coverageOnly: false, expression: '1=2' };
-    const detail = { receipt, changeCount: 1, beforeSummary: summary, afterSummary: summary };
-    const comparison = { receipt, beforeSummary: summary, afterSummary: summary, items: Array.from({ length: 50 }, (_, index) => ({ key: 'first-' + index, after: { ...row, id: 'first-' + index } })), total: 51, nextCursor: 'next-page' };
-    const fixture = TestBed.createComponent(PreviewPageComponent); fixture.detectChanges();
-    http.expectOne(request => request.url.endsWith('/previews')).flush({ items: [applied], total: 1, nextCursor: null, revision: 'r' }); await Promise.resolve();
-    http.expectOne(request => request.url.endsWith('/previews/' + id)).flush(applied); http.expectOne(request => request.url.endsWith('/proposals')).flush({ ...page, items: page.items.map(row => ({ ...row, state: 'applied' })) });
-    await Promise.resolve(); await Promise.resolve();
-    http.expectOne(request => request.url.endsWith('/applications/' + receiptId)).flush(detail); http.expectOne(request => request.url.endsWith('/comparison')).flush(comparison);
-    await Promise.resolve(); await Promise.resolve(); fixture.detectChanges();
-    for (const history of http.match(request => request.url.endsWith('/runs'))) history.flush({ items: [], total: 0, nextCursor: null });
-    const text = (fixture.nativeElement as HTMLElement).textContent!; expect(text).toContain('Aplicación completada'); expect(text).toContain('Valores modificados: 1'); expect(text).toContain('Propuestas sin cambio de valor: 1'); expect(text).toContain('SYNTHETIC_REMAINING'); expect(fixture.componentInstance.store.selected()).toEqual([]);
-    expect((fixture.nativeElement as HTMLElement).querySelector('#apply-title')).toBeNull();
-    const loading = fixture.componentInstance.store.loadApplication(true); http.expectOne(request => request.url.endsWith('/applications/' + receiptId)).flush(detail);
-    http.expectOne(request => request.url.endsWith('/comparison') && request.params.get('cursor') === 'next-page').flush({ ...comparison, items: [{ key: 'second', after: { ...row, id: 'second', code: 'SYNTHETIC_ERROR', status: 'error' } }], nextCursor: null }); await loading;
-    expect(fixture.componentInstance.store.comparison()?.items.map(row => row.key)).toEqual(['second']); http.expectNone(request => request.method === 'POST');
-  });
-  it('ignores late receipt and comparison responses after closing the workspace', async () => {
-    const fixture = await render(), store = fixture.componentInstance.store;
-    store.preview.set({ ...store.preview()!, state: 'applied', appliedReceiptId: 'receipt' }); const loading = store.loadApplication();
-    const detail = http.expectOne(request => request.url.endsWith('/applications/receipt')), comparison = http.expectOne(request => request.url.endsWith('/comparison'));
-    session.workspace.set(null); TestBed.tick(); detail.flush({ receipt: { id: 'receipt' } }); comparison.flush({ items: [], receipt: { id: 'receipt' } }); await loading;
-    expect(store.application()).toBeNull(); expect(store.comparison()).toBeNull();
+  it('pages a compact applied receipt, preserves no-op counts and rejects late comparison replies',async()=>{
+    const f=await render(),store=f.componentInstance.store;store.preview.set({...store.preview()!,state:'applied',appliedReceiptId:'receipt'});
+    const receipt={id:'receipt',previewId:id,acceptedCount:2,baseVersionId:versionId,newVersionId:'next',beforeValidationRunId:'before',validationRunId:'after',appliedAt:preview.createdAt,closureHash:'hash'};
+    const counts={complete:true,rows:2,variants:2,applicableVariants:2,duplicateRows:0,instances:2,byStatus:{pass:0,fail:1,error:1,not_applicable:0,not_evaluable:0}};
+    const result={id:'result',code:'SYNTHETIC_REMAINING',severity:'error',status:'fail',values:{},factReads:[],metadataReads:[],sources:[],diagnostics:[],expression:'1=2'};
+    const detail={receipt,changeCount:1,beforeSummary:counts,afterSummary:counts};
+    const loading=store.loadApplication();const request=http.expectOne(r=>r.url.endsWith('/applications/receipt'));expect(request.request.params.get('includeAcceptedIds')).toBe('false');request.flush(detail);
+    http.expectOne(r=>r.url.endsWith('/comparison')).flush({receipt,beforeSummary:counts,afterSummary:counts,items:Array.from({length:50},(_,i)=>({key:String(i),after:result})),total:51,nextCursor:'next-page'});await loading;f.detectChanges();
+    for(const r of http.match(r=>r.url.endsWith('/runs')))r.flush({items:[],total:0,nextCursor:null});
+    expect((f.nativeElement as HTMLElement).textContent).toContain('Propuestas sin cambio de valor: 1');expect((f.nativeElement as HTMLElement).querySelector('#apply-title')).toBeNull();
+    const primary=Array.from((f.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button.ce-primary-action')).filter(button=>!button.disabled);
+    expect(primary).toHaveLength(1);expect(primary[0]!.textContent).toContain('Descargar esta versión');
+    const more=store.loadApplication(true);http.expectOne(r=>r.url.endsWith('/applications/receipt')).flush(detail);const tail=http.expectOne(r=>r.url.endsWith('/comparison'));expect(tail.request.params.get('cursor')).toBe('next-page');tail.flush({receipt,beforeSummary:counts,afterSummary:counts,items:[{key:'last',after:result}],total:51,nextCursor:null});await more;expect(store.comparison()?.items).toHaveLength(1);
+    const late=store.loadApplication();const one=http.expectOne(r=>r.url.endsWith('/applications/receipt')),two=http.expectOne(r=>r.url.endsWith('/comparison'));session.workspace.set(null);TestBed.tick();one.flush({});two.flush({});await late;expect(store.application()).toBeNull();expect(store.comparison()).toBeNull();http.expectNone(r=>r.method==='POST');
   });
 });

@@ -38,7 +38,7 @@ describe('validation page HTTP workflow', () => {
     session.job.set(terminalJob); const fixture = TestBed.createComponent(ValidationPageComponent); fixture.detectChanges(); flushHistory(); TestBed.tick();
     http.expectOne((item) => item.url.endsWith('/runs/' + runId + '/results')).flush(page); await Promise.resolve(); fixture.detectChanges(); flushHistory();
     session.workspace.set({ ...workspace, currentVersionId: '027345c5-36db-4bb2-bcee-0f55b13165ad', versionIds: [versionId, '027345c5-36db-4bb2-bcee-0f55b13165ad'] }); TestBed.tick(); fixture.detectChanges(); flushHistory();
-    const text = (fixture.nativeElement as HTMLElement).textContent!; expect(text).toContain('histórico'); expect(text).toContain('v0190_m'); expect(text).toContain(versionId);
+    const text = (fixture.nativeElement as HTMLElement).textContent!; expect(text).toContain('histórico'); expect(text).toContain('v0190_m'); expect(text).toContain('Versión 1 evaluada'); expect(text).not.toContain(versionId);
   });
   it('never presents a cancelled run as a complete approval', async () => {
     session.job.set({ ...terminalJob, status: 'cancelled', progress: { completed: 0, total: 1, complete: false } });

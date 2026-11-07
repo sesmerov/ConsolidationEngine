@@ -13,12 +13,15 @@ import { policyLabel, resultLocation } from '../core/exact-value';
 import { ResultsStore } from './results.store';
 import { ResultsExportComponent } from './results-export.component';
 import { DirectionsComponent } from '../recalculation/directions.component';
+import { DirectionsStore } from '../recalculation/directions.store';
 import { CalculationDetailComponent } from '../shared/calculation-detail.component';
 @Component({ selector: 'ce-validation-page', standalone: true, imports: [StageTitleDirective, FormsModule, DatePipe, MatButtonModule, MatFormFieldModule, MatInputModule, MatTableModule, MatPaginatorModule, ResultsExportComponent, DirectionsComponent, CalculationDetailComponent], templateUrl: './validation-page.component.html', changeDetection: ChangeDetectionStrategy.OnPush })
 export class ValidationPageComponent {
 readonly store = inject(ResultsStore); readonly session = this.store.session; readonly versionLabel = versionLabel; readonly policyLabel = policyLabel; readonly resultLocation = resultLocation;
 readonly detail = signal<RuleResultDTO | undefined>(undefined); private detailTrigger?: HTMLElement;
 private readonly focus = inject(StageFocus, { optional: true });
+private readonly directions = inject(DirectionsStore);
+selectRun(id: string): void { if (this.directions.allowLeaveEditor()) { this.closeDetail(); this.store.selectRun(id); } }
 statusLabel(row: RuleResultDTO): string { return this.store.labels[row.status]; }
 openDetail(row: RuleResultDTO, event: Event): void { this.detailTrigger = event.currentTarget as HTMLElement; this.focus?.request(calculationHeadingId(row.id)); this.detail.set(row); }
 closeDetail(): void { this.detail.set(undefined); this.detailTrigger?.focus(); }

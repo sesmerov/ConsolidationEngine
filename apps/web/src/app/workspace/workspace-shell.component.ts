@@ -29,6 +29,8 @@ providers: [WorkspaceViewStore, StageFocus, ImportStore, ResultsStore, PreviewSt
 export class WorkspaceShellComponent implements DoCheck {
 readonly session = inject(SessionStore); readonly view = inject(WorkspaceViewStore); readonly confirmClose = signal(false);
 private readonly imports = inject(ImportStore); private readonly results = inject(ResultsStore); private readonly proposals = inject(PreviewStore);
+private readonly directions = inject(DirectionsStore);
+private readonly exports = inject(ExportStore);
 readonly visibleJob = computed(() => { const job = this.session.job(); return job && !this.view.resultWasPresented(job) ? job : null; });
 readonly stages = [
   { id: 'import', label: '1. Cargar' }, { id: 'validation', label: '2. Validar' },
@@ -59,9 +61,13 @@ readonly jobFeedback = viewChild<ElementRef<HTMLElement>>('jobFeedback');
 readonly jobStatus: Record<JobStatus, string> = { queued: 'Trabajo pendiente', running: 'Trabajo en curso', succeeded: 'Trabajo terminado', failed: 'No se pudo completar', cancelled: 'Trabajo cancelado', timed_out: 'Plazo de ejecución agotado' };
 constructor() {
   afterEveryRender(() => {
+    const resultPage = this.results.page(), artifact = this.exports.ready();
+    const directionsRendered = resultPage?.run.id === this.results.selectedRunId() && resultPage?.run.id === this.directions.run()?.id;
+    const resultsDownloadRendered = artifact?.kind === 'results' && artifact.runId === resultPage?.run.id && artifact.versionId === resultPage?.run.versionId;
     const result = this.view.stage() === 'import' ? this.imports.resultPresentation()
-      : this.view.stage() === 'validation' ? this.results.resultPresentation()
-      : this.view.stage() === 'preview' ? this.proposals.resultPresentation() : null;
+      : this.view.stage() === 'validation' ? this.results.resultPresentation() ?? (directionsRendered ? this.directions.resultPresentation() : null) ?? (resultsDownloadRendered ? this.exports.resultPresentation() : null)
+      : this.view.stage() === 'preview' ? this.proposals.resultPresentation()
+      : this.exports.resultPresentation();
     if (result) this.view.resultPresented(result);
   });
   effect(() => {
@@ -90,7 +96,7 @@ ngDoCheck(): void {
   const select = this.contextSelector()?.nativeElement;
   if (select && select.ownerDocument.activeElement === select) this.workspaceName()?.nativeElement.focus();
 }
-navigate(stage: WorkspaceStage): void { this.stageFocus.request({ import: 'import-title', validation: 'validation-title', preview: 'preview-title', exports: 'exports-title' }[stage]); this.view.visit(stage); }
+navigate(stage: WorkspaceStage): void { if (stage !== this.view.stage() && !this.directions.allowLeaveEditor()) return; this.stageFocus.request({ import: 'import-title', validation: 'validation-title', preview: 'preview-title', exports: 'exports-title' }[stage]); this.view.visit(stage); }
 cancelClose(): void { this.confirmClose.set(false); this.closeTrigger()?.nativeElement.focus(); }
 async close(): Promise<void> { await this.session.close(); }
 }

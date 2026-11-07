@@ -11,7 +11,8 @@
 @if (store.summaryError(); as message) { <p class="error" role="alert">{{ message }}</p><button mat-button (click)="store.loadSummary(true)" [disabled]="store.summaryLoading()">Volver a consultar contenido</button> }
 @if (store.summary(); as summary) {
 <p><strong>{{ summary.reports.length }} {{ summary.reports.length === 1 ? 'informe' : 'informes' }}</strong> · {{ profiles().join(' · ') }}</p>
-@if (excludedCount()) { <p class="notice">{{ excludedCount() }} {{ excludedCount() === 1 ? 'hoja excluida de los archivos de origen' : 'hojas excluidas de los archivos de origen' }}. Su contenido no se incluye en los informes exportados.</p> }
+@if (preservedExcludedCount()) { <p class="notice">{{ preservedExcludedCount() }} {{ preservedExcludedCount() === 1 ? 'hoja excluida del cálculo' : 'hojas excluidas del cálculo' }}. Se conservan en el Excel FINREP exportado, sin considerarlas validadas.</p> }
+@if (excludedCount() > preservedExcludedCount()) { <p class="notice">{{ excludedCount() - preservedExcludedCount() }} hojas excluidas de los archivos de origen. Su contenido no se incluye en los informes exportados.</p> }
 <details class="trace-details"><summary>Ver informes y contexto</summary>
 <p id="export-table-help" class="table-scroll-hint">Desplaza la tabla horizontalmente para ver todas las columnas.</p>
 <div class="table-region" role="region" aria-label="Detalle de los informes incluidos" aria-describedby="export-table-help" tabindex="0"><table mat-table [dataSource]="summary.reports" class="data-table" aria-label="Informes incluidos">

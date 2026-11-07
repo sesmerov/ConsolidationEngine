@@ -8,11 +8,11 @@ import { versionLabel } from '../core/display';
 import { coordinateText, factText, statusLabels, validationText } from '../core/exact-value';
 import { CalculationDetailComponent } from '../shared/calculation-detail.component';
 import { ExportStore } from './export.store';
-import type { ApplicationDetailDTO, ComparisonPageDTO, ComparisonRowDTO, RuleResultDTO, ValidationStatus } from '@ce/contracts';
+import type { CompactApplicationDetailDTO, CompactComparisonPageDTO, ComparisonRowDTO, RuleResultDTO, ValidationStatus } from '@ce/contracts';
 @Component({ selector: 'ce-comparison', standalone: true, imports: [MatButtonModule, MatTableModule, MatPaginatorModule, CalculationDetailComponent], changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './comparison.component.html' })
 export class ComparisonComponent {
 readonly session = inject(SessionStore); readonly exports = inject(ExportStore); readonly versionLabel = versionLabel;
-readonly page = input.required<ComparisonPageDTO>(); readonly detail = input<ApplicationDetailDTO | null>(null); readonly loading = input(false); readonly pageIndex = input(0); readonly changedOnly = input(true); readonly pageChange = output<number>(); readonly toggleAll = output<void>(); readonly more = output<void>();
+readonly page = input.required<CompactComparisonPageDTO>(); readonly detail = input<CompactApplicationDetailDTO | null>(null); readonly loading = input(false); readonly pageIndex = input(0); readonly changedOnly = input(true); readonly pageChange = output<number>(); readonly toggleAll = output<void>(); readonly more = output<void>();
 readonly labels = statusLabels; readonly value = validationText; readonly opened = signal<ComparisonRowDTO | null>(null); private trigger?: HTMLElement;
 private readonly focus = inject(StageFocus, { optional: true });
 readonly statuses: readonly ValidationStatus[] = ['pass','fail','not_applicable','not_evaluable','error'];

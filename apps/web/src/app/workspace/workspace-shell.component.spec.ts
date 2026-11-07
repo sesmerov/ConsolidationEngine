@@ -15,7 +15,7 @@ import { PreviewStore } from '../recalculation/preview.store';
 import { DirectionsStore } from '../recalculation/directions.store';
 import { ApplyStore } from '../recalculation/apply.store';
 import { ExportStore } from '../recalculation/export.store';
-import type { JobDTO, PreviewDTO, ReportContext, ValidationResultsPageDTO } from '@ce/contracts';
+import type { CompactPreviewDTO, JobDTO, ProposalSelectionSummaryDTO, ReportContext, ValidationResultsPageDTO } from '@ce/contracts';
 
 const workspace = { id: 'workspace', name: 'Cierre de prueba', state: 'ready' as const, currentVersionId: 'v1', versionIds: ['v0', 'v1'], contexts: [], counts: { snapshots: 1, coordinates: 2, facts: 2, sources: 2 }, sessionBytes: 1 };
 const domesticContext: ReportContext = {
@@ -25,7 +25,8 @@ const domesticContext: ReportContext = {
 const consolidatedContext: ReportContext = { ...domesticContext, contextId: 'consolidado', canonicalContextKey: 'scope-2' };
 const summary = { complete: true, rows: 0, variants: 0, instances: 0, duplicateRows: 0, applicableVariants: 0, byStatus: { pass: 0, fail: 0, error: 0, not_applicable: 0, not_evaluable: 0 } };
 const page = { items: [], total: 0, nextCursor: null, versionId: 'v1', configuredDirections: [], run: { id: 'run', versionId: 'v1', profileId: 'profile', status: 'completed', startedAt: '2026-11-04', diagnostics: [], summary, resultIds: [] } } as ValidationResultsPageDTO;
-const preview = { id: 'preview', baseVersionId: 'v1', profileId: 'profile', policyId: 'policy', state: 'ready', createdAt: '2026-11-04', proposalIds: [], diagnostics: [], graphSummary: { nodes: 0, edges: 0, order: [], blocked: 0, cycles: [], conflicts: [] } } as PreviewDTO;
+const preview = { id: 'preview', baseVersionId: 'v1', state: 'ready', createdAt: '2026-11-04', diagnosticCount: 0, graphSummary: { nodes: 0, edges: 0, blocked: 0, cycleCount: 0, conflictCount: 0 } } as CompactPreviewDTO;
+const selection: ProposalSelectionSummaryDTO = { id: 'selection', workspaceId: workspace.id, previewId: preview.id, baseVersionId: 'v1', revision: 1, state: 'ready', availableCount: 1, selectedCount: 1, requiredCount: 0, complete: true, closureHash: 'one' };
 describe('workspace navigation keeps one active stage', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({ deferBlockBehavior: DeferBlockBehavior.Playthrough, imports: [AppComponent], providers: [{ provide: ApiClient, useValue: {
@@ -65,6 +66,38 @@ describe('workspace navigation keeps one active stage', () => {
     expect(fixture.nativeElement.querySelector('.job-progress')?.textContent).toContain('Revisa el archivo.');
     session.job.set({ ...job, progress: { completed: 0, total: 1, complete: false } }); fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.job-progress')?.textContent).toContain('Progreso incompleto');
+  });
+  it('waits for the visible direction review and matching publication receipt before retiring their progress', async () => {
+    const fixture = TestBed.createComponent(AppComponent); fixture.detectChanges(); await fixture.whenStable();
+    const injector = fixture.debugElement.query(By.directive(WorkspaceShellComponent)).injector;
+    const view = injector.get(WorkspaceViewStore), results = injector.get(ResultsStore), directions = injector.get(DirectionsStore), session = TestBed.inject(SessionStore);
+    results.page.set(page); results.selectedRunId.set(page.run.id); view.visit('validation'); fixture.detectChanges(); await fixture.whenStable();
+    const counts = { totalRows: 0, included: 0, omitted: 0, pending: 0, conflicted: 0, excluded: 0, undetermined: 0 };
+    directions.review.set({ id: 'review', workspaceId: workspace.id, baseVersionId: 'v1', runId: page.run.id, state: 'ready', revision: 1, expiresAt: '2099-01-01T00:00:00.000Z', counts, conflictGroupCount: 0 });
+    const prepared: JobDTO = { jobId: 'prepared', workspaceId: workspace.id, baseVersionId: 'v1', kind: 'prepare-directions', status: 'succeeded', progress: { completed: 1, total: 1, complete: true }, diagnostics: [], resultRef: { type: 'direction-review', id: 'review' }, pollAfterMs: 500 };
+    session.job.set(prepared); fixture.detectChanges(); await fixture.whenStable(); expect(fixture.nativeElement.querySelector('.job-progress')).not.toBeNull();
+    directions.rows.set({ reviewId: 'review', revision: 1, items: [], total: 0, nextCursor: null }); fixture.detectChanges(); await fixture.whenStable(); expect(fixture.nativeElement.querySelector('.job-progress')).not.toBeNull();
+    directions.groups.set({ reviewId: 'review', revision: 1, items: [], total: 0, nextCursor: null }); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges(); expect(fixture.nativeElement.querySelector('.job-progress')).toBeNull();
+    session.job.set({ ...prepared, jobId: 'other-preparation', resultRef: { type: 'direction-review', id: 'other-review' } }); fixture.detectChanges(); await fixture.whenStable(); expect(fixture.nativeElement.querySelector('.job-progress')).not.toBeNull();
+    const committed: JobDTO = { ...prepared, kind: 'commit-directions', jobId: 'committed', newVersionId: 'v2' };
+    session.workspace.set({ ...workspace, currentVersionId: 'v2', versionIds: ['v0', 'v1', 'v2'] }); session.job.set(committed); fixture.detectChanges(); await fixture.whenStable(); expect(fixture.nativeElement.querySelector('.job-progress')).not.toBeNull();
+    directions.receipt.set({ reviewId: 'review', runId: page.run.id, baseVersionId: 'v1', newVersionId: 'v2', configVersion: 'config', included: 1 }); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Configuración guardada'); expect(fixture.nativeElement.querySelector('.job-progress')).toBeNull();
+    session.job.set({ ...committed, status: 'failed', diagnostics: [{ code: 'FAILED', message: 'No se guardó la configuración.' }] }); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.job-progress')?.textContent).toContain('No se guardó');
+  });
+  it('retires export progress only when its matching artifact is presented and never hides a newer export or failure', async () => {
+    const fixture = TestBed.createComponent(AppComponent); fixture.detectChanges(); await fixture.whenStable();
+    const injector = fixture.debugElement.query(By.directive(WorkspaceShellComponent)).injector, view = injector.get(WorkspaceViewStore), exports = injector.get(ExportStore), session = TestBed.inject(SessionStore);
+    TestBed.tick(); await fixture.whenStable();
+    const exported: JobDTO = { jobId: 'export-job', workspaceId: workspace.id, baseVersionId: 'v1', kind: 'export', status: 'succeeded', progress: { completed: 1, total: 1, complete: true }, diagnostics: [], resultRef: { type: 'export', id: 'artifact' }, pollAfterMs: 500 };
+    exports.ready.set({ id: 'artifact', workspaceId: workspace.id, versionId: 'v0', kind: 'report', filename: 'report.zip' }); session.job.set(exported);
+    fixture.detectChanges(); await fixture.whenStable(); expect(fixture.nativeElement.querySelector('.job-progress')).not.toBeNull();
+    view.visit('exports'); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Archivo preparado: report.zip'); expect(fixture.nativeElement.querySelector('.job-progress')).toBeNull();
+    session.job.set({ ...exported, jobId: 'new-export', resultRef: { type: 'export', id: 'new-artifact' } }); fixture.detectChanges(); await fixture.whenStable(); expect(fixture.nativeElement.querySelector('.job-progress')).not.toBeNull();
+    session.job.set({ ...exported, status: 'failed', diagnostics: [{ code: 'FAILED', message: 'Vuelve a preparar la descarga.' }] }); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.job-progress')?.textContent).toContain('Vuelve a preparar');
   });
   it('shows one context as entity, civil date and module once and removes those values when the context list empties', async () => {
     const session = TestBed.inject(SessionStore);
@@ -142,12 +175,12 @@ describe('workspace navigation keeps one active stage', () => {
     TestBed.tick(); await fixture.whenStable();
     directions.bind(page.run); directions.stateFilter.set('omitted');
     const catalog = new File(['x'], 'catalog.xlsx'); imports.catalog.set(catalog); imports.reports.set([new File(['x'], 'report.xlsx')]);
-    results.code.set('ABC'); results.selectedRunId.set('remembered-run'); proposals.selected.set(['remembered-proposal']); proposals.code.set('DEF');
+    results.code.set('ABC'); results.selectedRunId.set('remembered-run'); proposals.selection.set(selection); proposals.code.set('DEF');
     TestBed.inject(SessionStore).selectExportVersion('v0');
     const loader = TestbedHarnessEnvironment.loader(fixture);
     for (const text of ['2. Validar', '3. Recalcular', '4. Descargar', '1. Cargar']) { await (await loader.getHarness(MatButtonHarness.with({ text }))).click(); }
     expect(imports.catalog()).toBe(catalog); expect(imports.reports()[0]?.name).toBe('report.xlsx');
-    expect(results.code()).toBe('ABC'); expect(results.selectedRunId()).toBe('remembered-run'); expect(proposals.selected()).toEqual(['remembered-proposal']); expect(proposals.code()).toBe('DEF');
+    expect(results.code()).toBe('ABC'); expect(results.selectedRunId()).toBe('remembered-run'); expect(proposals.selection()).toEqual(selection); expect(proposals.code()).toBe('DEF');
     expect(directions.run()?.id).toBe(page.run.id); expect(directions.stateFilter()).toBe('omitted'); expect(TestBed.inject(SessionStore).exportVersionId()).toBe('v0');
     expect((fixture.nativeElement as HTMLElement).querySelectorAll('ce-import-page,ce-validation-page,ce-preview-page,ce-exports')).toHaveLength(1);
   });
@@ -163,15 +196,15 @@ describe('workspace navigation keeps one active stage', () => {
   });
   it('invalidates acknowledgement on selection/base changes while stage changes leave it intact', async () => {
     const fixture = TestBed.createComponent(AppComponent); fixture.detectChanges(); await fixture.whenStable(); const injector = fixture.debugElement.query(By.directive(WorkspaceShellComponent)).injector;
-    const apply = injector.get(ApplyStore); TestBed.tick(); apply.preview.set(preview); apply.selection.set({ selectedIds: ['a'], requiredIds: [], closureHash: 'one', complete: true, state: 'ready' }); TestBed.tick(); apply.acknowledged.set(true);
+    const apply = injector.get(ApplyStore); TestBed.tick(); apply.preview.set(preview); apply.selection.set(selection); TestBed.tick(); apply.acknowledged.set(true);
     const loader = TestbedHarnessEnvironment.loader(fixture); await (await loader.getHarness(MatButtonHarness.with({ text: '4. Descargar' }))).click(); expect(apply.acknowledged()).toBe(true);
-    apply.selection.set({ selectedIds: ['b'], requiredIds: [], closureHash: 'two', complete: true, state: 'ready' }); TestBed.tick(); expect(apply.acknowledged()).toBe(false);
+    apply.selection.set({ ...selection, revision: 2, closureHash: 'two' }); TestBed.tick(); expect(apply.acknowledged()).toBe(false);
     apply.acknowledged.set(true); TestBed.inject(SessionStore).workspace.set({ ...workspace, currentVersionId: 'v2', versionIds: ['v0', 'v1', 'v2'] }); TestBed.tick(); expect(apply.acknowledged()).toBe(false);
   });
   it('releases local files on close and rejects history that arrives after the workspace has gone', async () => {
     const fixture = TestBed.createComponent(AppComponent); fixture.detectChanges(); await fixture.whenStable(); const injector = fixture.debugElement.query(By.directive(WorkspaceShellComponent)).injector;
     const imports = injector.get(ImportStore); imports.catalog.set(new File(['x'], 'private.xlsx'));
-    let resolve!: (page: { items: PreviewDTO[]; total: number; nextCursor: null; revision: string }) => void;
+    let resolve!: (page: { items: CompactPreviewDTO[]; total: number; nextCursor: null; revision: string }) => void;
     vi.mocked(TestBed.inject(ApiClient).previews).mockReturnValueOnce(new Promise(done => { resolve = done; })); const proposals = injector.get(PreviewStore); TestBed.tick();
     await TestBed.inject(SessionStore).close(); fixture.detectChanges(); resolve({ items: [preview], total: 1, nextCursor: null, revision: 'old' }); await Promise.resolve();
     expect(imports.catalog()).toBeNull(); expect(proposals.history()).toEqual([]); expect((fixture.nativeElement as HTMLElement).querySelector('ce-workspace-shell')).toBeNull();

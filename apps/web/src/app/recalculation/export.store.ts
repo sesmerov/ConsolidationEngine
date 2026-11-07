@@ -14,6 +14,13 @@ export class ExportStore {
   readonly kind = signal<'report' | 'results'>('report'); readonly selectedRunId = signal(''); readonly history = signal<readonly RunSummaryDTO[]>([]); readonly cursor = signal<string | null>(null);
   readonly historyLoading = signal(false); readonly pending = signal(false); readonly error = signal<string | null>(null); readonly uncertain = signal(false); readonly ready = signal<Download | null>(null);
   readonly summary = signal<VersionExportSummaryDTO | null>(null); readonly summaryLoading = signal(false); readonly summaryError = signal<string | null>(null);
+  readonly resultPresentation = computed(() => {
+    const job = this.session.job(), artifact = this.ready();
+    if (!job || job.kind !== 'export' || job.status !== 'succeeded' || job.resultRef?.type !== 'export'
+      || job.workspaceId !== this.session.workspace()?.id || artifact?.workspaceId !== job.workspaceId || artifact.id !== job.resultRef.id) return null;
+    // The job's CAS base is the current version; the downloadable artifact may deliberately be historical.
+    return { jobId: job.jobId, workspaceId: job.workspaceId, versionId: job.newVersionId ?? job.baseVersionId ?? null };
+  });
   private summaryGeneration = 0; private summaryKey = '';
   readonly runs = computed(() => this.history().filter(run => run.versionId === this.session.exportVersionId()));
   readonly canStart = computed(() => !!this.session.exportVersionId() && !!this.session.etag() && !this.session.jobActive() && !this.session.pending() && !this.pending() && !this.uncertain()

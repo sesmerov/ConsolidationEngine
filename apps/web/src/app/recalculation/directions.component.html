@@ -40,20 +40,42 @@
         </mat-form-field>
         @if (store.groupFilter()) { <button mat-button (click)="store.filter('')">Volver a todas las decisiones</button> }
         @if (store.loading()) { <p role="status">Consultando destinos…</p> }
+        @if (store.groupsLoading()) { <p role="status">Consultando las decisiones por celda…</p> }
+        @for (group of store.displayGroups(); track group.groupId) {
+          <section class="conflict-card" role="group" [attr.data-group-id]="group.groupId" [attr.aria-label]="'Conflicto en ' + group.targetLabel + ' · ' + group.contextLabel">
+            <div class="conflict-title"><strong>{{ group.conceptLabel || group.targetLabel }}</strong><span class="conflict-status">{{ groupStates[group.state] }}</span></div>
+            @if (group.conceptLabel) { <p>{{ group.targetLabel }}</p> }
+            <p class="conflict-context">{{ group.contextLabel }}</p>
+            @if (store.editor()?.group?.groupId === group.groupId) {
+              @if (store.editor(); as editor) {
+                <p>{{ group.candidateCount }} reglas pueden calcular esta celda. Elige una o deja el importe sin recalcular.</p>
+                @if (store.candidatesLoading()) { <p role="status">Consultando reglas candidatas…</p> }
+                <mat-radio-group class="conflict-options" [attr.aria-label]="'Regla para ' + group.targetLabel" [value]="editor.value" (change)="store.selectCandidate($event.value)" [disabled]="!store.editable()">
+                  @for (candidate of store.candidates()?.items || []; track candidate.instanceId) {
+                    <div class="candidate-option">
+                      <mat-radio-button [value]="candidate.instanceId" [disabled]="!store.editable() || candidate.availability !== 'selectable'"><strong>{{ candidate.code }}</strong>@if (candidate.descriptionPreview) { <span class="candidate-description">{{ candidate.descriptionPreview }}{{ candidate.descriptionTruncated ? '…' : '' }}</span> }</mat-radio-button>
+                      <p class="candidate-expression">{{ candidate.expressionPreview }}{{ candidate.expressionTruncated ? '…' : '' }}</p>
+                      @if (candidate.availability === 'assignedElsewhere') { <p class="muted">Esta regla tiene otro destino elegido: {{ candidate.assignedTargetLabel }}. Revísalo antes de seleccionarla aquí.</p> }
+                      <button mat-button (click)="store.showCandidate(candidate.instanceId)" [disabled]="store.candidateDetailLoading()" [attr.aria-label]="'Ver regla ' + candidate.code">Ver regla</button>
+                    </div>
+                  }
+                  <mat-radio-button [value]="null">No recalcular esta celda</mat-radio-button>
+                </mat-radio-group>
+                @if (store.selectedOutsidePage()) { <p role="status">La regla elegida está en otra página: {{ editor.code }}.</p> }
+                @if (store.candidates(); as candidates) { <mat-paginator aria-label="Páginas de reglas candidatas" [length]="candidates.total" [pageSize]="50" [pageIndex]="store.candidatesPagination.index()" [hidePageSize]="true" [disabled]="store.busy() || store.uncertain()" (page)="store.loadCandidates($event.pageIndex)"/> }
+                @if (store.candidateDetailLoading()) { <p role="status">Consultando la regla completa…</p> }
+                @if (store.candidateDetail(); as detail) { <section class="candidate-detail" role="region" [attr.aria-label]="'Regla ' + detail.candidate.code"><h4>{{ detail.candidate.code }}</h4><p class="candidate-expression">{{ detail.expression }}</p>@if (detail.precondition) { <p>Precondición</p><p class="candidate-expression">{{ detail.precondition }}</p> }@for (description of detail.descriptions; track $index) { <p>{{ description.description }}</p><p class="muted">{{ description.sourceLabel }}</p> }<button mat-button (click)="store.candidateDetail.set(null)">Cerrar regla</button></section> }
+                <div class="choice-actions"><button mat-stroked-button (click)="confirmChoice($event)" [disabled]="!store.hasUnsavedChoice() || !store.editable()">Confirmar elección</button><button mat-button (click)="store.cancelChoice()" [disabled]="store.pending() || store.uncertain()">Cancelar</button></div>
+              }
+            } @else {
+              <p data-group-summary tabindex="-1">@if (group.state === 'resolved') { Regla elegida: <strong>{{ group.selectedCandidate?.code }}</strong> } @else if (group.state === 'omitted') { Omitida · se conserva el importe del informe. } @else { Elige entre {{ group.candidateCount }} reglas para continuar. }</p>
+              <button mat-stroked-button (click)="store.openGroup(group)" [disabled]="!store.editable()">{{ group.state === 'resolved' || group.state === 'omitted' ? 'Cambiar elección' : 'Elegir regla' }}</button>
+            }
+          </section>
+        }
+        @if (store.groups(); as groups) { @if (groups.total > 50) { <mat-paginator aria-label="Páginas de decisiones por celda" [length]="groups.total" [pageSize]="50" [pageIndex]="store.groupsPagination.index()" [hidePageSize]="true" [disabled]="store.busy() || store.hasUnsavedChoice() || store.uncertain()" (page)="store.loadGroups($event.pageIndex)"/> } }
+        @if (store.hasUnsavedChoice()) { <p class="notice" role="status">Confirma o cancela la elección pendiente antes de guardar o cambiar de etapa.</p> }
         @if (store.rows(); as rows) {
-          @for (group of store.conflicts(); track group.id) {
-            <div class="confirmation" role="group" [attr.aria-label]="'Conflicto en ' + group.targetLabel + ' · ' + group.contextLabel">
-              <strong>{{ group.targetLabel }} · {{ group.contextLabel }}</strong>
-              <p>{{ group.total }} reglas proponen escribir en esta celda. Conserva una u omite el grupo.</p>
-              @for (member of group.members; track member.rowId) {
-                <button mat-stroked-button [disabled]="!store.editable()" (click)="store.resolveGroup(group.id, member.instanceId!)">Conservar {{ member.code }}</button>
-              }
-              <button mat-button [disabled]="!store.editable()" (click)="store.resolveGroup(group.id, null)">Omitir grupo</button>
-              @if (group.members.length < group.total && !store.groupFilter()) {
-                <button mat-button (click)="store.filter('', group.id)">Ver todos los productores</button>
-              }
-            </div>
-          }
           @if (store.configurable().length) {
             <p id="directions-scroll-help" class="table-scroll-hint">Desplaza la tabla horizontalmente para ver todas las columnas.</p>
             <div class="table-region" role="region" aria-label="Configuración de destinos" aria-describedby="directions-scroll-help" tabindex="0">

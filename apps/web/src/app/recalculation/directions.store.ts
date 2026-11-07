@@ -5,6 +5,7 @@ import type {
   DirectionReviewCommitDTO, DirectionReviewDecision, DirectionReviewOperationDTO, DirectionReviewPageDTO,
   DirectionReviewPatchDTO, DirectionReviewPrepareDTO, DirectionReviewReceiptDTO, DirectionReviewRowDTO,
   DirectionReviewSummaryDTO, JobDTO, TargetSide, ValidationRunDTO,
+  DirectionConflictGroupDTO, DirectionConflictGroupsPageDTO, DirectionConflictCandidatesPageDTO, DirectionConflictCandidateDetailDTO,
 } from '@ce/contracts';
 import { ApiClient } from '../core/api-client';
 import { CursorPage, CursorPageError } from '../core/cursor-page';
@@ -16,6 +17,7 @@ type Attempt = { workspaceId: string; etag: string } & (
   | { kind: 'edit'; id: string; body: DirectionReviewPatchDTO }
   | { kind: 'commit'; id: string; body: DirectionReviewCommitDTO; key: string }
 );
+interface GroupEditor { group: DirectionConflictGroupDTO; revision: number; value: string | null | undefined; original: string | null | undefined; code?: string }
 const errorMessage = (error: unknown) => error instanceof HttpErrorResponse && typeof error.error?.error?.message === 'string'
   ? error.error.error.message as string : error instanceof CursorPageError ? error.message : 'No se pudo completar la revisión de destinos.';
 
@@ -30,6 +32,8 @@ export class DirectionsStore {
   private alive = true;
   private lookupGeneration = 0;
   private rowGeneration = 0;
+  private groupsGeneration = 0; private candidatesGeneration = 0; private detailGeneration = 0;
+  private confirmingGroupId: string | null = null;
   private expiryTimer?: ReturnType<typeof setTimeout>;
   private attempt: Attempt | null = null;
   private observedJob: { jobId: string; reviewId?: string } | null = null;
@@ -40,6 +44,20 @@ export class DirectionsStore {
   readonly review = signal<DirectionReviewSummaryDTO | null>(null);
   readonly otherReview = signal<DirectionReviewSummaryDTO | null>(null);
   readonly rows = signal<DirectionReviewPageDTO | null>(null);
+  readonly groups = signal<DirectionConflictGroupsPageDTO | null>(null);
+  readonly groupsPagination = new CursorPage(); readonly candidatesPagination = new CursorPage();
+  readonly groupsLoading = signal(false); readonly candidatesLoading = signal(false);
+  readonly editor = signal<GroupEditor | null>(null);
+  readonly candidates = signal<DirectionConflictCandidatesPageDTO | null>(null);
+  readonly candidateDetail = signal<DirectionConflictCandidateDetailDTO | null>(null);
+  readonly candidateDetailLoading = signal(false);
+  readonly anchoredGroup = signal<DirectionConflictGroupDTO | null>(null);
+  readonly displayGroups = computed(() => {
+    const items = this.groups()?.items ?? [], anchor = this.anchoredGroup();
+    return anchor && !items.some(group => group.groupId === anchor.groupId) ? [...items, anchor] : items;
+  });
+  readonly hasUnsavedChoice = computed(() => !!this.editor() && this.editor()!.value !== this.editor()!.original);
+  readonly selectedOutsidePage = computed(() => !!this.editor()?.value && !this.candidates()?.items.some(row => row.instanceId === this.editor()?.value));
   readonly receipt = signal<DirectionReviewReceiptDTO | null>(null);
   readonly stateFilter = signal<DirectionReviewDecision | ''>('');
   readonly groupFilter = signal('');
@@ -53,7 +71,7 @@ export class DirectionsStore {
   readonly error = signal('');
   readonly historical = computed(() => this.run()?.versionId !== this.session.versionId());
   readonly complete = computed(() => this.run()?.status === 'completed' && this.run()?.summary.complete === true);
-  readonly busy = computed(() => this.pending() || this.looking() || this.loading() || this.session.pending() || this.session.jobActive());
+  readonly busy = computed(() => this.pending() || this.looking() || this.loading() || this.groupsLoading() || this.candidatesLoading() || this.session.pending() || this.session.jobActive());
   readonly needsPartial = computed(() => {
     const counts = this.review()?.counts;
     return !!counts && counts.pending + counts.undetermined > 0;
@@ -62,24 +80,26 @@ export class DirectionsStore {
     && !this.otherReview() && (!this.review() || this.expired() || ['expired','obsolete','discarded','failed'].includes(this.review()!.state)));
   readonly editable = computed(() => this.synchronized() && this.complete() && !this.historical() && !this.expired() && !this.uncertain() && !this.busy()
     && !this.otherReview() && this.review()?.state === 'ready' && !!this.review()?.counts && this.rows()?.revision === this.review()?.revision);
-  readonly canSave = computed(() => this.editable() && this.review()?.conflictGroupCount === 0 && (!this.needsPartial() || this.partialAccepted()));
-  readonly conflicts = computed(() => {
-    const groups = new Map<string, DirectionReviewRowDTO[]>();
-    for (const row of this.rows()?.items ?? []) {
-      if (row.state !== 'conflicted' || !row.groupId) continue;
-      const members = groups.get(row.groupId) ?? [];
-      members.push(row); groups.set(row.groupId, members);
-    }
-    return [...groups.entries()].map(([id, members]) => {
-      const first = members[0]!;
-      const targetLabel = first.options.find(option => option.side === first.selectedSide)?.label ?? first.location;
-      return { id, members, targetLabel, contextLabel:first.contextLabel, total:first.producerCount ?? members.length };
-    });
-  });
+  readonly canSave = computed(() => this.editable() && !this.hasUnsavedChoice() && this.groups()?.revision === this.review()?.revision
+    && this.review()?.conflictGroupCount === 0 && (!this.needsPartial() || this.partialAccepted()));
   readonly configurable = computed(() => (this.rows()?.items ?? []).filter(row => ['included','pending','omitted'].includes(row.state)));
   readonly unavailable = computed(() => (this.rows()?.items ?? []).filter(row => row.state === 'excluded' || row.state === 'undetermined'));
+  readonly resultPresentation = computed(() => {
+    const job = this.session.job(), review = this.review(), receipt = this.receipt();
+    if (!job || job.status !== 'succeeded' || job.workspaceId !== this.session.workspace()?.id || job.resultRef?.type !== 'direction-review') return null;
+    const prepared = job.kind === 'prepare-directions' && review?.id === job.resultRef.id && review.state === 'ready'
+      && !this.expired() && !this.historical() && !!review.counts && this.rows()?.reviewId === review.id && this.rows()?.revision === review.revision
+      && this.groups()?.reviewId === review.id && this.groups()?.revision === review.revision;
+    const committed = job.kind === 'commit-directions' && receipt?.reviewId === job.resultRef.id
+      && receipt.baseVersionId === job.baseVersionId && receipt.newVersionId === job.newVersionId;
+    return prepared || committed ? { jobId: job.jobId, workspaceId: job.workspaceId, versionId: job.newVersionId ?? job.baseVersionId ?? null } : null;
+  });
 
   constructor() {
+    effect(() => {
+      const version = this.session.versionId(), editor = this.editor(), review = this.review();
+      if (editor && review && version !== review.baseVersionId) untracked(() => this.invalidateEditor('La versión cambió. La elección pendiente se ha cancelado; actualiza la revisión.'));
+    });
     effect(() => {
       const job = this.session.job();
       if (!job || job.workspaceId !== this.session.workspace()?.id || !isTerminalJob(job.status) || job.jobId !== this.observedJob?.jobId) return;
@@ -90,7 +110,7 @@ export class DirectionsStore {
     inject(DestroyRef).onDestroy(() => {
       this.alive = false;
       clearTimeout(this.expiryTimer);
-      this.lookupGeneration++; this.rowGeneration++;
+      this.lookupGeneration++; this.rowGeneration++; this.groupsGeneration++; this.candidatesGeneration++; this.detailGeneration++;
     });
   }
 
@@ -107,6 +127,7 @@ export class DirectionsStore {
       this.uncertain.set(false); this.pending.set(false);
     }
     this.scope = key;
+    this.resetGroups();
     this.lookupGeneration++; this.rowGeneration++;
     this.review.set(null); this.rows.set(null); this.otherReview.set(null); this.receipt.set(null);
     this.stateFilter.set(''); this.groupFilter.set(''); this.partialAccepted.set(false);
@@ -168,14 +189,19 @@ export class DirectionsStore {
     this.otherReview.set(null);
     if (previous?.id !== summary.id || previous.revision !== summary.revision) {
       this.partialAccepted.set(false); this.pagination.reset();
+      this.groupsPagination.reset(); this.candidatesPagination.reset();
+      if (this.editor() && this.editor()!.revision !== summary.revision) {
+        if (this.confirmingGroupId === this.editor()!.group.groupId) { this.editor.set(null); this.candidates.set(null); }
+        else this.invalidateEditor('La revisión cambió. Comprueba la elección publicada antes de continuar.');
+      }
     }
     clearTimeout(this.expiryTimer);
     this.expired.set(summary.state === 'expired');
     if (summary.state === 'ready') {
       const remaining = Date.parse(summary.expiresAt ?? '') - Date.now();
-      if (!(remaining > 0)) { this.expired.set(true); this.rows.set(null); return; }
-      this.expiryTimer = setTimeout(() => { this.expired.set(true); this.partialAccepted.set(false); }, Math.min(remaining,2_147_483_647));
-      await this.loadRows(0);
+      if (!(remaining > 0)) { this.expired.set(true); this.rows.set(null); this.invalidateEditor('La revisión ha caducado. Prepara una nueva para continuar.'); return; }
+      this.expiryTimer = setTimeout(() => { this.expired.set(true); this.partialAccepted.set(false); this.invalidateEditor('La revisión ha caducado. Prepara una nueva para continuar.'); }, Math.min(remaining,2_147_483_647));
+      await Promise.all([this.loadRows(0), this.loadGroups(0, previous?.id !== summary.id)]);
     } else {
       this.rowGeneration++; this.loading.set(false); this.rows.set(null);
       if (summary.receipt) await this.acceptReceipt(summary.workspaceId,summary.receipt);
@@ -213,7 +239,7 @@ export class DirectionsStore {
       const page = await this.api.directionReviewRows(review.workspaceId,review.id,{
         ...(state ? {state} : {}), ...(groupId ? {groupId} : {}), ...(request.cursor ? {cursor:request.cursor} : {}),
       });
-      if (generation !== this.rowGeneration || !this.matches(review) || this.review()?.id !== review.id) return;
+      if (generation !== this.rowGeneration || !this.matches(review) || this.review()?.id !== review.id || this.review()?.revision !== review.revision) return;
       if (page.reviewId !== review.id || page.revision !== review.revision) {
         this.rows.set(null); this.error.set('La revisión cambió. Actualiza los destinos antes de continuar.'); return;
       }
@@ -224,8 +250,97 @@ export class DirectionsStore {
     } finally { if (generation === this.rowGeneration) this.loading.set(false); }
   }
   async filter(state: DirectionReviewDecision | '', groupId = ''): Promise<void> {
+    if (!this.allowLeaveEditor()) return;
     this.stateFilter.set(state); this.groupFilter.set(groupId); this.rows.set(null);
     await this.loadRows();
+  }
+
+  allowLeaveEditor(): boolean {
+    if (!this.hasUnsavedChoice()) return true;
+    this.error.set('Confirma o cancela la elección pendiente antes de continuar.'); return false;
+  }
+  private invalidateEditor(message: string): void {
+    if (this.hasUnsavedChoice()) this.error.set(message);
+    this.editor.set(null); this.candidates.set(null); this.candidateDetail.set(null);
+    this.candidatesGeneration++; this.detailGeneration++;
+    this.candidatesLoading.set(false); this.candidateDetailLoading.set(false);
+  }
+  private resetGroups(): void {
+    this.groupsGeneration++; this.candidatesGeneration++; this.detailGeneration++;
+    this.groups.set(null); this.editor.set(null); this.candidates.set(null); this.candidateDetail.set(null); this.anchoredGroup.set(null);
+    this.groupsPagination.reset(); this.candidatesPagination.reset(); this.groupsLoading.set(false); this.candidatesLoading.set(false);
+  }
+  async loadGroups(index = 0, openFirst = false): Promise<void> {
+    const review = this.review();
+    if (!review || review.state !== 'ready' || this.expired() || !this.matches(review)) return;
+    if (index !== this.groupsPagination.index() && !this.allowLeaveEditor()) return;
+    const generation = ++this.groupsGeneration; this.groupsLoading.set(true);
+    try {
+      const request = this.groupsPagination.begin(JSON.stringify([review.id, review.revision]), index);
+      const page = await this.api.directionConflictGroups(review.workspaceId, review.id, request.cursor ? { cursor: request.cursor } : {});
+      if (generation !== this.groupsGeneration || !this.matches(review) || this.review()?.revision !== review.revision) return;
+      if (page.reviewId !== review.id || page.revision !== review.revision) throw new Error('La revisión cambió. Actualiza los destinos antes de continuar.');
+      this.groupsPagination.accept(request.index, page.total, page.nextCursor, page.items.length); this.groups.set(page);
+      if (openFirst && !this.editor()) { const group = page.items.find(item => item.state === 'conflicted' || item.state === 'pending'); if (group) await this.openGroup(group, true); }
+    } catch (error) { if (generation === this.groupsGeneration && this.matches(review)) this.error.set(errorMessage(error)); }
+    finally { if (generation === this.groupsGeneration) this.groupsLoading.set(false); }
+  }
+  async openGroup(group: DirectionConflictGroupDTO, initial = false): Promise<void> {
+    const review = this.review();
+    if (!review || !this.allowLeaveEditor() || (!initial && !this.editable())) return;
+    const original = group.state === 'omitted' ? null : group.selectedCandidate?.instanceId;
+    this.editor.set({ group, revision: review.revision, value: original, original, ...(group.selectedCandidate ? { code: group.selectedCandidate.code } : {}) });
+    this.candidates.set(null); this.candidateDetail.set(null); this.candidatesPagination.reset(); this.error.set('');
+    await this.loadCandidates();
+  }
+  async loadCandidates(index = 0): Promise<void> {
+    const editor = this.editor(), review = this.review();
+    if (!editor || !review || editor.revision !== review.revision || !this.matches(review)) return;
+    const generation = ++this.candidatesGeneration; this.candidatesLoading.set(true);
+    try {
+      const request = this.candidatesPagination.begin(JSON.stringify([review.id, review.revision, editor.group.groupId]), index);
+      const page = await this.api.directionConflictCandidates(review.workspaceId, review.id, editor.group.groupId, request.cursor ? { cursor: request.cursor } : {});
+      if (generation !== this.candidatesGeneration || this.editor()?.group.groupId !== editor.group.groupId || this.review()?.revision !== review.revision || !this.matches(review)) return;
+      if (page.reviewId !== review.id || page.revision !== review.revision || page.group.groupId !== editor.group.groupId) throw new Error('La revisión cambió. Actualiza los destinos antes de continuar.');
+      this.candidatesPagination.accept(request.index, page.total, page.nextCursor, page.items.length); this.candidates.set(page);
+    } catch (error) { if (generation === this.candidatesGeneration) this.error.set(errorMessage(error)); }
+    finally { if (generation === this.candidatesGeneration) this.candidatesLoading.set(false); }
+  }
+  selectCandidate(value: string | null): void {
+    const editor = this.editor(); if (!editor || !this.editable()) return;
+    const candidate = value === null ? undefined : this.candidates()?.items.find(row => row.instanceId === value);
+    if (value !== null && (!candidate || candidate.availability !== 'selectable')) return;
+    this.editor.set({ ...editor, value, code: candidate?.code ?? '' });
+    this.error.set('');
+  }
+  cancelChoice(): void {
+    if (this.pending() || this.uncertain()) return;
+    this.editor.set(null); this.candidates.set(null); this.candidateDetail.set(null); this.candidatesGeneration++; this.detailGeneration++; this.error.set('');
+  }
+  async confirmChoice(): Promise<boolean> {
+    const editor = this.editor(), review = this.review();
+    if (!editor || !review || editor.value === undefined || !this.hasUnsavedChoice() || !this.editable() || editor.revision !== review.revision) return false;
+    this.confirmingGroupId = editor.group.groupId; this.anchoredGroup.set(editor.group);
+    await this.resolveGroup(editor.group.groupId, editor.value);
+    this.confirmingGroupId = null;
+    if (this.uncertain() || this.review()?.revision === review.revision) return false;
+    const latest = this.displayGroups().find(group => group.groupId === editor.group.groupId);
+    if (latest && this.groups()?.items.includes(latest)) this.anchoredGroup.set(latest);
+    else if (this.review()?.state === 'ready') {
+      const fresh = this.review()!;
+      try { const page = await this.api.directionConflictCandidates(fresh.workspaceId, fresh.id, editor.group.groupId);
+        if (this.review()?.revision === page.revision && this.matches(fresh)) this.anchoredGroup.set(page.group);
+      } catch (error) { this.error.set(errorMessage(error)); }
+    }
+    return true;
+  }
+  async showCandidate(instanceId: string): Promise<void> {
+    const review = this.review(), editor = this.editor(); if (!review || !editor) return;
+    const generation = ++this.detailGeneration; this.candidateDetailLoading.set(true); this.candidateDetail.set(null);
+    try { const detail = await this.api.directionConflictCandidate(review.workspaceId, review.id, editor.group.groupId, instanceId);
+      if (generation === this.detailGeneration && this.matches(review) && this.review()?.revision === detail.revision && this.editor()?.group.groupId === editor.group.groupId) this.candidateDetail.set(detail);
+    } catch (error) { if (generation === this.detailGeneration) this.error.set(errorMessage(error)); }
+    finally { if (generation === this.detailGeneration) this.candidateDetailLoading.set(false); }
   }
 
   async prepare(): Promise<void> {
@@ -234,15 +349,16 @@ export class DirectionsStore {
     await this.send({kind:'prepare',workspaceId,etag,key:crypto.randomUUID(),body:{baseVersionId:run.versionId,runId:run.id}});
   }
   async choose(row: DirectionReviewRowDTO, choice: TargetSide | 'omit' | 'suggest'): Promise<void> {
+    if (!this.allowLeaveEditor()) return;
     if (!row.instanceId || row.state === 'excluded' || row.state === 'undetermined' || row.state === 'conflicted') return;
     if ((choice === 'left' || choice === 'right') && !row.options.some(option => option.side === choice)) return;
     await this.edit({op:'set',instanceId:row.instanceId,choice});
   }
   async resolveGroup(groupId: string, winnerInstanceId: string | null): Promise<void> {
-    if (!this.conflicts().some(group => group.id === groupId)) return;
+    if (!this.displayGroups().some(group => group.groupId === groupId)) return;
     await this.edit({op:'resolveGroup',groupId,winnerInstanceId});
   }
-  async omitAll(): Promise<void> { await this.edit({op:'omitAll'}); }
+  async omitAll(): Promise<void> { if (this.allowLeaveEditor()) await this.edit({op:'omitAll'}); }
   private async edit(operation: DirectionReviewOperationDTO): Promise<void> {
     const review = this.review(), etag = this.session.etag();
     if (!review || !etag || !this.editable()) return;
@@ -313,12 +429,13 @@ export class DirectionsStore {
     finally { if (generation === this.lookupGeneration) this.looking.set(false); }
   }
   async discard(): Promise<void> {
+    if (!this.allowLeaveEditor()) return;
     const review = this.otherReview() ?? this.review(), etag = this.session.etag();
     if (!review || review.state !== 'ready' || !etag || this.busy() || this.uncertain()) return;
     this.pending.set(true);
     try {
       await this.api.discardDirectionReview(review.workspaceId,review.id,etag);
-      if (this.owns(review.workspaceId)) { this.review.set(null); this.rows.set(null); this.otherReview.set(null); await this.recover(); }
+      if (this.owns(review.workspaceId)) { this.resetGroups(); this.review.set(null); this.rows.set(null); this.otherReview.set(null); await this.recover(); }
     } catch(error) { if (this.owns(review.workspaceId)) this.error.set(errorMessage(error)); }
     finally { if (this.owns(review.workspaceId)) this.pending.set(false); }
   }

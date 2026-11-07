@@ -20,7 +20,7 @@ describe('separate guided visual demonstrations', () => {
   async function render() { const fixture = TestBed.createComponent(ImportPageComponent); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges(); return fixture; }
   it('offers separate COREP and text/date guides without changing uploaded data or configuring targets', async () => {
     const fixture = await render(), element = fixture.nativeElement as HTMLElement, selector = element.querySelector<HTMLSelectElement>('#demo-selector');
-    expect(selector).not.toBeNull(); expect([...selector!.options].map(option => option.value)).toEqual(['corep', 'types']);
+    expect(selector).not.toBeNull(); expect([...selector!.options].map(option => option.value)).toEqual(['corep', 'finrep', 'types']);
     const store = fixture.componentInstance.store, catalog = new File(['catalog'], 'kept.xlsx'), report = new File(['report'], 'kept-report.xlsx');
     store.catalog.set(catalog); store.reports.set([report]); store.setContextSource('form'); store.updateContext('entityId', 'Conservar'); fixture.detectChanges(); await fixture.whenStable();
     selector!.value = 'types'; selector!.dispatchEvent(new Event('change')); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
@@ -79,7 +79,7 @@ describe('separate guided visual demonstrations', () => {
   });
   it('explains the two numerical dependency branches and distinguishes conditional validation from the five explicit directions', async () => {
     const fixture = await render(), guide = (fixture.nativeElement as HTMLElement).querySelector('[aria-label="Demostraciones guiadas"]')!;
-    expect(guide.textContent).toContain('5 procedentes de la EBA y 11 sintéticas'); expect(guide.textContent).toContain('Todos sus datos son sintéticos');
+    expect(guide.textContent).toContain('5 procedentes de la EBA y 11 sintéticas'); expect(guide.textContent).toContain('datos sintéticos');
     expect(guide.textContent).toContain('v0174_m → v0173_m → v0172_m'); expect(guide.textContent).toContain('v0176_m → v0175_m → v0172_m');
     expect(guide.textContent).toContain('DEMO_IF_THEN y DEMO_IF_ELSE'); expect(guide.textContent).toContain('DEMO_LT_FAIL seguirá fallando');
     expect(guide.querySelectorAll('table[aria-label="Cambios esperados COREP"] tr').length).toBe(6);

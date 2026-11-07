@@ -1,7 +1,7 @@
 import { DestroyRef, computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { isCivilDate, isTerminalJob } from '@ce/contracts';
-import type { CapabilitiesDTO, ImportContextInputDTO, ImportInspectionCommitDTO, ImportInspectionDTO, RulesPageDTO } from '@ce/contracts';
+import type { CapabilitiesDTO, Diagnostic, ImportContextInputDTO, ImportInspectionCommitDTO, ImportInspectionDTO, ReportProfileChoiceDTO, RulesPageDTO } from '@ce/contracts';
 import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
 import { WorkspaceViewStore } from '../workspace/workspace-view.store';
@@ -30,15 +30,20 @@ export class ImportStore {
   private queryTimer?: ReturnType<typeof setTimeout>;
   private rulesWorkspaceId: string | undefined;
   private rulesVersionId: string | null = null;
-  readonly selectedDemo = signal<'corep' | 'types'>('corep'); readonly demoDownloading = signal(false); readonly demoError = signal<string | null>(null);
+  readonly selectedDemo = signal<'corep' | 'types' | 'finrep'>('corep'); readonly demoDownloading = signal(false); readonly demoError = signal<string | null>(null);
   private downloadGeneration = 0; private demoWorkspaceId: string | undefined;
   readonly contextSource = signal<'workbook' | 'form'>('workbook'); readonly contextForm = signal<ContextForm>(emptyContext());
+  readonly contextProfile = signal<'corep' | 'finrep'>('corep');
+  readonly contextTable = computed(() => this.contextProfile() === 'finrep' ? 'F_01.01' : 'C_01.00');
+  readonly profileChoices = signal<readonly NonNullable<Diagnostic['profileChoice']>[]>([]);
+  readonly reportProfiles = signal<readonly ReportProfileChoiceDTO[]>([]);
+  private inspectionAttempt: { jobId: string | undefined; revision: number; reports: readonly File[] } | undefined;
   readonly inspection = signal<ImportInspectionDTO | null>(null); readonly inspectionPending = signal(false); readonly acceptedExcludedSheets = signal(false);
   readonly reviewDirty = signal(false); readonly locallyExpired = signal(false); readonly uncertainCommit = signal(false);
   readonly contextError = computed(() => this.contextSource() === 'workbook' ? null : this.validateContext());
   readonly liveInspection = computed(() => this.inspection()?.state === 'ready' || this.inspection()?.state === 'committing');
   readonly staleInspection = computed(() => !!this.inspection() && this.inspection()!.baseVersionId !== (this.session.versionId() ?? undefined));
-  readonly canInspect = computed(() => !!this.catalog() && this.reports().length > 0 && !this.contextError() && !this.liveInspection() && !this.uploading() && !this.inspectionPending() && !this.uncertainCommit() && !this.session.jobActive() && !this.session.pending());
+  readonly canInspect = computed(() => !!this.catalog() && this.reports().length > 0 && !this.contextError() && !this.liveInspection() && !this.uploading() && !this.inspectionPending() && !this.uncertainCommit() && !this.session.jobActive() && !this.session.pending() && this.profileChoices().every(choice => this.reportProfiles().some(selected => selected.reportIndex === choice.reportIndex && selected.sha256 === choice.sha256)));
   readonly canCommit = computed(() => this.inspection()?.state === 'ready' && !this.reviewDirty() && !this.locallyExpired() && !this.staleInspection() && !this.inspectionPending() && !this.uploading() && !this.session.jobActive() && !this.session.pending() && !this.uncertainCommit() && (!this.inspection()!.requiresPartialCoverageAcceptance || this.acceptedExcludedSheets()));
   private workspaceId: string | undefined; private inspectionGeneration = 0; private observedJob = ''; private alive = true; private commitAttempt: CommitAttempt | undefined;
   private commitJobId: string | undefined; private expiryTimer: ReturnType<typeof setTimeout> | undefined; private inputRevision = 0; private preparingRevision: number | undefined;
@@ -56,22 +61,35 @@ export class ImportStore {
         this.refreshRules();
       });
     });
-    effect(() => { const id = this.session.workspace()?.id; if (id !== this.workspaceId) { const previous = this.workspaceId; this.workspaceId = id; untracked(() => { this.inspectionGeneration++; this.inspection.set(null); this.acceptedExcludedSheets.set(false); this.reviewDirty.set(false); this.locallyExpired.set(false); this.commitAttempt = undefined; this.commitJobId = undefined; this.uncertainCommit.set(false); this.observedJob = ''; this.preparingRevision = undefined; if (this.expiryTimer) clearTimeout(this.expiryTimer); if (previous) { this.controller?.abort(); this.catalog.set(null); this.reports.set([]); this.contextSource.set('workbook'); this.contextForm.set(emptyContext()); this.inspectionPending.set(false); this.uploading.set(false); this.inputRevision++; this.lastInput = this.captureInput(); } if (id) void this.recoverInspection(); }); } });
-    effect(() => { const input = this.captureInput(); untracked(() => { const previous = this.lastInput; this.lastInput = input; if (previous && (previous.catalog !== input.catalog || previous.reports !== input.reports || previous.context !== input.context)) { this.inputRevision++; this.acceptedExcludedSheets.set(false); if (this.liveInspection()) this.reviewDirty.set(true); } }); });
+    effect(() => { const id = this.session.workspace()?.id; if (id !== this.workspaceId) { const previous = this.workspaceId; this.workspaceId = id; untracked(() => { this.inspectionGeneration++; this.inspection.set(null); this.acceptedExcludedSheets.set(false); this.reviewDirty.set(false); this.locallyExpired.set(false); this.commitAttempt = undefined; this.commitJobId = undefined; this.uncertainCommit.set(false); this.observedJob = ''; this.preparingRevision = undefined; this.inspectionAttempt = undefined; this.profileChoices.set([]); this.reportProfiles.set([]); this.contextProfile.set('corep'); if (this.expiryTimer) clearTimeout(this.expiryTimer); if (previous) { this.controller?.abort(); this.catalog.set(null); this.reports.set([]); this.contextSource.set('workbook'); this.contextForm.set(emptyContext()); this.inspectionPending.set(false); this.uploading.set(false); this.inputRevision++; this.lastInput = this.captureInput(); } if (id) void this.recoverInspection(); }); } });
+    effect(() => { const input = this.captureInput(); untracked(() => { const previous = this.lastInput; this.lastInput = input; if (previous && (previous.catalog !== input.catalog || previous.reports !== input.reports || previous.context !== input.context)) { this.inputRevision++; this.acceptedExcludedSheets.set(false); if (this.liveInspection()) this.reviewDirty.set(true); if (previous.reports !== input.reports) { this.profileChoices.set([]); this.reportProfiles.set([]); } } }); });
     effect(() => {
       const job = this.session.job();
       if (!job || job.workspaceId !== this.session.workspace()?.id || !isTerminalJob(job.status)) return;
       const isCommit = job.kind === 'import' && job.jobId === this.commitJobId;
       if (job.kind !== 'inspect-import' && !isCommit) return;
+      if (job.kind === 'inspect-import' && this.inspectionAttempt) {
+        if (job.jobId !== this.inspectionAttempt.jobId) return;
+        if (this.inspectionAttempt.revision !== this.inputRevision || this.inspectionAttempt.reports !== this.reports()) {
+          // A prepared server candidate must remain discardable, but may never approve the changed inputs.
+          if (job.status === 'succeeded' && job.resultRef?.type === 'import-inspection') untracked(() => { void this.loadInspection(job.resultRef!.id); });
+          return;
+        }
+      }
       const key = job.jobId + ':' + job.status;
       if (this.observedJob === key) return;
       this.observedJob = key;
       untracked(() => {
+        if (job.kind === 'inspect-import' && job.status === 'failed' && this.inspectionAttempt?.jobId === job.jobId) {
+          const requests = job.diagnostics.flatMap(issue => issue.profileChoice && this.reports()[issue.profileChoice.reportIndex] ? [issue.profileChoice] : []);
+          this.profileChoices.set(requests);
+        }
         if (isCommit && job.status === 'succeeded' && job.newVersionId) {
           this.view.published(job.workspaceId, job.baseVersionId ?? null, job.newVersionId, job.jobId, 'validation');
         }
         const inspection = this.inspection();
         if (job.kind === 'inspect-import' && job.status === 'succeeded' && job.resultRef?.type === 'import-inspection') {
+          this.profileChoices.set([]);
           void this.loadInspection(job.resultRef.id);
         } else if (isCommit && inspection) {
           void this.loadInspection(inspection.id);
@@ -87,7 +105,15 @@ export class ImportStore {
     inject(DestroyRef).onDestroy(() => clearTimeout(this.queryTimer));
   }
   setContextSource(source: 'workbook' | 'form'): void { this.contextSource.set(source); }
-  selectDemo(kind: string): void { if (kind === 'corep' || kind === 'types') this.selectedDemo.set(kind); }
+  selectDemo(kind: string): void { if (kind === 'corep' || kind === 'types' || kind === 'finrep') this.selectedDemo.set(kind); }
+  setContextProfile(profile: string): void { if (profile === 'corep' || profile === 'finrep') this.contextProfile.set(profile); }
+  chooseReportProfile(reportIndex: number, profileId: string): void {
+    const request = this.profileChoices().find(choice => choice.reportIndex === reportIndex);
+    if (!request) return;
+    const candidate = request.candidates.find(candidate => candidate.profileId === profileId);
+    this.reportProfiles.update(choices => [...choices.filter(choice => choice.reportIndex !== reportIndex), ...(candidate ? [{ reportIndex, sha256: request.sha256, profileId: candidate.profileId }] : [])].sort((a, b) => a.reportIndex - b.reportIndex));
+  }
+  selectedReportProfile(reportIndex: number): string { return this.reportProfiles().find(choice => choice.reportIndex === reportIndex)?.profileId ?? ''; }
   async downloadVisualDemo(artifact: 'catalog' | 'report'): Promise<void> {
     const workspaceId = this.session.workspace()?.id, kind = this.selectedDemo(); if (!workspaceId || this.demoDownloading()) return;
     const generation = ++this.downloadGeneration; this.demoDownloading.set(true); this.demoError.set(null);
@@ -99,23 +125,25 @@ export class ImportStore {
     finally { if (this.alive && generation === this.downloadGeneration) this.demoDownloading.set(false); }
   }
   updateContext(field: keyof ContextForm, value: string): void { this.contextForm.update(form => ({ ...form, [field]: value })); }
-  private captureInput() { return { catalog: this.catalog(), reports: this.reports(), context: JSON.stringify([this.contextSource(), this.contextForm()]) }; }
+  private captureInput() { return { catalog: this.catalog(), reports: this.reports(), context: JSON.stringify([this.contextSource(), this.contextForm(), this.contextProfile(), this.reportProfiles()]) }; }
   private validateContext(): string | null {
     const form = this.contextForm(); if (!form.entityId.trim() || form.entityId.length > 200) return 'Indica una entidad de hasta 200 caracteres.';
     if (!isCivilDate(form.referenceDate)) return 'Indica una fecha de referencia válida.'; if (form.submissionDate && !isCivilDate(form.submissionDate)) return 'Revisa la fecha de envío.';
     if (!/^[A-Z]{3}$/.test(form.currency)) return 'Indica una divisa de tres letras mayúsculas, como EUR.';
     if (!['0', '3', '6'].includes(form.scaleExponent)) return 'Elige si los importes están en unidades, miles o millones.';
     if (form.displayDecimals !== 'INF') { if (!/^-?\d{1,2}$/.test(form.displayDecimals)) return 'Indica la precisión escrita: de −18 a 18, o INF si es exacta.'; const precision = parseInt(form.displayDecimals, 10), base = precision - parseInt(form.scaleExponent, 10); if (precision < -18 || precision > 18 || base < -18 || base > 18) return 'La precisión escrita y la precisión en unidades base deben estar entre −18 y 18.'; }
-    if (!['true', 'false'].includes(form.presented)) return 'Indica expresamente si se presenta la tabla C_01.00.'; return null;
+    if (!['true', 'false'].includes(form.presented)) return 'Indica expresamente si se presenta la tabla ' + this.contextTable() + '.'; return null;
   }
   contextInput(): ImportContextInputDTO {
-    if (this.contextSource() === 'workbook') return { source: 'workbook' }; const form = this.contextForm();
-    return { source: 'form', declaration: { entityId: form.entityId.trim(), referenceDate: form.referenceDate, ...(form.submissionDate ? { submissionDate: form.submissionDate } : {}), currency: form.currency, scaleExponent: parseInt(form.scaleExponent, 10) as 0 | 3 | 6, displayDecimals: form.displayDecimals === 'INF' ? 'INF' : parseInt(form.displayDecimals, 10), filingIndicators: { 'C_01.00': form.presented === 'true' } } };
+    const choices = this.reportProfiles().length ? { reportProfiles: this.reportProfiles() } : {};
+    if (this.contextSource() === 'workbook') return { source: 'workbook', ...choices }; const form = this.contextForm();
+    return { source: 'form', declaration: { entityId: form.entityId.trim(), referenceDate: form.referenceDate, ...(form.submissionDate ? { submissionDate: form.submissionDate } : {}), currency: form.currency, scaleExponent: parseInt(form.scaleExponent, 10) as 0 | 3 | 6, displayDecimals: form.displayDecimals === 'INF' ? 'INF' : parseInt(form.displayDecimals, 10), filingIndicators: { [this.contextTable()]: form.presented === 'true' } }, ...choices };
   }
   async inspect(): Promise<void> {
     const workspace = this.session.workspace(), etag = this.session.etag(), catalog = this.catalog(); if (!workspace || !etag || !catalog || !this.canInspect()) return;
     const controller = new AbortController(); this.controller = controller; this.preparingRevision = this.inputRevision; this.uploading.set(true); this.error.set(null); this.acceptedExcludedSheets.set(false); this.reviewDirty.set(false); this.inspection.set(null); this.locallyExpired.set(false); if (this.expiryTimer) clearTimeout(this.expiryTimer);
-    try { const job = await this.api.inspectImport(workspace.id, etag, catalog, this.reports(), this.contextInput(), crypto.randomUUID(), controller.signal); if (!this.alive || workspace.id !== this.session.workspace()?.id) return; this.session.trackJob(job); }
+    const attempt = { revision: this.inputRevision, reports: this.reports(), jobId: undefined as string | undefined }; this.inspectionAttempt = attempt;
+    try { const job = await this.api.inspectImport(workspace.id, etag, catalog, attempt.reports, this.contextInput(), crypto.randomUUID(), controller.signal); if (!this.alive || workspace.id !== this.session.workspace()?.id || this.inspectionAttempt !== attempt) return; attempt.jobId = job.jobId; this.session.trackJob(job); }
     catch (error) { if (this.alive && workspace.id === this.session.workspace()?.id) {
       if (controller.signal.aborted) this.error.set('Carga cancelada. El conjunto vigente se conserva.'); else this.report(error);
       if (error instanceof HttpErrorResponse && (error.status === 0 || error.status === 409 || error.status >= 500)) {
@@ -138,7 +166,8 @@ export class ImportStore {
     const changed = this.inspection()?.id !== value.id; this.inspection.set(value); if (changed) this.acceptedExcludedSheets.set(false);
     this.reviewDirty.set(this.reviewDirty() || revision !== this.inputRevision); this.locallyExpired.set(value.state === 'ready' && Date.parse(value.expiresAt) <= Date.now());
     if (hydrate && revision === this.inputRevision && value.context[0]) { const context = value.context[0], form = context.declaration;
-      this.contextSource.set(context.origin); this.contextForm.set({ entityId: form.entityId, referenceDate: form.referenceDate, submissionDate: form.submissionDate ?? '', currency: form.currency ?? '', scaleExponent: form.scaleExponent === undefined ? '' : String(form.scaleExponent), displayDecimals: form.displayDecimals === undefined ? '' : String(form.displayDecimals), presented: form.filingIndicators['C_01.00'] === undefined ? '' : String(form.filingIndicators['C_01.00']) }); this.lastInput = this.captureInput();
+      this.contextProfile.set(form.framework === 'FINREP' ? 'finrep' : 'corep');
+      this.contextSource.set(context.origin); this.contextForm.set({ entityId: form.entityId, referenceDate: form.referenceDate, submissionDate: form.submissionDate ?? '', currency: form.currency ?? '', scaleExponent: form.scaleExponent === undefined ? '' : String(form.scaleExponent), displayDecimals: form.displayDecimals === undefined ? '' : String(form.displayDecimals), presented: form.filingIndicators[this.contextTable()] === undefined ? '' : String(form.filingIndicators[this.contextTable()]) }); this.lastInput = this.captureInput();
     }
     if (this.expiryTimer) clearTimeout(this.expiryTimer); if (value.state === 'ready' && !this.locallyExpired()) this.expiryTimer = setTimeout(() => { this.locallyExpired.set(true); this.acceptedExcludedSheets.set(false); void this.loadInspection(value.id); }, Math.max(1, Date.parse(value.expiresAt) - Date.now()));
     if (value.commitJobId) this.commitJobId = value.commitJobId;

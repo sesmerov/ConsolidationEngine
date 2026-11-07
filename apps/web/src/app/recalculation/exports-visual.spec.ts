@@ -37,6 +37,14 @@ describe('visual export content and exact artifact identity', () => {
     expect(content!.textContent).toContain('Versión 1'); expect(content!.textContent).toContain('histórica'); expect(content!.textContent).toContain('Demostración de texto y fechas'); expect(content!.textContent).not.toContain('COREP de fondos propios');
     expect(api.exportSummary).toHaveBeenCalledWith('workspace', 'original'); expect(TestBed.inject(SessionStore).versionId()).toBe('current');
   });
+  it('explains that excluded FINREP sheets are preserved without claiming they were validated', async () => {
+    api.exportSummary.mockResolvedValue({ ...summary('current'), reports: [{ ...summary('current').reports[0], displayName: 'finrep.xlsx', profileId: 'eba-finrep-4.0-f0101-v1', selectedSheets: ['1.1'], excludedSheets: ['1.2', '1.3'] }] });
+    const fixture = await renderExports(), content = (fixture.nativeElement as HTMLElement).textContent!;
+    expect(content).toContain('FINREP · F 01.01');
+    expect(content).toContain('2 hojas excluidas del cálculo');
+    expect(content).toContain('Se conservan en el Excel FINREP exportado, sin considerarlas validadas');
+    expect(content).not.toContain('Su contenido no se incluye');
+  });
   it.each(['report', 'other-version', 'other-run'] as const)('does not offer a repeat download for an unrelated %s artifact', async kind => {
     const fixture = await renderResults(); const artifact = { workspaceId: workspace.id, versionId: kind === 'other-version' ? 'current' : 'original', id: 'artifact', filename: kind === 'report' ? 'report.zip' as const : 'results.zip' as const, kind: kind === 'report' ? 'report' as const : 'results' as const, runId: kind === 'other-run' ? 'other-run' : run.id };
     TestBed.inject(ExportStore).ready.set(artifact); fixture.detectChanges();

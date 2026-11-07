@@ -1,6 +1,6 @@
 # Demostraciones visuales
 
-En **Cargar → Demostraciones guiadas** hay dos ejemplos independientes. Descarga el
+En **Cargar → Demostraciones guiadas** hay tres ejemplos independientes. Descarga el
 catálogo y el informe del mismo ejemplo y usa un conjunto distinto para cada uno.
 Elegir una guía o descargar sus archivos no carga datos ni configura destinos.
 
@@ -8,15 +8,16 @@ Elegir una guía o descargar sus archivos no carga datos ni configura destinos.
 |---|---|---|---|
 | COREP | `demo-corep-catalog.xlsx` | `demo-corep-report.xlsx` | Cinco reglas procedentes del catálogo EBA y once sintéticas; todos los datos son sintéticos. |
 | Texto y fechas | `demo-types-catalog.xlsx` | `demo-types-report.xlsx` | Ocho reglas y un informe propios, sintéticos. No es una plantilla regulatoria EBA. |
+| FINREP | `demo-finrep-catalog.xlsx` | `demo-finrep-report.xlsx` | Hoja 1.1 del layout EBA 4.0; cinco reglas propias y todos los importes sintéticos. |
 
-Las descargas se sirven mediante `GET /api/v1/templates/demos/{corep|types}/{catalog|report}`
+Las descargas se sirven mediante `GET /api/v1/templates/demos/{corep|types|finrep}/{catalog|report}`
 con la sesión de la aplicación. Las copias generadas están en `tests/fixtures/generated/`.
 No es necesario editar los libros para completar la guía.
 
 ## Carga y revisión
 
 1. Selecciona los dos archivos en **Catálogo de reglas** e **Informes**.
-2. Conserva **Usar Contexto del libro**. Ambos incluyen la entidad `SYNTHETIC`, referencia
+2. Conserva **Usar Contexto del libro**. Los tres incluyen la entidad `SYNTHETIC`, referencia
    y envío `2025-12-31`; no hay que escribir coordenadas del informe.
 3. Pulsa **Inspeccionar archivos** y revisa el contexto, las hojas incluidas y la cantidad
    de valores. Este paso prepara un candidato, todavía no publica datos.
@@ -47,8 +48,8 @@ Los fallos son casos de demostración, no una señal de que los archivos estén 
 
 En **Validar**, pulsa **Preparar revisión de destinos**. Revisa los dos grupos en conflicto:
 
-1. En r0070, pulsa **Conservar v0174_m**. `DEMO_RANGE` y `DEMO_PRECONDITION` también podrían escribir en esa celda y quedan omitidas.
-2. En r0200, pulsa **Omitir grupo** para excluir de la configuración tanto `DEMO_ZERO` como `DEMO_INTERVAL`.
+1. En r0070, elige **v0174_m** en las opciones y pulsa **Confirmar elección**. Puedes revisar la decisión con **Cambiar elección**. `DEMO_RANGE` y `DEMO_PRECONDITION` también podrían escribir en esa celda y quedan omitidas.
+2. En r0200, elige **No recalcular esta celda** y pulsa **Confirmar elección** para excluir de la configuración tanto `DEMO_ZERO` como `DEMO_INTERVAL`.
 3. Comprueba **5 incluidas, 4 omitidas y 7 excluidas** de 16 reglas. Pulsa **Guardar configuración**. Se publica la configuración que se usará para simular. El cambio en los importes es posterior, cuando selecciones propuestas y confirmes su aplicación.
 
 | Regla | Destino C_01.00, columna 0010 | Anterior → propuesto (EUR) |
@@ -68,8 +69,8 @@ v0174_m → v0173_m ┐
 v0176_m → v0175_m ┘
 ```
 
-Selecciona primero v0172_m: faltarán cuatro antecedentes. Puedes consultarlos sin
-seleccionarlos; elige después cada uno expresamente. Comprueba los cinco cambios,
+Las cinco propuestas aparecen preseleccionadas. Para comprobar sus dependencias, desmarca un antecedente: Aplicar quedará bloqueado. Puedes consultarlos sin
+seleccionarlos; vuelve a incluir el antecedente antes de continuar. Comprueba los cinco cambios,
 marca la confirmación y pulsa **Aplicar cambios seleccionados**. Se crea una nueva
 versión y se vuelven a validar las dieciséis reglas.
 
@@ -116,20 +117,58 @@ con estado **Informado** no equivale a **Sin dato**. Las fechas son civiles, sin
 zona horaria. Las ocho reglas son sólo de validación; no existen controles de destino
 para ellas y una simulación sin direcciones produce cero propuestas.
 
+## FINREP F 01.01: dos cambios encadenados
+
+El informe contiene las **38 posiciones** de `F_01.01`, columna `0010`, en la hoja
+**1.1** del anexo fijado EBA 4.0. El contexto declara `FINREP / FINREP_F0101_4.0`:
+el módulo es un alias local, no una denominación oficial de remisión XBRL.
+
+1. Carga el catálogo y el informe FINREP en un conjunto propio, conservando el contexto
+   del libro. Confirma la carga y sigue el realce de **Validar**.
+2. Valida: aparecen **2 reglas que pasan y 3 que fallan**. Las dos igualdades tienen
+   un único destino disponible; guarda su configuración.
+3. Sigue el realce de **Recalcular** y simula. Ambas propuestas comienzan seleccionadas.
+   Revisa **90 → 100** para efectivo y **105 → 120** para el total de activos del ejemplo.
+   La segunda lee el efectivo ya propuesto: **100 + 20 = 120**.
+4. Confirma la selección y aplica. La validación pasa a **4 reglas que pasan y 1 que falla**.
+   La desigualdad falsa permanece así intencionadamente.
+5. Sigue el realce de **Descargar** y descarga los informes de la versión aplicada.
+   Puedes cargar el Excel descargado con el mismo catálogo en otro conjunto: conserva
+   las 38 posiciones, el contexto de negocio y los dos importes recalculados.
+
+| Regla propia | Expresión resumida | Antes → después |
+|---|---|---|
+| FIN_TOTAL_CASH | r0010 = r0020 + r0030 + r0040 | Falla → Pasa; 90 → 100 |
+| FIN_TOTAL_ASSETS_DEMO | r0380 = r0010 + r0050 | Falla → Pasa; 105 → 120 |
+| FIN_GREATER_PASS | r0020 > r0030 | Pasa → Pasa |
+| FIN_GREATER_FAIL | r0040 > r0020 | Falla → Falla |
+| FIN_CONDITIONAL | Si r0020 > 0, r0030 ≥ 0; si no, r0040 = 0 | Pasa → Pasa |
+
+Las desigualdades y el condicional solo validan. Las fórmulas del ejemplo simplifican
+el contenido del balance para mostrar la dependencia entre dos cálculos; no son reglas
+oficiales FINREP. Los cuatro sumandos son 40, 35, 25 y 20; las demás posiciones se
+informan a cero, salvo los dos totales iniciales indicados.
+
+Al cargar el anexo completo, elige **FINREP F 01.01** cuando el libro también contenga
+un perfil COREP reconocido y acepta sus hojas excluidas antes de confirmar. En FINREP,
+la descarga conserva esas hojas y las partes ajenas al cálculo del libro original.
+El formato, la estructura y los importes se verifican de nuevo antes de publicar el
+archivo. La plantilla vacía está disponible como **Plantilla FINREP F 01.01**.
+
 ## Alcance y evidencia
 
 Estas expectativas describen los archivos sin editar y no se toman como respuestas
 del motor: cada carga se evalúa realmente. Las pruebas comparan sus resultados con el
 oráculo congelado; la guía no configura reglas, interpreta expresiones ni suministra
 valores a la simulación. La evidencia ejecutada se registra en
-[verification-002.md](verification-002.md); una prueba automática no sustituye la
+[verification-002.md](verification-002.md) y [verification-004.md](verification-004.md); una prueba automática no sustituye la
 aceptación humana.
 
-La cobertura regulatoria visual se limita a CA1. Los ejemplos no acreditan soporte
+La cobertura regulatoria visual se limita a CA1 y F 01.01 del layout EBA 4.0 fijado. Los ejemplos no acreditan soporte
 completo de COREP, FINREP o DPM-XL. Los errores deliberados de sintaxis, ciclos y otros
-casos negativos se prueban aparte y no se incluyen en estos dos recorridos principales.
+casos negativos se prueban aparte y no se incluyen en estos tres recorridos principales.
 
-El importador de compatibilidad `ce-report-1` se utiliza por API en las regresiones del motor. El control de FINREP por esa vía conserva los mismos cuatro importes y dos reglas del ensayo de entrada visual. [Resultado y procedencia del ensayo](../specs/003-simplificar-flujo/evidencia.md)
+El importador de compatibilidad `ce-report-1` se utiliza por API en las regresiones del motor. El ensayo FINREP de la iteración 003 documenta el rechazo visual anterior y su control por compatibilidad; no describe el nuevo soporte de F 01.01. [Resultado histórico y procedencia](../specs/003-simplificar-flujo/evidencia.md)
 
 ## Guardar una versión o sus resultados
 
@@ -141,14 +180,16 @@ Un informe con varios contextos muestra su cantidad y los valores comunes, sin o
 la existencia de entidades o fechas diferentes.
 
 **Informes y registro de cambios** prepara un libro por archivo de origen en su perfil:
-CA1 para COREP, Datos para la demostración tipada y el formato anterior cuando corresponda.
-Los datos y el contexto pertenecen a la versión elegida; las hojas excluidas no se
-reconstruyen. El registro de cambios se entrega separado. Son extractos de trabajo local
-reimportables, no ficheros oficiales de remisión.
+CA1 para COREP, 1.1 para FINREP, Datos para la demostración tipada y el formato anterior cuando corresponda.
+Los datos y el contexto pertenecen a la versión elegida. FINREP conserva las partes del
+original y modifica únicamente sus importes autorizados y el contexto necesario;
+COREP y la demo tipada generan un extracto de las hojas admitidas. El registro de
+cambios se entrega separado. Son libros de trabajo local reimportables, no ficheros
+oficiales de remisión.
 
 **Resultados de validación** permite elegir una ejecución de esa versión. Una ejecución
 incompleta conserva su aviso y estado. Desde Validar, **Descargar resultados de esta
 ejecución** usa la ejecución visible y su propia versión. Repetir esa descarga sólo
 reutiliza un paquete que coincide en versión y ejecución.
 
-Tras aplicar cambios, sigue **Siguiente paso** en **Descargar**. **Descargar informes aplicados** identifica la versión nueva del recibo y conserva la elección histórica del selector. También puedes usar **Descargar esta versión** desde la comparación. El último paquete disponible muestra la versión que contiene.
+Tras aplicar cambios, sigue el realce de la etapa **Descargar**. **Descargar informes aplicados** identifica la versión nueva del recibo y conserva la elección histórica del selector. También puedes usar **Descargar esta versión** desde la comparación. El último paquete disponible muestra la versión que contiene.

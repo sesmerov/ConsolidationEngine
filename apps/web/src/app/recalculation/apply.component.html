@@ -1,17 +1,21 @@
 @if (showConfirmation()) {
 <section class="confirmation" aria-labelledby="apply-title">
 <h3 id="apply-title">Confirmar la aplicación</h3>
-<p>{{ selectedIds().length }} {{ selectedIds().length === 1 ? 'propuesta seleccionada' : 'propuestas seleccionadas' }}. Al aplicar se creará una versión y se volverá a validar todo el catálogo.</p>
-<details class="selection-review"><summary>Revisar selección completa ({{ selectedProposals().length }})</summary><ul class="selected-changes">@for (row of selectedProposals(); track row.id) { <li><strong>{{ row.code }}</strong> · {{ target(row) }} <span class="value-change"><ce-exact-value [value]="row.before?.normalizedValue" [decimals]="row.before?.coordinate?.decimals || ''"/><span aria-hidden="true">→</span><ce-exact-value [value]="row.after?.normalizedValue" [decimals]="row.before?.coordinate?.decimals || ''"/></span>@if (row.before?.derivation; as derivation) { <span class="muted">Recalculado en una aplicación anterior</span> }@if (noChange(row)) { <span class="muted">Sin cambio de valor</span> }</li> }</ul></details>
-@if (!selection()) { <p class="notice">Pendiente de comprobar las dependencias de esta selección.</p> }
-@else if (selection()?.requiredIds?.length) { <p class="notice">Selecciona los predecesores pendientes para continuar.</p> }
-@else if (!canApply() && !uncertain() && !pending()) { <p class="notice">Para aplicar se necesita la selección completa y vigente con el detalle de cada propuesta.</p> }
+<p>{{ selection()?.selectedCount }} {{ selection()?.selectedCount === 1 ? 'propuesta seleccionada' : 'propuestas seleccionadas' }}. Al aplicar se creará una versión y se volverá a validar todo el catálogo.</p>
+<details class="selection-review" [open]="store.reviewOpen()" (toggle)="store.toggleReview($any($event.target).open)"><summary>Revisar selección completa ({{ selection()?.selectedCount }})</summary>
+@if (store.reviewLoading()) { <p role="status">Cargando cambios seleccionados…</p> }
+@if (store.reviewPage(); as page) {
+<ul class="selected-changes">@for (row of page.items; track row.id) { <li><strong>{{ row.code }}</strong> · {{ target(row) }} <span class="value-change"><ce-exact-value [value]="row.before?.normalizedValue" [decimals]="row.before?.decimals || ''"/><span aria-hidden="true">→</span><ce-exact-value [value]="row.after?.normalizedValue" [decimals]="row.before?.decimals || ''"/></span> <span>{{ row.before?.unit }}</span>@if (noChange(row)) { <span class="muted">Sin cambio de valor</span> }</li> }</ul>
+<mat-paginator aria-label="Páginas de cambios seleccionados" [length]="page.total" [pageSize]="50" [pageIndex]="store.reviewPagination.index()" [hidePageSize]="true" [showFirstLastButtons]="false" [disabled]="store.reviewLoading()" (page)="store.loadReview($event.pageIndex)"/>
+} @else if (!store.reviewLoading()) { <button mat-button (click)="store.loadReview()">Consultar cambios seleccionados</button> }
+</details>
+@if (selectionBusy() || selection()?.state !== 'ready') { <p class="notice">La selección se está actualizando. Espera a que termine antes de aceptar los cambios.</p> }
+@else if (selection()?.requiredCount) { <p class="notice">Selecciona los antecedentes pendientes para continuar.</p> }
+@else if (!canApply() && !uncertain() && !pending()) { <p class="notice">Para aplicar se necesita una selección completa y vigente. Actualiza los datos si han cambiado.</p> }
 <mat-checkbox [checked]="acknowledged()" [disabled]="!canApply()" (change)="acknowledged.set($event.checked)">He revisado cada propuesta y acepto aplicar el conjunto completo mostrado.</mat-checkbox>
 <button mat-flat-button class="ce-primary-action" (click)="apply()" [disabled]="!canApply() || !acknowledged()">Aplicar cambios seleccionados</button>
 </section>
 }
 @if (pending()) { <p aria-live="polite">Enviando la aplicación…</p> }
 @if (error(); as message) { <p class="error" role="alert">{{ message }}</p> }
-@if (uncertain()) {
-  <button mat-stroked-button (click)="retry()" [disabled]="pending() || session.pending() || session.jobActive()">Reintentar misma aplicación</button>
-}
+@if (uncertain()) { <button mat-stroked-button (click)="retry()" [disabled]="pending() || session.pending() || session.jobActive()">Reintentar misma aplicación</button> }
