@@ -21,3 +21,5 @@ export * from './compact.js';
 export * from './demo-session.js';
 export * from './transfers.js';
 export * from './operations.js';
+export * from './hosted-views.js';
+export * from './compact-inspection.js';

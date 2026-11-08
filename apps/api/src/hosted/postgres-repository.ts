@@ -38,7 +38,7 @@ export interface ReviewRow extends QueryResultRow {
   session_id: string; workspace_id: string; id: string; basis_id: string; source_run_id: string; base_version_id: string;
   revision: string; state: DirectionReviewSummaryDTO['state']; config_changed: boolean; dirty_count: number; base_config_version: string | null;
   preparation_job_id: string | null; pending_job_id: string | null; ready_at: Date | null; expires_at: Date;
-  counts: DirectionReviewSummaryDTO['counts']; receipt: DirectionReviewSummaryDTO['receipt'] | null; choices_ref: JsonObject | null;
+  counts: NonNullable<DirectionReviewSummaryDTO['counts']> & { conflictGroupCount?: number }; receipt: DirectionReviewSummaryDTO['receipt'] | null; choices_ref: JsonObject | null;
 }
 export interface SelectionRow extends QueryResultRow {
   session_id: string; workspace_id: string; id: string; preview_id: string; version_id: string; basis_id: string; revision: string;
@@ -76,11 +76,12 @@ export function publicJob(row: JobRow): JobDTO {
     diagnostics: row.diagnostics.items ?? [], pollAfterMs: 5000 };
 }
 export function publicReview(row: ReviewRow): DirectionReviewSummaryDTO {
+  const { conflictGroupCount, ...counts } = row.counts ?? {};
   return { id: row.id, workspaceId: row.workspace_id, validationBasisId: row.basis_id, baseVersionId: row.base_version_id,
     runId: row.source_run_id, revision: revisionNumber(row.revision), state: row.state,
     ...(row.pending_job_id || row.preparation_job_id ? { jobId: (row.pending_job_id ?? row.preparation_job_id)! } : {}),
     ...(row.ready_at ? { readyAt: row.ready_at.toISOString() } : {}), expiresAt: row.expires_at.toISOString(),
-    ...(row.counts && 'totalRows' in row.counts ? { counts: row.counts } : {}), ...(row.receipt ? { receipt: row.receipt } : {}) };
+    ...('totalRows' in counts ? { counts } : {}), ...(conflictGroupCount === undefined ? {} : { conflictGroupCount }), ...(row.receipt ? { receipt: row.receipt } : {}) };
 }
 const emptySummary = (): ValidationSummary => ({ complete: false, rows: 0, variants: 0, applicableVariants: 0, instances: 0,
   duplicateRows: 0, byStatus: { pass: 0, fail: 0, not_applicable: 0, not_evaluable: 0, error: 0 } });

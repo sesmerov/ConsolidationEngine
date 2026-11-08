@@ -17,3 +17,27 @@ export function createPager() {
   };
 }
 export const paginationProperties = { limit: { type: 'string', pattern: '^(?:[1-9]|[1-9][0-9]|1[0-9]{2}|200)$' }, cursor: { type: 'string', maxLength: 8192 } } as const;
+
+/** Hosted cursors share a deployment key and seek in SQL; no process-local secret or array offset. */
+export function createHostedCursorCodec(secret: Uint8Array) {
+  if (secret.byteLength !== 32) throw new TypeError('Hosted cursor key must be 32 bytes');
+  const sign = (value: string) => createHmac('sha256', secret).update(value).digest();
+  return {
+    encode(fingerprint: string, after: { sortKey: string; rowKey: string }): string {
+      const payload = Buffer.from(JSON.stringify({ fingerprint, after })).toString('base64url');
+      return payload + '.' + sign(payload).toString('base64url');
+    },
+    decode(cursor: string, fingerprint: string): { sortKey: string; rowKey: string } {
+      try {
+        if (cursor.length > 8192) throw new Error();
+        const [payload, signature, extra] = cursor.split('.'); if (!payload || !signature || extra) throw new Error();
+        const actual = Buffer.from(signature, 'base64url'), expected = sign(payload);
+        if (actual.toString('base64url') !== signature || actual.length !== expected.length || !timingSafeEqual(actual, expected)) throw new Error();
+        const value = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+        if (value.fingerprint !== fingerprint || typeof value.after?.sortKey !== 'string' || typeof value.after?.rowKey !== 'string'
+          || value.after.sortKey.length > 500 || !value.after.rowKey || value.after.rowKey.length > 500) throw new Error();
+        return value.after;
+      } catch { throw new ApiError('INVALID_CURSOR'); }
+    },
+  };
+}
