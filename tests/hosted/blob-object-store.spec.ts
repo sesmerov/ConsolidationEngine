@@ -36,4 +36,10 @@ describe('private Blob provider adapter with controlled SDK boundary', () => {
     vi.stubEnv('VERCEL_BLOB_RETRIES', '0'); const { transport, calls } = fixture(); calls.put.mockRejectedValueOnce(new Error('lost acknowledgement'));
     await expect(transport.put(privateKey, Buffer.from('x'))).rejects.toThrow('lost acknowledgement'); expect(calls.put).toHaveBeenCalledTimes(1);
   });
+  it('deletes a bounded batch with one provider request and rejects unbounded lists before I/O', async () => {
+    vi.stubEnv('VERCEL_BLOB_RETRIES', '0'); const { transport, calls } = fixture(), controller = new AbortController();
+    const keys = Array.from({ length: 100 }, (_, i) => privateKey.slice(0, -12) + String(i).padStart(12, '0'));
+    await transport.removeMany(keys, controller.signal); expect(calls.del).toHaveBeenCalledExactlyOnceWith(keys, { token: 'synthetic-test-token', abortSignal: controller.signal });
+    await expect(transport.removeMany([...keys, privateKey])).rejects.toThrow(/1–100/); await expect(transport.removeMany([])).rejects.toThrow(/1–100/); expect(calls.del).toHaveBeenCalledTimes(1);
+  });
 });

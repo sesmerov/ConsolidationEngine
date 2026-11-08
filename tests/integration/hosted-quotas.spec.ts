@@ -66,4 +66,17 @@ describe('maintenance quota reserve', () => {
     expect(usage).toEqual([{ resource: 'blob-advanced-operations', units: 14 }]);
     expect((await h.databases[0].query("SELECT count(*)::int AS n FROM physical_objects WHERE status='deleted'")).rows[0]!.n).toBe(1400);
   }, 120_000);
+
+  it('keeps byte accounting balanced when consumption is older than30 days but release is recent', async () => {
+    const seeded = await seedHostedWorkspace(h), quotas = new QuotaLedger(h.databases[0], h.config);
+    const old = new Date(h.clock.now() - 31 * 86_400_000);
+    await h.databases[0].transaction(async tx => {
+      const held = await quotas.reserve(tx, { owner: seeded.owner, operationId: randomUUID(), resource: 'blob-bytes', units: 100, purpose: 'public', now: old });
+      await quotas.consume(tx, { reservationId: held.id, now: old });
+      await quotas.release(tx, { reservationId: held.id, confirmedAbsent: true, now: h.clock.date() });
+    });
+    await new HostedMaintenance(h.databases[0], h.config, { quotas, transport: h.objectTransport, now: h.clock.now }).sweep();
+    await expect(h.databases[0].transaction(tx => quotas.reserve(tx, { owner: seeded.owner, operationId: randomUUID(), resource: 'blob-bytes', units: 1, purpose: 'public', now: h.clock.date() }))).resolves.toMatchObject({ state: 'reserved' });
+    expect((await h.databases[0].query("SELECT sum(CASE WHEN category='released' THEN -units ELSE units END)::int AS n FROM usage_ledger WHERE resource='blob-bytes'")).rows[0]!.n).toBe(0);
+  });
 });

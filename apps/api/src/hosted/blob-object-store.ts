@@ -6,6 +6,8 @@ export interface PrivateObjectTransport {
   put(privateKey: string, bytes: Uint8Array, signal?: AbortSignal): Promise<void>;
   get(privateKey: string, signal?: AbortSignal): Promise<Uint8Array | null>;
   remove(privateKey: string, signal?: AbortSignal): Promise<void>;
+  /** A resolved call confirms every key absent; a rejected call may have deleted any subset. */
+  removeMany(privateKeys: readonly string[], signal?: AbortSignal): Promise<void>;
 }
 interface BlobSdk { readonly put: typeof put; readonly get: typeof get; readonly del: typeof del }
 const keyPattern = /^ce\/v1\/[a-f0-9-]{36}\/[a-f0-9-]{36}\/[a-f0-9-]{36}$/;
@@ -36,5 +38,10 @@ export class BlobObjectTransport implements PrivateObjectTransport {
   }
   async remove(privateKey: string, signal?: AbortSignal): Promise<void> {
     key(privateKey); await this.sdk.del(privateKey, { token: this.token, ...(signal ? { abortSignal: signal } : {}) });
+  }
+  async removeMany(privateKeys: readonly string[], signal?: AbortSignal): Promise<void> {
+    if (!privateKeys.length || privateKeys.length > 100 || new Set(privateKeys).size !== privateKeys.length) throw new TypeError('Private deletion batch must contain 1–100 unique keys.');
+    for (const value of privateKeys) key(value); signal?.throwIfAborted();
+    await this.sdk.del([...privateKeys], { token: this.token, ...(signal ? { abortSignal: signal } : {}) });
   }
 }

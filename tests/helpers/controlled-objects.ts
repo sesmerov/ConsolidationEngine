@@ -4,7 +4,7 @@ import type { WorkspaceOwner } from '../../apps/api/src/ports/workspace-reposito
 import { ControlledBarriers } from './controlled-queue.js';
 
 interface Entry { readonly owner: WorkspaceOwner; readonly reference: PrivateObjectReference; bytes: Uint8Array }
-type Operation = 'put' | 'get' | 'remove';
+type Operation = 'put' | 'get' | 'remove' | 'removeMany';
 /** Provider boundary with real bytes/hash checks; SQL authorization and quota reservations remain in the caller. */
 export class ControlledObjects implements ObjectStore {
   private readonly data = new Map<string, Entry>();
@@ -82,6 +82,11 @@ export class ControlledObjectTransport {
   async remove(privateKey: string, signal?: AbortSignal): Promise<void> {
     const failure = await this.before('remove', privateKey, signal);
     this.data.delete(privateKey); await this.after('remove', failure, signal);
+  }
+  async removeMany(privateKeys: readonly string[], signal?: AbortSignal): Promise<void> {
+    if (!privateKeys.length || privateKeys.length > 100 || new Set(privateKeys).size !== privateKeys.length || privateKeys.some(key => !key || key.length > 1000)) throw new Error('INVALID_PRIVATE_OBJECT_BATCH');
+    const failure = await this.before('removeMany', privateKeys[0]!, signal);
+    for (const key of privateKeys) this.data.delete(key); await this.after('removeMany', failure, signal);
   }
   corrupt(privateKey: string, bytes: Uint8Array): void {
     if (!this.data.has(privateKey)) throw new Error('OBJECT_NOT_FOUND'); this.data.set(privateKey, Uint8Array.from(bytes));
