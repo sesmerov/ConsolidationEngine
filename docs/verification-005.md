@@ -74,3 +74,11 @@ Los puertos async de repositorio, objetos y despacho tienen adaptadores locales,
 Precisión de UI acordada al integrar: todas las reglas omitidas explícitamente es un estado listo, distinto de no existir candidatos. Se permite una simulación deliberada vacía para conservar esas decisiones; nunca aplicación vacía. Antes de preparar los contadores son desconocidos, no ceros. Una revisión mantiene su ejecución compatible aunque aparezca otra de la misma base.
 
 Docker aislado confirma PostgreSQL17.11 con postgres:17 y límites de128MiB/1CPU, ejecutando solamente --version; aún no hay evidencia SQL funcional ni de capacidad del motor.
+
+### Preparación parcial T053: dependencias alojadas
+
+Instalados los pins pg8.23.1, @types/pg8.23.1, @vercel/blob2.8.2 y @upstash/qstash2.12.1 mediante npm11.19.1, sin scripts de instalación. No cambia ninguna versión del lockfile preexistente; verificado comparando todos sus paquetes anteriores. Imports de los cuatro SDK/tipos y parser de configuración: PASS. La configuración y las pruebas hosted de T053 siguen pendientes.
+
+La instalación reveló GHSA-mrhx-c7xc-m3w5 en Zod4.1.11, transitivo de @vercel/cli-config0.3.1 incluido por OIDC. La corrección puntual fija @vercel/cli-config0.3.6 y Zod4.6.6 con override; el bundle del paquete también necesita la corrección, por eso no basta con sustituir solo Zod. npm update dirigido al paquete y npm ls confirman resolución; npm audit posterior:0 vulnerabilidades conocidas. Esto no es garantía de ausencia de vulnerabilidades. Se mantiene el SDK Blob decidido en el plan y el resto del toolchain.
+
+Fuente de la corrección: https://github.com/advisories/GHSA-mrhx-c7xc-m3w5, consultada2026-11-08; versión corregida4.6.6. Smoke de parseGlobalConfig con objeto sintético válido e inválido, sin leer configuración de usuario ni hacer peticiones a proveedores: PASS. Ninguna cuenta ni despliegue creados.

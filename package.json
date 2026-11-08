@@ -41,6 +41,12 @@
     "vitest": "5.0.5"
   },
   "overrides": {
+    "@vercel/oidc": {
+      "@vercel/cli-config": {
+        ".": "0.3.6",
+        "zod": "4.6.6"
+      }
+    },
     "@fastify/static": {
       "glob": {
         ".": "14.0.2",
