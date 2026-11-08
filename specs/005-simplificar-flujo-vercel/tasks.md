@@ -6,7 +6,7 @@ description: "Tareas ejecutables de la iteración 005: flujo sencillo y demo pú
 
 **Input**: [spec.md](spec.md), [plan.md](plan.md), [research.md](research.md), [data-model.md](data-model.md), [contrato UI](contracts/ui.md), [contrato API](contracts/api.md), [contrato de despliegue](contracts/deployment.md) y [quickstart.md](quickstart.md).
 
-**Rama**: `codex/005-simplificar-flujo-vercel` · **Fecha**: 2026-11-08 · **Estado**: tareas pendientes, sin implementación ni resultados de pruebas nuevos.
+**Rama**: `codex/005-simplificar-flujo-vercel` · **Fecha**: 2026-11-08 · **Estado**: implementación en curso; consultar casillas y docs/verification-005.md para la evidencia real.
 
 **Organización**: historias en prioridad P1 → P2 → P3. Se adelanta el cierre transversal a US6 para cumplir la petición expresa: README es el último trabajo funcional, después de verificar el producto y capturar sus pantallas finales. La entrega no provisiona ni publica servicios.
 
@@ -24,7 +24,7 @@ description: "Tareas ejecutables de la iteración 005: flujo sencillo y demo pú
 
 **Objetivo**: fijar el punto de partida y los casos verificables sin cambiar el alcance.
 
-- [ ] T001 Registrar rama/commit inicial, toolchain, hashes de fuentes y matriz de evidencia pendiente por FR/SC en `docs/verification-005.md`; contrastar los comandos existentes de `package.json` con `specs/005-simplificar-flujo-vercel/quickstart.md`, sin atribuir resultados de 004 a 005.
+- [X] T001 Registrar rama/commit inicial, toolchain, hashes de fuentes y matriz de evidencia pendiente por FR/SC en `docs/verification-005.md`; contrastar los comandos existentes de `package.json` con `specs/005-simplificar-flujo-vercel/quickstart.md`, sin atribuir resultados de 004 a 005.
 - [ ] T002 [P] Crear `docs/controls-005.md` a partir de `specs/005-simplificar-flujo-vercel/contracts/ui.md`: identificar los 17 tipos de selectores, 11 desplegables y casillas/radios/toggles adicionales por componente, decisión prevista, casos cero/una/varias opciones, teclado y futura evidencia; no marcar controles comprobados todavía.
 - [ ] T003 [P] Preparar fixtures sintéticos reutilizables en `tests/helpers/iteration005-fixtures.ts` y `tests/e2e/iteration005-helpers.ts`: dos lados elegibles, único destino con colisión, 51 productores/decisiones, cero candidatos, base antigua, versiones 1/6 y valor individual grande; reutilizar originales/manifiestos existentes sin modificarlos.
 
