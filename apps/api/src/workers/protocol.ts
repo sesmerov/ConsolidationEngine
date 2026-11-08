@@ -47,3 +47,22 @@ export interface OperationContext {
   readonly cancelled: () => boolean; readonly progress: (completed: number, total: number) => void;
 }
 export interface WorkerOperation { execute(input: JsonValue, context: OperationContext): Promise<WorkerOutput> | WorkerOutput }
+
+/** Hosted IPC carries only durable references and the shared cancellation flag. Runtime module is server configuration. */
+export interface HostedWorkerRequest {
+  readonly claim: import('../hosted/job-coordinator.js').HostedJobClaim;
+  readonly schema: string; readonly cancellation: SharedArrayBuffer; readonly commandModule?: string;
+  /** Internal server startup configuration. Never persisted in jobs, returned by HTTP or chosen by the visitor. */
+  readonly runtime?: HostedWorkerRuntime;
+}
+export interface HostedWorkerRuntime {
+  readonly config: import('../hosted/config.js').HostedConfig;
+  readonly objectTransport?: { readonly moduleUrl: string; readonly descriptor: JsonValue };
+}
+export type HostedWorkerMessage =
+  | { readonly type: 'progress'; readonly completed: number; readonly total: number }
+  | { readonly type: 'result'; readonly output: import('../hosted/publication.js').PublicationEnvelope }
+  | { readonly type: 'failure'; readonly diagnostic: Diagnostic };
+export interface HostedCommandModule {
+  executeHostedCommand(request: HostedWorkerRequest, cancelled: () => boolean): Promise<import('../hosted/publication.js').PublicationEnvelope>;
+}
