@@ -24,6 +24,7 @@
     "test:unit": "vitest run --project engine && npm run test --workspace @ce/web -- --watch=false",
     "test:integration": "vitest run --project integration",
     "test:contract": "vitest run --project contract",
+    "test:hosted": "node scripts/test-hosted.mjs",
     "test:foundation": "npm run build:api && vitest run --project integration --project contract tests/integration/session-jobs.spec.ts tests/contract/local-session.spec.ts",
     "test:e2e": "playwright test",
     "bench": "node scripts/benchmark.mjs",
