@@ -14,7 +14,7 @@ import { ruleSourceDetails } from '../presentation/rule-presentation.js';
 import type { JobAcceptance } from '../jobs/job-manager.js';
 import { canonicalHash, canonicalStringify, directionConfigurationVersion, immutable } from '../session/canonical-state.js';
 import type { WorkspaceStore } from '../session/workspace-store.js';
-import { getValidation } from '../validation/validation-service.js';
+import { getValidation, validationMatchesBasis } from '../validation/validation-service.js';
 import type { StateRecord, WorkerOutput } from '../workers/protocol.js';
 import { activeReviewKey, latestDirectionCommitKey, releasedReview, reviewEntry, reviewKey } from './direction-review-record.js';
 import type { ReviewRecord } from './direction-review-record.js';
@@ -180,7 +180,7 @@ export class DirectionReviewService {
     this.store.assertIdle(w);
     this.store.assertBase(w, body.baseVersionId);
     const run = getValidation(this.store, w, body.runId);
-    if (run.run.versionId !== body.baseVersionId || run.run.status !== 'completed' || !run.run.summary.complete)
+    if (!validationMatchesBasis(run, this.store.snapshot(w, body.baseVersionId)))
       throw new ApiError('INVALID_DIRECTION', { reason: 'VALIDATION_REQUIRED' });
     const seeds: ReviewSeed[] = [];
     const budget = new WorkBudget();
@@ -256,7 +256,7 @@ export class DirectionReviewService {
       throw new ApiError('DIRECTION_REVIEW_NOT_APPLICABLE', { reason: 'PARTIAL_REVIEW_NOT_ACCEPTED' });
     const { runId, baseVersionId, revision } = old.summary;
     const validation = getValidation(this.store, w, runId);
-    if (validation.run.versionId !== baseVersionId || validation.run.status !== 'completed' || !validation.run.summary.complete)
+    if (!validationMatchesBasis(validation, this.store.snapshot(w, baseVersionId)))
       throw new ApiError('DIRECTION_REVIEW_NOT_APPLICABLE');
     const newVersionId = randomUUID(), ref = { type: 'direction-review', id };
     const committing: ReviewRecord = { ...old, summary: { ...old.summary, state: 'committing', jobId } };

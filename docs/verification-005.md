@@ -24,6 +24,8 @@ Existen `build`, `typecheck`, `test`, `test:e2e` y suites específicas en packag
 
 `docker.exe` existe, pero `docker info` falla porque el daemon Linux de Docker Desktop no está arrancado (pipe `dockerDesktopLinuxEngine` ausente). Existe cliente PostgreSQL18; todavía no se ha verificado PostgreSQL17 de pruebas. No se han leído credenciales ni tocado la sesión del usuario en3340. Esto es disponibilidad inicial del entorno, no resultado de capacidad ni bloqueo de las historias locales.
 
+Preparación posterior del entorno: Docker Desktop se arrancó en segundo plano con ventana oculta. La comprobación fuera del sandbox confirma estado `running`, servidor Docker29.5.3 y WSL2; el sandbox no tiene acceso a su pipe/registros. PostgreSQL17 aislado y el paquete Linux siguen pendientes de sus tareas. No se han detenido ni modificado contenedores ajenos.
+
 ## Matriz de evidencia
 
 | Criterio | Requisitos | Comprobación prevista | Estado inicial |
@@ -44,3 +46,18 @@ Existen `build`, `typecheck`, `test`, `test:e2e` y suites específicas en packag
 - T001: punto de partida, toolchain, hashes y requisitos de evidencia registrados. Ninguna prueba de producto de005 ejecutada todavía.
 - Baseline: `pwsh -NoProfile -File scripts/run-with-toolchain.ps1 run build` termina correctamente (ANTLR, contratos, motor, API y Angular). El primer intento restringido falló al lanzar Java con EPERM; la misma compilación con permiso de ejecución completa pasó. El bundle inicial existente es707,00 kB frente al aviso de700 kB, registrado antes de cambios funcionales; no es fallo de compilación ni resultado de mejora de005.
 - T002/T003: inventario inicial de17 selectores,11 detalles y18 controles adicionales documentado en `controls-005.md`, con comprobación final pendiente. Helpers sintéticos comprobados con tipos estrictos y aserciones del motor para ambos lados, único destino,51 productores,51 decisiones, cero candidatos, base de datos cambiados y seis versiones. El valor UTF-8 mayor de1 MiB es solo fixture de transporte; no afirma que el perfil acepte una celda Excel/texto gigante. Helpers E2E todavía no ejecutados en navegador. Fuentes originales sin cambios.
+- Ejecución de fundamentos: T009 se marca paralelizable tras comprobar que crea contratos nuevos independientes de las mutaciones de T004–T008; la integración de `index.ts` espera a que sus escritores lo liberen. No cambia requisitos ni arquitectura, y evita editar archivos compartidos simultáneamente. Total105 tareas,21 marcadas[P].
+- Aclaración de representación en T009: la primera carga parte de un conjunto vacío. `UploadBatchCreate.baseVersionId` es campo requerido `UUID|null`; null representa ausencia de versión y mantiene If-Match obligatorio. Contrato API/modelo precisados, sin inventar una versión inicial ni debilitar concurrencia.
+
+Comprobación de tipos de helpers: `node node_modules/typescript/bin/tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --skipLibCheck --esModuleInterop --allowJs --checkJs false tests/helpers/iteration005-fixtures.ts tests/e2e/iteration005-helpers.ts`, usando el ejecutable Node fijado: exit0. Aserciones por stdin a Node/esbuild con `prepareDirectionProjection`, `readDirectionRows` y `validate005`: pendientes1, incluido1, conflictos51, pendiente51 en segunda página, excluido1, fail→pass entre datos cambiados, seis UUID distintos y valor UTF-8 de1 MiB+65 bytes. Inventario17/11/18, guardas de tamaños y `git diff --check`: exit0.
+
+### T004–T006: identidad de base de validación
+
+Prueba roja inicial: `node node_modules/vitest/vitest.mjs run --project integration tests/integration/validation-basis.spec.ts` con toolchain fijada,7 fallos por conducta ausente y3 controles aprobados. Tras implementación y caso adicional de selección autorizada de ejecución:11/11. Las publicaciones nuevas asignan UUID; configurar solo conserva la base si los demás datos no cambian. La aplicación reserva la base antes del worker y publica la misma en revalidación/snapshot. Legacy sin base solo reutiliza la versión exacta; exportación nunca relaja la coincidencia de versión.
+
+- `scripts/run-with-toolchain.ps1 run build:api`: PASS.
+- Vitest integration/contract: session-jobs, retained-size, direction-review-lifecycle, apply-worker, application-atomicity, revalidation-comparison, proposal-selection-application, validations, results-export:9 archivos/105 pruebas PASS.
+- Vitest engine/integration: validation-basis, apply-candidate, validation-run:3 archivos/76 pruebas PASS (incluyen las11 nuevas; no contarlas de nuevo).
+- `git diff --check`: PASS. Ejecución Vitest fuera de sandbox tras EPERM de spawn. Sin nuevas pruebas de navegador ni cobertura alojada atribuida a este incremento.
+
+Preparación local adicional: descargada imagen oficial `postgres:17`, digest `sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f`. Aún no se ha creado base de pruebas ni probado SQL; ningún recurso comercial provisionado.

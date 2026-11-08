@@ -1,10 +1,10 @@
-import type { DataType, Diagnostic, NormalizedValue, PresentationDTO, Rational, SourceLocator } from './common.js';
+import type { DataType, Diagnostic, NormalizedValue, PresentationDTO, Rational, SourceLocator, ValidationBasisId } from './common.js';
 import type { RecalculationPolicyDTO } from './profiles.js';
 import type { Coordinate, FactDerivation } from './report.js';
 import type { SourceFile } from './report.js';
 import type { Severity } from './catalog.js';
 import type { DirectionChoiceDTO } from './recalculation.js';
-import { dateValueSchema, rationalSchema, sourceLocatorSchema, textValueSchema, uuidSchema } from './common.schemas.js';
+import { dateValueSchema, rationalSchema, sourceLocatorSchema, textValueSchema, uuidSchema, validationBasisIdSchema } from './common.schemas.js';
 import { coordinateSchema } from './report.js';
 import { diagnosticSchema } from './catalog.js';
 export type ValidationStatus = 'pass' | 'fail' | 'not_applicable' | 'not_evaluable' | 'error';
@@ -54,6 +54,8 @@ export interface ValidationSummary {
 }
 export interface ValidationRunDTO {
   readonly id: string; readonly versionId: string; readonly profileId: string; readonly status: 'running' | 'completed' | 'incomplete';
+  /** Legacy runs without a basis remain compatible only with their exact version. */
+  readonly validationBasisId?: ValidationBasisId;
   readonly startedAt: string; readonly endedAt?: string; readonly summary: ValidationSummary; readonly resultIds: readonly string[];
   readonly diagnostics: readonly Diagnostic[];
 }
@@ -73,7 +75,7 @@ export const validationSummarySchema = { type: 'object', additionalProperties: f
   } } as const;
 export const validationRunSchema = { type: 'object', additionalProperties: false,
   required: ['id', 'versionId', 'profileId', 'status', 'startedAt', 'summary', 'resultIds', 'diagnostics'], properties: {
-    id: uuidSchema, versionId: uuidSchema, profileId: { type: 'string' }, status: { enum: ['running', 'completed', 'incomplete'] },
+    id: uuidSchema, versionId: uuidSchema, validationBasisId: validationBasisIdSchema, profileId: { type: 'string' }, status: { enum: ['running', 'completed', 'incomplete'] },
     startedAt: { type: 'string', format: 'date-time' }, endedAt: { type: 'string', format: 'date-time' }, summary: validationSummarySchema,
     resultIds: { type: 'array', items: { type: 'string' } }, diagnostics: { type: 'array', items: diagnosticSchema },
   } } as const;

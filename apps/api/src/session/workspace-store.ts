@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { MAX_SNAPSHOTS, SESSION_LIMIT_BYTES, UUID_PATTERN, isTerminalJob } from '@ce/contracts';
-import type { JobDTO, JsonValue, PreviewBundle, Snapshot, SnapshotContent, WorkspaceDTO } from '@ce/contracts';
+import type { JobDTO, JsonValue, PreviewBundle, Snapshot, SnapshotContent, SnapshotPublicationReason, WorkspaceDTO } from '@ce/contracts';
 import { ApiError } from '../errors.js';
 import { canonicalHash, immutable } from './canonical-state.js';
 import { RetainedSize } from './retained-size.js';
@@ -9,7 +9,7 @@ import { activeReviewKey, releasedReview, reviewKey } from '../recalculation/dir
 import type { ReviewRecord } from '../recalculation/direction-review-record.js';
 import { terminalSelection, type ProposalSelectionRecord } from '../recalculation/proposal-selection-record.js';
 /** Reserved version identifiers are supplied only by main-thread publication preparation. */
-export interface PublicationOutput extends WorkerOutput { readonly snapshotVersionId?: string }
+export interface PublicationOutput extends WorkerOutput { readonly snapshotVersionId?: string; readonly snapshotValidationBasisId?: string }
 
 interface WorkspaceState { id: string; name: string; state: 'empty' | 'ready' | 'closed'; sessionId: string; closing?: boolean;
   currentVersionId?: string; versionIds: readonly string[]; activeJobId?: string }
@@ -43,6 +43,7 @@ export class WorkspaceStore {
     const w = this.require(id); const current = w.currentVersionId ? this.snapshots.get(w.currentVersionId) : undefined;
     return immutable({ id: w.id, name: w.name, state: w.state, versionIds: w.versionIds,
       ...(w.currentVersionId ? { currentVersionId: w.currentVersionId } : {}), ...(w.activeJobId ? { activeJobId: w.activeJobId } : {}),
+      ...(current?.validationBasisId ? { validationBasisId: current.validationBasisId } : {}),
       contexts: current?.content.contexts ?? [], counts: { snapshots: w.versionIds.length, coordinates: current?.content.coordinates.length ?? 0,
         facts: current?.content.facts.length ?? 0, sources: current?.content.sources.length ?? 0 }, sessionBytes: this.bytes });
   }
@@ -71,13 +72,29 @@ export class WorkspaceStore {
     if (prepared.bytes > this.maxBytes) throw new ApiError('SESSION_LIMIT');
     return () => { prepared.commit(); this.recordRoots = recordRoots; };
   }
-  private candidate(w: WorkspaceState, content: SnapshotContent, versionId: string = randomUUID()): Snapshot {
-    if (!UUID_PATTERN.test(versionId) || this.snapshots.has(versionId)) throw new ApiError('INTERNAL_ERROR');
-    return immutable({ versionId, ...(w.currentVersionId ? { parentVersionId: w.currentVersionId } : {}),
-      contentHash: canonicalHash(content), createdAt: new Date().toISOString(), content: immutable(content) });
+  private assertSameValidationInputs(previous: SnapshotContent, next: SnapshotContent): void {
+    const excluded = new Set(['configVersion', 'directions', 'directionDecisionState']);
+    for (const key of new Set([...Object.keys(previous), ...Object.keys(next)])) {
+      if (excluded.has(key)) continue;
+      const before = previous[key as keyof SnapshotContent], after = next[key as keyof SnapshotContent];
+      if (before === after) continue;
+      if (before === undefined || after === undefined || canonicalHash(before) !== canonicalHash(after)) throw new ApiError('INTERNAL_ERROR');
+    }
   }
-  publish(id: string, base: string | undefined, content: SnapshotContent, additions: readonly StateRecord[] = []): Snapshot {
-    this.assertBase(id, base); const w = this.require(id); const snapshot = this.candidate(w, content);
+  private candidate(w: WorkspaceState, content: SnapshotContent, versionId: string = randomUUID(), reason: SnapshotPublicationReason = 'import', reservedBasisId?: string): Snapshot {
+    if (!UUID_PATTERN.test(versionId) || this.snapshots.has(versionId)) throw new ApiError('INTERNAL_ERROR');
+    const previous = w.currentVersionId ? this.snapshots.get(w.currentVersionId) : undefined;
+    if (reason === 'configuration') {
+      if (!previous || reservedBasisId !== undefined) throw new ApiError('INTERNAL_ERROR');
+      this.assertSameValidationInputs(previous.content, content);
+    }
+    const validationBasisId = reason === 'configuration' ? previous!.validationBasisId ?? previous!.versionId : reservedBasisId ?? randomUUID();
+    if (!UUID_PATTERN.test(validationBasisId) || reason !== 'configuration' && validationBasisId === previous?.validationBasisId) throw new ApiError('INTERNAL_ERROR');
+    return immutable({ versionId, ...(w.currentVersionId ? { parentVersionId: w.currentVersionId } : {}),
+      validationBasisId, contentHash: canonicalHash(content), createdAt: new Date().toISOString(), content: immutable(content) });
+  }
+  publish(id: string, base: string | undefined, content: SnapshotContent, additions: readonly StateRecord[] = [], reason: SnapshotPublicationReason = 'import'): Snapshot {
+    this.assertBase(id, base); const w = this.require(id); const snapshot = this.candidate(w, content, undefined, reason);
     const next = { ...w, state: 'ready' as const, currentVersionId: snapshot.versionId, versionIds: [...w.versionIds, snapshot.versionId] };
     const snapshots = new Map(this.snapshots).set(snapshot.versionId, snapshot); const records = this.invalidateInspections(this.obsoletePreviews(this.withRecords(additions), snapshot.versionId), snapshot.versionId);
     this.invalidateDirectionReview(records, id, snapshot.versionId);
@@ -154,12 +171,14 @@ export class WorkspaceStore {
     this.assertAccepting(job.workspaceId); this.assertBase(job.workspaceId, job.baseVersionId); let w = this.require(job.workspaceId);
     if (w.activeJobId !== job.jobId || this.job(job.workspaceId, job.jobId).status !== 'running' || !output.complete) throw new ApiError('INTERNAL_ERROR');
     if (job.kind === 'apply') {
-      if (!output.applicationCandidate || !output.snapshotContent || !output.snapshotVersionId) throw new ApiError('INTERNAL_ERROR');
+      if (!output.applicationCandidate || !output.snapshotContent || !output.snapshotVersionId || !output.snapshotValidationBasisId) throw new ApiError('INTERNAL_ERROR');
     } else if (job.kind === 'commit-directions') {
       if (!output.snapshotVersionId || !output.snapshotContent || output.applicationCandidate) throw new ApiError('INTERNAL_ERROR');
     } else if (output.snapshotVersionId !== undefined || output.applicationCandidate !== undefined) throw new ApiError('INTERNAL_ERROR');
+    if (job.kind !== 'apply' && output.snapshotValidationBasisId !== undefined) throw new ApiError('INTERNAL_ERROR');
     let records = this.withRecords(output.records ?? []); const snapshots = new Map(this.snapshots);
-    const snapshot = output.snapshotContent ? this.candidate(w, output.snapshotContent, output.snapshotVersionId) : undefined;
+    const reason = job.kind === 'apply' ? 'application' : job.kind === 'commit-directions' ? 'configuration' : 'import';
+    const snapshot = output.snapshotContent ? this.candidate(w, output.snapshotContent, output.snapshotVersionId, reason, output.snapshotValidationBasisId) : undefined;
     if (snapshot) { snapshots.set(snapshot.versionId, snapshot); records = this.invalidateInspections(this.obsoletePreviews(records, snapshot.versionId), snapshot.versionId); this.invalidateDirectionReview(records, w.id, snapshot.versionId); w = { ...w, state: 'ready', currentVersionId: snapshot.versionId, versionIds: [...w.versionIds, snapshot.versionId] }; }
     if (snapshot && job.kind === 'import') for (const [key, value] of records) if (key.startsWith(`inspection:${job.workspaceId}:`)) {
       const record = value as InspectionRecord;

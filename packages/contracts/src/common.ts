@@ -2,6 +2,8 @@ export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | readonly JsonValue[] | { readonly [key: string]: JsonValue };
 export type JsonObject = { readonly [key: string]: JsonValue };
 export type UUID = string;
+export type ValidationBasisId = UUID;
+export type SnapshotPublicationReason = 'import' | 'configuration' | 'application';
 export type CivilDate = string;
 export interface Rational { readonly numerator: string; readonly denominator: string }
 export type DataType = 'number' | 'boolean' | 'text' | 'date';
@@ -35,6 +37,8 @@ export interface SnapshotContent {
 }
 export interface Snapshot {
   readonly versionId: UUID; readonly parentVersionId?: UUID; readonly contentHash: string;
+  /** Optional only for legacy in-process callers; every new server publication has an immutable input basis. */
+  readonly validationBasisId?: ValidationBasisId;
   readonly createdAt: string; readonly content: SnapshotContent;
 }
 export const JOB_KINDS = ['import','inspect-import','prepare-directions','commit-directions','validate','preview','select-proposals','apply','export'] as const;
@@ -51,6 +55,7 @@ export interface JobDTO {
 export interface WorkspaceDTO {
   readonly id: UUID; readonly name: string; readonly state: 'empty' | 'ready' | 'closed';
   readonly currentVersionId?: UUID; readonly versionIds: readonly UUID[]; readonly activeJobId?: UUID;
+  readonly validationBasisId?: ValidationBasisId;
   readonly contexts: readonly ReportContext[];
   readonly counts: { readonly snapshots: number; readonly coordinates: number; readonly facts: number; readonly sources: number };
   readonly sessionBytes: number;

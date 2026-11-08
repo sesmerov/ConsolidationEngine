@@ -5,6 +5,7 @@ import type { WorkLimits } from '@ce/engine';
 import { ApiError } from '../errors.js';
 import { canonicalStringify, directionConfigurationVersion } from '../session/canonical-state.js';
 import type { WorkspaceStore } from '../session/workspace-store.js';
+import { validationMatchesBasis } from '../validation/validation-service.js';
 
 /** Public and final-publication guard; the worker repeats this against its private input. */
 export function assertDirectionsAllowed(snapshot: Snapshot, limits?: Partial<WorkLimits>): void {
@@ -52,7 +53,7 @@ export function replaceDirections(store: WorkspaceStore, workspaceId: string, ch
   store.assertAccepting(workspaceId); store.assertIdle(workspaceId); const snapshot = store.current(workspaceId);
   if (!snapshot) throw new ApiError('INVALID_DIRECTION', { reason: 'VALIDATION_REQUIRED' });
   const runs = store.listRecords<ValidationBundle>('validation:' + workspaceId + ':').map(entry => entry.value)
-    .filter(bundle => bundle.run.versionId === snapshot.versionId && bundle.run.status === 'completed' && bundle.run.summary.complete);
+    .filter(bundle => validationMatchesBasis(bundle, snapshot));
   if (!runs.length) throw new ApiError('INVALID_DIRECTION', { reason: 'VALIDATION_REQUIRED' });
   const instances = new Map(runs.flatMap(bundle => bundle.results).flatMap(result => result.instanceId && result.binding && !result.coverageOnly ? [[result.instanceId, result] as const] : []));
   const seen = new Set<string>(), directions: DirectionDTO[] = []; const budget = new WorkBudget();
@@ -70,5 +71,5 @@ export function replaceDirections(store: WorkspaceStore, workspaceId: string, ch
   // Snapshot and preview invalidation share the store's single quota-checked publication.
   const directionDecisionState = replacedDirectionDecisionState();
   const configVersion = directionConfigurationVersion(directions, directionDecisionState);
-  return store.publish(workspaceId, snapshot.versionId, { ...snapshot.content, configVersion, directionDecisionState, directions });
+  return store.publish(workspaceId, snapshot.versionId, { ...snapshot.content, configVersion, directionDecisionState, directions }, [], 'configuration');
 }

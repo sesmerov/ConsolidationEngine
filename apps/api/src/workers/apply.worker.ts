@@ -14,6 +14,7 @@ export function execute(input: JsonValue, context: OperationContext): WorkerOutp
     const budget = new WorkBudget({ cancelled: context.cancelled, ...('limits' in data ? { limits: data.limits as Partial<WorkLimits> } : {}) });
     const selectedIds = data.selectionProjection ? selectedProposalIds(data.preview as unknown as PreviewBundle, data.selectionProjection as unknown as ProposalSelectionProjection, budget) : data.selectedIds as string[];
     const options: ApplyCandidateOptions = { receiptId: data.receiptId as string, newVersionId: data.newVersionId as string, beforeRunId: data.beforeRunId as string,
+      ...(typeof data.newValidationBasisId === 'string' ? { newValidationBasisId: data.newValidationBasisId } : {}),
       runId: data.runId as string, startedAt: data.startedAt as string, selectedIds, closureHash: data.closureHash as string, budget,
       cancelled: context.cancelled, progress: context.progress, ...('limits' in data ? { limits: data.limits as Partial<WorkLimits> } : {}),
       ...('beforeValidation' in data ? { beforeValidation: data.beforeValidation as unknown as ValidationBundle } : {}) };

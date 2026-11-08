@@ -15,6 +15,7 @@ import { getRecalculationPolicy } from './policy.js';
 
 export interface ApplyCandidateOptions {
   readonly receiptId: string; readonly newVersionId: string; readonly beforeRunId: string; readonly runId: string; readonly startedAt: string;
+  readonly newValidationBasisId?: string;
   readonly selectedIds: readonly string[]; readonly closureHash: string; readonly beforeValidation?: ValidationBundle;
   readonly budget?: WorkBudget; readonly limits?: Partial<WorkLimits>; readonly cancelled?: () => boolean; readonly now?: () => number;
   readonly progress?: (completed: number, total: number) => void;
@@ -56,6 +57,7 @@ function completed(bundle: ValidationBundle): ValidationBundle {
 }
 function reusable(bundle: ValidationBundle | undefined, snapshot: Snapshot, id: string): bundle is ValidationBundle {
   return !!bundle && bundle.run.id === id && bundle.run.versionId === snapshot.versionId && bundle.run.profileId === snapshot.content.profileId
+    && (bundle.run.validationBasisId === undefined || bundle.run.validationBasisId === snapshot.validationBasisId)
     && bundle.run.status === 'completed' && bundle.run.summary.complete && bundle.run.summary.rows === snapshot.content.catalog.records.length
     && bundle.run.summary.variants === snapshot.content.catalog.variants.length && bundle.run.resultIds.length === bundle.results.length
     && bundle.results.every((result, index) => result.id === bundle.run.resultIds[index] && result.runId === id && result.versionId === snapshot.versionId && result.profileId === snapshot.content.profileId);
@@ -69,7 +71,8 @@ export function applyCandidate(snapshot: Snapshot, bundle: PreviewBundle, option
   const { preview } = bundle, selected = new Set(options.selectedIds);
   if (selected.size === 0 || selected.size !== options.selectedIds.length
     || [options.receiptId, options.newVersionId, options.beforeRunId, options.runId].some(id => !UUID_PATTERN.test(id))
-    || options.newVersionId === snapshot.versionId || options.beforeRunId === options.runId || !Number.isFinite(Date.parse(options.startedAt))) throw new ApplicationError('INVALID_REQUEST', 'La solicitud de aplicación no es válida.');
+    || options.newVersionId === snapshot.versionId || options.beforeRunId === options.runId || !Number.isFinite(Date.parse(options.startedAt))
+    || options.newValidationBasisId !== undefined && (!UUID_PATTERN.test(options.newValidationBasisId) || options.newValidationBasisId === snapshot.validationBasisId)) throw new ApplicationError('INVALID_REQUEST', 'La solicitud de aplicación no es válida.');
   if (preview.baseVersionId !== snapshot.versionId) throw new ApplicationError('STALE_VERSION', 'La previsualización pertenece a otra versión.');
   if (preview.profileId !== snapshot.content.profileId || preview.policyId !== RECALCULATION_POLICY_ID) throw new ApplicationError('PROFILE_MISMATCH', 'El perfil o la política no coincide.');
   assertRecalculationConfiguration(snapshot, { budget });
@@ -132,7 +135,9 @@ export function applyCandidate(snapshot: Snapshot, bundle: PreviewBundle, option
   }
   advance(2);
   // This private evaluation view is never returned as a persisted snapshot; main computes the final content hash.
-  const validation = completed(runValidation({ ...current, versionId: options.newVersionId, parentVersionId: snapshot.versionId }, { ...runOptions, runId: options.runId }));
+  const validation = completed(runValidation({ ...current, versionId: options.newVersionId, parentVersionId: snapshot.versionId,
+    ...(options.newValidationBasisId || snapshot.validationBasisId ? { validationBasisId: options.newValidationBasisId ?? options.newVersionId } : {}),
+  }, { ...runOptions, runId: options.runId }));
   advance(3);
   return { factPatches, beforeValidation, validation };
 }

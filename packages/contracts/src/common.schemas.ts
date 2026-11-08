@@ -2,6 +2,8 @@ import { JOB_KINDS } from './common.js';
 
 export const jobKindSchema = { type: 'string', enum: JOB_KINDS } as const;
 export const uuidSchema = { type: 'string', pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$' } as const;
+/** Same opaque UUID contract as other server identities, independent of configuration version. */
+export const validationBasisIdSchema = uuidSchema;
 export const civilDateSchema = { type: 'string', format: 'date', pattern: '^\\d{4}-\\d{2}-\\d{2}$' } as const;
 /** The v2 civil range excludes 0000 without changing administrative dates accepted by v1. */
 export const civilDateV2Schema = { type: 'string', format: 'date', pattern: '^(?!0000)\\d{4}-\\d{2}-\\d{2}$' } as const;

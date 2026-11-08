@@ -10,7 +10,7 @@ export function registerHistory(app: FastifyInstance): void {
   }, async request => {
     const { workspaceId } = request.params, query = request.query; app.ce.store.get(workspaceId);
     const rows: (RunSummaryDTO | PreviewSummaryDTO)[] = resource === 'runs'
-      ? app.ce.store.listRecords<ValidationBundle>('validation:' + workspaceId + ':').map(({ value: { run } }) => ({ id: run.id, versionId: run.versionId, profileId: run.profileId, status: run.status, startedAt: run.startedAt, ...(run.endedAt ? { endedAt: run.endedAt } : {}) }))
+      ? app.ce.store.listRecords<ValidationBundle>('validation:' + workspaceId + ':').map(({ value: { run } }) => ({ id: run.id, versionId: run.versionId, ...(run.validationBasisId ? { validationBasisId: run.validationBasisId } : {}), profileId: run.profileId, status: run.status, startedAt: run.startedAt, ...(run.endedAt ? { endedAt: run.endedAt } : {}) }))
       : app.ce.store.listRecords<PreviewBundle>('preview:' + workspaceId + ':').map(({ value: { preview } }) => ({ id: preview.id, baseVersionId: preview.baseVersionId, profileId: preview.profileId, policyId: preview.policyId, state: preview.state, createdAt: preview.createdAt }));
     const key = (row: RunSummaryDTO | PreviewSummaryDTO) => ('startedAt' in row ? row.startedAt : row.createdAt) + ':' + row.id;
     rows.sort((a, b) => key(a) < key(b) ? 1 : key(a) > key(b) ? -1 : 0); const revision = canonicalHash(rows);

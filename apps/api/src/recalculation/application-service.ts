@@ -16,9 +16,10 @@ export const applicationKey = (workspaceId: string, receiptId: string) => 'appli
 export function getApplication(store: WorkspaceStore, workspaceId: string, receiptId: string): ApplicationBundle {
   store.get(workspaceId); const bundle = store.getRecord<ApplicationBundle>(applicationKey(workspaceId, receiptId)); if (!bundle) throw new ApiError('RESOURCE_NOT_FOUND'); return bundle;
 }
-function assertValidation(bundle: ValidationBundle, runId: string, versionId: string, snapshot: Snapshot): void {
+function assertValidation(bundle: ValidationBundle, runId: string, versionId: string, snapshot: Snapshot, basisId = snapshot.validationBasisId, requireBasis = false): void {
   const run = bundle?.run, rows = bundle?.results;
   if (!run || !Array.isArray(rows) || run.id !== runId || run.versionId !== versionId || run.profileId !== snapshot.content.profileId || run.status !== 'completed' || run.summary?.complete !== true
+    || (requireBasis || run.validationBasisId !== undefined) && run.validationBasisId !== basisId
     || run.summary.rows !== snapshot.content.catalog.records.length || run.summary.variants !== snapshot.content.catalog.variants.length || !Array.isArray(run.resultIds) || run.resultIds.length !== rows.length
     || new Set(run.resultIds).size !== rows.length || rows.some((row, index) => row.id !== run.resultIds[index] || row.runId !== runId || row.versionId !== versionId || row.profileId !== snapshot.content.profileId)) throw new ApiError('INTERNAL_ERROR');
   const counts = { pass: 0, fail: 0, not_applicable: 0, not_evaluable: 0, error: 0 };
@@ -57,7 +58,7 @@ export function prepareApplication(store: WorkspaceStore, workspaceId: string, b
   if (preview.preview.profileId !== snapshot.content.profileId || preview.preview.policyId !== RECALCULATION_POLICY_ID) throw new ApiError('PREVIEW_NOT_APPLICABLE');
   if (legacyProposals) { assertDirectionsAllowed(snapshot, limits); assertSelectedProposalsAllowed(snapshot, legacyProposals, limits); }
   const before = selectionRef ? undefined : existingValidation(store, workspaceId, snapshot);
-  const intent = immutable({ receiptId: randomUUID(), newVersionId: randomUUID(), beforeRunId: before?.run.id ?? randomUUID(), runId: randomUUID(), startedAt: new Date().toISOString(),
+  const intent = immutable({ receiptId: randomUUID(), newVersionId: randomUUID(), newValidationBasisId: randomUUID(), beforeRunId: before?.run.id ?? randomUUID(), runId: randomUUID(), startedAt: new Date().toISOString(),
     previewId: body.previewId, baseVersionId: body.baseVersionId, ...(selectionRef ? { selectionRef } : { selectedIds: [...body.selectedIds!].sort() }), closureHash: body.closureHash });
   const assertPreview = () => {
     store.assertBase(workspaceId, intent.baseVersionId); const current = getPreview(store, workspaceId, intent.previewId);
@@ -84,7 +85,7 @@ export function prepareApplication(store: WorkspaceStore, workspaceId: string, b
         if (acceptedSet.size !== acceptedIds.length || acceptedIds.length !== selectionRecord!.projection!.selectedCount) throw new ApiError('INTERNAL_ERROR');
         for (let n = 0; n < preview.proposals.length; n++) { const proposal = preview.proposals[n]!; if (selected(n)) { if (!acceptedSet.has(proposal.id)) throw new ApiError('INTERNAL_ERROR'); proposals.push(proposal); } if ((n & 1023) === 1023) { yield; assertPreview(); } }
       } else proposals.push(...legacyProposals!);
-      assertValidation(candidate.beforeValidation, intent.beforeRunId, intent.baseVersionId, snapshot); assertValidation(candidate.validation, intent.runId, intent.newVersionId, snapshot);
+      assertValidation(candidate.beforeValidation, intent.beforeRunId, intent.baseVersionId, snapshot); assertValidation(candidate.validation, intent.runId, intent.newVersionId, snapshot, intent.newValidationBasisId, true);
       const baseFacts = new Map(snapshot.content.facts.map(fact => [fact.factKey, fact])), coordinates = new Map(snapshot.content.coordinates.map(cell => [cell.factKey, cell]));
       const supplied = new Map(candidate.factPatches.map(fact => [fact.factKey, fact])); if (supplied.size !== candidate.factPatches.length) throw new ApiError('INTERNAL_ERROR');
       const patches = new Map<string, ReportedFact>(), changes: ApplyChangeDTO[] = [];
@@ -117,7 +118,7 @@ export function prepareApplication(store: WorkspaceStore, workspaceId: string, b
         baseVersionId: intent.baseVersionId, newVersionId: intent.newVersionId, beforeValidationRunId: intent.beforeRunId, validationRunId: intent.runId, appliedAt: new Date().toISOString() };
       const applied = markPreviewApplied(preview, receipt.id, acceptedIds);
       const application: ApplicationBundle = { receipt, changes };
-      return { assertCommit: assertPreview, output: { ...output, snapshotContent: content, snapshotVersionId: intent.newVersionId, records: [...(output.records ?? []),
+      return { assertCommit: assertPreview, output: { ...output, snapshotContent: content, snapshotVersionId: intent.newVersionId, snapshotValidationBasisId: intent.newValidationBasisId, records: [...(output.records ?? []),
         { key: validationKey(workspaceId, intent.beforeRunId), value: (before ?? candidate.beforeValidation) as unknown as JsonValue },
         { key: validationKey(workspaceId, intent.runId), value: candidate.validation as unknown as JsonValue },
         { key: previewKey(workspaceId, intent.previewId), value: applied as unknown as JsonValue },

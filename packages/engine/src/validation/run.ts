@@ -193,6 +193,7 @@ export function runValidation(snapshot: Snapshot, options: RunValidationOptions)
   results.sort((a, b) => ordinal(orderKeys.get(a)!, orderKeys.get(b)!)); for (const result of results) counts[result.status]++;
   const ended = Math.max(Date.parse(options.startedAt), (options.now ?? Date.now)());
   return { run: { id: options.runId, versionId: snapshot.versionId, profileId: content.profileId, status: complete ? 'completed' : 'incomplete', startedAt: options.startedAt, endedAt: new Date(ended).toISOString(),
+    ...(snapshot.validationBasisId ? { validationBasisId: snapshot.validationBasisId } : {}),
     summary: { complete, rows: content.catalog.records.length, variants: content.catalog.variants.length, applicableVariants: applicable.size, instances: results.filter(result => !result.coverageOnly).length,
       duplicateRows: content.catalog.variants.reduce((sum, variant) => sum + Math.max(0, variant.sourceRecords.length - 1), 0), byStatus: counts }, resultIds: results.map(result => result.id), diagnostics }, results };
 }
