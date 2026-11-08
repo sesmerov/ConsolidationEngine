@@ -16,6 +16,7 @@ export const directionReviewDecisions = ['included', 'omitted', 'pending', 'conf
 const classes = ['singleLeft', 'singleRight', 'both', 'none', 'undetermined'] as const;
 export type DirectionReviewState = typeof states[number];
 export type DirectionReviewDecision = typeof directionReviewDecisions[number];
+export type DirectionReviewScope = 'pending' | 'resolved' | 'all';
 export type DirectionReviewClass = typeof classes[number];
 export type DirectionReviewCountsDTO = Readonly<Record<DirectionReviewDecision | 'totalRows', number>>;
 export interface DirectionReviewReceiptDTO {
@@ -24,6 +25,7 @@ export interface DirectionReviewReceiptDTO {
 }
 export interface DirectionReviewSummaryDTO {
   readonly id: string; readonly workspaceId: string; readonly baseVersionId: string; readonly runId: string;
+  readonly validationBasisId?: string;
   readonly state: DirectionReviewState; readonly revision: number; readonly jobId?: string;
   readonly readyAt?: string; readonly expiresAt?: string; readonly counts?: DirectionReviewCountsDTO;
   readonly conflictGroupCount?: number; readonly receipt?: DirectionReviewReceiptDTO;
@@ -87,9 +89,10 @@ const count = { type: 'integer', minimum: 0, maximum: 1_000_000 };
 const side = { enum: ['left', 'right'] };
 const label = { type: 'string', maxLength: 2048 };
 const receipt = closed({ reviewId: uuidSchema, runId: uuidSchema, baseVersionId: uuidSchema, newVersionId: uuidSchema, configVersion: digest, included: count });
-const counts = closed(Object.fromEntries(['totalRows', ...directionReviewDecisions].map(key => [key, count])));
+export const directionReviewCountsSchema = closed(Object.fromEntries(['totalRows', ...directionReviewDecisions].map(key => [key, count])));
+const counts = directionReviewCountsSchema;
 export const directionReviewSummarySchema = closed({
-  id: uuidSchema, workspaceId: uuidSchema, baseVersionId: uuidSchema, runId: uuidSchema, state: { enum: states },
+  id: uuidSchema, workspaceId: uuidSchema, baseVersionId: uuidSchema, runId: uuidSchema, validationBasisId: uuidSchema, state: { enum: states },
   revision: { ...revision, minimum: 0 }, jobId: uuidSchema, readyAt: { type: 'string', format: 'date-time' }, expiresAt: { type: 'string', format: 'date-time' },
   counts, conflictGroupCount: count, receipt,
 }, ['id', 'workspaceId', 'baseVersionId', 'runId', 'state', 'revision']);

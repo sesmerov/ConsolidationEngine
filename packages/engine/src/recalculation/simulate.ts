@@ -9,6 +9,7 @@ import { evaluateCandidate } from './candidate.js';
 import { assertRecalculationConfiguration } from './configuration.js';
 
 export interface SimulateOptions {
+  readonly budget?: WorkBudget;
   readonly previewId: string; readonly now?: () => number; readonly limits?: Partial<WorkLimits>;
   readonly cancelled?: () => boolean; readonly progress?: (completed: number, total: number) => void;
 }
@@ -34,7 +35,7 @@ const blockMessage: Record<DependencyBlockReason, string> = {
 /** The base is immutable. Only fully completed simulations return a publishable preview bundle. */
 export function simulate(snapshot: Snapshot, options: SimulateOptions): PreviewBundle {
   const createdAt = new Date((options.now ?? Date.now)()).toISOString();
-  const budget = new WorkBudget({ ...(options.now ? { now: options.now } : {}), ...(options.limits ? { limits: options.limits } : {}), ...(options.cancelled ? { cancelled: options.cancelled } : {}) });
+  const budget = options.budget ?? new WorkBudget({ ...(options.now ? { now: options.now } : {}), ...(options.limits ? { limits: options.limits } : {}), ...(options.cancelled ? { cancelled: options.cancelled } : {}) });
   budget.check(); uuidV5(options.previewId, '');
   assertRecalculationConfiguration(snapshot, { budget });
   // All graph and candidate resolution shares one private snapshot identity. Only its facts

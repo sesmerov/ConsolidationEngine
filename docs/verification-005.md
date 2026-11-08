@@ -82,3 +82,21 @@ Instalados los pins pg8.23.1, @types/pg8.23.1, @vercel/blob2.8.2 y @upstash/qsta
 La instalación reveló GHSA-mrhx-c7xc-m3w5 en Zod4.1.11, transitivo de @vercel/cli-config0.3.1 incluido por OIDC. La corrección puntual fija @vercel/cli-config0.3.6 y Zod4.6.6 con override; el bundle del paquete también necesita la corrección, por eso no basta con sustituir solo Zod. npm update dirigido al paquete y npm ls confirman resolución; npm audit posterior:0 vulnerabilidades conocidas. Esto no es garantía de ausencia de vulnerabilidades. Se mantiene el SDK Blob decidido en el plan y el resto del toolchain.
 
 Fuente de la corrección: https://github.com/advisories/GHSA-mrhx-c7xc-m3w5, consultada2026-11-08; versión corregida4.6.6. Smoke de parseGlobalConfig con objeto sintético válido e inválido, sin leer configuración de usuario ni hacer peticiones a proveedores: PASS. Ninguna cuenta ni despliegue creados.
+
+### US1 en integración: foco, halo y guía
+
+T010 rojo:5 fallos conductuales/5 controles aprobados. Tras implementar el hito de validación por base,19/19 pruebas focales PASS (viewstore10, ResultsStore4, StageFocus5). Configurar ya no anuncia avance; validar completo conserva versión y recomienda Recalcular. Halo hermano del botón dentro de envoltorio propio, sin clases privadas Material.
+
+T011 reprodujo dos fallos reales de baseline en navegador: a390px el halo difería28,83px del ancho del botón; el título tenía focus-visible=false y outline2px solid. En summary no se reprodujo contorno pintado con ratón (outline-style:none aunque el ancho computado fuera3px); con teclado sí3px solid. Se preservó ese comportamiento y se corrigió solo el título con estilo acotado. La geometría final, tres anchuras y modalidades siguen PENDIENTES de T016 después del build integrado; los19 tests unitarios no sustituyen esa evidencia.
+
+Imagen Linux preparada para gates posteriores: node:24.22.2-bookworm-slim, digest sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9; probes aislados sin red con2GiB/1CPU confirman Node24.22.2/npm11.19.1. Son pruebas del runtime, no del paquete ni de capacidad.
+
+### US2 backend y US3 identidad de descarga
+
+T017/T018:13 fallos iniciales por endpoints inexistentes; implementación final incluye17 casos nuevos (7 contrato/10 lifecycle). Build:api PASS; ocho suites/64 pruebas PASS, y tres suites/24 pruebas PASS después de ajustar filtrado de grupos antes de hidratación y rearme de TTL al cancelar. Las repeticiones no se suman como casos distintos.
+
+Comprobados:51 decisiones/productores, diez reentradas sin versiones, configuración equivalente sin versión nueva ni validación adicional, omisiones explícitas completas, GET de revisión caducada sin mutar estado, presupuesto agotado, selección alterada, dependencias fuera de página, CAS y aplicación con nueva base. Un solo worker compila configuración, simula y prepara selección bajo el mismo presupuesto; publicación local atómica, sin prefijos tras fallo/cancelación. La durabilidad entre procesos sigue pendiente de US5.
+
+T034/T037: nuevo contrato inicialmente rechaza con400 la query de intención ausente. Tras implementar, download-intent y results-export:12/12 PASS. Resumen, recibo reservado y artefacto incluyen intención/huella canónica; resultados requieren versión exacta, no solo base. Compatibilidad explícita: Accept application/json devuelve resumen del artefacto; descargaZIP completa continúa como ruta legacy local. Hosted deberá ofrecer resumen/partes privadas y no heredar la descarga completa.
+
+Primer build web integrado PASS (bundle inicial723,34kB frente al aviso700kB; baseline707kB). Primer E2E de guía: geometría corregida comprobada a320/390/1440; cuatro fallos de aserción confundían outlineWidth computado3px con outline-style:none que no pinta contorno. El trace confirma headingPointer y summaryPointer sin estilo visible, teclado3px solid. Se corrige esa aserción y se amplía estática/movimiento reducido/colores forzados a las tres anchuras. Repetición pendiente; no registrar aún T016comoPASS.

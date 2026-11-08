@@ -6,18 +6,19 @@ import {
   directionReviewPrepareSchema, directionReviewRowsQuerySchema, directionReviewSummarySchema, emptyQuerySchema,
   directionConflictGroupParamsSchema, directionConflictCandidateParamsSchema, directionConflictPageQuerySchema,
   directionConflictGroupsPageSchema, directionConflictCandidatesPageSchema, directionConflictCandidateDetailSchema,
+  recalculationReviewPrepareSchema, recalculationReviewRowsQuerySchema, recalculationReviewGroupsQuerySchema, recalculationReviewCandidatesQuerySchema,
 } from '@ce/contracts';
-import type { DirectionReviewCommitDTO, DirectionReviewDecision, DirectionReviewPatchDTO, DirectionReviewPrepareDTO, JsonValue } from '@ce/contracts';
+import type { DirectionReviewCommitDTO, DirectionReviewDecision, DirectionReviewScope, DirectionReviewPatchDTO, DirectionReviewPrepareDTO, RecalculationReviewPrepareDTO, JsonValue } from '@ce/contracts';
 import { ApiError } from '../errors.js';
 import { requireCurrentVersion } from '../plugins/version-guard.js';
 import { canonicalHash } from '../session/canonical-state.js';
 import { registerJobRoute } from './jobs.js';
 
 interface Params { workspaceId: string; reviewId: string }
-interface RowsQuery { limit?: string; cursor?: string; state?: DirectionReviewDecision; groupId?: string }
-interface PageQuery { limit?: string; cursor?: string }
-export function registerDirectionReviews(app: FastifyInstance): void {
-  const path = '/workspaces/:workspaceId/direction-reviews', collection = '/api/v1' + path, member = collection + '/:reviewId';
+interface RowsQuery { limit?: string; cursor?: string; state?: DirectionReviewDecision; groupId?: string; scope?: DirectionReviewScope }
+interface PageQuery { limit?: string; cursor?: string; scope?: DirectionReviewScope }
+export function registerDirectionReviews(app: FastifyInstance, current = false): void {
+  const path = '/workspaces/:workspaceId/' + (current ? 'recalculation-reviews' : 'direction-reviews'), collection = '/api/v1' + path, member = collection + '/:reviewId';
   const reviews = app.ce.directionReviews;
   const secret = randomBytes(32);
   const signature = (text: string) => createHmac('sha256', secret).update(text).digest('base64url');
@@ -33,12 +34,14 @@ export function registerDirectionReviews(app: FastifyInstance): void {
     } catch { throw new ApiError('INVALID_CURSOR'); }
   }
   registerJobRoute(app, {
-    path, kind: 'prepare-directions', bodySchema: directionReviewPrepareSchema,
+    path, kind: 'prepare-directions', bodySchema: current ? recalculationReviewPrepareSchema : directionReviewPrepareSchema,
     prepare: request => {
       const { workspaceId } = request.params as Params, body = request.body as DirectionReviewPrepareDTO;
       return { input: body as unknown as JsonValue, baseVersionId: body.baseVersionId, bodyHash: canonicalHash({ workspaceId, operation: 'prepare-directions', body }) };
     },
-    accept: ({ workspaceId, input, jobId }) => reviews.prepare(workspaceId, input as unknown as DirectionReviewPrepareDTO, jobId),
+    ...(current ? { reuse: ({ workspaceId, input }: { workspaceId: string; input: JsonValue }) => reviews.reusable(workspaceId, input as unknown as RecalculationReviewPrepareDTO) } : {}),
+    accept: ({ workspaceId, input, jobId }) => current ? reviews.prepareCurrent(workspaceId, input as unknown as RecalculationReviewPrepareDTO, jobId)
+      : reviews.prepare(workspaceId, input as unknown as DirectionReviewPrepareDTO, jobId),
   });
   app.get<{ Params: Pick<Params,'workspaceId'> }>(collection, {
     schema: { params: directionReviewCollectionParamsSchema, querystring: emptyQuerySchema, response: { 200: directionReviewActiveSchema } },
@@ -47,13 +50,13 @@ export function registerDirectionReviews(app: FastifyInstance): void {
     schema: { params: directionReviewParamsSchema, querystring: emptyQuerySchema, response: { 200: directionReviewSummarySchema } },
   }, request => reviews.get(request.params.workspaceId, request.params.reviewId));
   app.get<{ Params: Params; Querystring: RowsQuery }>(member + '/rows', {
-    schema: { params: directionReviewParamsSchema, querystring: directionReviewRowsQuerySchema, response: { 200: directionReviewPageSchema } },
+    schema: { params: directionReviewParamsSchema, querystring: current ? recalculationReviewRowsQuerySchema : directionReviewRowsQuerySchema, response: { 200: directionReviewPageSchema } },
   }, request => {
-    const { workspaceId, reviewId } = request.params, { cursor, limit, state, groupId } = request.query;
+    const { workspaceId, reviewId } = request.params, { cursor, limit, state, groupId, scope: filterScope } = request.query;
     const { revision } = reviews.get(workspaceId, reviewId);
-    const scope = canonicalHash({ resource: 'direction-review-rows', workspaceId, reviewId, revision, state: state ?? '', groupId: groupId ?? '' });
+    const scope = canonicalHash({ resource: 'direction-review-rows', workspaceId, reviewId, revision, state: state ?? '', groupId: groupId ?? '', scope: filterScope ?? 'all' });
     const offset = cursorOffset(cursor, scope);
-    const page = reviews.rows(workspaceId, reviewId, { offset, limit: Number(limit ?? 50), ...(state ? { state } : {}), ...(groupId ? { groupId } : {}) });
+    const page = reviews.rows(workspaceId, reviewId, { offset, limit: Number(limit ?? 50), ...(state ? { state } : {}), ...(groupId ? { groupId } : {}), ...(filterScope ? { scope: filterScope } : {}) });
     const nextOffset = offset + page.items.length;
     const payload = Buffer.from(JSON.stringify({ fingerprint: scope, offset: nextOffset })).toString('base64url');
     return { ...page, nextCursor: nextOffset < page.total ? payload + '.' + signature(payload) : null };
@@ -64,16 +67,16 @@ export function registerDirectionReviews(app: FastifyInstance): void {
     return { ...page, nextCursor: nextOffset < page.total ? payload + '.' + signature(payload) : null };
   }
   app.get<{ Params: Params; Querystring: PageQuery }>(member + '/groups', {
-    schema: { params: directionReviewParamsSchema, querystring: directionConflictPageQuerySchema, response: { 200: directionConflictGroupsPageSchema } },
+    schema: { params: directionReviewParamsSchema, querystring: current ? recalculationReviewGroupsQuerySchema : directionConflictPageQuerySchema, response: { 200: directionConflictGroupsPageSchema } },
   }, request => {
-    const { workspaceId, reviewId } = request.params, { cursor, limit } = request.query;
+    const { workspaceId, reviewId } = request.params, { cursor, limit, scope: filterScope } = request.query;
     const { revision } = reviews.get(workspaceId, reviewId);
-    const scope = canonicalHash({ resource: 'direction-conflict-groups', workspaceId, reviewId, revision });
+    const scope = canonicalHash({ resource: 'direction-conflict-groups', workspaceId, reviewId, revision, scope: filterScope ?? 'all' });
     const offset = cursorOffset(cursor, scope);
-    return withCursor(reviews.groups(workspaceId, reviewId, { offset, limit: Number(limit ?? 50) }), offset, scope);
+    return withCursor(reviews.groups(workspaceId, reviewId, { offset, limit: Number(limit ?? 50), ...(filterScope ? { scope: filterScope } : {}) }), offset, scope);
   });
   app.get<{ Params: Params & { groupId: string }; Querystring: PageQuery }>(member + '/groups/:groupId/candidates', {
-    schema: { params: directionConflictGroupParamsSchema, querystring: directionConflictPageQuerySchema, response: { 200: directionConflictCandidatesPageSchema } },
+    schema: { params: directionConflictGroupParamsSchema, querystring: current ? recalculationReviewCandidatesQuerySchema : directionConflictPageQuerySchema, response: { 200: directionConflictCandidatesPageSchema } },
   }, request => {
     const { workspaceId, reviewId, groupId } = request.params, { cursor, limit } = request.query;
     const { revision } = reviews.get(workspaceId, reviewId);
@@ -94,7 +97,7 @@ export function registerDirectionReviews(app: FastifyInstance): void {
     requireCurrentVersion(request, app.ce.store, workspaceId);
     return reply.header('ETag', app.ce.store.etag(workspaceId)).send(reviews.patch(workspaceId, reviewId, request.body));
   });
-  registerJobRoute(app, {
+  if (!current) registerJobRoute(app, {
     path: path + '/:reviewId/commit', kind: 'commit-directions', bodySchema: directionReviewCommitSchema, paramsSchema: directionReviewParamsSchema,
     prepare: request => {
       const { workspaceId, reviewId } = request.params as Params, body = request.body as DirectionReviewCommitDTO;

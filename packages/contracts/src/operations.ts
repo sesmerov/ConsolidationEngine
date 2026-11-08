@@ -1,5 +1,7 @@
 import type { JobStatus, ResultRef, UUID } from './common.js';
 import { uuidSchema } from './common.schemas.js';
+import type { DownloadIntent } from './download.js';
+import { downloadIntentSchema } from './download.js';
 
 /** Reserved identities are not evidence that a version or preview has been published. */
 export interface RecalculationReservationDTO {
@@ -8,7 +10,10 @@ export interface RecalculationReservationDTO {
   readonly effectiveVersionId: UUID;
   readonly reservedPreviewId: UUID;
 }
-export type OperationReservationDTO = RecalculationReservationDTO;
+export interface ExportReservationDTO {
+  readonly kind: 'export'; readonly intent: DownloadIntent; readonly intentFingerprint: string; readonly reservedExportId: UUID;
+}
+export type OperationReservationDTO = RecalculationReservationDTO | ExportReservationDTO;
 /** A compact, owner-authorized receipt. It never contains request bodies or credentials. */
 export interface OperationReceiptDTO {
   readonly operationId: UUID;
@@ -21,11 +26,13 @@ export interface OperationReceiptDTO {
   readonly resultRef?: ResultRef;
   readonly newVersionId?: UUID;
 }
-export const operationReservationSchema = {
+export const operationReservationSchema = { oneOf: [{
   type: 'object', additionalProperties: false,
   required: ['kind', 'inputVersionId', 'effectiveVersionId', 'reservedPreviewId'],
   properties: { kind: { const: 'recalculation' }, inputVersionId: uuidSchema, effectiveVersionId: uuidSchema, reservedPreviewId: uuidSchema },
-} as const;
+}, { type: 'object', additionalProperties: false, required: ['kind', 'intent', 'intentFingerprint', 'reservedExportId'],
+  properties: { kind: { const: 'export' }, intent: downloadIntentSchema, intentFingerprint: { type: 'string', pattern: '^[a-f0-9]{64}$' }, reservedExportId: uuidSchema },
+}] } as const;
 export const operationReceiptSchema = {
   type: 'object', additionalProperties: false,
   required: ['operationId', 'workspaceId', 'jobId', 'responseStatus', 'phase'],

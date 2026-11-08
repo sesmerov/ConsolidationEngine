@@ -1,6 +1,8 @@
 import type { CivilDate } from './common.js';
 import type { ReportProfileId } from './profiles.js';
 import { civilDateSchema, uuidSchema } from './common.schemas.js';
+import type { DownloadIntent } from './download.js';
+import { downloadIntentSchema } from './download.js';
 export interface ReportExportSummaryDTO {
   readonly sourceFileId: string; readonly displayName: string; readonly profileId: ReportProfileId;
   readonly contextCount: number; readonly commonEntityId?: string; readonly commonReferenceDate?: CivilDate;
@@ -10,10 +12,12 @@ export interface ReportExportSummaryDTO {
 /** Bounded by source files; contextCount covers all contexts, never a truncated sample. */
 export interface VersionExportSummaryDTO {
   readonly versionId: string; readonly profileId: string; readonly createdAt: string; readonly reports: readonly ReportExportSummaryDTO[];
+  readonly intent?: DownloadIntent; readonly intentFingerprint?: string;
 }
 const sheets = { type: 'array', maxItems: 256, uniqueItems: true, items: { type: 'string', minLength: 1, maxLength: 31 } } as const;
 export const versionExportSummarySchema = { type: 'object', additionalProperties: false, required: ['versionId', 'profileId', 'createdAt', 'reports'], properties: {
   versionId: uuidSchema, profileId: { type: 'string' }, createdAt: { type: 'string', format: 'date-time' },
+  intent: downloadIntentSchema, intentFingerprint: { type: 'string', pattern: '^[a-f0-9]{64}$' },
   reports: { type: 'array', maxItems: 20, items: { type: 'object', additionalProperties: false,
     required: ['sourceFileId', 'displayName', 'profileId', 'contextCount', 'contextOrigin', 'selectedSheets', 'excludedSheets'], properties: {
       sourceFileId: uuidSchema, displayName: { type: 'string', maxLength: 200 }, profileId: { enum: ['ce-report-1', 'eba-corep-of-4.0-ca1-v1', 'eba-finrep-4.0-f0101-v1', 'ce-demo-types-1'] },

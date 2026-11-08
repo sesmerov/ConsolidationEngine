@@ -181,10 +181,12 @@ export class WorkspaceStore {
       if (!output.applicationCandidate || !output.snapshotContent || !output.snapshotVersionId || !output.snapshotValidationBasisId) throw new ApiError('INTERNAL_ERROR');
     } else if (job.kind === 'commit-directions') {
       if (!output.snapshotVersionId || !output.snapshotContent || output.applicationCandidate) throw new ApiError('INTERNAL_ERROR');
+    } else if (job.kind === 'recalculation-operation') {
+      if (!!output.snapshotVersionId !== !!output.snapshotContent || output.applicationCandidate || output.resultRef?.type !== 'preview') throw new ApiError('INTERNAL_ERROR');
     } else if (output.snapshotVersionId !== undefined || output.applicationCandidate !== undefined) throw new ApiError('INTERNAL_ERROR');
     if (job.kind !== 'apply' && output.snapshotValidationBasisId !== undefined) throw new ApiError('INTERNAL_ERROR');
     let records = this.withRecords(output.records ?? []); const snapshots = new Map(this.snapshots);
-    const reason = job.kind === 'apply' ? 'application' : job.kind === 'commit-directions' ? 'configuration' : 'import';
+    const reason = job.kind === 'apply' ? 'application' : job.kind === 'commit-directions' || job.kind === 'recalculation-operation' ? 'configuration' : 'import';
     const snapshot = output.snapshotContent ? this.candidate(w, output.snapshotContent, output.snapshotVersionId, reason, output.snapshotValidationBasisId) : undefined;
     if (snapshot) { snapshots.set(snapshot.versionId, snapshot); records = this.invalidateInspections(this.obsoletePreviews(records, snapshot.versionId), snapshot.versionId); this.invalidateDirectionReview(records, w.id, snapshot.versionId); w = { ...w, state: 'ready', currentVersionId: snapshot.versionId, versionIds: [...w.versionIds, snapshot.versionId] }; }
     if (snapshot && job.kind === 'import') for (const [key, value] of records) if (key.startsWith(`inspection:${job.workspaceId}:`)) {

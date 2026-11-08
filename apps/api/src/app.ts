@@ -28,6 +28,9 @@ import { registerResults } from './routes/results.js';
 import { registerDirections } from './routes/directions.js';
 import { registerDirectionReviews } from './routes/direction-reviews.js';
 import { DirectionReviewService } from './recalculation/direction-review-service.js';
+import { RecalculationOperationService } from './recalculation/recalculation-operation-service.js';
+import { registerRecalculationState } from './routes/recalculation-state.js';
+import { registerRecalculationOperations } from './routes/recalculation-operations.js';
 import { registerPreviews } from './routes/previews.js';
 import { registerHistory } from './routes/history.js';
 import { registerApplications } from './routes/applications.js';
@@ -40,7 +43,7 @@ import type { ReportExportLimits } from './export/recalculated-report.js';
 import { createLocalAdapters } from './local/local-adapters.js';
 import type { LocalAdapters } from './local/local-adapters.js';
 import { registerOperations } from './routes/operations.js';
-export interface AppServices { readonly store: WorkspaceStore; readonly idempotency: IdempotencyStore; readonly jobs: JobManager; readonly files: SessionFiles; readonly uploads: UploadManager; readonly preparations: PreparationManager; readonly inspections: ImportInspectionService; readonly directionReviews: DirectionReviewService; readonly proposalSelections: ProposalSelectionService; readonly adapters: LocalAdapters }
+export interface AppServices { readonly store: WorkspaceStore; readonly idempotency: IdempotencyStore; readonly jobs: JobManager; readonly files: SessionFiles; readonly uploads: UploadManager; readonly preparations: PreparationManager; readonly inspections: ImportInspectionService; readonly directionReviews: DirectionReviewService; readonly recalculationOperations: RecalculationOperationService; readonly proposalSelections: ProposalSelectionService; readonly adapters: LocalAdapters }
 declare module 'fastify' { interface FastifyInstance { ce: AppServices } }
 export interface AppOptions extends JobManagerOptions {
   mode?: 'development' | 'production'; apiPort?: number; webPort?: number;
@@ -49,6 +52,7 @@ export interface AppOptions extends JobManagerOptions {
   serveWeb?: boolean;
   validationLimits?: Partial<WorkLimits>;
   previewLimits?: Partial<WorkLimits>;
+  recalculationOperationLimits?: Partial<WorkLimits>;
   applicationLimits?: Partial<WorkLimits>;
   exportLimits?: Partial<ExportLimits>; fileLimitBytes?: number;
   reportExportLimits?: Partial<ReportExportLimits>;
@@ -64,7 +68,7 @@ export async function createApp(options: AppOptions = {}): Promise<FastifyInstan
   const store = options.store ?? new WorkspaceStore();
   const files = options.files ?? await SessionFiles.create(store.sessionId, undefined, options.fileLimitBytes);
   const jobs = options.jobs ?? new JobManager(store, { ...options, workerModules: { import: new URL('./workers/import.worker.js', import.meta.url), 'inspect-import': new URL('./workers/inspect-import.worker.js', import.meta.url), validate: new URL('./workers/validate.worker.js', import.meta.url), preview: new URL('./workers/preview.worker.js', import.meta.url), apply: new URL('./workers/apply.worker.js', import.meta.url), export: new URL('./workers/export.worker.js', import.meta.url),
-    'prepare-directions': new URL('./workers/prepare-directions.worker.js', import.meta.url), 'commit-directions': new URL('./workers/commit-directions.worker.js', import.meta.url), 'select-proposals': new URL('./workers/select-proposals.worker.js', import.meta.url), ...options.workerModules } });
+    'prepare-directions': new URL('./workers/prepare-directions.worker.js', import.meta.url), 'commit-directions': new URL('./workers/commit-directions.worker.js', import.meta.url), 'select-proposals': new URL('./workers/select-proposals.worker.js', import.meta.url), 'recalculation-operation': new URL('./workers/recalculation-operation.worker.js', import.meta.url), ...options.workerModules } });
   const uploads = new UploadManager(store);
   const preparations = new PreparationManager(store);
   const inspections = new ImportInspectionService(store, files, options.inspectionNow ? { now: options.inspectionNow } : {});
@@ -73,7 +77,8 @@ export async function createApp(options: AppOptions = {}): Promise<FastifyInstan
     ...(options.directionReviewLimits ? { limits: options.directionReviewLimits } : {}),
   });
   const proposalSelections = new ProposalSelectionService(store, options.proposalSelectionLimits);
-  app.decorate('ce', { store, files, jobs, uploads, preparations, inspections, directionReviews, proposalSelections, idempotency: new IdempotencyStore(store), adapters: createLocalAdapters(store, files, jobs) });
+  const recalculationOperations = new RecalculationOperationService(store, directionReviews, options.recalculationOperationLimits ?? options.previewLimits);
+  app.decorate('ce', { store, files, jobs, uploads, preparations, inspections, directionReviews, recalculationOperations, proposalSelections, idempotency: new IdempotencyStore(store), adapters: createLocalAdapters(store, files, jobs) });
   const token = randomBytes(32).toString('base64url');
   installLocalSession(app, { token, mode: options.mode ?? 'production', apiPort: options.apiPort ?? 3000, webPort: options.webPort ?? 4200 });
   app.setErrorHandler((error, request, reply) => {
@@ -94,6 +99,7 @@ export async function createApp(options: AppOptions = {}): Promise<FastifyInstan
   registerValidations(app, options.validationLimits); registerResults(app);
   registerDirections(app);
   registerDirectionReviews(app);
+  registerDirectionReviews(app, true); registerRecalculationState(app); registerRecalculationOperations(app);
   registerPreviews(app, options.previewLimits); registerHistory(app);
   registerApplications(app, options.applicationLimits);
   registerProposalSelections(app);

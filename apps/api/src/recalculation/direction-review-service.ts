@@ -3,7 +3,7 @@ import { setImmediate as yieldToLoop } from 'node:timers/promises';
 import { directionReviewDecisions } from '@ce/contracts';
 import type {
   DirectionConflictCandidateDTO, DirectionConflictCandidateDetailDTO, DirectionReviewActiveDTO, DirectionReviewCommitDTO, DirectionReviewDecision, DirectionReviewMutationResponseDTO,
-  DirectionReviewPatchDTO, DirectionReviewPrepareDTO, DirectionReviewReceiptDTO, DirectionReviewSummaryDTO, JsonValue,
+  DirectionReviewPatchDTO, DirectionReviewPrepareDTO, DirectionReviewReceiptDTO, DirectionReviewSummaryDTO, DirectionReviewScope, RecalculationReviewPrepareDTO, RecalculationOperationDTO, JsonValue,
 } from '@ce/contracts';
 import {
   DirectionReviewError, editDirectionProjection, readDirectionRows, readDirectionGroups, readDirectionCandidates, readDirectionCandidate, verifyDirectionCompilation, WorkBudget, WorkLimitError,
@@ -22,7 +22,7 @@ import type { ReviewRecord } from './direction-review-record.js';
 const ttlMs = 15 * 60_000;
 const json = (value: unknown) => value as JsonValue;
 type Ready = ReviewRecord & { readonly projection: DirectionReviewProjection };
-export interface ReviewPageFilter { readonly state?: DirectionReviewDecision; readonly groupId?: string; readonly offset: number; readonly limit: number }
+export interface ReviewPageFilter { readonly state?: DirectionReviewDecision; readonly scope?: DirectionReviewScope; readonly groupId?: string; readonly offset: number; readonly limit: number }
 export interface DirectionReviewOptions { readonly now?: () => number; readonly limits?: Partial<WorkLimits> }
 
 /** All business data and mutation receipts live in the workspace quota. Only the expiry timer is external. */
@@ -66,6 +66,59 @@ export class DirectionReviewService {
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
   }
+  /** A read-only view: expiration never mutates authority from recalculation-state GET. */
+  peekCompatible(w: string): ReviewRecord | undefined {
+    const snapshot = this.store.current(w), id = this.store.getRecord<string>(activeReviewKey(w));
+    if (!snapshot || !id) return;
+    const record = this.record(w, id), summary = record.summary;
+    if (!['preparing', 'ready', 'committing'].includes(summary.state) || summary.baseVersionId !== snapshot.versionId
+      || summary.state === 'ready' && this.now() >= Date.parse(summary.expiresAt!)) return;
+    try { if (validationMatchesBasis(getValidation(this.store, w, summary.runId), snapshot)) return record; } catch { /* Released run. */ }
+  }
+  assertCurrentInput(w: string, body: RecalculationReviewPrepareDTO): void {
+    this.store.assertBase(w, body.baseVersionId);
+    const snapshot = this.store.snapshot(w, body.baseVersionId);
+    if (body.validationBasisId !== (snapshot.validationBasisId ?? snapshot.versionId)) throw new ApiError('DIRECTION_REVIEW_NOT_APPLICABLE', { reason: 'BASIS_MISMATCH' });
+    if (!validationMatchesBasis(getValidation(this.store, w, body.runId), snapshot)) throw new ApiError('DIRECTION_REVIEW_NOT_APPLICABLE', { reason: 'VALIDATION_REQUIRED' });
+  }
+  reusable(w: string, body: RecalculationReviewPrepareDTO): string | undefined {
+    this.assertCurrentInput(w, body);
+    const record = this.peekCompatible(w);
+    return record && ['ready', 'preparing'].includes(record.summary.state) ? record.summary.jobId : undefined;
+  }
+  prepareCurrent(w: string, body: RecalculationReviewPrepareDTO, jobId: string): Promise<JobAcceptance> {
+    this.assertCurrentInput(w, body);
+    return this.prepare(w, body, jobId);
+  }
+  operationLease(w: string, body: RecalculationOperationDTO, jobId: string) {
+    this.assertCurrentInput(w, body);
+    const old = this.ready(w, body.reviewId);
+    this.checkRevision(old, body.expectedRevision);
+    if (old.summary.runId !== body.runId || old.summary.baseVersionId !== body.baseVersionId) throw new ApiError('DIRECTION_REVIEW_NOT_APPLICABLE');
+    const counts = old.projection.counts;
+    if (counts.pending || counts.conflicted || counts.undetermined) throw new ApiError('DIRECTION_REVIEW_NOT_APPLICABLE', { reason: 'UNRESOLVED_DECISIONS' });
+    if (!counts.included && !counts.omitted) throw new ApiError('DIRECTION_REVIEW_NOT_APPLICABLE', { reason: 'NO_CANDIDATES' });
+    const run = getValidation(this.store, w, body.runId);
+    const pending: ReviewRecord = { ...old, summary: { ...old.summary, state: 'committing', jobId } };
+    const assertCommit = () => {
+      this.assertLease(w, body.reviewId, 'committing', jobId, body.expectedRevision);
+      this.assertCurrentInput(w, body);
+      if (getValidation(this.store, w, body.runId) !== run) throw new ApiError('DIRECTION_REVIEW_NOT_APPLICABLE');
+    };
+    return { review: old, pending, assertCommit,
+      initialRecords: [reviewEntry(pending)],
+      assertStart: () => { if (this.ready(w, body.reviewId) !== old) throw new ApiError('STALE_DIRECTION_REVIEW'); },
+      onTerminal: () => {
+        const current = this.record(w, body.reviewId);
+        if (current.summary.state !== 'committing' || current.summary.jobId !== jobId) return [];
+        try { this.store.assertAccepting(w); this.assertCurrentInput(w, body); } catch { return this.finish(w, releasedReview(current, 'obsolete')); }
+        if (this.now() >= Date.parse(old.summary.expiresAt!)) return this.finish(w, releasedReview(current, 'expired'));
+        queueMicrotask(() => this.schedule(w));
+        return [reviewEntry(old)];
+      },
+      finalize: async () => this.schedule(w),
+    };
+  }
   active(w: string): DirectionReviewActiveDTO {
     const workspace = this.store.get(w);
     this.expire(w);
@@ -102,7 +155,7 @@ export class DirectionReviewService {
       throw error;
     }
   }
-  groups(w: string, id: string, page: { offset: number; limit: number }) {
+  groups(w: string, id: string, page: { offset: number; limit: number; scope?: DirectionReviewScope }) {
     const record = this.ready(w, id);
     return { reviewId: id, revision: record.summary.revision, ...this.readResource(() => readDirectionGroups(record.projection, page)) };
   }
@@ -205,6 +258,7 @@ export class DirectionReviewService {
       seeds.push(seed);
     }
     const id = randomUUID(), summary: DirectionReviewSummaryDTO = { id, workspaceId: w, baseVersionId: body.baseVersionId,
+      validationBasisId: this.store.snapshot(w, body.baseVersionId).validationBasisId ?? body.baseVersionId,
       runId: body.runId, state: 'preparing', revision: 0, jobId };
     const initial: ReviewRecord = { summary };
     const input = immutable({ seeds, reviewId: id, ...(this.options.limits ? { limits: this.options.limits } : {}) });

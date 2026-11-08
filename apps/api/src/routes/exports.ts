@@ -1,9 +1,9 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
-import { emptyQuerySchema, uuidSchema, versionExportSummarySchema } from '@ce/contracts';
+import { downloadIntentKey, emptyQuerySchema, exportRequestSchema, uuidSchema, versionExportSummarySchema } from '@ce/contracts';
 import { WorkBudget } from '@ce/engine';
-import type { ApplicationBundle, JsonValue } from '@ce/contracts';
+import type { ApplicationBundle, DownloadIntent, ExportArtifactSummaryDTO, JsonValue } from '@ce/contracts';
 import { ApiError } from '../errors.js';
 import { checkExportData, exportLimits } from '../export/results-export.js';
 import type { ExportLimits, ResultsExportData } from '../export/results-export.js';
@@ -16,17 +16,16 @@ import { registerJobRoute } from './jobs.js';
 import { versionExportSummary } from '../export/report-ownership.js';
 export function registerExports(app: FastifyInstance, overrides?: Partial<ExportLimits>, reportOverrides?: Partial<ReportExportLimits>): void {
   const resultsLimits = exportLimits(overrides), reportLimits = reportExportLimits(reportOverrides);
-  app.get<{ Params: { workspaceId: string; versionId: string } }>('/api/v1/workspaces/:workspaceId/versions/:versionId/export-summary', { schema: {
-    querystring: emptyQuerySchema, params: { type: 'object', additionalProperties: false, required: ['workspaceId', 'versionId'], properties: { workspaceId: uuidSchema, versionId: uuidSchema } },
+  app.get<{ Params: { workspaceId: string; versionId: string }; Querystring: { kind?: 'report' | 'results'; runId?: string } }>('/api/v1/workspaces/:workspaceId/versions/:versionId/export-summary', { schema: {
+    querystring: { oneOf: [{ type: 'object', additionalProperties: false, properties: { kind: { const: 'report' } } }, { type: 'object', additionalProperties: false, required: ['kind', 'runId'], properties: { kind: { const: 'results' }, runId: uuidSchema } }] }, params: { type: 'object', additionalProperties: false, required: ['workspaceId', 'versionId'], properties: { workspaceId: uuidSchema, versionId: uuidSchema } },
     response: { 200: versionExportSummarySchema },
   } }, request => {
     const snapshot = app.ce.store.snapshot(request.params.workspaceId, request.params.versionId), budget = new WorkBudget({ cancelled: () => request.raw.aborted });
-    return versionExportSummary(snapshot, () => budget.check());
+    const intent: DownloadIntent = { workspaceId: request.params.workspaceId, versionId: snapshot.versionId, ...(request.query.kind === 'results' ? { kind: 'results', runId: request.query.runId! } : { kind: 'report' }) };
+    if (intent.kind === 'results' && getValidation(app.ce.store, intent.workspaceId, intent.runId).run.versionId !== intent.versionId) throw new ApiError('STALE_VERSION');
+    return { ...versionExportSummary(snapshot, () => budget.check()), intent, intentFingerprint: createHash('sha256').update(downloadIntentKey(intent)).digest('hex') };
   });
-  registerJobRoute(app, { path: '/workspaces/:workspaceId/exports', kind: 'export', bodySchema: { oneOf: [
-    { type: 'object', additionalProperties: false, required: ['versionId', 'runId', 'kind'], properties: { versionId: uuidSchema, runId: uuidSchema, kind: { const: 'results' } } },
-    { type: 'object', additionalProperties: false, required: ['versionId', 'kind'], properties: { versionId: uuidSchema, kind: { const: 'report' } } },
-  ] }, prepare: (request) => ({ input: request.body as JsonValue }),
+  registerJobRoute(app, { path: '/workspaces/:workspaceId/exports', kind: 'export', bodySchema: exportRequestSchema, prepare: (request) => ({ input: request.body as JsonValue }),
     accept: async ({ workspaceId, input }) => {
       const body = input as { kind: 'results'; versionId: string; runId: string } | { kind: 'report'; versionId: string };
       const snapshot = app.ce.store.snapshot(workspaceId, body.versionId);
@@ -52,7 +51,8 @@ export function registerExports(app: FastifyInstance, overrides?: Partial<Export
       try {
         for (let i = 0; i < prepared.reportCount + 3; i++) { const file = await app.ce.files.openFile(workspaceId, lease); allocated.push({ id: file.id, path: file.path }); await file.handle.close(); }
         const id = randomUUID(), [json, xlsx, zip] = allocated.slice(-3), paths = { json: json!.path, xlsx: xlsx!.path, zip: zip!.path }; let finalized = false;
-        return { includeSnapshot: false, input: { exportId: id, fileId: zip!.id, kind: prepared.kind, data: prepared.data,
+        const intent: DownloadIntent = { workspaceId, ...body };
+        return { includeSnapshot: false, reservation: { kind: 'export', intent, intentFingerprint: createHash('sha256').update(downloadIntentKey(intent)).digest('hex'), reservedExportId: id }, input: { exportId: id, fileId: zip!.id, kind: prepared.kind, data: prepared.data,
           paths: prepared.kind === 'report' ? { ...paths, reports: allocated.slice(0, prepared.reportCount).map(file => file.path) } : paths, limits: prepared.limits,...(prepared.kind==='report'?{originalReports}:{}) } as unknown as JsonValue,
           finalize: async () => { if (finalized) return;
             const published = app.ce.store.getRecord<ExportArtifact>(exportKey(workspaceId, id));
@@ -65,6 +65,11 @@ export function registerExports(app: FastifyInstance, overrides?: Partial<Export
     params: { type: 'object', additionalProperties: false, required: ['workspaceId', 'exportId'], properties: { workspaceId: uuidSchema, exportId: uuidSchema } } } }, async (request, reply) => {
     const { workspaceId, exportId } = request.params; app.ce.store.get(workspaceId); const artifact = app.ce.store.getRecord<ExportArtifact>(exportKey(workspaceId, exportId));
     if (!artifact) throw new ApiError('RESOURCE_NOT_FOUND'); await app.ce.jobs.settle(artifact.jobId);
+    if (request.headers.accept?.includes('application/json')) {
+      const summary: ExportArtifactSummaryDTO = { id: artifact.id, jobId: artifact.jobId, intent: artifact.intent, intentFingerprint: artifact.intentFingerprint,
+        status: 'ready', size: artifact.size, sha256: artifact.sha256, filename: artifact.filename, mimeType: 'application/zip' };
+      return reply.type('application/json').send(summary);
+    }
     const location = await app.ce.files.filePath(workspaceId, artifact.fileId);
     return reply.type(artifact.mimeType).header('Content-Disposition', 'attachment; filename="' + artifact.filename + '"').header('Content-Length', artifact.size).send(createReadStream(location));
   });

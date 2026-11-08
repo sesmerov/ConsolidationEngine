@@ -85,7 +85,7 @@ describe('minimal, versioned histories', () => {
     const first = firstResponse.json(); expect(Object.keys(first).sort()).toEqual(['items', 'nextCursor', 'revision', 'total']);
     expect(first.total).toBe(3); expect(first.items.map((item: { id: string }) => item.id)).toEqual([uuid(23)]); expect(first.revision).toBeTypeOf('string');
     expect(first.nextCursor).toBeTypeOf('string');
-    const allowed = resource === 'runs' ? ['endedAt', 'id', 'profileId', 'startedAt', 'status', 'versionId'] : ['baseVersionId', 'createdAt', 'id', 'policyId', 'profileId', 'state'];
+    const allowed = resource === 'runs' ? ['endedAt', 'id', 'profileId', 'startedAt', 'status', 'validationBasisId', 'versionId'] : ['baseVersionId', 'createdAt', 'id', 'policyId', 'profileId', 'state'];
     expect(Object.keys(first.items[0]).sort()).toEqual(allowed.sort());
     expect(firstResponse.body).not.toMatch(/"(?:ast|expression|proposals|results|facts|sourceLocator|path|stack)"|ce-session-/i);
     const second = (await list(resource, '?limit=1&cursor=' + encodeURIComponent(first.nextCursor))).json();

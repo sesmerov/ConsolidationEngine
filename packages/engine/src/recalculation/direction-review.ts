@@ -180,11 +180,12 @@ function expectedDirection(projection: DirectionReviewProjection, row: ReviewRow
   };
 }
 
-export function compileDirectionConfiguration(snapshot: Snapshot, projection: DirectionReviewProjection, options: { budget?: WorkBudget } = {}): DirectionConfiguration {
+/** Derive a configuration from sealed decisions without repeating cell resolution on admission. */
+export function projectDirectionConfiguration(projection: DirectionReviewProjection, options: { budget?: WorkBudget; requireResolved?: boolean } = {}): DirectionConfiguration {
   const budget = options.budget ?? new WorkBudget();
   budget.check();
   if (projection.conflictGroupCount || projection.counts.conflicted) throw new DirectionReviewError('UNRESOLVED_CONFLICT');
-  if (projection.baseVersionId !== snapshot.versionId) throw new DirectionReviewError('BASE_MISMATCH');
+  if (options.requireResolved && (projection.counts.pending || projection.counts.undetermined)) throw new DirectionReviewError('UNRESOLVED_DECISIONS');
   const directions: DirectionDTO[] = [], claimed = new Set<string>();
   const totals: Record<DirectionOrigin, number> = { explicit: 0, automatic: 0, previous: 0 };
   for (const [i, row] of projection.rows.entries()) {
@@ -194,7 +195,6 @@ export function compileDirectionConfiguration(snapshot: Snapshot, projection: Di
     const direction = expectedDirection(projection, row, choice);
     if (claimed.has(direction.targetKey)) throw new DirectionReviewError('UNRESOLVED_CONFLICT');
     claimed.add(direction.targetKey);
-    if (!resolveDirection(snapshot, direction, { budget }).resolved) throw new DirectionReviewError('INVALID_DIRECTION');
     directions.push(direction);
     totals[origin]++;
   }
@@ -213,6 +213,17 @@ export function compileDirectionConfiguration(snapshot: Snapshot, projection: Di
   originExceptions.sort((a, b) => ordinal(a.instanceId, b.instanceId));
   unselectedExceptions.sort(ordinal);
   return { directions, decisionState: { schemaVersion: 1, mode: 'reviewed', source: 'review', originDefault, originExceptions, unselectedDefault, unselectedExceptions } };
+}
+
+export function compileDirectionConfiguration(snapshot: Snapshot, projection: DirectionReviewProjection, options: { budget?: WorkBudget; requireResolved?: boolean } = {}): DirectionConfiguration {
+  const budget = options.budget ?? new WorkBudget();
+  if (projection.baseVersionId !== snapshot.versionId) throw new DirectionReviewError('BASE_MISMATCH');
+  const configuration = projectDirectionConfiguration(projection, { ...options, budget });
+  for (const direction of configuration.directions) {
+    budget.check();
+    if (!resolveDirection(snapshot, direction, { budget }).resolved) throw new DirectionReviewError('INVALID_DIRECTION');
+  }
+  return configuration;
 }
 
 function hasKeys(value: unknown, keys: readonly string[]): value is Record<string, unknown> {

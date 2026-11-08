@@ -1,6 +1,6 @@
 import type {
   DirectionConflictCandidateDTO, DirectionConflictGroupDTO, DirectionOrigin, DirectionReviewClass, DirectionReviewCountsDTO, DirectionReviewDecision, DirectionReviewOperationDTO,
-  DirectionReviewRowDTO, RuleResultDTO, TargetSide,
+  DirectionReviewRowDTO, DirectionReviewScope, RuleResultDTO, TargetSide,
 } from '@ce/contracts';
 import { WorkBudget } from '../execution/budget.js';
 import { ordinal } from '../resolver/coordinates.js';
@@ -90,12 +90,16 @@ function publicGroup(projection: DirectionReviewProjection, group: number): Dire
   const members = membersAt(projection, group), candidates = candidatesAt(projection, group);
   const first = candidates[0]!;
   const row = projection.rows[first]!, target = optionForGroup(projection, first, group)!;
-  const state = members.length > 1 ? 'conflicted' : members.length === 1 ? 'resolved' : flagAt(projection.omittedFlags, group) ? 'omitted' : 'pending';
+  const state = groupStateAt(projection, group);
   const winner = members.length === 1 ? projection.rows[members[0]!] : undefined;
   return { groupId: projection.groups[group]!.id, targetLabel: target.label, contextLabel: row.contextLabel,
     candidateCount: candidates.length, activeCount: members.length, state,
     ...(winner ? { selectedCandidate: { instanceId: winner.seed.instanceId!, code: winner.seed.code,
       targetSide: optionForGroup(projection, members[0]!, group)!.side } } : {}) };
+}
+function groupStateAt(projection: DirectionReviewProjection, group: number): DirectionConflictGroupDTO['state'] {
+  const count = membersAt(projection, group).length;
+  return count > 1 ? 'conflicted' : count === 1 ? 'resolved' : flagAt(projection.omittedFlags, group) ? 'omitted' : 'pending';
 }
 export type DirectionCandidateIdentity = Omit<DirectionConflictCandidateDTO,
   'descriptionPreview' | 'expressionPreview' | 'descriptionTruncated' | 'expressionTruncated'>;
@@ -107,9 +111,16 @@ function publicCandidate(projection: DirectionReviewProjection, group: number, r
     availability: assignedElsewhere ? 'assignedElsewhere' : 'selectable', selected: active?.group === group,
     ...(assignedElsewhere ? { assignedTargetLabel: active.label } : {}) };
 }
-export function readDirectionGroups(projection: DirectionReviewProjection, query: { offset: number; limit: number }) {
+export function readDirectionGroups(projection: DirectionReviewProjection, query: { offset: number; limit: number; scope?: DirectionReviewScope }) {
   checkPage(query.offset, query.limit);
-  return { total: projection.observedGroups.length, items: projection.observedGroups.slice(query.offset, query.offset + query.limit).map(group => publicGroup(projection, group)) };
+  const items: DirectionConflictGroupDTO[] = []; let total = 0;
+  for (const group of projection.observedGroups) {
+    const state = groupStateAt(projection, group), pending = state === 'conflicted' || state === 'pending';
+    if (query.scope === 'pending' && !pending || query.scope === 'resolved' && pending) continue;
+    if (total >= query.offset && items.length < query.limit) items.push(publicGroup(projection, group));
+    total++;
+  }
+  return { total, items };
 }
 export function readDirectionCandidates(projection: DirectionReviewProjection, groupId: string, query: { offset: number; limit: number }) {
   checkPage(query.offset, query.limit);
@@ -155,31 +166,35 @@ function checkedIndex(lookup: Readonly<Record<string, number>>, id: string, erro
   if (!Object.hasOwn(lookup, id)) throw new DirectionReviewError(error);
   return lookup[id]!;
 }
-export function readDirectionRows(projection: DirectionReviewProjection, query: { offset: number; limit: number; state?: DirectionReviewDecision; groupId?: string }) {
+export function readDirectionRows(projection: DirectionReviewProjection, query: { offset: number; limit: number; state?: DirectionReviewDecision; groupId?: string; scope?: DirectionReviewScope }) {
   let { offset } = query;
-  const { limit, state, groupId } = query;
+  const { limit, state, groupId, scope } = query;
+  const matches = (value: DirectionReviewDecision) => (!state || value === state) &&
+    (scope === 'pending' ? ['pending', 'conflicted', 'undetermined'].includes(value) : scope === 'resolved' ? ['included', 'omitted'].includes(value) : true);
   if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new DirectionReviewError('INVALID_PAGE');
   if (groupId !== undefined) {
     const indices = membersAt(projection, checkedIndex(projection.byGroup, groupId, 'UNKNOWN_GROUP'));
     const groupState = indices.length > 1 ? 'conflicted' : 'included';
-    const total = state && groupState !== state ? 0 : indices.length;
+    const total = matches(groupState) ? indices.length : 0;
     return { total, items: total ? indices.slice(offset, offset + limit).map(index => publicRow(projection, index)) : [] };
   }
-  const total = state ? projection.counts[state] : projection.rows.length;
+  const countMatches = (counts: DirectionReviewCountsDTO) => (['included', 'omitted', 'pending', 'conflicted', 'excluded', 'undetermined'] as const)
+    .reduce((sum, value) => sum + (matches(value) ? counts[value] : 0), 0);
+  const total = countMatches(projection.counts);
   const items: DirectionReviewRowDTO[] = [];
-  if (!state) {
+  if (!state && (!scope || scope === 'all')) {
     for (let index = offset; index < Math.min(total, offset + limit); index++) items.push(publicRow(projection, index));
   } else if (offset < total) {
     // Skip whole blocks with the category counts; hydrate only the requested items.
     for (let block = 0; block < projection.blockCounts.length && items.length < limit; block++) {
-      const matches = projection.blockCounts[block]![state];
-      if (offset >= matches) {
-        offset -= matches;
+      const matchCount = countMatches(projection.blockCounts[block]!);
+      if (offset >= matchCount) {
+        offset -= matchCount;
         continue;
       }
       const end = Math.min(projection.rows.length, (block + 1) * blockSize);
       for (let index = block * blockSize; index < end && items.length < limit; index++) {
-        if (stateAt(projection, index) !== state) continue;
+        if (!matches(stateAt(projection, index))) continue;
         if (offset) offset--; else items.push(publicRow(projection, index));
       }
     }
