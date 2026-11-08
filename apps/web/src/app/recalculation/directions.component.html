@@ -1,5 +1,5 @@
 <section class="directions-panel" aria-labelledby="directions-title">
-<h3 id="directions-title">Elegir qué celdas recalcular</h3>
+<h3 id="directions-title" tabindex="-1">Elegir qué celdas recalcular</h3>
 @if (store.error(); as error) { <p role="alert" class="error">{{ error }}</p> }
 @if (store.uncertain()) { <p class="notice">La respuesta está sin confirmar. El reintento conserva la solicitud original.</p><button mat-stroked-button [disabled]="store.pending()" (click)="store.retry()">Reintentar la misma operación</button> }
 @if (store.looking() || store.pending() || store.review()?.state === 'preparing') { <p role="status">Preparando las decisiones de recálculo…</p> }
@@ -29,7 +29,7 @@
                       <mat-radio-button [value]="candidate.instanceId" [disabled]="!store.editable() || candidate.availability !== 'selectable'"><strong>{{ candidate.code }}</strong>@if (candidate.descriptionPreview) { <span class="candidate-description">{{ candidate.descriptionPreview }}{{ candidate.descriptionTruncated ? '…' : '' }}</span> }</mat-radio-button>
                       <p class="candidate-expression">{{ candidate.expressionPreview }}{{ candidate.expressionTruncated ? '…' : '' }}</p>
                       @if (candidate.availability === 'assignedElsewhere') { <p class="muted">Esta regla tiene otro destino elegido: {{ candidate.assignedTargetLabel }}. Revísalo antes de seleccionarla aquí.</p> }
-                      <button mat-button (click)="openCandidate(candidate.instanceId, $event)" [disabled]="store.candidateDetailLoading()" [attr.aria-label]="'Ver regla ' + candidate.code">Ver regla</button>
+                      <button mat-button (click)="openCandidate(candidate.instanceId, $event)" [attr.aria-label]="'Ver regla ' + candidate.code">Ver regla</button>
                     </div>
                   }
                   <mat-radio-button [value]="null">No recalcular esta celda</mat-radio-button>
@@ -37,7 +37,7 @@
                 @if (store.selectedOutsidePage()) { <p role="status">La regla elegida está en otra página: {{ editor.code }}.</p> }
                 @if (store.candidates(); as candidates) { <mat-paginator aria-label="Páginas de reglas candidatas" [length]="candidates.total" [pageSize]="50" [pageIndex]="store.candidatesPagination.index()" [hidePageSize]="true" [disabled]="store.busy() || store.uncertain()" (page)="store.loadCandidates($event.pageIndex)"/> }
                 @if (store.candidateDetailLoading()) { <p role="status">Consultando la regla completa…</p> }
-                @if (store.candidateDetail(); as detail) { <section class="candidate-detail" role="region" [attr.aria-label]="'Regla ' + detail.candidate.code"><h4 [id]="candidateHeadingId(detail.candidate.instanceId)" tabindex="-1">{{ detail.candidate.code }}</h4><p class="candidate-expression">{{ detail.expression }}</p>@if (detail.precondition) { <p>Precondición</p><p class="candidate-expression">{{ detail.precondition }}</p> }@for (description of detail.descriptions; track $index) { <p>{{ description.description }}</p><p class="muted">{{ description.sourceLabel }}</p> }<button mat-button (click)="closeCandidate()">Cerrar regla</button></section> }
+                @if (store.candidateDetail(); as detail) { <section class="candidate-detail" role="region" [attr.aria-label]="'Regla ' + detail.candidate.code"><h4 [id]="candidateHeadingId(detail.candidate.instanceId)" tabindex="-1" ceStageTitle>{{ detail.candidate.code }}</h4><p class="candidate-expression">{{ detail.expression }}</p>@if (detail.precondition) { <p>Precondición</p><p class="candidate-expression">{{ detail.precondition }}</p> }@for (description of detail.descriptions; track $index) { <p>{{ description.description }}</p><p class="muted">{{ description.sourceLabel }}</p> }<button mat-button (click)="closeCandidate()">Cerrar regla</button></section> }
                 <div class="choice-actions"><button mat-stroked-button (click)="confirmChoice($event)" [disabled]="!store.hasUnsavedChoice() || !store.editable()">Confirmar elección</button><button mat-button (click)="cancelChoice($event)" [disabled]="store.pending() || store.uncertain()">Cancelar</button></div>
               }
             } @else {
@@ -57,7 +57,7 @@
                 <ng-container matColumnDef="target"><th mat-header-cell *matHeaderCellDef>Destino</th><td mat-cell *matCellDef="let row">
                   @if (row.classification === 'both') {
                     <mat-form-field appearance="outline"><mat-label>{{ row.code }} · Destino</mat-label>
-                      <select matNativeControl [ngModel]="row.state === 'omitted' ? 'omit' : row.selectedSide || ''" [disabled]="!store.editable()" (ngModelChange)="store.choose(row, $event)">
+                      <select #sideChoice matNativeControl [ngModel]="row.state === 'omitted' ? 'omit' : row.selectedSide || ''" [disabled]="!store.editable()" (ngModelChange)="choose(row, $event, sideChoice)">
                         <option value="" disabled>Elige un destino</option>
                         @for (option of row.options; track option.side) { <option [value]="option.side">{{ option.label }} · {{ option.side === 'left' ? 'Izquierda' : 'Derecha' }}</option> }
                         <option value="omit">Omitir</option>

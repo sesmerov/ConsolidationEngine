@@ -20,6 +20,7 @@ export class DirectionsStore {
  private groupsGeneration=0; private candidatesGeneration=0; private detailGeneration=0; private confirmingGroupId:string|null=null;
  private expiryTimer?:ReturnType<typeof setTimeout>; private attempt:Attempt|null=null; private observedJob:{jobId:string;reviewId?:string}|null=null;
  private synchronized=signal(false); private staleEditor=signal(false);
+ private refreshedValidation='';
  readonly state=signal<RecalculationStateDTO|null>(null); readonly run=computed(()=>this.state()?.compatibleRun??null);
  readonly review=signal<DirectionReviewSummaryDTO|null>(null); readonly rows=signal<DirectionReviewPageDTO|null>(null);
  readonly groups=signal<DirectionConflictGroupsPageDTO|null>(null); readonly groupsPagination=new CursorPage(); readonly candidatesPagination=new CursorPage();
@@ -48,6 +49,10 @@ export class DirectionsStore {
    if(workspace&&this.state()&&version!==this.state()!.currentVersionId&&!this.session.jobActive())void this.recover();
   });});
   effect(()=>{const job=this.session.job();if(!job||job.workspaceId!==this.session.workspace()?.id||!isTerminalJob(job.status)||job.jobId!==this.observedJob?.jobId)return;this.observedJob=null;untracked(()=>{void this.finishJob(job);});});
+  effect(()=>{const job=this.session.job(),running=this.session.jobActive(),looking=this.looking();untracked(()=>{
+   if(!this.active||running||looking||job?.kind!=='validate'||job.status!=='succeeded'||job.workspaceId!==this.session.workspace()?.id||this.pending()||this.uncertain()||this.refreshedValidation===job.jobId)return;
+   if(this.state()?.state==='needs_validation'||this.state()?.state==='preparation_required'){this.refreshedValidation=job.jobId;void this.recover();}
+  });});
   inject(DestroyRef).onDestroy(()=>{this.alive=false;clearTimeout(this.expiryTimer);this.lookupGeneration++;this.rowGeneration++;this.groupsGeneration++;this.candidatesGeneration++;this.detailGeneration++;});
  }
  activate():void {this.active=true;void this.recover();}

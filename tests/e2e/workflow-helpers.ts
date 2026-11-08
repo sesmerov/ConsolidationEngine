@@ -20,11 +20,17 @@ export async function navigateStage(page: Page, stage: keyof typeof stages): Pro
 }
 
 /** Exercise a native choice through keyboard navigation, including return through the tab order. */
-export async function chooseNativeOptionWithKeyboard(page: Page, selector: Locator, value: string): Promise<void> {
-  await expect(selector).toBeEnabled(); await selector.focus(); await page.keyboard.press('Home');
-  const optionCount = await selector.locator('option').count();
-  for(let index=0; index<optionCount && await selector.inputValue()!==value; index++) await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('Enter'); await expect(selector).toHaveValue(value);
+export async function chooseNativeOptionWithKeyboard(page: Page, selector: Locator, value: string, removesControl=false): Promise<void> {
+  await expect(selector).toBeEnabled();
+  const values=await selector.locator('option').evaluateAll(options=>options.filter(option=>!(option as HTMLOptionElement).disabled).map(option=>(option as HTMLOptionElement).value));
+  const index=values.indexOf(value);expect(index).toBeGreaterThanOrEqual(0);
+  // Open the native popup first: Enter on a closed Windows select would open it,
+  // making the following Tab only close the popup rather than advance focus.
+  await selector.focus();await page.keyboard.press('Space');await page.keyboard.press('Home');
+  for(let step=0;step<index;step++)await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  if(removesControl){await expect(selector).toHaveCount(0);return;}
+  await expect(selector).toHaveValue(value);
   await page.keyboard.press('Tab'); await page.keyboard.press('Shift+Tab'); await expect(selector).toBeFocused();
 }
 

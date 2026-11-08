@@ -38,7 +38,7 @@ test('entry without validation and ten entries with a compatible run never publi
   const before=(await current(page)).workspace.versionIds;
   for(let i=0;i<10;i++){await navigateStage(page,'recalculation'); await expect(page.getByRole('heading',{name:'Elegir qué celdas recalcular',exact:true})).toBeVisible(); await expect(page.getByLabel('DECISION_001 · Destino')).toBeVisible(); if(i<9) await navigateStage(page,'validation');}
   expect((await current(page)).workspace.versionIds).toEqual(before);
-  await chooseNativeOptionWithKeyboard(page,page.getByLabel('DECISION_001 · Destino'),'left');await page.getByRole('button',{name:'Revisar decisiones',exact:true}).click();await expect(page.getByLabel('DECISION_001 · Destino')).toHaveValue('left');expect((await current(page)).workspace.versionIds).toEqual(before);
+  await chooseNativeOptionWithKeyboard(page,page.getByLabel('DECISION_001 · Destino'),'left',true);await expect(page.locator('#directions-title')).toBeFocused();await page.getByRole('button',{name:'Revisar decisiones',exact:true}).click();await expect(page.getByLabel('DECISION_001 · Destino')).toHaveValue('left');expect((await current(page)).workspace.versionIds).toEqual(before);
   await expect(page.getByRole('button',{name:/Preparar revisión|Guardar configuración/})).toHaveCount(0);
 });
 test('decision 51 is globally pending and explicit omission persists before compound simulation',async({page})=>{

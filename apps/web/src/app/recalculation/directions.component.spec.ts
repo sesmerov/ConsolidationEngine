@@ -5,6 +5,7 @@ import type { DirectionReviewSummaryDTO, RecalculationStateDTO } from '@ce/contr
 import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
 import { DirectionsComponent } from './directions.component';
+import { StageFocus } from '../core/stage-title.directive';
 const counts = {totalRows:4,included:1,omitted:0,pending:1,conflicted:2,excluded:0,undetermined:0};
 const ready:DirectionReviewSummaryDTO = {id:'review',workspaceId:'workspace',baseVersionId:'base',validationBasisId:'basis',runId:'source-run',state:'ready',revision:1,expiresAt:'2099-11-01T12:00:00Z',counts,conflictGroupCount:1};
 const state:RecalculationStateDTO = {workspaceId:'workspace',currentVersionId:'base',validationBasisId:'basis',compatibleRun:{id:'newer-run',versionId:'base',validationBasisId:'basis'},configuration:{configVersion:'config',directionCount:0},review:ready,counts,state:'pending'};
@@ -18,7 +19,7 @@ describe('current-base destination decisions',()=>{
  api.directionReviewRows.mockResolvedValue({reviewId:'review',revision:1,items:[both],total:1,nextCursor:null});
  api.directionConflictGroups.mockResolvedValue({reviewId:'review',revision:1,items:[group],total:1,nextCursor:null});
  api.directionConflictCandidates.mockImplementation(async(_w,_id,_g,query={})=>({reviewId:'review',revision:1,group,items:query.cursor?candidates.slice(50):candidates.slice(0,50),total:51,nextCursor:query.cursor?null:'next'}));
- TestBed.configureTestingModule({imports:[DirectionsComponent],providers:[{provide:ApiClient,useValue:api}]}); session=TestBed.inject(SessionStore);
+ TestBed.configureTestingModule({imports:[DirectionsComponent],providers:[StageFocus,{provide:ApiClient,useValue:api}]}); session=TestBed.inject(SessionStore);
  session.workspace.set({id:'workspace',name:'Demo',state:'ready',currentVersionId:'base',versionIds:['base'],contexts:[],counts:{snapshots:1,coordinates:3,facts:3,sources:2},sessionBytes:100}); session.etag.set('"base"'); });
  afterEach(()=>TestBed.resetTestingModule());
  async function render(){const f=TestBed.createComponent(DirectionsComponent); f.detectChanges(); await new Promise(r=>setTimeout(r,0)); await f.whenStable(); f.detectChanges(); return f;}
@@ -29,6 +30,22 @@ describe('current-base destination decisions',()=>{
  it('auto-prepares using the current basis without publishing a version',async()=>{api.recalculationState.mockResolvedValue({...state,review:undefined,counts:null,state:'preparation_required'});
  api.prepareDirectionReview.mockResolvedValue({jobId:'prepare',kind:'prepare-directions',workspaceId:'workspace',baseVersionId:'base',status:'queued',progress:{completed:0,total:1,complete:false},diagnostics:[],pollAfterMs:60000});
  await render(); expect(api.prepareDirectionReview.mock.calls[0]?.slice(0,3)).toEqual(['workspace',{baseVersionId:'base',validationBasisId:'basis',runId:'newer-run'},'"base"']); expect(session.versionId()).toBe('base'); });
+ it('automatically prepares after a validation completes while the analyst is already in Recalcular',async()=>{
+   api.recalculationState.mockResolvedValue({...state,review:undefined,counts:null,state:'preparation_required'});
+   api.prepareDirectionReview.mockResolvedValue({jobId:'prepare-after-validation',kind:'prepare-directions',workspaceId:'workspace',baseVersionId:'base',status:'queued',progress:{completed:0,total:1,complete:false},diagnostics:[],pollAfterMs:60000});
+   const validation={jobId:'validation',kind:'validate',workspaceId:'workspace',baseVersionId:'base',status:'running',progress:{completed:0,total:1,complete:false},diagnostics:[],pollAfterMs:60000};session.trackJob(validation as any);
+   const f=await render();expect(api.prepareDirectionReview).not.toHaveBeenCalled();expect(f.componentInstance.store.state()?.state).toBe('preparation_required');
+   session.trackJob({...validation,status:'succeeded',progress:{completed:1,total:1,complete:true},resultRef:{type:'validation',id:'newer-run'}} as any);f.detectChanges();await f.whenStable();f.detectChanges();
+   expect(api.prepareDirectionReview).toHaveBeenCalledOnce();expect(session.versionId()).toBe('base');
+ });
+ it('rechecks once when a pre-validation lookup arrives after the terminal validation notification',async()=>{
+   let release!:(value:unknown)=>void;api.recalculationState.mockImplementationOnce(()=>new Promise(resolve=>{release=resolve;})).mockResolvedValue({...state,review:undefined,counts:null,state:'preparation_required'});
+   api.prepareDirectionReview.mockResolvedValue({jobId:'prepare-race',kind:'prepare-directions',workspaceId:'workspace',baseVersionId:'base',status:'queued',progress:{completed:0,total:1,complete:false},diagnostics:[],pollAfterMs:60000});
+   session.trackJob({jobId:'validation-race',kind:'validate',workspaceId:'workspace',baseVersionId:'base',status:'running',progress:{completed:0,total:1,complete:false},diagnostics:[],pollAfterMs:60000});
+   const f=TestBed.createComponent(DirectionsComponent);f.detectChanges();session.job.update(job=>({...job!,status:'succeeded'}));f.detectChanges();
+   release({...state,review:undefined,compatibleRun:undefined,counts:null,state:'needs_validation'});await f.whenStable();f.detectChanges();await f.whenStable();f.detectChanges();
+   expect(api.recalculationState).toHaveBeenCalledTimes(2);expect(api.prepareDirectionReview).toHaveBeenCalledOnce();
+ });
  it('retains an unconfirmed conflict choice across filters, exit guard and a changed base',async()=>{const f=await render(),s=f.componentInstance.store; s.selectCandidate('producer-0');
  expect(s.hasUnsavedChoice()).toBe(true); expect(api.editDirectionReview).not.toHaveBeenCalled(); await s.showResolved(); expect(s.rowScope()).toBe('pending'); expect(s.allowLeaveEditor()).toBe(false);
  session.workspace.update(w=>({...w!,currentVersionId:'new',versionIds:['base','new']})); f.detectChanges(); await f.whenStable(); expect(s.editor()?.value).toBe('producer-0'); expect(s.canSimulate()).toBe(false); expect(s.error()).toContain('Confirma o cancela'); });
@@ -36,6 +53,13 @@ describe('current-base destination decisions',()=>{
    const f=await render(),root=f.nativeElement as HTMLElement,s=f.componentInstance.store;s.selectCandidate('producer-0');f.detectChanges();
    const cancel=Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find(button=>button.textContent?.trim()==='Cancelar')!;cancel.focus();cancel.click();f.detectChanges();await f.whenStable();f.detectChanges();
    expect(s.editor()).toBeNull();expect(api.editDirectionReview).not.toHaveBeenCalled();const summary=root.querySelector('[data-group-id="g"] [data-group-summary]');expect(summary).not.toBeNull();expect(document.activeElement).toBe(summary);
+ });
+ it('returns focus to the decision summary when a resolved side selector leaves the pending page',async()=>{
+   const f=await render(),root=f.nativeElement as HTMLElement;
+   api.editDirectionReview.mockResolvedValue({summary:{...ready,revision:2,counts:{...counts,included:2,pending:0}},appliedRevision:2});
+   api.directionReviewRows.mockResolvedValue({reviewId:'review',revision:2,items:[],total:0,nextCursor:null});api.directionConflictGroups.mockResolvedValue({reviewId:'review',revision:2,items:[],total:0,nextCursor:null});
+   const select=root.querySelector<HTMLSelectElement>('select')!;select.focus();select.value='left';select.dispatchEvent(new Event('change'));f.detectChanges();await vi.waitFor(()=>expect(f.componentInstance.store.pending()).toBe(false));await f.whenStable();f.detectChanges();
+   expect(api.editDirectionReview.mock.calls[0]?.[2].operations).toEqual([{op:'set',instanceId:'both-instance',choice:'left'}]);expect(root.querySelector('select')).toBeNull();expect(document.activeElement).toBe(root.querySelector('#directions-title'));
  });
  it('preserves candidate 51 across pages and sends a patch only after confirmation',async()=>{const f=await render(),s=f.componentInstance.store;
  await s.loadCandidates(1); s.selectCandidate('producer-50'); await s.loadCandidates(0); expect(s.selectedOutsidePage()).toBe(true); expect(s.editor()?.value).toBe('producer-50');
@@ -53,7 +77,7 @@ describe('current-base destination decisions',()=>{
  api.directionConflictCandidate.mockResolvedValue(detail);
  const trigger=root.querySelector<HTMLButtonElement>('[aria-label="Ver regla RULE_0"]')!;trigger.focus();trigger.click();await f.whenStable();f.detectChanges();
  expect(api.directionConflictCandidate).toHaveBeenCalledWith('workspace','review','g','producer-0');
- const region=root.querySelector('.candidate-detail')!;expect(region.textContent).toContain(detail.expression);expect(region.querySelector('script')).toBeNull();expect(region.textContent).toContain('catalogo.xlsx · Validations · fila 2');
+ const region=root.querySelector('.candidate-detail')!;expect(region.textContent).toContain(detail.expression);expect(region.querySelector('script')).toBeNull();expect(region.textContent).toContain('catalogo.xlsx · Validations · fila 2');expect(document.activeElement).toBe(region.querySelector('h4'));
  const close=Array.from(region.querySelectorAll('button')).find(button=>button.textContent?.includes('Cerrar regla'))!;close.focus();close.click();f.detectChanges();expect(root.querySelector('.candidate-detail')).toBeNull();expect(document.activeElement).toBe(trigger);
  let resolve!:(value:unknown)=>void;api.directionConflictCandidate.mockImplementationOnce(()=>new Promise(value=>{resolve=value;}));
  const pending=s.showCandidate('producer-0');s.cancelChoice();resolve(detail);await pending;f.detectChanges();expect(s.candidateDetail()).toBeNull();expect(root.querySelector('.candidate-detail')).toBeNull();expect(api.editDirectionReview).not.toHaveBeenCalled();
