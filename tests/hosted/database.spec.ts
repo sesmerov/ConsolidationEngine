@@ -12,7 +12,9 @@ describe('PostgreSQL 17 authority foundation (real SQL)', () => {
     const [one, two] = harness.databases;
     await Promise.all([one.migrate(), two.migrate()]);
     expect(Number((await one.query<{ server_version_num: string }>('SHOW server_version_num')).rows[0]!.server_version_num)).toBeGreaterThanOrEqual(170000);
-    expect((await one.query('SELECT version FROM schema_migrations')).rows).toEqual([{ version: 1 }]);
+    const versions = (await one.query<{ version: number }>('SELECT version FROM schema_migrations ORDER BY version')).rows;
+    expect(versions.length).toBeGreaterThanOrEqual(1);
+    expect(versions.map(item => item.version)).toEqual(versions.map((_, index) => index + 1));
     expect((await two.query('SELECT count(*)::int AS count FROM demo_sessions')).rows[0]).toEqual({ count: 0 });
     expect(one.poolMaximum).toBe(2);
     expect(two.poolMaximum).toBe(2);
@@ -71,6 +73,12 @@ describe('PostgreSQL 17 authority foundation (real SQL)', () => {
     const db = new HostedDatabase({ databaseUrl: harness.config.databaseUrl, schema: harness.schema, tls: harness.config.databaseTls, poolMaximum: 1 });
     try { expect(db.poolMaximum).toBe(1); expect((await db.query('SELECT 1 AS ready')).rows).toEqual([{ ready: 1 }]); }
     finally { await db.close(); }
+  });
+  it('refuses a changed migration checksum instead of silently accepting drift', async () => {
+    const original = (await harness.databases[0].query<{ checksum: string }>('SELECT checksum FROM schema_migrations WHERE version=1')).rows[0]!.checksum;
+    await harness.databases[0].query('UPDATE schema_migrations SET checksum=$1 WHERE version=1', ['0'.repeat(64)]);
+    try { await expect(harness.databases[1].migrate()).rejects.toThrow(/checksum mismatch/); }
+    finally { await harness.databases[0].query('UPDATE schema_migrations SET checksum=$1 WHERE version=1', [original]); }
   });
 });
 

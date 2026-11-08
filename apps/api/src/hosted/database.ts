@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg';
 import { normalizeDatabaseUrl, type DatabaseTls } from './config.js';
@@ -57,21 +57,30 @@ export class HostedDatabase implements DatabaseTransaction {
   }
   /** Advisory lock serializes concurrent initializers; DDL, version and checksum commit together. */
   async migrate(): Promise<void> {
-    const sql = await readFile(new URL('./migrations/001-demo.sql', import.meta.url), 'utf8');
-    const checksum = createHash('sha256').update(sql).digest('hex');
+    const directory = new URL('./migrations/', import.meta.url);
+    const filenames = (await readdir(directory)).filter(name => /^\d{3}-[a-z0-9-]+\.sql$/.test(name)).sort();
+    const migrations = await Promise.all(filenames.map(async filename => {
+      const sql = await readFile(new URL(filename, directory), 'utf8');
+      return { version: Number(filename.slice(0, 3)), sql, checksum: createHash('sha256').update(sql).digest('hex') };
+    }));
+    if (!migrations.length || migrations.some((migration, index) => migration.version !== index + 1)) throw new Error('Migrations must be consecutively numbered from 001');
     await this.transaction(async tx => {
       await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`ce-migrate:${this.schema}`]);
       const version = (await tx.query<{ server_version_num: string }>('SHOW server_version_num')).rows[0]!.server_version_num;
       if (Number(version) < 170000 || Number(version) >= 180000) throw new Error('PostgreSQL 17 is required for the verified authority schema');
       await tx.query(`CREATE SCHEMA IF NOT EXISTS "${this.schema}"`);
       await tx.query(`CREATE TABLE IF NOT EXISTS schema_migrations (version integer PRIMARY KEY CHECK(version>0), checksum text NOT NULL CHECK(length(checksum)=64), applied_at timestamptz NOT NULL DEFAULT now())`);
-      const previous = await tx.query<{ checksum: string }>('SELECT checksum FROM schema_migrations WHERE version=1');
-      if (previous.rowCount) {
-        if (previous.rows[0]!.checksum !== checksum) throw new Error('Migration 001 checksum mismatch; use a new versioned migration');
-        return;
+      const previous = await tx.query<{ version: number; checksum: string }>('SELECT version,checksum FROM schema_migrations ORDER BY version');
+      if (previous.rows.some(migration => !migrations.some(source => source.version === migration.version))) throw new Error('Database has migrations not present in this deployment');
+      for (const migration of migrations) {
+        const applied = previous.rows.find(item => item.version === migration.version);
+        if (applied) {
+          if (applied.checksum !== migration.checksum) throw new Error(`Migration ${migration.version} checksum mismatch; use a new versioned migration`);
+          continue;
+        }
+        await tx.query(migration.sql);
+        await tx.query('INSERT INTO schema_migrations(version,checksum) VALUES($1,$2)', [migration.version, migration.checksum]);
       }
-      await tx.query(sql);
-      await tx.query('INSERT INTO schema_migrations(version,checksum) VALUES(1,$1)', [checksum]);
     });
   }
   async close(): Promise<void> { await this.pool.end(); }

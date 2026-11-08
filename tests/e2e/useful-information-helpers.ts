@@ -33,4 +33,3 @@ export async function expectNoTechnicalText(page: Page) {
   for (const label of ['Información técnica', 'Detalle técnico', 'Identificadores y política de cálculo', 'Procedencia y lecturas']) expect(visible).not.toContain(label);
   expect(visible).not.toContain('["');
 }
-

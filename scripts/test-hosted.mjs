@@ -8,7 +8,7 @@ const execute = promisify(execFile);
 const root = fileURLToPath(new URL('../', import.meta.url));
 const ownership = randomUUID();
 const image = 'postgres@sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f';
-let containerId, child, interrupted = false;
+let containerId, child, creationAttempted = false, interrupted = false;
 async function docker(args, options = {}) {
   return execute('docker', args, { cwd: root, windowsHide: true, timeout: 30_000, maxBuffer: 1024 * 1024, ...options });
 }
@@ -18,6 +18,7 @@ async function provision() {
   catch { throw new Error('Hosted tests require a reachable PostgreSQL 17 TEST_DATABASE_URL or Docker Desktop. No SQL mock or skipped PASS is available.'); }
   const password = randomBytes(32).toString('base64url');
   try {
+    creationAttempted = true;
     const result = await docker(['run', '--detach', '--rm', '--pull=never', '--name', `ce-hosted-${ownership}`,
       '--label', `ce.hosted-test-owner=${ownership}`, '--publish', '127.0.0.1::5432',
       '--env', 'POSTGRES_PASSWORD', '--env', 'POSTGRES_USER=ce_test', '--env', 'POSTGRES_DB=ce_test', image],
@@ -36,6 +37,19 @@ async function provision() {
   throw new Error('Owned PostgreSQL 17 did not become ready within the test startup deadline.');
 }
 async function cleanup() {
+  if (!containerId && creationAttempted) {
+    // A lost docker-run response can leave our named resource alive; reconcile by exact name plus ownership label.
+    try {
+      const found = (await docker(['inspect', '--format', '{{.Id}} {{index .Config.Labels "ce.hosted-test-owner"}}', `ce-hosted-${ownership}`])).stdout.trim().split(' ');
+      if (found[1] !== ownership || !/^[a-f0-9]{64}$/.test(found[0] ?? '')) throw new Error('Test container ownership mismatch');
+      containerId = found[0];
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Test container ownership mismatch') throw error;
+      const stderr = error && typeof error === 'object' && 'stderr' in error ? String(error.stderr) : '';
+      if (/No such (object|container)/i.test(stderr)) return;
+      throw new Error('Could not reconcile the possibly created test container');
+    }
+  }
   if (!containerId) return;
   const owner = (await docker(['inspect', '--format', '{{index .Config.Labels "ce.hosted-test-owner"}}', containerId])).stdout.trim();
   if (owner !== ownership) throw new Error('Refusing to remove a container without the exact test ownership label.');
