@@ -22,6 +22,17 @@ describe('validation page HTTP workflow', () => {
     for (const request of http.match(request => request.method === 'GET' && request.url.endsWith('/direction-reviews'))) request.flush({ active:null });
   }
   afterEach(() => { http.verify(); TestBed.resetTestingModule(); });
+  it('shows one run as readable context and restores focus before removing a multi-run selector', async () => {
+    const fixture=TestBed.createComponent(ValidationPageComponent);fixture.detectChanges();flushHistory();await Promise.resolve();
+    const store=fixture.componentInstance.store,root=fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('#validation-run')).toBeNull();
+    const run={...page.run,status:'completed' as const};store.history.set([run]);store.selectedRunId.set(run.id);fixture.detectChanges();
+    expect(root.querySelector('#validation-run')).toBeNull();expect(root.querySelector('.history-controls')?.textContent).toContain('Terminada');
+    const action=root.querySelector<HTMLButtonElement>('button')!;action.focus();fixture.detectChanges();expect(document.activeElement).toBe(action);
+    store.history.set([run,{...run,id:'older-run'}]);fixture.detectChanges();const selector=root.querySelector<HTMLSelectElement>('#validation-run')!;
+    expect(selector.options).toHaveLength(2);selector.focus();store.history.set([run]);fixture.detectChanges();
+    expect(root.querySelector('#validation-run')).toBeNull();expect(document.activeElement).toBe(root.querySelector('#validation-title'));
+  });
   it('starts validation against the visible snapshot and separates pass from warning severity with exact values', async () => {
     const fixture = TestBed.createComponent(ValidationPageComponent); fixture.detectChanges(); flushHistory();
     const button = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find((element) => element.textContent?.includes('Validar informes'))!; expect(button).toBeDefined(); button.click();
@@ -29,6 +40,7 @@ describe('validation page HTTP workflow', () => {
     request.flush(terminalJob); await Promise.resolve(); TestBed.tick();
     http.expectOne((item) => item.url.endsWith('/runs/' + runId + '/results')).flush(page); await Promise.resolve(); fixture.detectChanges(); flushHistory();
     const element = fixture.nativeElement as HTMLElement; expect(element.textContent).toContain('Pasa'); expect(element.textContent).toContain('Advertencia');
+    expect(element.querySelector('ce-results-export details')).toBeNull();expect(element.textContent).not.toContain('Formato de resultados');expect(element.querySelector('ce-results-export')?.textContent).toContain('Ir a Descargar resultados');
     expect(element.querySelector('ce-calculation-detail')).toBeNull();
     element.querySelector<HTMLButtonElement>('button[aria-label="Ver cálculo y origen de v0190_m"]')!.click(); fixture.detectChanges();
     const detail = element.querySelector('[role="region"][aria-label="Cálculo y origen de v0190_m"]')!;

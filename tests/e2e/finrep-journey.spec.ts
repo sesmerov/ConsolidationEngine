@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { readZipParts } from '../helpers/xlsx-fixtures.js';
 import { navigateStage } from './workflow-helpers.js';
-import { prepareDirections, saveDirections } from './direction-review-helpers.js';
+import { prepareDirections, ensureDirectionsReady } from './direction-review-helpers.js';
 
 async function session(page: Page) {
   const bootstrap = await (await page.request.get('/api/v1/bootstrap')).json();
@@ -59,10 +59,10 @@ for (const width of [320, 390, 1440]) test(`FINREP F 01.01 ${width}px: downloada
   const validated = await action(page, '/validations', 'Validar informes');
   const results = await get(page, `/runs/${validated.resultRef.id}/results`);
   expect(results.total).toBe(5); expect(results.run.summary.byStatus).toMatchObject({ pass: 2, fail: 3, error: 0 });
-  const reviewId = await prepareDirections(page); await saveDirections(page, reviewId, 2);
-  await expect(page.getByRole('button', { name: '3. Recalcular', exact: true })).toHaveClass(/stage-recommended/);
+  const reviewId = await prepareDirections(page); await ensureDirectionsReady(page, reviewId, 2);
+  await expect(page.getByRole('button', { name: '3. Recalcular', exact: true })).toHaveAttribute('aria-current','step');
   await navigateStage(page, 'recalculation');
-  const simulated = await action(page, '/previews', 'Simular recálculos');
+  const simulated = await action(page, '/recalculation-operations', 'Simular recálculos');
   const selection = await get(page, `/previews/${simulated.resultRef.id}/selection-state`);
   expect(selection).toMatchObject({ selectedCount: 2, requiredCount: 0, revision: 1 });
   const table = page.getByRole('table', { name: 'Propuestas de recálculo', exact: true });
@@ -89,8 +89,11 @@ for (const width of [320, 390, 1440]) test(`FINREP F 01.01 ${width}px: downloada
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath(`finrep-applied-${width}.png`), fullPage: true });
   await navigateStage(page, 'download'); await page.locator('#export-version').selectOption(imported.newVersionId);
+  await expect(page.locator('#export-version')).toHaveValue(imported.newVersionId);
+  await page.locator('#export-version').selectOption(applied.newVersionId);
   const downloading = page.waitForEvent('download');
-  await action(page, '/exports', /Descargar informes aplicados/);
+  const exporting=page.waitForResponse(response=>response.url().endsWith('/exports')&&response.request().method()==='POST');
+  await page.locator('[data-download-action]').click();const exportRequest=await exporting;expect(exportRequest.request().postDataJSON().versionId).toBe(applied.newVersionId);
   const download = await downloading, zip = info.outputPath('finrep-applied.zip'); await download.saveAs(zip);
   const report = (await readZipParts(zip)).find(part => part.name === 'reports/report-001.xlsx'); expect(report).toBeDefined();
   const restoredPath = info.outputPath('finrep-restored.xlsx'); await writeFile(restoredPath, report!.data);

@@ -44,6 +44,6 @@ export const operationReceiptSchema = {
       type: { type: 'string', minLength: 1, maxLength: 100 }, id: { type: 'string', minLength: 1, maxLength: 200 },
     } }, newVersionId: uuidSchema,
   },
-  allOf: [{ if: { properties: { phase: { const: 'succeeded' } }, required: ['phase'] },
-    then: {}, else: { not: { anyOf: [{ required: ['resultRef'] }, { required: ['newVersionId'] }] } } }],
+  allOf: [{ if: { type: 'object', properties: { phase: { const: 'succeeded' } }, required: ['phase'] },
+    then: {}, else: { not: { anyOf: [{ type: 'object', required: ['resultRef'] }, { type: 'object', required: ['newVersionId'] }] } } }],
 } as const;

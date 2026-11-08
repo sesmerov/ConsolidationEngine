@@ -13,6 +13,8 @@ h2 { font-size: 24px; margin: 0 0 12px; } h3 { font-size: 18px; margin: 20px 0 1
 p { line-height: 1.6; margin: 10px 0; } a { color: #0758a8; }
 button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 3px solid #175caa; outline-offset: 3px; }
 [tabindex='-1']:focus { outline: 2px solid #175caa; outline-offset: 4px; }
+:is(h1,h2,h3,h4)[tabindex='-1']:focus:not(:focus-visible) { outline: none; }
+:is(h1,h2,h3,h4)[tabindex='-1']:focus-visible { outline: 3px solid #175caa; outline-offset: 3px; }
 [hidden] { display: none !important; }
 .skip-link { position: fixed; top: 8px; left: 8px; z-index: 100; padding: 12px; background: white; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }
 .skip-link:focus { clip-path: none; width: auto; height: auto; }
@@ -75,5 +77,5 @@ pre { white-space:pre-wrap; overflow-wrap:anywhere; background:#edf2f8; padding:
 .summary-table { border-collapse:collapse; width:100%; } .summary-table th,.summary-table td { padding:10px; text-align:left; border-bottom:1px solid #e0e6ef; }
 .job-progress { margin-bottom:20px; } .job-progress mat-progress-bar { margin:12px 0; }
 .two-columns { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
-@media(max-width:900px) { .workspace-layout { grid-template-columns:1fr; gap:16px; } .stage-nav { position:static; flex-direction:row; flex-wrap:wrap; } .stage-nav button { width:auto; flex:1 1 140px; } }
-@media(max-width:500px) { .app-main { padding:14px 10px; } .app-header { padding:14px; } .workspace-card,.empty-state { padding:16px; } .calculation-detail { padding:14px; } .two-columns { grid-template-columns:1fr; } .workspace-meta { gap:14px; } .history-controls mat-form-field { min-width:0; width:100%; } .filters mat-form-field { flex-basis:100%; } .stage-nav { gap:4px; padding:6px; } .stage-nav button { flex-basis:110px; } }
+@media(max-width:900px) { .workspace-layout { grid-template-columns:1fr; gap:16px; } .stage-nav { position:static; flex-direction:row; flex-wrap:wrap; } .stage-nav .stage-step { flex:1 1 140px; } }
+@media(max-width:500px) { .app-main { padding:14px 10px; } .app-header { padding:14px; } .workspace-card,.empty-state { padding:16px; } .calculation-detail { padding:14px; } .two-columns { grid-template-columns:1fr; } .workspace-meta { gap:14px; } .history-controls mat-form-field { min-width:0; width:100%; } .filters mat-form-field { flex-basis:100%; } .stage-nav { gap:4px; padding:6px; } .stage-nav .stage-step { flex-basis:110px; } }

@@ -59,7 +59,7 @@
         } @empty { <p>No hay descripciones adicionales conservadas para esta variante.</p> }
       }
     </div>
-    <details class="trace-details calculation-explanation">
+    @if (hasNumericExplanation()) { <details class="trace-details calculation-explanation">
       <summary>Cómo se obtiene este importe</summary>
         @if (proposal(); as proposed) {
           @if (proposed.before) { <p>Precisión del destino: {{ proposed.before.coordinate.decimals }}</p> }
@@ -67,6 +67,6 @@
           @if (proposed.derivedInterval; as value) { <p>Intervalo calculado: <span class="exact-value">[{{ decimalText(value.lo) }} → {{ decimalText(value.hi) }}]</span></p> }
         }
         @for (operand of operands(); track operand.label) { @if (interval(operand.value); as value) { <p>{{ operand.label }} · intervalo: <span class="exact-value">{{ value }}</span></p> } }
-    </details>
+    </details> }
   </section>
 }

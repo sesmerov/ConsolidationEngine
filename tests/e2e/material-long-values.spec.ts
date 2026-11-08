@@ -4,7 +4,7 @@ import type { Locator, Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
 import { importLegacyFixture, navigateStage } from './workflow-helpers.js';
-import { prepareDirections, saveDirections } from './direction-review-helpers.js';
+import { prepareDirections, ensureDirectionsReady } from './direction-review-helpers.js';
 
 const fixturesRoot = path.resolve('tests/fixtures/generated');
 
@@ -150,9 +150,9 @@ for (const width of [320, 390, 1440]) {
 
     // A single simulation exposes the exact amount in the main table; application is covered elsewhere.
     const reviewId = await prepareDirections(page);
-    await saveDirections(page, reviewId, 1);
+    await ensureDirectionsReady(page, reviewId, 1);
     await navigateStage(page, 'recalculation');
-    const previewing = page.waitForResponse(response => response.url().endsWith('/previews') && response.request().method() === 'POST');
+    const previewing = page.waitForResponse(response => response.url().endsWith('/recalculation-operations') && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Simular recálculos', exact: true }).click();
     await finishJob(page, (await (await previewing).json()).jobId);
     const proposal = page.locator('.proposal-row');

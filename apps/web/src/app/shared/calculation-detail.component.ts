@@ -35,6 +35,7 @@ export class CalculationDetailComponent {
       .flatMap(([label, value]) => value ? [{ label, value }] : []);
   });
   readonly reads = computed<readonly ReadRow[]>(() => this.proposal() ? this.proposal()?.calculation?.reads ?? [] : (this.result()?.factReads ?? []).map(fact => ({ fact })));
+  readonly hasNumericExplanation = computed(() => this.operands().some(operand => operand.value.kind === 'number') || !!this.proposal()?.exactNominal || !!this.proposal()?.derivedInterval);
   readonly columns = ['coordinate', 'value', 'origin'];
   readonly origins = computed(() => {
     const locators = [...(this.row()?.sources ?? []), ...this.reads().map(read => read.fact.sourceLocator), ...(this.row()?.metadataReads ?? []).flatMap(read => read.sourceLocator ? [read.sourceLocator] : []),

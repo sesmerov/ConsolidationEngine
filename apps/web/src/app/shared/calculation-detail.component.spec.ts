@@ -81,6 +81,28 @@ describe('calculation and source detail', () => {
     const { root } = render(row); expect(root.textContent).toContain(text); expect(root.textContent).toContain('Texto vacío'); expect(root.textContent).toContain('29/02/2024'); expect(root.textContent).toContain('Sin dato');
     expect(root.querySelector('img,b')).toBeNull();
   });
+  it.each(['text','date'] as const)('keeps %s evidence and source without an empty numeric explanation', kind => {
+    const typed = kind === 'text' ? {kind:'text' as const,value:'Banco'} : {kind:'date' as const,value:'2024-02-29'};
+    const row: RuleResultDTO = {...result(),values:{left:typed,right:typed,result:{kind:'boolean',value:true}},diagnostics:[{code:'SYNTHETIC_NOTICE',message:'Comprobación de tipo conservada.'}]};
+    const {root} = render(row);
+    expect(root.querySelector('.calculation-explanation')).toBeNull();
+    expect(root.textContent).toContain(kind === 'text' ? 'Banco' : '29/02/2024');
+    expect(root.textContent).toContain('Comprobación de tipo conservada.');
+    expect(root.querySelector('[data-source-location]')?.textContent).toContain('informe.xlsx');
+  });
+  it('does not offer a calculation expander for a boolean result or unevaluated operands', () => {
+    const {root,fixture} = render({...result(),values:{result:{kind:'boolean',value:false}}});
+    expect(root.querySelector('.calculation-explanation')).toBeNull();
+    fixture.componentRef.setInput('result',{...result(),values:{},status:'not_evaluable',diagnostics:[{code:'MISSING',message:'Falta el importe declarado.'}]});fixture.detectChanges();
+    expect(root.querySelector('.calculation-explanation')).toBeNull();expect(root.textContent).toContain('Falta el importe declarado.');
+    expect(root.querySelector('table[aria-label="Entradas utilizadas"]')).not.toBeNull();
+  });
+  it('keeps a real numeric zero and interval accessible instead of treating zero as missing', () => {
+    const {root} = render({...result(),values:{left:numeric('0'),right:numeric('1'),result:{kind:'boolean',value:false}},factReads:[fact('0')]});
+    const explanation=root.querySelector<HTMLDetailsElement>('.calculation-explanation');
+    expect(explanation).not.toBeNull();expect(explanation?.textContent).toContain('0');expect(explanation?.textContent).toContain('intervalo:');
+    expect(root.querySelector('table')?.textContent).toContain('0,00');
+  });
   it('keeps exact nominal and intervals in a readable explanation without technical dumps', () => {
     const row = { ...proposal(), exactNominal: rational('1', '3'), after: { normalizedValue: rational('33', '100'), originalText: '0.33', decimals: '2', unit: 'EUR' }, derivedInterval: { lo: rational('1', '4'), hi: rational('1', '2') } };
     const { fixture, root } = render(row, 'proposal'); expect(mainText(root)).toContain('Redondeado'); expect(mainText(root)).not.toContain('1/3');

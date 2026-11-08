@@ -43,6 +43,11 @@ describe('FINREP form, verified profile choices and demonstration', () => {
     session.trackJob({ ...job('first'), status: 'failed', diagnostics: [{ code: 'REPORT_PROFILE_REQUIRED', message: 'Elige', profileChoice: choice }] }); f.detectChanges(); await f.whenStable();
     expect((f.nativeElement as HTMLElement).querySelector('[data-profile-choice]')).toBeNull(); expect(store.contextInput()).toEqual({ source: 'workbook' });
   });
+  it('shows an unsupported workbook diagnosis without inventing an empty profile selector',async()=>{
+    api.inspectImport.mockResolvedValueOnce({...job('unsupported'),status:'failed',diagnostics:[{code:'REPORT_PROFILE_UNSUPPORTED',message:'No se reconoce ninguna plantilla compatible en este libro.',fileName:'desconocido.xlsx'}]});
+    const f=await render(),store=f.componentInstance.store;store.catalog.set(new File(['rules'],'rules.xlsx'));store.reports.set([new File(['report'],'desconocido.xlsx')]);f.detectChanges();await f.whenStable();await store.inspect();f.detectChanges();await f.whenStable();f.detectChanges();
+    const root=f.nativeElement as HTMLElement;expect(root.querySelector('[data-profile-choice]')).toBeNull();expect(root.textContent).toContain('No se reconoce ninguna plantilla compatible');expect(root.textContent).toContain('desconocido.xlsx');expect(store.canInspect()).toBe(true);
+  });
   it('offers FINREP synthetic demo with two known changes and independent download filenames', async () => {
     const f = await render(), store = f.componentInstance.store; store.selectDemo('finrep'); f.detectChanges();
     expect(store.selectedDemo()).toBe('finrep'); const text = (f.nativeElement as HTMLElement).textContent!;

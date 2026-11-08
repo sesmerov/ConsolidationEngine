@@ -1,12 +1,13 @@
 import { inject, Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import type { HttpResponse } from '@angular/common/http';
 import { firstValueFrom, fromEvent, takeUntil } from 'rxjs';
 import type { BootstrapDTO, CapabilitiesDTO, DirectionChoiceDTO, DirectionsResponseDTO, JobDTO, RulesPageDTO, WorkspaceDTO, ValidationResultsPageDTO } from '@ce/contracts';
 import type { HistoryPageDTO, PreviewDTO, PreviewSelectionDTO, PreviewSummaryDTO, ProposalDTO, ProposalsPageDTO, RunSummaryDTO } from '@ce/contracts';
 import type { ApplicationDetailDTO, ApplicationRequestDTO, ComparisonPageDTO } from '@ce/contracts';
 import type { ActiveImportInspectionDTO, ImportContextInputDTO, ImportInspectionCommitDTO, ImportInspectionDTO } from '@ce/contracts';
-import type { VersionExportSummaryDTO } from '@ce/contracts';
+import type { ExportArtifactSummaryDTO, VersionExportSummaryDTO } from '@ce/contracts';
+import type { OperationReceiptDTO, RecalculationStateDTO, RecalculationOperationRequestDTO, RecalculationOperationAcceptedDTO } from '@ce/contracts';
 import type {
   DirectionConflictGroupsPageDTO, DirectionConflictCandidatesPageDTO, DirectionConflictCandidateDetailDTO,
   ProposalSelectionSummaryDTO, ProposalSelectionEditDTO, ProposalSelectionRowsQueryDTO, ProposalSelectionPageDTO,
@@ -45,6 +46,14 @@ export class ApiClient {
   cancelJob(workspaceId: string, jobId: string): Promise<JobDTO> {
     return firstValueFrom(this.http.delete<JobDTO>(this.jobUrl(workspaceId, jobId), { headers: this.headers() }));
   }
+  operation(id: string): Promise<OperationReceiptDTO> { return firstValueFrom(this.http.get<OperationReceiptDTO>('/api/v1/operations/' + encodeURIComponent(id), { headers: this.headers() })); }
+  operationReceipt(key: string): Promise<OperationReceiptDTO> { return firstValueFrom(this.http.get<OperationReceiptDTO>('/api/v1/operation-receipts/' + encodeURIComponent(key), { headers: this.headers() })); }
+  recalculationState(workspaceId: string): Promise<RecalculationStateDTO> {
+    return firstValueFrom(this.http.get<RecalculationStateDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/recalculation-state', { headers: this.headers() }));
+  }
+  recalculate(workspaceId: string, body: RecalculationOperationRequestDTO, etag: string, key: string): Promise<RecalculationOperationAcceptedDTO> {
+    return firstValueFrom(this.http.post<RecalculationOperationAcceptedDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/recalculation-operations', body, { headers: this.headers(etag).set('Idempotency-Key', key) }));
+  }
   capabilities(): Promise<CapabilitiesDTO> { return firstValueFrom(this.http.get<CapabilitiesDTO>('/api/v1/capabilities', { headers: this.headers() })); }
   corepTemplate(): Promise<Blob> { return firstValueFrom(this.http.get('/api/v1/templates/corep-ca1', { headers: this.headers(), responseType: 'blob' })); }
   visualDemo(kind: 'corep' | 'types' | 'finrep', artifact: 'catalog' | 'report'): Promise<Blob> { return firstValueFrom(this.http.get(`/api/v1/templates/demos/${kind}/${artifact}`, { headers: this.headers(), responseType: 'blob' })); }
@@ -68,7 +77,7 @@ export class ApiClient {
     return firstValueFrom(this.http.get<ValidationResultsPageDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/runs/' + encodeURIComponent(runId) + '/results', { headers: this.headers(), params: { limit: '50', ...filters } }));
   }
   private reviewsUrl(workspaceId: string, reviewId?: string): string {
-    const collection = '/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/direction-reviews';
+    const collection = '/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/recalculation-reviews';
     return reviewId ? collection + '/' + encodeURIComponent(reviewId) : collection;
   }
   activeDirectionReviews(workspaceId: string): Promise<DirectionReviewActiveDTO> {
@@ -77,10 +86,10 @@ export class ApiClient {
   directionReview(workspaceId: string, id: string): Promise<DirectionReviewSummaryDTO> {
     return firstValueFrom(this.http.get<DirectionReviewSummaryDTO>(this.reviewsUrl(workspaceId, id), { headers: this.headers() }));
   }
-  directionReviewRows(workspaceId: string, id: string, filters: { cursor?: string; groupId?: string; state?: DirectionReviewDecision }): Promise<DirectionReviewPageDTO> {
+  directionReviewRows(workspaceId: string, id: string, filters: { cursor?: string; groupId?: string; state?: DirectionReviewDecision; scope?: 'pending'|'resolved'|'all' }): Promise<DirectionReviewPageDTO> {
     return firstValueFrom(this.http.get<DirectionReviewPageDTO>(this.reviewsUrl(workspaceId, id) + '/rows', { headers:this.headers(), params:{limit:'50',...filters} }));
   }
-  directionConflictGroups(workspaceId: string, id: string, query: { cursor?: string } = {}): Promise<DirectionConflictGroupsPageDTO> {
+  directionConflictGroups(workspaceId: string, id: string, query: { cursor?: string; scope?: 'pending'|'resolved'|'all' } = {}): Promise<DirectionConflictGroupsPageDTO> {
     return firstValueFrom(this.http.get<DirectionConflictGroupsPageDTO>(this.reviewsUrl(workspaceId, id) + '/groups', { headers: this.headers(), params: { limit: '50', ...query } }));
   }
   directionConflictCandidates(workspaceId: string, id: string, groupId: string, query: { cursor?: string } = {}): Promise<DirectionConflictCandidatesPageDTO> {
@@ -165,14 +174,20 @@ export class ApiClient {
   exportResults(workspaceId: string, versionId: string, runId: string, etag: string, key: string): Promise<JobDTO> {
     return firstValueFrom(this.http.post<JobDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/exports', { versionId, runId, kind: 'results' }, { headers: this.headers(etag).set('Idempotency-Key', key) }));
   }
-  exportSummary(workspaceId: string, versionId: string): Promise<VersionExportSummaryDTO> {
-    return firstValueFrom(this.http.get<VersionExportSummaryDTO>(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/versions/${encodeURIComponent(versionId)}/export-summary`, { headers: this.headers() }));
+  exportSummary(workspaceId: string, versionId: string, kind: 'report' | 'results' = 'report', runId?: string): Promise<VersionExportSummaryDTO> {
+    const params = new HttpParams().set('kind', kind); const query = kind === 'results' && runId ? params.set('runId', runId) : params;
+    return firstValueFrom(this.http.get<VersionExportSummaryDTO>(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/versions/${encodeURIComponent(versionId)}/export-summary`, { headers: this.headers(), params: query }));
+  }
+  exportArtifactSummary(workspaceId: string, exportId: string): Promise<ExportArtifactSummaryDTO> {
+    return firstValueFrom(this.http.get<ExportArtifactSummaryDTO>(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/exports/${encodeURIComponent(exportId)}`, { headers: this.headers().set('Accept', 'application/json') }));
   }
   exportReport(workspaceId: string, versionId: string, etag: string, key: string): Promise<JobDTO> {
     return firstValueFrom(this.http.post<JobDTO>('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/exports', { versionId, kind: 'report' }, { headers: this.headers(etag).set('Idempotency-Key', key) }));
   }
-  downloadExport(workspaceId: string, exportId: string): Promise<Blob> {
-    return firstValueFrom(this.http.get('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/exports/' + encodeURIComponent(exportId), { headers: this.headers(), responseType: 'blob' }));
+  downloadExport(workspaceId: string, exportId: string, signal?: AbortSignal): Promise<Blob> {
+    if (signal?.aborted) return Promise.reject(new DOMException('Descarga cancelada.', 'AbortError'));
+    const request = this.http.get('/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/exports/' + encodeURIComponent(exportId), { headers: this.headers().set('Accept', 'application/zip'), responseType: 'blob' });
+    return firstValueFrom(signal ? request.pipe(takeUntil(fromEvent(signal, 'abort'))) : request);
   }
   private jobUrl(workspaceId: string, jobId: string): string {
     return '/api/v1/workspaces/' + encodeURIComponent(workspaceId) + '/jobs/' + encodeURIComponent(jobId);

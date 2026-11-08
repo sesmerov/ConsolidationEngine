@@ -3,15 +3,22 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { isTerminalJob } from '@ce/contracts';
 import type { CompactPreviewDTO, CompactApplicationDetailDTO, CompactComparisonPageDTO, PreviewSummaryDTO,
   ProposalSelectionSummaryDTO, ProposalSelectionPageDTO, ProposalSelectionRowDTO, ProposalSelectionFilterDTO,
-  ProposalSelectionEditDTO, ProposalSelectionOperationDTO, ProposalDependencyPageDTO, ProposalExplanationDTO } from '@ce/contracts';
+  ProposalSelectionEditDTO, ProposalSelectionOperationDTO, ProposalDependencyPageDTO, ProposalExplanationDTO, OperationReceiptDTO, JobDTO } from '@ce/contracts';
 import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
 import { CursorPage, CursorPageError } from '../core/cursor-page';
 import { ApplyStore } from './apply.store';
+import { DirectionsStore } from './directions.store';
+import { OperationAttemptStore } from '../core/operation-attempt.store';
+import type { RecalculationOperationAttempt } from '../core/operation-attempt.store';
 interface SelectionAttempt { workspaceId: string; previewId: string; baseVersionId: string; etag: string; key: string; body: ProposalSelectionEditDTO | null }
 @Injectable({ providedIn: 'root' })
 export class PreviewStore {
   private readonly api = inject(ApiClient); readonly session = inject(SessionStore); private readonly applying = inject(ApplyStore);
+  private readonly directions = inject(DirectionsStore); private readonly attempts = inject(OperationAttemptStore);
+  private operationAttempt: RecalculationOperationAttempt | null = null; private finishingOperation = '';
+  readonly operationUncertain = signal(false);
+  readonly decisionsChanged = computed(() => this.directions.hasUnsavedChoice() || !!this.directions.review() && this.directions.review()!.revision > 1 && this.directions.review()!.state !== 'committed');
   private generation = 0; private historyGeneration = 0; private detailGeneration = 0; private dependencyGeneration = 0; private applicationGeneration = 0;
   private workspaceId: string | undefined; private version: string | null | undefined; private context: string | null | undefined;
   private ownPreviewJob = ''; private observedPreviewJob = ''; private observedSelectionJob = ''; private observedApplication = '';
@@ -34,24 +41,25 @@ export class PreviewStore {
     && !this.loading() && !this.selecting() && !this.selectionUncertain() && !this.pending() && !this.applying.pending() && !this.applying.uncertain() && !this.session.pending() && !this.session.jobActive());
   readonly allMatchingSelected = computed(() => !!this.page()?.filterCounts.available && this.page()!.filterCounts.selected === this.page()!.filterCounts.available);
   readonly partiallySelected = computed(() => !!this.page()?.filterCounts.selected && !this.allMatchingSelected());
-  readonly canSimulate = computed(() => !!this.session.workspace()?.id && !!this.session.versionId() && !!this.session.etag()
+  readonly canSimulate = computed(() => this.directions.canSimulate() && !this.operationUncertain() && !!this.session.workspace()?.id && !!this.session.versionId() && !!this.session.etag()
     && !this.pending() && !this.selectionUncertain() && !this.selecting() && !this.applying.pending() && !this.applying.uncertain() && !this.session.pending() && !this.session.jobActive());
   readonly canDiscard = computed(() => this.preview()?.state === 'ready' && !this.historical() && !this.pending() && !this.selecting()
     && !this.selectionUncertain() && !this.applying.pending() && !this.applying.uncertain() && !this.session.pending() && !this.session.jobActive());
   readonly labels = { ready: 'Preparada', applied: 'Aplicada', discarded: 'Descartada', obsolete: 'Obsoleta', available: 'Disponible', blocked: 'Bloqueada', accepted: 'Aceptada' };
   readonly resultPresentation = computed(() => {
     const job = this.session.job(), preview = this.preview(); if (!job || job.status !== 'succeeded' || job.workspaceId !== this.session.workspace()?.id) return null;
-    const visible = job.kind === 'preview' ? job.resultRef?.id === preview?.id && this.page()?.previewId === preview?.id
+    const visible = job.kind === 'preview' || job.kind === 'recalculation-operation' ? job.resultRef?.id === preview?.id && this.page()?.previewId === preview?.id
       : job.kind === 'apply' && this.comparison()?.receipt.id === job.resultRef?.id && this.comparison()?.receipt.newVersionId === job.newVersionId;
     return visible ? { jobId: job.jobId, workspaceId: job.workspaceId, versionId: job.newVersionId ?? job.baseVersionId ?? null } : null;
   });
   constructor() {
     effect(() => { const id = this.session.workspace()?.id, version = this.session.versionId(), context = this.session.selectedContextId(); untracked(() => {
-      if (id !== this.workspaceId) { this.workspaceId = id; this.version = version; this.context = context; this.reset(); if (id) void this.loadHistory(); }
+      if (id !== this.workspaceId) { this.workspaceId = id; this.version = version; this.context = context; this.reset(); if (id) { void this.loadHistory(); void this.restoreOperation(id); } }
       else if (version !== this.version) { this.version = version; this.applying.invalidateSelection(); this.closeDetail(); this.closeDependencies(); this.pagination.reset(); if (id) { void this.loadHistory(); if (this.selectedPreviewId()) void this.load(); } }
       else if (context !== this.context) { this.context = context; this.pagination.reset(); if (this.selectedPreviewId()) void this.load(); }
     }); });
     effect(() => { const job = this.session.job(); if (!job || job.workspaceId !== this.session.workspace()?.id) return; untracked(() => {
+      if (job.kind === 'recalculation-operation' && isTerminalJob(job.status) && job.jobId === this.operationAttempt?.jobId) void this.finishOperation(job);
       if (job.kind === 'preview' && job.status === 'succeeded' && job.resultRef?.type === 'preview' && job.baseVersionId === this.session.versionId() && job.jobId === this.ownPreviewJob && job.jobId !== this.observedPreviewJob) {
         this.observedPreviewJob = job.jobId; this.choose(job.resultRef.id); void this.loadHistory();
       }
@@ -61,14 +69,23 @@ export class PreviewStore {
       if (job.kind === 'apply' && job.status === 'succeeded' && job.resultRef?.type === 'application' && job.jobId !== this.observedApplication) { this.observedApplication = job.jobId; void this.loadHistory(); if (this.selectedPreviewId()) void this.load(); }
     }); });
     effect(() => { this.applying.preview.set(this.preview()); this.applying.selection.set(this.selection()); this.applying.selectionBusy.set(this.selecting() || this.selectionUncertain()); });
+    effect(() => { this.directions.operationLocked.set(this.pending() || this.operationUncertain() || !!this.operationAttempt && this.session.jobActive()); });
+    effect(() => { const review = this.directions.review(); const local = this.directions.hasUnsavedChoice(); untracked(() => {
+      const key = review ? review.id + ':' + review.revision : '';
+      if (key !== this.decisionRevision || local) this.applying.acknowledged.set(false);
+      this.applying.configurationPending.set(local || !!review && review.revision > 1 && review.state !== 'committed');
+      this.decisionRevision = key;
+    }); });
     inject(DestroyRef).onDestroy(() => this.reset());
   }
+  private decisionRevision = '';
   private reset(): void {
     this.generation++; this.historyGeneration++; this.applicationGeneration++; this.closeDetail(); this.closeDependencies(); this.pagination.reset(); this.comparisonPagination.reset(); this.changedOnly.set(true);
     this.ownPreviewJob = ''; this.observedPreviewJob = ''; this.observedSelectionJob = ''; this.observedApplication = ''; this.selectionJobId = undefined; this.selectionAttempt = undefined; this.recoveringJob = '';
     this.history.set([]); this.historyCursor.set(null); this.selectedPreviewId.set(null); this.preview.set(null); this.page.set(null); this.selection.set(null); this.applying.invalidateSelection();
     this.selectionMissing.set(false); this.selectionUncertain.set(false); this.selecting.set(false); this.application.set(null); this.comparison.set(null); this.applicationLoading.set(false);
     this.confirmDiscard.set(false); this.loading.set(false); this.historyLoading.set(false); this.pending.set(false); this.error.set(null); this.scope.set('all');
+    this.operationAttempt = null; this.operationUncertain.set(false); this.finishingOperation = '';
   }
   async loadHistory(append = false): Promise<void> {
     const w = this.session.workspace()?.id; if (!w) return; const generation = ++this.historyGeneration, cursor = append ? this.historyCursor() : null; this.historyLoading.set(true);
@@ -121,10 +138,69 @@ export class PreviewStore {
     catch (error) { if (w === this.session.workspace()?.id && previewId === this.preview()?.id) this.report(error); } finally { if (this.recoveringJob === jobId) this.recoveringJob = ''; }
   }
   async execute(): Promise<void> {
-    const w = this.session.workspace()?.id, version = this.session.versionId(), etag = this.session.etag(); if (!w || !version || !etag || !this.canSimulate()) return;
-    this.pending.set(true); this.error.set(null); try { const job = await this.api.createPreview(w, version, etag, crypto.randomUUID()); if (w === this.session.workspace()?.id) { this.ownPreviewJob = job.jobId; this.session.trackJob(job); } }
-    catch (error) { if (w === this.session.workspace()?.id) this.report(error); } finally { if (w === this.session.workspace()?.id) this.pending.set(false); }
+    const w = this.session.workspace()?.id, etag = this.session.etag(), input = this.directions.simulationInput();
+    if (!w || !etag || !input || !this.canSimulate()) return;
+    try { const attempt: RecalculationOperationAttempt = { operation: 'recalculation', workspaceId: w, ...input, etag, key: crypto.randomUUID() };
+      this.attempts.save(attempt); this.operationAttempt = attempt; this.applying.invalidateSelection(); await this.sendOperation();
+    } catch (error) { this.error.set(error instanceof Error ? error.message : 'No se pudo conservar el intento.'); }
   }
+  private async restoreOperation(workspaceId: string): Promise<void> {
+    try { this.operationAttempt = this.attempts.get('recalculation', workspaceId); if (this.operationAttempt) { this.operationUncertain.set(true); await this.recoverOperation(); } }
+    catch (error) { this.error.set(error instanceof Error ? error.message : 'No se pudo recuperar el intento de simulación.'); }
+  }
+  async retryOperation(): Promise<void> {
+    if (!this.operationUncertain() || this.pending() || this.session.jobActive() || !this.operationAttempt) return;
+    const recovered = await this.recoverOperation(); if (!recovered && this.operationAttempt) await this.sendOperation();
+  }
+  private async sendOperation(): Promise<void> {
+    const attempt = this.operationAttempt; if (!attempt || attempt.workspaceId !== this.session.workspace()?.id) return;
+    const { baseVersionId, validationBasisId, runId, reviewId, expectedRevision } = attempt;
+    this.pending.set(true); this.error.set(null);
+    try { const accepted = await this.api.recalculate(attempt.workspaceId, { baseVersionId, validationBasisId, runId, reviewId, expectedRevision }, attempt.etag, attempt.key);
+      if (this.operationAttempt !== attempt || attempt.workspaceId !== this.session.workspace()?.id) return;
+      if (accepted.inputVersionId !== attempt.baseVersionId) throw new Error('La operación recibida no corresponde a esta simulación.');
+      const saved = { ...attempt, operationId: accepted.operationId, jobId: accepted.jobId }; this.attempts.save(saved); this.operationAttempt = saved;
+      const job = await this.api.job(attempt.workspaceId,accepted.jobId);
+      if (this.operationAttempt !== saved || attempt.workspaceId !== this.session.workspace()?.id) return;
+      this.operationUncertain.set(false); this.session.trackJob(job); if (isTerminalJob(job.status)) await this.finishOperation(job);
+    } catch (error) {
+      if (attempt.workspaceId !== this.session.workspace()?.id) return;
+      const uncertain = !(error instanceof HttpErrorResponse) || error.status === 0 || error.status >= 500;
+      this.operationUncertain.set(uncertain); this.report(error);
+      if (uncertain) await this.recoverOperation();
+      else { this.clearOperation(attempt.workspaceId); if ([409,410,412].includes(error.status)) { await this.session.refreshWorkspace(attempt.workspaceId); await this.directions.recover(false); } }
+    } finally { if (attempt.workspaceId === this.session.workspace()?.id) this.pending.set(false); }
+  }
+  private async recoverOperation(): Promise<boolean> {
+    const attempt = this.operationAttempt; if (!attempt || attempt.workspaceId !== this.session.workspace()?.id) return false;
+    try { const receipt = attempt.operationId ? await this.api.operation(attempt.operationId) : await this.api.operationReceipt(attempt.key);
+      if (this.operationAttempt !== attempt || attempt.workspaceId !== this.session.workspace()?.id) return true;
+      this.checkReceipt(attempt,receipt);
+      const saved = { ...attempt, operationId: receipt.operationId, jobId: receipt.jobId }; this.attempts.save(saved); this.operationAttempt = saved;
+      if (receipt.phase === 'dispatch_pending') { this.operationUncertain.set(true); return false; }
+      const job = await this.api.job(attempt.workspaceId,receipt.jobId);
+      if (this.operationAttempt !== saved || attempt.workspaceId !== this.session.workspace()?.id) return true;
+      this.operationUncertain.set(false); this.session.trackJob(job); if (isTerminalJob(job.status)) await this.finishOperation(job,receipt); return true;
+    } catch (error) { this.operationUncertain.set(true); if (!(error instanceof HttpErrorResponse && error.status === 404)) this.report(error); return false; }
+  }
+  private checkReceipt(attempt: RecalculationOperationAttempt, receipt: OperationReceiptDTO): void {
+    if (receipt.workspaceId !== attempt.workspaceId || attempt.operationId && receipt.operationId !== attempt.operationId || receipt.reservation?.kind !== 'recalculation' || receipt.reservation.inputVersionId !== attempt.baseVersionId) throw new Error('El recibo no corresponde a esta simulación.');
+  }
+  private async finishOperation(job: JobDTO, knownReceipt?: OperationReceiptDTO): Promise<void> {
+    const attempt = this.operationAttempt; if (!attempt?.operationId || attempt.jobId !== job.jobId || this.finishingOperation === job.jobId) return;
+    this.finishingOperation = job.jobId;
+    try { const receipt = knownReceipt ?? await this.api.operation(attempt.operationId); this.checkReceipt(attempt,receipt);
+      if (this.operationAttempt !== attempt || attempt.workspaceId !== this.session.workspace()?.id) return;
+      if (receipt.phase === 'succeeded' && receipt.resultRef?.type === 'preview') {
+        await this.session.refreshWorkspace(attempt.workspaceId); if (this.operationAttempt !== attempt || attempt.workspaceId !== this.session.workspace()?.id) return;
+        this.clearOperation(attempt.workspaceId); this.choose(receipt.resultRef.id); await this.loadHistory(); await this.directions.recover();
+      } else if (isTerminalJob(job.status) && receipt.phase === job.status && job.status !== 'succeeded') {
+        this.clearOperation(attempt.workspaceId); this.error.set(job.diagnostics[0]?.message ?? 'La simulación no se completó. Los datos siguen sin cambios. Puedes volver a simular.'); await this.directions.recover(false);
+      } else this.operationUncertain.set(true);
+    } catch (error) { this.operationUncertain.set(true); this.report(error); }
+    finally { this.finishingOperation = ''; }
+  }
+  private clearOperation(workspaceId: string): void { this.attempts.clear('recalculation',workspaceId); this.operationAttempt = null; this.operationUncertain.set(false); }
   selectable(row: ProposalSelectionRowDTO): boolean { return this.editable() && row.state === 'available'; }
   async toggle(id: string, checked: boolean): Promise<void> { this.applying.invalidateSelection(); const row = this.page()?.items.find(row => row.id === id) ?? this.dependencies()?.items.find(row => row.id === id);
     if (!row || !this.selectable(row) || row.selected === checked) return; await this.editSelection([{ op: 'set', proposalId: id, selected: checked }]); }

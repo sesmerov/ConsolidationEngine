@@ -1,8 +1,9 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { JsonValue } from '@ce/contracts';
+import { downloadIntentKey } from '@ce/contracts';
 import { runValidation } from '@ce/engine';
 import { createApp, type AppOptions } from '../../apps/api/src/app.js';
 import { execute } from '../../apps/api/src/workers/export.worker.js';
@@ -30,7 +31,10 @@ it('describes the exact historical report profile without exposing facts, contex
     const response = await app.inject({ url: `${base}/versions/${snapshot.versionId}/export-summary`, headers });
     expect(response.statusCode, response.body).toBe(200);
     const summary = response.json(), source = snapshot.content.sources.find(source => source.kind === 'report')!;
-    expect(Object.keys(summary).sort()).toEqual(['createdAt', 'profileId', 'reports', 'versionId']);
+    expect(Object.keys(summary).sort()).toEqual(['createdAt', 'intent', 'intentFingerprint', 'profileId', 'reports', 'versionId']);
+    const intent = { workspaceId: workspace.id, versionId: snapshot.versionId, kind: 'report' as const };
+    expect(summary.intent).toEqual(intent);
+    expect(summary.intentFingerprint).toBe(createHash('sha256').update(downloadIntentKey(intent)).digest('hex'));
     expect(summary).toMatchObject({ versionId: snapshot.versionId, profileId: snapshot.content.profileId, createdAt: snapshot.createdAt,
       reports: [{ sourceFileId: source.id, displayName: source.displayName, profileId, contextCount: 1, contextOrigin: 'workbook', selectedSheets, excludedSheets: [], commonEntityId: snapshot.content.contexts[0]!.entityId, commonReferenceDate: snapshot.content.contexts[0]!.referenceDate }] });
     expect(Object.keys(summary.reports[0]).every(key => ['sourceFileId', 'displayName', 'profileId', 'contextCount', 'contextOrigin', 'selectedSheets', 'excludedSheets', 'commonEntityId', 'commonReferenceDate', 'scaleExponent', 'displayDecimals'].includes(key))).toBe(true);

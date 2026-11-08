@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
-import type { DirectionReviewMutationResponseDTO, DirectionReviewSummaryDTO, JobDTO } from '@ce/contracts';
-import { expectPublishedVersion } from './workflow-helpers.js';
+import type { DirectionReviewMutationResponseDTO, DirectionReviewSummaryDTO } from '@ce/contracts';
+
 
 type Activate = (control: Locator) => Promise<void>;
 const click: Activate = control => control.click();
@@ -11,31 +11,17 @@ async function getSession(page: Page) {
   return { base: `/api/v1/workspaces/${bootstrap.activeWorkspaceId}`, headers: { 'X-CE-Session': String(bootstrap.sessionToken) } };
 }
 
-async function finishJob(page: Page, jobId: string) {
-  const session = await getSession(page);
-  let job!: JobDTO;
-  await expect.poll(async () => {
-    const response = await page.request.get(`${session.base}/jobs/${jobId}`, { headers: session.headers });
-    expect(response.status()).toBe(200);
-    job = await response.json();
-    return job.status;
-  }, { timeout: 60_000 }).toMatch(/^(succeeded|failed|cancelled|timed_out)$/);
-  expect(job.status, JSON.stringify(job.diagnostics)).toBe('succeeded');
-  return job;
-}
-
 export async function prepareDirections(page: Page, activate: Activate = click) {
-  const posting = page.waitForResponse(r => r.url().endsWith('/direction-reviews') && r.request().method() === 'POST');
-  await activate(page.getByRole('button', { name: 'Preparar revisión de destinos', exact: true }));
-  const accepted = await posting;
-  expect(accepted.status()).toBe(202);
-  const job = await finishJob(page, (await accepted.json()).jobId);
-  expect(job.resultRef?.type).toBe('direction-review');
-  return job.resultRef!.id;
+  await activate(page.getByRole('button', {name:'3. Recalcular',exact:true}));
+  await expect(page.getByRole('heading',{name:'Elegir qué celdas recalcular',exact:true})).toBeVisible();
+  const session=await getSession(page); let review:DirectionReviewSummaryDTO|undefined, stateName='';
+  await expect.poll(async()=>{const state=await(await page.request.get(session.base+'/recalculation-state',{headers:session.headers})).json();review=state.review;stateName=state.state;return review?.state;},{timeout:60000}).toBe('ready');
+  if(stateName!=='no_candidates') await expect(page.getByRole('button',{name:'Revisar decisiones',exact:true})).toBeEnabled();
+  return review!.id;
 }
 
 async function editReview(page: Page, reviewId: string, control: Locator, activate: Activate) {
-  const patch = page.waitForResponse(r => r.url().endsWith('/direction-reviews/' + reviewId) && r.request().method() === 'PATCH');
+  const patch = page.waitForResponse(r => r.url().endsWith('/recalculation-reviews/' + reviewId) && r.request().method() === 'PATCH');
   await activate(control);
   const response = await patch;
   expect(response.status()).toBe(200);
@@ -53,18 +39,13 @@ export async function chooseConflict(page: Page, reviewId: string, group: Locato
   return editReview(page, reviewId, group.getByRole('button', { name: 'Confirmar elección', exact: true }), activate);
 }
 
-export async function saveDirections(page: Page, reviewId: string, expectedCount: number, activate: Activate = click) {
-  const posting = page.waitForResponse(r => r.url().endsWith(`/direction-reviews/${reviewId}/commit`) && r.request().method() === 'POST');
-  await activate(page.getByRole('button', { name: 'Guardar configuración', exact: true }));
-  const response = await posting;
-  expect(response.status()).toBe(202);
-  const job = await finishJob(page, (await response.json()).jobId);
-  expect(job.newVersionId).toBeTruthy();
-  await expectPublishedVersion(page, job.newVersionId!);
-  const session = await getSession(page);
-  const saved: DirectionReviewSummaryDTO = await (await page.request.get(`${session.base}/direction-reviews/${reviewId}`, { headers: session.headers })).json();
-  expect(saved.receipt).toMatchObject({ reviewId, newVersionId: job.newVersionId, included: expectedCount });
-  return job.newVersionId!;
+/** Choices remain a draft; only Simular publishes configuration together with its preview. */
+export async function ensureDirectionsReady(page: Page, reviewId: string, expectedCount: number, _activate: Activate = click) {
+  const session=await getSession(page);
+  const review:DirectionReviewSummaryDTO=await(await page.request.get(session.base+'/recalculation-reviews/'+reviewId,{headers:session.headers})).json();
+  expect(review.counts?.included).toBe(expectedCount);expect(review.counts?.pending).toBe(0);expect(review.conflictGroupCount).toBe(0);
+  await expect(page.getByRole('button',{name:'Simular recálculos',exact:true})).toBeEnabled();
+  return (await(await page.request.get(session.base,{headers:session.headers})).json()).currentVersionId as string;
 }
 
 /** The analyst must make both producer decisions for the unmodified COREP demo. */
@@ -84,5 +65,5 @@ export async function configureCorepDemo(page: Page, activate: Activate = click,
   await expect(omit).toContainText('DEMO_INTERVAL');
   const summary = await chooseConflict(page, reviewId, omit, null, activate);
   expect(summary.counts).toMatchObject({ totalRows: 16, included: 5, omitted: 4, excluded: 7, pending: 0, conflicted: 0, undetermined: 0 });
-  return saveDirections(page, reviewId, 5, activate);
+  return ensureDirectionsReady(page, reviewId, 5, activate);
 }

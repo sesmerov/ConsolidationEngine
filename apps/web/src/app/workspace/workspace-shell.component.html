@@ -13,7 +13,7 @@
   @if (workspace.contexts.length > 1) {
     <mat-form-field appearance="outline">
       <mat-label>Contexto</mat-label>
-      <select #contextSelector matNativeControl id="context-selector" [ngModel]="session.selectedContextId()" (ngModelChange)="session.selectContext($event)">
+      <select #contextSelector matNativeControl id="context-selector" [ngModel]="session.selectedContextId()" (ngModelChange)="selectContext($event)">
         @for (option of contextOptions(); track option.id) {
           <option [value]="option.id">{{ option.label }}</option>
         }
@@ -26,15 +26,19 @@
 </section>
 <div class="workspace-layout"><nav class="stage-nav" aria-label="Etapas del trabajo">
   @for (stage of stages; track stage.id) {
+    <div class="stage-step">
     <button mat-button (click)="navigate(stage.id)" [disabled]="stage.id !== 'import' && !workspace.currentVersionId"
       [attr.aria-current]="view.stage() === stage.id ? 'step' : null" [attr.aria-label]="stage.label"
       [class.stage-recommended]="view.recommended() === stage.id">
       {{ stage.label }}
       @if (view.recommended() === stage.id) {
         <span class="stage-arrow" aria-hidden="true">→</span>
-        @for (active of pulse() ? [pulse()!] : []; track active.id) { <span class="stage-pulse" aria-hidden="true" [style.animation-delay.ms]="active.delay"></span> }
       }
     </button>
+    @if (view.recommended() === stage.id) {
+      @for (active of pulse() ? [pulse()!] : []; track active.id) { <span class="stage-pulse" aria-hidden="true" [style.animation-delay.ms]="active.delay"></span> }
+    }
+    </div>
   }
   <span class="stage-announcement" aria-live="polite" aria-atomic="true">{{ announcement() }}</span>
 </nav>

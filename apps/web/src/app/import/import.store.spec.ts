@@ -99,4 +99,17 @@ describe('ImportStore preserves the accepted version', () => {
     clearing.flush({ ...page, total: 300 }); await Promise.resolve(); fixture.detectChanges();
     expect(element.textContent).toContain('0 de 1 registros');
   });
+  it('filters every catalogue status from the rendered selector and preserves full literal diagnostics and source evidence',async()=>{
+    const {fixture,element,setValue}=await renderFilters(),select=element.querySelector<HTMLSelectElement>('select[name=status]')!;
+    const expression='<script>literal</script>'+ ' + 1234567890'.repeat(70);
+    const rows=[['error','Error de sintaxis'],['unsupported','No soportada'],['applicable','Aplicable'],['not_applicable','No aplicable'],['not_evaluable','Falta contexto']] as const;
+    for(const [status,label] of rows){
+      setValue(select,status);const request=http.expectOne(request=>request.url.endsWith('/rules')&&request.params.get('status')===status);
+      const row={id:status,code:'RULE_'+status,syntaxStatus:status==='error'?'error':'valid',supportStatus:status==='unsupported'?'unsupported':'supported',applicability:status,variantId:'variant',active:true,sourceLocator:{fileId:'catalog',sheet:'Validations',row:7},modules:['COREP'],severity:'error',expression,diagnostics:[{code:'SYNTHETIC_DETAIL',message:'Revisa esta expresión completa.',line:1,column:8,locator:{column:'G',row:7}}]};
+      request.flush({...page,items:[row],total:1,sources:[{id:'catalog',displayName:'catalogo.xlsx'}]});await Promise.resolve();fixture.detectChanges();
+      const detail=element.querySelector<HTMLDetailsElement>('details.rule-row')!;expect(detail.querySelector('summary')?.textContent).toContain(label);detail.open=true;
+      expect(detail.querySelector('pre')?.textContent).toBe(expression);expect(detail.querySelector('script')).toBeNull();expect(detail.textContent).toContain('catalogo.xlsx · Validations · fila 7');expect(detail.textContent).toContain('SYNTHETIC_DETAIL: Revisa esta expresión completa.');expect(detail.textContent).toContain('G7');
+    }
+    setValue(select,'');http.expectOne(request=>request.url.endsWith('/rules')&&!request.params.has('status')).flush({...page,items:[],total:0});await Promise.resolve();fixture.detectChanges();expect(element.textContent).toContain('Sin coincidencias');expect(element.textContent).toContain('Filas del catálogo');expect(element.querySelector('details.rule-row')).toBeNull();
+  });
 });

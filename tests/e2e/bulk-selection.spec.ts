@@ -30,14 +30,12 @@ async function seed51(page: Page) {
   const c = await connection(page), current = await page.request.get(c.base, { headers: c.headers });
   const job = await page.request.post(c.base + '/validations', { headers: { ...c.headers, 'If-Match': current.headers()['etag']!, 'Idempotency-Key': crypto.randomUUID() }, data: { baseVersionId: (await current.json()).currentVersionId } });
   const validated = await finish(page, (await job.json()).jobId);
-  const results = await (await page.request.get(c.base + '/runs/' + validated.resultRef.id + '/results?limit=200', { headers: c.headers })).json();
-  const fresh = await page.request.get(c.base, { headers: c.headers });
-  expect((await page.request.put(c.base + '/directions', { headers: { ...c.headers, 'If-Match': fresh.headers()['etag']! }, data: { directions: results.items.map((r: any) => ({ instanceId: r.instanceId, targetSide: 'left' })) } })).status()).toBe(200);
   await page.reload(); await navigateStage(page, 'recalculation');
-  const posting = page.waitForResponse(r => r.url().endsWith('/previews') && r.request().method() === 'POST');
+  const posting = page.waitForResponse(r => r.url().endsWith('/recalculation-operations') && r.request().method() === 'POST');
   await page.getByRole('button', { name: 'Simular recálculos', exact: true }).click();
   const preview = await finish(page, (await (await posting).json()).jobId);
-  await expect(page.locator('#preview-history')).toHaveValue(preview.resultRef.id);
+  await expect(page.locator('ce-preview-page .history-controls')).toContainText('Preparada');
+  await expect(page.getByRole('table', {name:'Propuestas de recálculo',exact:true})).toBeVisible();
   return { ...c, previewId: preview.resultRef.id as string };
 }
 test.beforeEach(async ({ page }) => {
@@ -64,6 +62,9 @@ test('51 proposals: global preselection, persisted deselection, filter scope, ex
   await page.getByRole('button', { name: 'Limpiar selección', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Confirmar la aplicación', exact: true })).toHaveCount(0);
   await all.check(); await expect(page.getByText(/Faltan 50 antecedentes/)).toBeVisible();
+  await page.getByRole('button',{name:'Revisar dependencias pendientes',exact:true}).focus();await page.keyboard.press('Enter');
+  const returnToProposals=page.getByRole('button',{name:'Volver a las propuestas',exact:true});await expect(returnToProposals).toHaveCount(1);await expect(table.locator('.proposal-row')).toHaveCount(50);await expect(page.getByLabel('Estado de propuesta',{exact:true})).toHaveCount(0);
+  await returnToProposals.focus();await page.keyboard.press('Enter');await expect(table.locator('.proposal-row')).toHaveCount(1);await expect(page.getByLabel('Código de propuesta',{exact:true})).toHaveValue('BULK_051');await expect(table.getByLabel('Seleccionar BULK_051',{exact:true})).toBeChecked();
   await page.getByLabel('Código de propuesta', { exact: true }).fill(''); await page.getByRole('button', { name: 'Filtrar propuestas', exact: true }).click();
   await all.check(); await expect(page.getByText(/La selección contiene todos sus antecedentes/)).toBeVisible();
   await acceptance.check(); await table.getByLabel('Seleccionar BULK_001', { exact: true }).uncheck();
@@ -74,6 +75,8 @@ test('51 proposals: global preselection, persisted deselection, filter scope, ex
   expect(Buffer.byteLength(JSON.stringify(body))).toBeLessThan(1024);
   const applied = await finish(page, (await application.json()).jobId);
   await expect(page.locator('ce-comparison')).toContainText('Valores modificados: 51');
+  const appliedToggle=page.getByRole('button',{name:'Ver propuestas aplicadas',exact:true});await expect(appliedToggle).toHaveAttribute('aria-expanded','false');await appliedToggle.focus();await page.keyboard.press('Enter');
+  const hideApplied=page.getByRole('button',{name:'Ocultar propuestas aplicadas',exact:true});await expect(hideApplied).toHaveAttribute('aria-expanded','true');await expect(table).toBeVisible();await expect(page.locator('ce-comparison')).toBeVisible();await hideApplied.focus();await page.keyboard.press('Enter');await expect(table).toBeHidden();await expect(page.locator('ce-comparison')).toBeVisible();
   const compact = await (await page.request.get(c.base + '/applications/' + applied.resultRef.id + '?includeAcceptedIds=false', { headers: c.headers })).json();
   expect(compact.receipt.acceptedCount).toBe(51); expect(compact.receipt).not.toHaveProperty('acceptedIds');
   await expect(table.locator('input[type=checkbox]:enabled')).toHaveCount(0);

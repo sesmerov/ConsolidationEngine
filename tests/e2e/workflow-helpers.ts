@@ -19,6 +19,44 @@ export async function navigateStage(page: Page, stage: keyof typeof stages): Pro
   await expect(page.locator(stages[stage].component)).toBeVisible();
 }
 
+/** Exercise a native choice through keyboard navigation, including return through the tab order. */
+export async function chooseNativeOptionWithKeyboard(page: Page, selector: Locator, value: string): Promise<void> {
+  await expect(selector).toBeEnabled(); await selector.focus(); await page.keyboard.press('Home');
+  const optionCount = await selector.locator('option').count();
+  for(let index=0; index<optionCount && await selector.inputValue()!==value; index++) await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter'); await expect(selector).toHaveValue(value);
+  await page.keyboard.press('Tab'); await page.keyboard.press('Shift+Tab'); await expect(selector).toBeFocused();
+}
+
+/** One history item is readable text; multiple items expose an actual selectable identity. */
+export async function expectSelectedHistory(page: Page, kind: 'validation' | 'preview', id: string): Promise<void> {
+  const bootstrap = await (await page.request.get('/api/v1/bootstrap')).json() as BootstrapDTO;
+  const base = '/api/v1/workspaces/' + bootstrap.activeWorkspaceId;
+  const headers = { 'X-CE-Session': bootstrap.sessionToken };
+  type HistoryItem = { id: string; versionId?: string; baseVersionId?: string; status?: string; state?: string };
+  let items: HistoryItem[] = [], selected!: HistoryItem;
+  await expect.poll(async () => {
+    const response = await page.request.get(base + (kind === 'validation' ? '/runs' : '/previews') + '?limit=50', { headers });
+    expect(response.status()).toBe(200);
+    items = (await response.json()).items;
+    const item = items.find(value => value.id === id);
+    if (!item || item.status === 'running') return false;
+    selected = item; return true;
+  }, { timeout: 15_000 }).toBe(true);
+  const selector = page.locator(kind === 'validation' ? '#validation-run' : '#preview-history');
+  await expect(selector).toHaveCount(items.length > 1 ? 1 : 0);
+  if (items.length > 1) { await expect(selector).toHaveValue(id); return; }
+  const workspace = await (await page.request.get(base, { headers })).json() as WorkspaceDTO;
+  const versionNumber = workspace.versionIds.indexOf((selected.versionId ?? selected.baseVersionId)!) + 1;
+  expect(versionNumber).toBeGreaterThan(0);
+  const labels: Record<string, string> = { completed: 'Terminada', incomplete: 'Incompleta', ready: 'Preparada', applied: 'Aplicada', discarded: 'Descartada', obsolete: 'Obsoleta' };
+  const label = labels[(selected.status ?? selected.state)!]; expect(label).toBeTruthy();
+  const history = page.locator('.history-controls');
+  await expect(history).toContainText(kind === 'validation' ? 'Ejecución:' : 'Previsualización:');
+  await expect(history).toContainText('Versión ' + versionNumber);
+  await expect(history).toContainText(label!);
+}
+
 /** Verify the internal identity through the API and its public numbered label through the UI. */
 export async function expectPublishedVersion(page: Page, versionId: string): Promise<void> {
   const bootstrap = await (await page.request.get('/api/v1/bootstrap')).json() as BootstrapDTO;

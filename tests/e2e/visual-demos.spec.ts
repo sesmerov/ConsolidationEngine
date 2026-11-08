@@ -85,7 +85,7 @@ async function loadDemo(page: Page, kind: 'corep' | 'types', info: TestInfo) {
 async function validateDemo(page: Page, kind: 'corep' | 'types') {
   await stage(page, '2. Validar', '#validation-title');
   await expect(page.locator('.stage-recommended')).toHaveCount(0);
-  const job = await runAction(page, '/validations', 'Validar informes');
+  const job = await milestone(page, '2. Validar', '3. Recalcular', '**/validations', () => runAction(page, '/validations', 'Validar informes'));
   const results = await get(page, `/runs/${job.resultRef.id}/results?limit=200`), oracle = kind === 'corep' ? corpus.corep : corpus.typed;
   expect(results.total).toBe(oracle.rules.length);
   expect(results.run.summary.byStatus).toMatchObject({ ...oracle.expectedInitialCounts, not_evaluable: 0, error: 0 });
@@ -156,17 +156,17 @@ for (const width of [320, 390, 1440]) {
     await loadDemo(page, 'corep', info); const results = await validateDemo(page, 'corep');
     const excluded = results.items.filter((item: any) => item.recalculation.policy.mode === 'validation_only'); expect(excluded).toHaveLength(2);
     await rejectForcedDirection(page, excluded[0].instanceId);
-    await milestone(page, '2. Validar', '3. Recalcular', '**/direction-reviews/*/commit', () => configureCorepDemo(page, undefined, async () => {
+    await configureCorepDemo(page, undefined, async () => {
       await noPageOverflow(page);
       await page.locator('.directions-panel').screenshot({ path: info.outputPath(`revision-corep-${width}.png`) });
-    }));
+    });
     await page.getByRole('navigation', { name: 'Etapas del trabajo' }).screenshot({ path: info.outputPath(`siguiente-etapa-${width}.png`) });
     if (width === 390) {
       await page.getByRole('button', { name: '3. Recalcular', exact: true }).tap();
       await expect(page.locator('#preview-title')).toBeFocused();
     } else await stage(page, '3. Recalcular', '#preview-title');
     await expect(page.locator('.stage-recommended')).toHaveCount(0);
-    const simulated = await runAction(page, '/previews', 'Simular recálculos');
+    const simulated = await runAction(page, '/recalculation-operations', 'Simular recálculos');
     const proposals = await get(page, `/previews/${simulated.resultRef.id}/proposals?limit=200`);
     expect(proposals.items.map((item: any) => item.code).sort()).toEqual(officialCodes);
     for (const proposal of proposals.items) {
@@ -208,16 +208,19 @@ for (const width of [320, 390, 1440]) {
     expect(results.items.every((item: any) => item.recalculation.policy.mode === 'validation_only')).toBe(true);
     await rejectForcedDirection(page, results.items[0].instanceId);
     const reviewId = await prepareDirections(page);
-    const summary = await get(page, `/direction-reviews/${reviewId}`);
+    const summary = await get(page, `/recalculation-reviews/${reviewId}`);
     expect(summary.counts).toMatchObject({ totalRows: 8, excluded: 8, included: 0 });
     await expect(page.locator('ce-directions').getByRole('combobox', { name: / · Destino$/ })).toHaveCount(0);
     await expect(page.locator('.stage-recommended')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Descargar resultados de esta ejecución', exact: true })).toBeEnabled();
+    await stage(page, '2. Validar', '#validation-title');
+    await expect(page.getByRole('button', { name: 'Ir a Descargar resultados', exact: true })).toBeEnabled();
     await page.getByRole('table', { name: 'Resultados de validación', exact: true }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: info.outputPath(`demo-types-results-${width}.png`) });
-    await stage(page, '3. Recalcular', '#preview-title'); const simulated = await runAction(page, '/previews', 'Simular recálculos');
-    const proposals = await get(page, `/previews/${simulated.resultRef.id}/proposals?limit=200`); expect(proposals.total).toBe(0);
-    await expect(page.getByText('No hay direcciones guardadas.', { exact: false })).toBeVisible();
+    await stage(page, '3. Recalcular', '#preview-title');
+    await expect(page.getByRole('button', {name:'Simular recálculos',exact:true})).toBeDisabled();
+    expect((await get(page, '/previews')).items).toEqual([]);
+    await expect(page.getByText('No hay recálculos disponibles', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button',{name:'Ir a Descargar',exact:true})).toBeEnabled();
     const apply = page.getByRole('button', { name: 'Aplicar cambios seleccionados', exact: true }); if (await apply.count()) await expect(apply).toBeDisabled();
     await noPageOverflow(page);
   });

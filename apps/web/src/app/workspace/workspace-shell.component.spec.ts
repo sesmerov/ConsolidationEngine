@@ -15,6 +15,7 @@ import { PreviewStore } from '../recalculation/preview.store';
 import { DirectionsStore } from '../recalculation/directions.store';
 import { ApplyStore } from '../recalculation/apply.store';
 import { ExportStore } from '../recalculation/export.store';
+import { OperationAttemptStore } from '../core/operation-attempt.store';
 import type { CompactPreviewDTO, JobDTO, ProposalSelectionSummaryDTO, ReportContext, ValidationResultsPageDTO } from '@ce/contracts';
 
 const workspace = { id: 'workspace', name: 'Cierre de prueba', state: 'ready' as const, currentVersionId: 'v1', versionIds: ['v0', 'v1'], contexts: [], counts: { snapshots: 1, coordinates: 2, facts: 2, sources: 2 }, sessionBytes: 1 };
@@ -29,15 +30,18 @@ const preview = { id: 'preview', baseVersionId: 'v1', state: 'ready', createdAt:
 const selection: ProposalSelectionSummaryDTO = { id: 'selection', workspaceId: workspace.id, previewId: preview.id, baseVersionId: 'v1', revision: 1, state: 'ready', availableCount: 1, selectedCount: 1, requiredCount: 0, complete: true, closureHash: 'one' };
 describe('workspace navigation keeps one active stage', () => {
   beforeEach(() => {
-    TestBed.configureTestingModule({ deferBlockBehavior: DeferBlockBehavior.Playthrough, imports: [AppComponent], providers: [{ provide: ApiClient, useValue: {
+    TestBed.configureTestingModule({ deferBlockBehavior: DeferBlockBehavior.Playthrough, imports: [AppComponent], providers: [{ provide: OperationAttemptStore, useValue: { get: vi.fn().mockReturnValue(null), save: vi.fn(), clear: vi.fn(), clearAll: vi.fn() } }, { provide: ApiClient, useValue: {
       capabilities: vi.fn().mockResolvedValue({ knownDifferences: [] }),
       activeImportInspection: vi.fn().mockResolvedValue({ active: null }),
       activeDirectionReviews: vi.fn().mockResolvedValue({ active: null }),
+      recalculationState: vi.fn().mockResolvedValue({workspaceId:workspace.id,currentVersionId:'v1',validationBasisId:'basis',configuration:{configVersion:'config',directionCount:0},counts:null,state:'needs_validation'}),
       rules: vi.fn().mockResolvedValue({ items: [], total: 0, nextCursor: null, sources: [], coverage: {}, dataSummary: {} }),
       runs: vi.fn().mockResolvedValue({ items: [], total: 0, nextCursor: null }),
       previews: vi.fn().mockResolvedValue({ items: [], total: 0, nextCursor: null }),
       closeWorkspace: vi.fn().mockResolvedValue(undefined),
       exportReport: vi.fn(),
+      operationReceipt: vi.fn().mockRejectedValue(new HttpErrorResponse({ status: 404 })),
+      exportSummary: vi.fn().mockImplementation((workspaceId,versionId,kind='report',runId) => Promise.resolve({versionId,profileId:'profile',createdAt:'2026-11-08T00:00:00Z',reports:[],intent:{workspaceId,versionId,kind,...(runId?{runId}:{})},intentFingerprint:'a'.repeat(64)})),
     } }] });
     const session = TestBed.inject(SessionStore); vi.spyOn(session, 'connect').mockResolvedValue(); session.connected.set(true); session.workspace.set(workspace); session.etag.set('"v-v1"');
   });
@@ -67,31 +71,28 @@ describe('workspace navigation keeps one active stage', () => {
     session.job.set({ ...job, progress: { completed: 0, total: 1, complete: false } }); fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.job-progress')?.textContent).toContain('Progreso incompleto');
   });
-  it('waits for the visible direction review and matching publication receipt before retiring their progress', async () => {
-    const fixture = TestBed.createComponent(AppComponent); fixture.detectChanges(); await fixture.whenStable();
-    const injector = fixture.debugElement.query(By.directive(WorkspaceShellComponent)).injector;
-    const view = injector.get(WorkspaceViewStore), results = injector.get(ResultsStore), directions = injector.get(DirectionsStore), session = TestBed.inject(SessionStore);
-    results.page.set(page); results.selectedRunId.set(page.run.id); view.visit('validation'); fixture.detectChanges(); await fixture.whenStable();
-    const counts = { totalRows: 0, included: 0, omitted: 0, pending: 0, conflicted: 0, excluded: 0, undetermined: 0 };
-    directions.review.set({ id: 'review', workspaceId: workspace.id, baseVersionId: 'v1', runId: page.run.id, state: 'ready', revision: 1, expiresAt: '2099-01-01T00:00:00.000Z', counts, conflictGroupCount: 0 });
-    const prepared: JobDTO = { jobId: 'prepared', workspaceId: workspace.id, baseVersionId: 'v1', kind: 'prepare-directions', status: 'succeeded', progress: { completed: 1, total: 1, complete: true }, diagnostics: [], resultRef: { type: 'direction-review', id: 'review' }, pollAfterMs: 500 };
-    session.job.set(prepared); fixture.detectChanges(); await fixture.whenStable(); expect(fixture.nativeElement.querySelector('.job-progress')).not.toBeNull();
-    directions.rows.set({ reviewId: 'review', revision: 1, items: [], total: 0, nextCursor: null }); fixture.detectChanges(); await fixture.whenStable(); expect(fixture.nativeElement.querySelector('.job-progress')).not.toBeNull();
-    directions.groups.set({ reviewId: 'review', revision: 1, items: [], total: 0, nextCursor: null }); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges(); expect(fixture.nativeElement.querySelector('.job-progress')).toBeNull();
-    session.job.set({ ...prepared, jobId: 'other-preparation', resultRef: { type: 'direction-review', id: 'other-review' } }); fixture.detectChanges(); await fixture.whenStable(); expect(fixture.nativeElement.querySelector('.job-progress')).not.toBeNull();
-    const committed: JobDTO = { ...prepared, kind: 'commit-directions', jobId: 'committed', newVersionId: 'v2' };
-    session.workspace.set({ ...workspace, currentVersionId: 'v2', versionIds: ['v0', 'v1', 'v2'] }); session.job.set(committed); fixture.detectChanges(); await fixture.whenStable(); expect(fixture.nativeElement.querySelector('.job-progress')).not.toBeNull();
-    directions.receipt.set({ reviewId: 'review', runId: page.run.id, baseVersionId: 'v1', newVersionId: 'v2', configVersion: 'config', included: 1 }); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Configuración guardada'); expect(fixture.nativeElement.querySelector('.job-progress')).toBeNull();
-    session.job.set({ ...committed, status: 'failed', diagnostics: [{ code: 'FAILED', message: 'No se guardó la configuración.' }] }); fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.job-progress')?.textContent).toContain('No se guardó');
+  it('retires direction preparation only after its current review is presented in Recalcular', async () => {
+    const fixture=TestBed.createComponent(AppComponent);fixture.detectChanges();await fixture.whenStable();
+    const injector=fixture.debugElement.query(By.directive(WorkspaceShellComponent)).injector;
+    const view=injector.get(WorkspaceViewStore),directions=injector.get(DirectionsStore),session=TestBed.inject(SessionStore),api=TestBed.inject(ApiClient);
+    const counts={totalRows:0,included:0,omitted:0,pending:0,conflicted:0,excluded:0,undetermined:0};
+    const review={id:'review',workspaceId:workspace.id,baseVersionId:'v1',validationBasisId:'basis',runId:'run',state:'ready' as const,revision:1,expiresAt:'2099-01-01T00:00:00Z',counts,conflictGroupCount:0};
+    vi.mocked(api.recalculationState).mockResolvedValue({workspaceId:workspace.id,currentVersionId:'v1',validationBasisId:'basis',compatibleRun:{id:'run',versionId:'v1',validationBasisId:'basis'},configuration:{configVersion:'config',directionCount:0},review,counts,state:'no_candidates'});
+    Object.assign(api,{directionReviewRows:vi.fn().mockResolvedValue({reviewId:'review',revision:1,items:[],total:0,nextCursor:null}),directionConflictGroups:vi.fn().mockResolvedValue({reviewId:'review',revision:1,items:[],total:0,nextCursor:null})});
+    const prepared:JobDTO={jobId:'prepared',workspaceId:workspace.id,baseVersionId:'v1',kind:'prepare-directions',status:'succeeded',progress:{completed:1,total:1,complete:true},diagnostics:[],resultRef:{type:'direction-review',id:'review'},pollAfterMs:500};
+    session.job.set(prepared);view.visit('validation');fixture.detectChanges();await fixture.whenStable();expect(fixture.nativeElement.querySelector('.job-progress')).not.toBeNull();
+    view.visit('preview');fixture.detectChanges();await fixture.whenStable();fixture.detectChanges();await fixture.whenStable();fixture.detectChanges();
+    expect(directions.review()?.id).toBe('review');expect(fixture.nativeElement.querySelector('.job-progress')).toBeNull();
+    session.job.set({...prepared,jobId:'other',resultRef:{type:'direction-review',id:'other-review'}});fixture.detectChanges();await fixture.whenStable();expect(fixture.nativeElement.querySelector('.job-progress')).not.toBeNull();
+    session.job.set({...prepared,jobId:'failed',status:'failed',diagnostics:[{code:'FAILED',message:'No se prepararon las decisiones.'}]});fixture.detectChanges();expect(fixture.nativeElement.querySelector('.job-progress')?.textContent).toContain('No se prepararon');
   });
   it('retires export progress only when its matching artifact is presented and never hides a newer export or failure', async () => {
     const fixture = TestBed.createComponent(AppComponent); fixture.detectChanges(); await fixture.whenStable();
     const injector = fixture.debugElement.query(By.directive(WorkspaceShellComponent)).injector, view = injector.get(WorkspaceViewStore), exports = injector.get(ExportStore), session = TestBed.inject(SessionStore);
     TestBed.tick(); await fixture.whenStable();
     const exported: JobDTO = { jobId: 'export-job', workspaceId: workspace.id, baseVersionId: 'v1', kind: 'export', status: 'succeeded', progress: { completed: 1, total: 1, complete: true }, diagnostics: [], resultRef: { type: 'export', id: 'artifact' }, pollAfterMs: 500 };
-    exports.ready.set({ id: 'artifact', workspaceId: workspace.id, versionId: 'v0', kind: 'report', filename: 'report.zip' }); session.job.set(exported);
+    vi.spyOn(exports,'ready').mockReturnValue({ id: 'artifact', jobId: exported.jobId, intent: { workspaceId: workspace.id, versionId: 'v0', kind: 'report' }, intentFingerprint:'a'.repeat(64), filename:'report.zip', mimeType:'application/zip', size:3, sha256:'b'.repeat(64), status:'ready' });
+    vi.spyOn(exports,'resultPresentation').mockImplementation(() => session.job()?.jobId === exported.jobId ? {jobId:exported.jobId,workspaceId:workspace.id,versionId:'v1'} : null); session.job.set(exported);
     fixture.detectChanges(); await fixture.whenStable(); expect(fixture.nativeElement.querySelector('.job-progress')).not.toBeNull();
     view.visit('exports'); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Archivo preparado: report.zip'); expect(fixture.nativeElement.querySelector('.job-progress')).toBeNull();
@@ -173,7 +174,8 @@ describe('workspace navigation keeps one active stage', () => {
     const injector = fixture.debugElement.query(By.directive(WorkspaceShellComponent)).injector;
     const imports = injector.get(ImportStore), results = injector.get(ResultsStore), proposals = injector.get(PreviewStore), directions = injector.get(DirectionsStore);
     TestBed.tick(); await fixture.whenStable();
-    directions.bind(page.run); directions.stateFilter.set('omitted');
+    const currentState={workspaceId:workspace.id,currentVersionId:'v1',validationBasisId:'basis',compatibleRun:{id:'server-current-run',versionId:'v1',validationBasisId:'basis'},configuration:{configVersion:'config',directionCount:0},counts:null,state:'needs_validation' as const};
+    vi.mocked(TestBed.inject(ApiClient).recalculationState).mockResolvedValue(currentState); directions.state.set(currentState); directions.stateFilter.set('omitted');
     const catalog = new File(['x'], 'catalog.xlsx'); imports.catalog.set(catalog); imports.reports.set([new File(['x'], 'report.xlsx')]);
     results.code.set('ABC'); results.selectedRunId.set('remembered-run'); proposals.selection.set(selection); proposals.code.set('DEF');
     TestBed.inject(SessionStore).selectExportVersion('v0');
@@ -181,7 +183,7 @@ describe('workspace navigation keeps one active stage', () => {
     for (const text of ['2. Validar', '3. Recalcular', '4. Descargar', '1. Cargar']) { await (await loader.getHarness(MatButtonHarness.with({ text }))).click(); }
     expect(imports.catalog()).toBe(catalog); expect(imports.reports()[0]?.name).toBe('report.xlsx');
     expect(results.code()).toBe('ABC'); expect(results.selectedRunId()).toBe('remembered-run'); expect(proposals.selection()).toEqual(selection); expect(proposals.code()).toBe('DEF');
-    expect(directions.run()?.id).toBe(page.run.id); expect(directions.stateFilter()).toBe('omitted'); expect(TestBed.inject(SessionStore).exportVersionId()).toBe('v0');
+    expect(directions.run()?.id).toBe('server-current-run'); expect(directions.stateFilter()).toBe('omitted'); expect(TestBed.inject(SessionStore).exportVersionId()).toBe('v0');
     expect((fixture.nativeElement as HTMLElement).querySelectorAll('ce-import-page,ce-validation-page,ce-preview-page,ce-exports')).toHaveLength(1);
   });
   it('preserves an uncertain export attempt across navigation and uses its original key, body and CAS on retry', async () => {

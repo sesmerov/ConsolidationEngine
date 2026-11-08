@@ -171,7 +171,7 @@ for (const width of [320, 390, 1440]) {
     const configured = await page.request.put(`${base}/directions`, { headers: { ...session.headers, 'If-Match': current.headers()['etag']! }, data: { directions: results.items.map((result: { instanceId: string }) => ({ instanceId: result.instanceId, targetSide: 'left' })) } });
     expect(configured.status()).toBe(200);
     await page.reload(); await stage(page, '3. Recalcular', '#preview-title');
-    const previewing = page.waitForResponse(response => response.url().endsWith('/previews') && response.request().method() === 'POST');
+    const previewing = page.waitForResponse(response => response.url().endsWith('/recalculation-operations') && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Simular recálculos', exact: true }).click();
     const previewJob = await finishJob(page, (await (await previewing).json()).jobId);
     const proposals = await (await page.request.get(`${base}/previews/${previewJob.resultRef.id}/proposals?limit=200`, { headers: session.headers })).json();
@@ -259,14 +259,18 @@ for (const width of [320, 390, 1440]) {
     await assertNoPageOverflow(page);
     await comparison.getByRole('table', { name: 'Comparación de resultados', exact: true }).getByRole('row').first().scrollIntoViewIfNeeded();
     await page.screenshot({ path: testInfo.outputPath(`material-comparison-${width}.png`) });
+    await expect(comparison.getByRole('button', { name: 'Descargar esta versión', exact: true })).toHaveCount(0);
+    await stage(page, '4. Descargar', '#exports-title');
+    await expect(page.locator('#export-version')).toHaveValue(imported.newVersionId);
+    await page.locator('#export-version').selectOption(applied.newVersionId);
     const request = page.waitForRequest(request => request.url().endsWith('/exports') && request.method() === 'POST');
-    const downloading = page.waitForEvent('download'); await comparison.getByRole('button', { name: 'Descargar esta versión', exact: true }).click();
+    const downloading = page.waitForEvent('download'); await page.locator('[data-download-action]').click();
     expect((await request).postDataJSON().versionId).toBe(applied.newVersionId);
     const saved = testInfo.outputPath('applied.zip'); await (await downloading).saveAs(saved);
     const entries = await readZipParts(saved), changes = JSON.parse(entries.find(entry => entry.name === 'changes.json')!.data.toString('utf8'));
     expect(changes.changes).toHaveLength(51);
     expect(changes.changes.map((change: { after: { originalText: string } }) => change.after.originalText).sort()).toEqual(Array.from({ length: 51 }, (_, offset) => `${offset + 11}.00`).sort());
-    await stage(page, '4. Descargar', '#exports-title'); await expect(page.locator('#export-version')).toHaveValue(imported.newVersionId);
+    await stage(page, '3. Recalcular', '#preview-title'); await stage(page, '4. Descargar', '#exports-title'); await expect(page.locator('#export-version')).toHaveValue(applied.newVersionId);
     await testInfo.attach('verification', { body: JSON.stringify({ actor: 'Playwright automation', width, selectedExplicitly: 51, originalVersion: imported.newVersionId, appliedVersion: applied.newVersionId, humanAcceptance: false, isolationPort: 3318, fixture: randomUUID() }), contentType: 'application/json' });
   });
 }

@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SessionStore } from './session.store';
+import { OperationAttemptStore } from './operation-attempt.store';
 import type { ReportContext } from '@ce/contracts';
 const workspaceId = 'a4a99ec0-bb65-41f5-90d1-b857f4ebefb2';
 const workspace = { id: workspaceId, name: 'Cierre', state: 'empty', versionIds: [], contexts: [], counts: { snapshots: 0, coordinates: 0, facts: 0, sources: 0 }, sessionBytes: 0 };
@@ -11,6 +12,25 @@ describe('SessionStore HTTP lifecycle', () => {
   let store: SessionStore;
   beforeEach(() => { TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] }); http = TestBed.inject(HttpTestingController); store = TestBed.inject(SessionStore); });
   afterEach(() => { http.verify(); TestBed.resetTestingModule(); });
+  function persistAttempt(): OperationAttemptStore {
+    const attempts=TestBed.inject(OperationAttemptStore);attempts.save({operation:'export',intent:{workspaceId,versionId:workspaceId,kind:'report'},key:workspaceId,etag:'"original"'});return attempts;
+  }
+  it('cleans only owned attempts after confirmed close and retains them while close is rejected or pending',async()=>{
+    const create=store.create('Cierre');http.expectOne('/api/v1/workspaces').flush(workspace,{headers:{ETag:'"empty"'}});await create;
+    const attempts=persistAttempt();sessionStorage.setItem('another-app:keep','yes');
+    const rejected=store.close();http.expectOne('/api/v1/workspaces/'+workspaceId).flush({error:{code:'STALE_VERSION',message:'Actualiza el conjunto.'}},{status:412,statusText:'Stale'});await rejected;
+    expect(attempts.get('export',workspaceId)).not.toBeNull();
+    const closing=store.close();expect(attempts.get('export',workspaceId)).not.toBeNull();http.expectOne('/api/v1/workspaces/'+workspaceId).flush(null,{status:204,statusText:'No Content'});await closing;
+    expect(attempts.get('export',workspaceId)).toBeNull();expect(sessionStorage.getItem('another-app:keep')).toBe('yes');sessionStorage.removeItem('another-app:keep');
+  });
+  it('removes stale attempts when bootstrap confirms there is no surviving workspace',async()=>{
+    const attempts=persistAttempt();const connecting=store.connect();http.expectOne('/api/v1/bootstrap').flush({sessionToken:'new',apiVersion:'v1',sessionPersistence:'ephemeral'});await connecting;
+    expect(attempts.get('export',workspaceId)).toBeNull();
+  });
+  it.each([{status:403,code:'INVALID_SESSION',cleared:true},{status:410,code:'SESSION_EXPIRED',cleared:true},{status:403,code:'ORIGIN_NOT_ALLOWED',cleared:false},{status:410,code:'IMPORT_INSPECTION_EXPIRED',cleared:false}])('clears attempts for session termination, not a resource or origin error: $code',async({status,code,cleared})=>{
+    const attempts=persistAttempt();const connecting=store.connect();http.expectOne('/api/v1/bootstrap').flush({error:{code,message:'No disponible.'}},{status,statusText:'Unavailable'});await connecting;
+    expect(attempts.get('export',workspaceId)===null).toBe(cleared);attempts.clearAll();
+  });
   it('preserves the active context by ID on refresh and falls back to the first remaining context or none', async () => {
     const firstContext: ReportContext = { contextId: 'primero', canonicalContextKey: 'scope-a', entityId: 'Entidad', referenceDate: '2025-12-31', framework: 'COREP', moduleVersion: 'COREP_OF_4.0', filingIndicators: {} };
     const secondContext = { ...firstContext, contextId: 'segundo', canonicalContextKey: 'scope-b' };

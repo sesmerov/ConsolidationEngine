@@ -1,3 +1,4 @@
+import { expectSelectedHistory } from './workflow-helpers.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -6,7 +7,7 @@ import type { Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
 import { readZipParts } from '../helpers/xlsx-fixtures.js';
-import { prepareDirections, saveDirections } from './direction-review-helpers.js';
+import { prepareDirections, ensureDirectionsReady } from './direction-review-helpers.js';
 import { importLegacyFixture, navigateStage, openCalculation } from './workflow-helpers.js';
 const root = path.resolve('tests/fixtures/generated');
 const exact = '123456789012345678901234567890.123456789';
@@ -42,29 +43,31 @@ async function upload(page: Page, catalog: Buffer, reports: { name: string; buff
 async function validate(page: Page) {
   await navigateStage(page, 'validation');
   const response = page.waitForResponse(response => response.url().endsWith('/validations') && response.request().method() === 'POST'); await page.getByRole('button', { name: 'Validar informes', exact: true }).click(); const accepted = await (await response).json(); expect((await poll(page, accepted.jobId)).status).toBe('succeeded');
-  await expect(page.locator('#validation-run')).toHaveValue(accepted.resultRef.id); const connection = await session(page); return (await page.request.get(`/api/v1/workspaces/${connection.id}/runs/${accepted.resultRef.id}/results?limit=200`, { headers: connection.headers })).json();
+  await expectSelectedHistory(page, 'validation', accepted.resultRef.id); const connection = await session(page); return (await page.request.get(`/api/v1/workspaces/${connection.id}/runs/${accepted.resultRef.id}/results?limit=200`, { headers: connection.headers })).json();
 }
 async function prepare(page: Page) {
   const files = await fixtures(), originalVersion = await upload(page, files.catalog, [{ name: 'synthetic-original.xlsx', buffer: files.report }]), initial = await validate(page);
   const reviewId = await prepareDirections(page);
+  await page.getByRole('button', { name: 'Revisar decisiones', exact: true }).click();
   const zero = page.getByRole('table', { name: 'Destinos de recálculo' }).getByRole('row').filter({ has: page.getByText('synthetic_zero', { exact: true }) });
-  const omitting = page.waitForResponse(response => response.url().endsWith('/direction-reviews/' + reviewId) && response.request().method() === 'PATCH');
+  const omitting = page.waitForResponse(response => response.url().endsWith('/recalculation-reviews/' + reviewId) && response.request().method() === 'PATCH');
   await zero.getByRole('button', { name: 'Omitir', exact: true }).click();
   expect((await omitting).status()).toBe(200);
   await expect(zero.getByRole('button', { name: 'Usar', exact: true })).toBeVisible();
-  await saveDirections(page, reviewId, selectedCodes.length);
+  await ensureDirectionsReady(page, reviewId, selectedCodes.length);
   await navigateStage(page, 'recalculation');
-  const connection = await session(page), response = await page.request.get(`/api/v1/workspaces/${connection.id}`, { headers: connection.headers }), workspace = await response.json(), etag = response.headers()['etag']!;
-  const previewResponse = page.waitForResponse(response => response.url().endsWith('/previews') && response.request().method() === 'POST'); await page.getByRole('button', { name: 'Simular recálculos', exact: true }).click(); const job = await poll(page, (await (await previewResponse).json()).jobId); expect(job.status).toBe('succeeded');
-  await expect(page.locator('#preview-history')).toHaveValue(job.resultRef.id); await expect(page.locator('.proposal-row')).toHaveCount(4);
+  const connection = await session(page);
+  const previewResponse = page.waitForResponse(response => response.url().endsWith('/recalculation-operations') && response.request().method() === 'POST'); await page.getByRole('button', { name: 'Simular recálculos', exact: true }).click(); const job = await poll(page, (await (await previewResponse).json()).jobId); expect(job.status).toBe('succeeded');
+  const response = await page.request.get(`/api/v1/workspaces/${connection.id}`, { headers: connection.headers }), workspace = await response.json(), etag = response.headers()['etag']!;
+  await expectSelectedHistory(page, 'preview', job.resultRef.id); await expect(page.locator('.proposal-row')).toHaveCount(4);
   const proposals = (await (await page.request.get(`/api/v1/workspaces/${connection.id}/previews/${job.resultRef.id}/proposals?limit=200`, { headers: connection.headers })).json()).items;
   return { ...files, connection, workspace, etag, previewId: job.resultRef.id as string, proposals, originalVersion, initial };
 }
 async function download(page: Page, version: string, filename: string, location: string, runId?: string) {
   await navigateStage(page, 'download');
   await page.locator('#export-version').selectOption(version); await page.locator('#export-kind').selectOption(runId ? 'results' : 'report');
-  if (runId) { await page.getByRole('button', { name: 'Actualizar ejecuciones exportables', exact: true }).click(); await expect(page.locator('#export-run option[value="' + runId + '"]')).toHaveCount(1); await page.locator('#export-run').selectOption(runId); }
-  const downloading = page.waitForEvent('download'); await page.getByRole('button', { name: 'Preparar descarga', exact: true }).click(); const artifact = await downloading; expect(artifact.suggestedFilename()).toBe(filename); await artifact.saveAs(location); return readZipParts(location);
+  if (runId) { await page.getByRole('button', { name: 'Actualizar ejecuciones exportables', exact: true }).click(); await expect(page.locator('[data-download-action]')).toBeEnabled(); if (await page.locator('#export-run').count()) await page.locator('#export-run').selectOption(runId); else await expect(page.locator('[data-export-run]')).toBeVisible(); }
+  const downloading = page.waitForEvent('download'); await page.locator('[data-download-action]').click(); const artifact = await downloading; expect(artifact.suggestedFilename()).toBe(filename); await artifact.saveAs(location); return readZipParts(location);
 }
 test.beforeAll(async () => {
   const manifest = JSON.parse(await readFile(path.resolve('tests/fixtures/source-manifest.json'), 'utf8')); hashes.set(manifest.sourceName, manifest.sha256); hashes.set('grammar/dpm_xlLexer-v0.9.g4', manifest.grammarHashes.lexer); hashes.set('grammar/dpm_xlParser-v0.9.g4', manifest.grammarHashes.parser);
@@ -93,10 +96,10 @@ test('V06/V10/V14/V16: explicit application, complete comparison, historic expor
   const detail = await openCalculation(page, changed, 'synthetic_A', 'Después'); await expect(detail).toContainText('Recalculado en una aplicación anterior'); await expect(detail).toContainText('Este valor recalculado no estaba escrito en el informe original');
   const after = await (await page.request.get(`/api/v1/workspaces/${connection.id}/runs/${receipt.validationRunId}/results?limit=200`, { headers: connection.headers })).json(); expect(after.run.summary.byStatus).toMatchObject({ pass: 7, fail: 1, error: 1 });
   const find = (code: string) => after.items.find((row: { code: string }) => row.code === code); expect(find('synthetic_A').values.left.nominal).toEqual({ numerator: '12', denominator: '1' }); expect(find('synthetic_D').values.left.nominal).toEqual({ numerator: '24', denominator: '1' }); expect(find('synthetic_fraction').values.left.nominal).toEqual({ numerator: '33', denominator: '100' });
-  const replay = await page.request.post(`/api/v1/workspaces/${connection.id}/applications`, { headers: { ...connection.headers, 'If-Match': prepared.etag, 'Idempotency-Key': key }, data: body }); expect(replay.status()).toBe(202); expect((await replay.json()).jobId).toBe(job.jobId);
+  const replay = await page.request.post(`/api/v1/workspaces/${connection.id}/applications`, { headers: { ...connection.headers, 'If-Match': response.request().headers()['if-match']!, 'Idempotency-Key': key }, data: body }); expect(replay.status()).toBe(202); expect((await replay.json()).jobId).toBe(job.jobId);
   const latest = await (await page.request.get(`/api/v1/workspaces/${connection.id}`, { headers: connection.headers })).json(); expect(latest.versionIds.filter((id: string) => id === receipt.newVersionId)).toHaveLength(1);
   const lateCancel = await page.request.delete(`/api/v1/workspaces/${connection.id}/jobs/${job.jobId}`, { headers: connection.headers }); expect((await lateCancel.json()).status).toBe('succeeded');
-  await page.reload(); await navigateStage(page, 'recalculation'); await expect(page.locator('#preview-history')).toHaveValue(prepared.previewId); await expect(page.locator('ce-comparison')).toContainText('Aplicación completada');
+  await page.reload(); await navigateStage(page, 'recalculation'); await expectSelectedHistory(page, 'preview', prepared.previewId); await expect(page.locator('ce-comparison')).toContainText('Aplicación completada');
   await openCalculation(page, page.locator('ce-comparison').getByRole('row').filter({ has: page.getByRole('button', { name: 'Ver cálculo y origen de synthetic_A', exact: true }) }), 'synthetic_A', 'Después'); await page.locator('ce-comparison').screenshot({ path: path.resolve('.cache/apply-export-ui.png') });
   const saved = path.resolve('.cache/applied-report.zip'), entries = await download(page, receipt.newVersionId, 'report.zip', saved), log = JSON.parse(entries.find(entry => entry.name === 'changes.json')!.data.toString('utf8'));
   expect(log.receipts.map((entry: { id: string }) => entry.id)).toEqual([receipt.id]); expect(log.changes).toHaveLength(4); expect(log.changes.find((change: { code: string }) => change.code === 'synthetic_fraction').exactNominal).toEqual({ numerator: '1', denominator: '3' });

@@ -1,3 +1,4 @@
+import { expectSelectedHistory } from './workflow-helpers.js';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
@@ -19,7 +20,7 @@ async function upload(page: Page, report: string | Buffer, catalog?: Buffer) {
 async function validate(page: Page) {
   await navigateStage(page, 'validation');
   const response = page.waitForResponse((response) => response.url().endsWith('/validations') && response.request().method() === 'POST'); await page.getByRole('button', { name: 'Validar informes', exact: true }).click();
-  const accepted = await (await response).json(); expect(accepted.resultRef.type).toBe('validation'); await expect(page.locator('#validation-run')).toHaveValue(accepted.resultRef.id, { timeout: 15000 });
+  const accepted = await (await response).json(); expect(accepted.resultRef.type).toBe('validation'); await expectSelectedHistory(page, 'validation', accepted.resultRef.id);
   const connection = await session(page); return (await page.request.get(`/api/v1/workspaces/${connection.id}/runs/${accepted.resultRef.id}/results?limit=200`, { headers: connection.headers })).json();
 }
 test.beforeEach(async ({ page }) => {
@@ -42,7 +43,7 @@ test('V02/V04/V15: G169 passes at the interval boundary, fails beyond it, and pr
   expect(technical.factReads.find((read: { sourceLocator: { row: number; column: string } }) => read.sourceLocator.row === 3 && read.sourceLocator.column === 'G').coordinate.decimals).toBe('2');
   await page.locator('ce-validation-page').screenshot({ path: path.resolve('.cache/validation-ui.png') });
   await page.locator('#validation-run').selectOption(original.run.id); await expect(page.getByText(/Resultado histórico:/)).toBeVisible();
-  const downloadPromise = page.waitForEvent('download'); await page.getByRole('button', { name: 'Descargar resultados de esta ejecución', exact: true }).click(); const download = await downloadPromise;
+  await page.getByRole('button', { name: 'Ir a Descargar resultados', exact: true }).click(); await expect(page.locator('ce-exports')).toBeVisible(); const downloadPromise = page.waitForEvent('download'); await page.locator('[data-download-action]').click(); const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('results.zip'); const location = path.resolve('.cache/validation-results.zip'); await download.saveAs(location); const parts = await readZipParts(location);
   expect(parts.map((part) => part.name)).toEqual(['results.json', 'results.xlsx']); const exported = JSON.parse(parts[0]!.data.toString('utf8')); expect(exported.versionId).toBe(original.versionId); expect(exported.run.summary).toEqual(original.run.summary); expect(exported.results.find((row: { instanceId?: string }) => row.instanceId === applicable.instanceId).values.left.nominal).toEqual({ numerator: '10', denominator: '1' });
 });
@@ -75,7 +76,7 @@ test('V05/V12/V15: null provenance, unsupported syntax and arithmetic errors sta
   await page.getByLabel('Código del resultado').fill('synthetic_nulls'); await page.getByRole('button', { name: 'Filtrar resultados' }).click(); await expect(page.getByText('1 de 1 resultados', { exact: true })).toBeVisible();
   const detail = await openCalculation(page, page.locator('.result-row'), 'synthetic_nulls'); await expect(detail.getByRole('table', { name: 'Entradas utilizadas', exact: true }).getByText('Sin dato', { exact: true })).toHaveCount(2);
   expect(result('synthetic_nulls').factReads.map((read: { presence: string }) => read.presence).sort()).toEqual(['explicit_null', 'implicit_null']);
-  const downloadPromise = page.waitForEvent('download'); await page.getByRole('button', { name: 'Descargar resultados de esta ejecución', exact: true }).click(); const downloaded = await downloadPromise; const location = path.resolve('.cache/validation-exact.zip'); await downloaded.saveAs(location);
+  await page.getByRole('button', { name: 'Ir a Descargar resultados', exact: true }).click(); await expect(page.locator('ce-exports')).toBeVisible(); const downloadPromise = page.waitForEvent('download'); await page.locator('[data-download-action]').click(); const downloaded = await downloadPromise; const location = path.resolve('.cache/validation-exact.zip'); await downloaded.saveAs(location);
   const entries = await readZipParts(location), json = JSON.parse(entries[0]!.data.toString('utf8')); expect(json.results).toHaveLength(pageData.total); expect(json.results.find((row: { code: string }) => row.code === 'synthetic_fraction').values.left.nominal).toEqual({ numerator: '1', denominator: '3' });
 });
 test('V04: permuting catalog and fact rows preserves semantic instance identities and outcomes', async ({ page }) => {

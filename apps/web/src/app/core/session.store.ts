@@ -4,9 +4,11 @@ import type { HttpResponse } from '@angular/common/http';
 import { isTerminalJob } from '@ce/contracts';
 import type { JobDTO, WorkspaceDTO } from '@ce/contracts';
 import { ApiClient } from './api-client';
+import { OperationAttemptStore } from './operation-attempt.store';
 @Injectable({ providedIn: 'root' })
 export class SessionStore {
   private readonly api = inject(ApiClient);
+  private readonly attempts = inject(OperationAttemptStore);
   private timer: ReturnType<typeof setTimeout> | undefined;
   private generation = 0;
   readonly connected = signal(false);
@@ -18,6 +20,7 @@ export class SessionStore {
   readonly selectedContextId = signal<string | null>(null);
   readonly selectedExportVersionId = signal<string | null>(null);
   readonly versionId = computed(() => this.workspace()?.currentVersionId ?? null);
+  readonly validationBasisId = computed(() => this.workspace()?.validationBasisId ?? null);
   readonly exportVersionId = computed(() => { const selected = this.selectedExportVersionId(); return selected && this.workspace()?.versionIds.includes(selected) ? selected : this.versionId(); });
   readonly selectedContext = computed(() => this.workspace()?.contexts.find((context) => context.contextId === this.selectedContextId()) ?? null);
   readonly jobActive = computed(() => { const job = this.job(); return job ? !isTerminalJob(job.status) : false; });
@@ -27,14 +30,14 @@ export class SessionStore {
     await this.perform(async () => {
       const bootstrap = await this.api.bootstrap(); this.api.setSessionToken(bootstrap.sessionToken); this.connected.set(true);
       if (bootstrap.activeWorkspaceId) await this.refreshWorkspace(bootstrap.activeWorkspaceId);
-      else { this.workspace.set(null); this.etag.set(null); this.job.set(null); this.selectedContextId.set(null); this.selectedExportVersionId.set(null); }
+      else { this.attempts.clearAll(); this.workspace.set(null); this.etag.set(null); this.job.set(null); this.selectedContextId.set(null); this.selectedExportVersionId.set(null); }
     });
   }
   async create(name: string): Promise<void> { await this.perform(async () => { this.acceptWorkspace(await this.api.createWorkspace(name)); }); }
   async close(): Promise<void> {
     const workspace = this.workspace(); const etag = this.etag(); if (!workspace || !etag) return;
     await this.perform(async () => {
-      await this.api.closeWorkspace(workspace.id, etag); this.stopPolling(); this.workspace.set(null); this.etag.set(null); this.job.set(null); this.selectedContextId.set(null); this.selectedExportVersionId.set(null);
+      await this.api.closeWorkspace(workspace.id, etag); this.attempts.clearAll(); this.stopPolling(); this.workspace.set(null); this.etag.set(null); this.job.set(null); this.selectedContextId.set(null); this.selectedExportVersionId.set(null);
     });
   }
   async refreshWorkspace(id = this.workspace()?.id): Promise<void> {
@@ -80,7 +83,10 @@ export class SessionStore {
     try { await action(); } catch (error) { this.report(error); } finally { this.pending.set(false); }
   }
   private report(error: unknown): void {
-    if (error instanceof HttpErrorResponse && error.status === 403) { this.connected.set(false); this.api.clearSession(); this.stopPolling(); }
+    if (error instanceof HttpErrorResponse && (error.status === 401 || ['INVALID_SESSION','SESSION_EXPIRED','SESSION_REVOKED'].includes(String(error.error?.error?.code)))) {
+      this.connected.set(false); this.api.clearSession(); this.stopPolling(); this.attempts.clearAll();
+      this.workspace.set(null); this.etag.set(null); this.job.set(null); this.selectedContextId.set(null); this.selectedExportVersionId.set(null);
+    }
     const message = error instanceof HttpErrorResponse && typeof error.error?.error?.message === 'string' ? error.error.error.message as string : 'No se pudo conectar con la sesión local. Comprueba que el servidor siga abierto.';
     this.error.set(message);
   }

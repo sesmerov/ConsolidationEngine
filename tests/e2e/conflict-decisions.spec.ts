@@ -4,7 +4,7 @@ import type { Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
 import { importLegacyFixture, navigateStage } from './workflow-helpers.js';
-import { chooseConflict, prepareDirections, saveDirections } from './direction-review-helpers.js';
+import { chooseConflict, prepareDirections, ensureDirectionsReady } from './direction-review-helpers.js';
 
 async function create(page: Page) {
   const boot = await (await page.request.get('/api/v1/bootstrap')).json();
@@ -32,11 +32,14 @@ test('COREP choices remain editable, keyboard arrows are local, and no fact vers
   const before = await data(page), reviewId = await prepareDirections(page), group = page.getByRole('group', { name: /r0070/ });
   await expect(group).toBeVisible();
   if (!await group.getByRole('radiogroup').count()) await group.getByRole('button', { name: 'Elegir regla', exact: true }).click();
-  const edits: string[] = []; page.on('request', request => { if (request.method() === 'PATCH' && request.url().endsWith('/direction-reviews/' + reviewId)) edits.push(request.postData() ?? ''); });
+  const ruleTrigger=group.getByRole('button',{name:'Ver regla DEMO_RANGE',exact:true});await ruleTrigger.focus();await page.keyboard.press('Enter');
+  const ruleDetail=group.getByRole('region',{name:'Regla DEMO_RANGE',exact:true});await expect(ruleDetail).toBeVisible();await expect(ruleDetail.getByRole('heading',{name:'DEMO_RANGE',exact:true})).toBeFocused();await expect(ruleDetail).toContainText('demo-corep-catalog.xlsx');
+  await ruleDetail.getByRole('button',{name:'Cerrar regla',exact:true}).focus();await page.keyboard.press('Enter');await expect(ruleDetail).toHaveCount(0);await expect(ruleTrigger).toBeFocused();
+  const edits: string[] = []; page.on('request', request => { if (request.method() === 'PATCH' && request.url().endsWith('/recalculation-reviews/' + reviewId)) edits.push(request.postData() ?? ''); });
   const radio = group.getByRole('radio').first(); await radio.focus(); await page.keyboard.press('ArrowDown');
   await expect(group.getByRole('button', { name: 'Confirmar elección', exact: true })).toBeEnabled();
-  expect(edits).toHaveLength(0); await expect(page.getByRole('button', { name: 'Guardar configuración', exact: true })).toBeDisabled();
-  await page.getByRole('button', { name: '3. Recalcular', exact: true }).click(); await expect(page.locator('ce-validation-page')).toBeVisible();
+  expect(edits).toHaveLength(0); await expect(page.getByRole('button', { name: 'Simular recálculos', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '2. Validar', exact: true }).click(); await expect(page.locator('ce-preview-page')).toBeVisible();
   await group.getByRole('button', { name: 'Cancelar', exact: true }).click(); expect(edits).toHaveLength(0);
   await chooseConflict(page, reviewId, group, 'DEMO_RANGE'); await expect(group).toContainText('Regla elegida: DEMO_RANGE');
   await chooseConflict(page, reviewId, group, 'v0174_m'); await expect(group).toContainText('Regla elegida: v0174_m');
@@ -44,8 +47,8 @@ test('COREP choices remain editable, keyboard arrows are local, and no fact vers
   expect(edits).toHaveLength(3); expect((await data(page)).workspace.versionIds).toEqual(before.workspace.versionIds);
   await expect(page.getByRole('button', { name: /^Conservar / })).toHaveCount(0);
   await page.locator('ce-directions').screenshot({ path: info.outputPath('conflicts-editable.png') });
-  await saveDirections(page, reviewId, 5);
-  await expect(page.getByRole('button', { name: '3. Recalcular', exact: true })).toHaveClass(/stage-recommended/);
+  await ensureDirectionsReady(page, reviewId, 5);
+  await expect(page.getByRole('button', { name: 'Simular recálculos', exact: true })).toBeEnabled();
 });
 
 test('candidate 51 survives page changes, resolution, omission and re-editing', async ({ page }) => {
@@ -65,10 +68,10 @@ test('candidate 51 survives page changes, resolution, omission and re-editing', 
   await group.getByRole('radio', { name: /^RULE_051/ }).check();
   await pagination.getByRole('button', { name: 'Anterior', exact: true }).click();
   await expect(group).toContainText('La regla elegida está en otra página: RULE_051');
-  const patched = page.waitForResponse(r => r.request().method() === 'PATCH' && r.url().endsWith('/direction-reviews/' + reviewId));
+  const patched = page.waitForResponse(r => r.request().method() === 'PATCH' && r.url().endsWith('/recalculation-reviews/' + reviewId));
   await group.getByRole('button', { name: 'Confirmar elección', exact: true }).click(); expect((await patched).status()).toBe(200);
   await expect(group).toContainText('Regla elegida: RULE_051');
   await chooseConflict(page, reviewId, group, null); await expect(group).toContainText('Omitida');
   await chooseConflict(page, reviewId, group, 'RULE_001'); await expect(group).toContainText('Regla elegida: RULE_001');
-  await saveDirections(page, reviewId, 1);
+  await ensureDirectionsReady(page, reviewId, 1);
 });

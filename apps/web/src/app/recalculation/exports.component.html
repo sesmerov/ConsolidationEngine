@@ -1,10 +1,14 @@
 <section class="workspace-card" aria-labelledby="exports-title"><p class="eyebrow">04 · DESCARGAR</p><h2 id="exports-title" tabindex="-1" ceStageTitle>Guardar informes y resultados</h2><p>Elige la versión que quieres conservar y el contenido del paquete.</p>
-@if (applied(); as entry) {
-  <button mat-flat-button class="ce-primary-action" data-applied-download (click)="store.startForVersion(entry.newVersionId)" [disabled]="pending() || session.jobActive()">Descargar informes aplicados · {{ versionLabel(session.workspace(), entry.newVersionId) }}</button>
+<div class="export-form">
+@if ((session.workspace()?.versionIds?.length || 0) > 1) {
+  <mat-form-field appearance="outline"><mat-label>Versión para exportar</mat-label><select matNativeControl id="export-version" [ngModel]="session.exportVersionId() || ''" (ngModelChange)="store.selectVersion($event)" [disabled]="store.choiceLocked()">@for (version of session.workspace()?.versionIds || []; track version) { <option [value]="version">{{ versionLabel(session.workspace(), version) }}{{ version === session.versionId() ? ' · vigente' : ' · histórica' }}</option> }</select></mat-form-field>
+} @else { <p data-export-version>Versión para exportar: <strong>{{ versionLabel(session.workspace(), session.exportVersionId()) }}</strong></p> }
+<mat-form-field appearance="outline"><mat-label>Contenido</mat-label><select matNativeControl id="export-kind" [ngModel]="kind()" (ngModelChange)="store.selectKind($event)" [disabled]="store.choiceLocked()"><option value="report">Informes y registro de cambios</option><option value="results">Resultados de validación</option></select></mat-form-field>
+@if (kind() === 'results') {
+  @if (runs().length > 1) { <mat-form-field appearance="outline"><mat-label>Ejecución de la versión elegida</mat-label><select matNativeControl id="export-run" [ngModel]="selectedRunId()" (ngModelChange)="store.selectRun($event)" [disabled]="store.choiceLocked()">@for (run of runs(); track run.id) { <option [value]="run.id">{{ run.startedAt | date:'dd/MM/yyyy HH:mm:ss' }} · {{ run.status === 'completed' ? 'Terminada' : 'Incompleta' }}</option> }</select></mat-form-field> }
+  @else if (chosenRun(); as run) { <p data-export-run>Ejecución: <strong>{{ run.startedAt | date:'dd/MM/yyyy HH:mm:ss' }} · {{ run.status === 'completed' ? 'Terminada' : 'Incompleta' }}</strong></p> }
 }
-<div class="export-form"><mat-form-field appearance="outline"><mat-label>Versión para exportar</mat-label><select matNativeControl id="export-version" [value]="session.exportVersionId() || ''" (change)="session.selectExportVersion($any($event.target).value)">@for (version of session.workspace()?.versionIds || []; track version) { <option [value]="version">{{ versionLabel(session.workspace(), version) }}{{ version === session.versionId() ? ' · vigente' : ' · histórica' }}</option> }</select></mat-form-field>
-<mat-form-field appearance="outline"><mat-label>Contenido</mat-label><select matNativeControl id="export-kind" [value]="kind()" (change)="kind.set($any($event.target).value)"><option value="report">Informes y registro de cambios</option><option value="results">Resultados de validación</option></select></mat-form-field>
-@if (kind() === 'results') { <mat-form-field appearance="outline"><mat-label>Ejecución de la versión elegida</mat-label><select matNativeControl id="export-run" [value]="selectedRunId()" (change)="selectedRunId.set($any($event.target).value)"><option value="">Selecciona una ejecución</option>@for (run of runs(); track run.id) { <option [value]="run.id" [disabled]="run.status === 'running'">{{ run.startedAt | date:'dd/MM/yyyy HH:mm:ss' }} · {{ run.status === 'completed' ? 'Terminada' : run.status === 'running' ? 'En curso' : 'Incompleta' }}</option> }</select></mat-form-field> }</div>
+</div>
 <section class="export-summary" role="region" aria-label="Contenido de la versión elegida">
 <h3>{{ versionLabel(session.workspace(), session.exportVersionId()) }} · {{ session.exportVersionId() === session.versionId() ? 'vigente' : 'histórica' }}</h3>
 @if (store.summaryLoading()) { <p role="status">Consultando el contenido de esta versión…</p> }
@@ -13,7 +17,7 @@
 <p><strong>{{ summary.reports.length }} {{ summary.reports.length === 1 ? 'informe' : 'informes' }}</strong> · {{ profiles().join(' · ') }}</p>
 @if (preservedExcludedCount()) { <p class="notice">{{ preservedExcludedCount() }} {{ preservedExcludedCount() === 1 ? 'hoja excluida del cálculo' : 'hojas excluidas del cálculo' }}. Se conservan en el Excel FINREP exportado, sin considerarlas validadas.</p> }
 @if (excludedCount() > preservedExcludedCount()) { <p class="notice">{{ excludedCount() - preservedExcludedCount() }} hojas excluidas de los archivos de origen. Su contenido no se incluye en los informes exportados.</p> }
-<details class="trace-details"><summary>Ver informes y contexto</summary>
+@if (summary.reports.length) { <details class="trace-details"><summary>Ver informes y contexto</summary>
 <p id="export-table-help" class="table-scroll-hint">Desplaza la tabla horizontalmente para ver todas las columnas.</p>
 <div class="table-region" role="region" aria-label="Detalle de los informes incluidos" aria-describedby="export-table-help" tabindex="0"><table mat-table [dataSource]="summary.reports" class="data-table" aria-label="Informes incluidos">
 <ng-container matColumnDef="file"><th mat-header-cell *matHeaderCellDef>Archivo de origen</th><td mat-cell *matCellDef="let report"><strong>{{ report.displayName }}</strong><span class="cell-secondary">{{ profileLabel(report.profileId) }}</span></td></ng-container>
@@ -21,14 +25,15 @@
 <ng-container matColumnDef="context"><th mat-header-cell *matHeaderCellDef>Contexto</th><td mat-cell *matCellDef="let report">{{ report.commonEntityId || 'Varias entidades' }}<span class="cell-secondary">{{ report.commonReferenceDate ? civilDate(report.commonReferenceDate) : 'Varias fechas de referencia' }} · {{ report.contextCount }} {{ report.contextCount === 1 ? 'contexto' : 'contextos' }}</span><span class="cell-secondary">{{ report.contextOrigin === 'form' ? 'Declarado en pantalla' : 'Leído del libro' }}</span>@if (report.scaleExponent !== undefined) { <span class="cell-secondary">{{ report.scaleExponent === 3 ? 'Miles' : report.scaleExponent === 6 ? 'Millones' : 'Unidades' }} · {{ report.displayDecimals === 'INF' ? 'Valor exacto' : report.displayDecimals + ' decimales escritos' }}</span> }</td></ng-container>
 <tr mat-header-row *matHeaderRowDef="['file','sheets','context']"></tr><tr mat-row *matRowDef="let report; columns: ['file','sheets','context'];"></tr></table></div>
 @for (report of summary.reports; track report.sourceFileId) { @if (report.excludedSheets.length) { <details class="excluded-sheets"><summary>Hojas excluidas de {{ report.displayName }} ({{ report.excludedSheets.length }})</summary><ul>@for (sheet of report.excludedSheets; track sheet) { <li>{{ sheet }}</li> }</ul></details> } }
-</details>
+</details> }
 }
 </section>
 @if (kind() === 'report') { <p>Incluye los informes con los datos y el contexto de la versión elegida, y un registro separado de los cambios aplicados.</p><p class="notice">Extracto de trabajo local para reimportar en este sistema. El paquete no es un fichero oficial de remisión.</p> }
 @else { <p>Incluye el resultado de cada regla, sus lecturas y diagnósticos de la ejecución elegida.</p>@if (incompleteRun()) { <p class="notice">Ejecución incompleta: el paquete conserva ese estado. No constituye una validación completa.</p> }<button mat-button (click)="loadHistory()" [disabled]="historyLoading()">Actualizar ejecuciones exportables</button>@if (cursor()) { <button mat-button (click)="loadHistory(true)" [disabled]="historyLoading()">Cargar más ejecuciones exportables</button> }@if (!runs().length) { <p class="notice">No hay una ejecución cargada para esta versión.</p> } }
-<button mat-flat-button [class.ce-primary-action]="!applied()" (click)="start()" [disabled]="!canStart()">Preparar descarga</button>
-@if (uncertain()) { <p class="notice">La respuesta no está confirmada. El reintento conserva la versión y la solicitud originales.</p><button mat-stroked-button (click)="retry()" [disabled]="pending() || session.jobActive() || session.pending()">Reintentar misma exportación</button> }
-@if (pending()) { <p aria-live="polite">Preparando la descarga…</p> } @if (error(); as message) { <p class="error" role="alert">{{ message }}</p> }
-@if (ready(); as artifact) { <p>Último paquete disponible: <strong>{{ artifact.kind === 'report' ? 'Informes y cambios' : 'Resultados de validación' }} · {{ versionLabel(session.workspace(), artifact.versionId) }}</strong></p><button mat-stroked-button (click)="download()" [disabled]="pending()">Descargar paquete de nuevo</button> }
-@if (ready(); as artifact) { <p class="muted">Archivo preparado: {{ artifact.filename }} · {{ versionLabel(session.workspace(), artifact.versionId) }}</p> }
-<p class="muted">Guarda las descargas antes de cerrar el conjunto o reiniciar el servidor.</p></section>
+@if (store.invalidReason(); as reason) { <p class="notice" id="download-unavailable">{{ reason }}</p> }
+<button mat-flat-button class="ce-primary-action" data-download-action (click)="store.activate()" [disabled]="store.actionDisabled()" [attr.aria-describedby]="store.invalidReason() ? 'download-unavailable' : null">{{ store.actionLabel() }}</button>
+@if (store.state() === 'preparing' || store.state() === 'transferring') { <button mat-button (click)="store.cancel()" [disabled]="session.pending()">{{ store.state() === 'transferring' ? 'Cancelar transferencia' : 'Cancelar preparación' }}</button> }
+@if (uncertain()) { <p class="notice">La respuesta no está confirmada. El reintento conserva la versión y la solicitud originales.</p> }
+@if (error(); as message) { <p class="error" role="alert">{{ message }}</p> }
+@if (ready(); as artifact) { <p class="muted" role="status">Archivo preparado: {{ artifact.filename }} · {{ versionLabel(session.workspace(), artifact.intent.versionId) }}</p> }
+</section>

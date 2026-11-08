@@ -1,6 +1,7 @@
 :host { display: block; min-width: 0; }
 .stage-announcement { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
-.stage-nav button { position: relative; border: 2px solid transparent; }
+.stage-step { position: relative; min-width: 0; border-radius: 999px; }
+.stage-nav button { position: relative; display: flex; border: 2px solid transparent; border-radius: inherit; }
 .stage-nav .stage-recommended { border-color: #146c43; background: #e9f5ee; color: #146c43; font-weight: 700; }
 .stage-arrow { margin-inline-start: .4rem; font-size: 1.2em; }
 .stage-pulse { position: absolute; pointer-events: none; inset: 0; border: 3px solid #146c43; border-radius: inherit; animation: stage-emphasis 1.5s ease-in-out 3; }

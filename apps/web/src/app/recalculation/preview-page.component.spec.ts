@@ -25,13 +25,19 @@ describe('compact preview, persisted selection and explanation',()=>{
     http.expectOne(r=>r.url.endsWith('/selection-state')).flush(s);http.expectOne(r=>r.url.endsWith('/selection-state/rows')).flush(page);
   }
   async function render(state='ready'){
-    const f=TestBed.createComponent(PreviewPageComponent);f.detectChanges();http.expectOne(r=>r.url.endsWith('/previews')).flush({items:[{...preview,state}],total:1,nextCursor:null});await settle();
+    const f=TestBed.createComponent(PreviewPageComponent);f.detectChanges();http.expectOne(r=>r.url.endsWith('/recalculation-state')).flush({workspaceId,currentVersionId:versionId,validationBasisId:versionId,configuration:{configVersion:'config',directionCount:0},counts:null,state:'needs_validation'});http.expectOne(r=>r.url.endsWith('/previews')).flush({items:[{...preview,state}],total:1,nextCursor:null});await settle();
     respond({...preview,state},{...summary(),state},rows({...summary(),state}));await settle();f.detectChanges();return f;
   }
   const button=(f:Awaited<ReturnType<typeof render>>,text:string)=>Array.from((f.nativeElement as HTMLElement).querySelectorAll('button')).find(x=>x.textContent?.includes(text))!;
   async function finishEdit(promise:Promise<void>,s=summary(2),page=rows(s)){
     const req=http.expectOne(r=>r.url.endsWith('/selection-state/edits'));req.flush(job());await settle();respond(preview,s,page);await promise;TestBed.tick();
   }
+  it('shows one retained preview as text and keeps focus when the history selector becomes unnecessary',async()=>{
+    const f=await render(),store=f.componentInstance.store,root=f.nativeElement as HTMLElement;
+    expect(root.querySelector('#preview-history')).toBeNull();expect(root.querySelector('.history-controls')?.textContent).toContain('Preparada');
+    const current=store.history()[0]!;store.history.set([current,{...current,id:'older'}]);f.detectChanges();const select=root.querySelector<HTMLSelectElement>('#preview-history')!;
+    expect(select.options).toHaveLength(2);select.focus();store.history.set([current]);f.detectChanges();expect(root.querySelector('#preview-history')).toBeNull();expect(document.activeElement).toBe(root.querySelector('#preview-title'));
+  });
   it('starts preselected without acceptance and retains global counts through a filter with no matches',async()=>{
     const f=await render(),store=f.componentInstance.store,element=f.nativeElement as HTMLElement;
     expect(element.querySelectorAll('.proposal-row input:checked')).toHaveLength(2);expect(element.querySelector<HTMLInputElement>('#apply-title ~ mat-checkbox input')?.checked).toBe(false);
@@ -72,22 +78,34 @@ describe('compact preview, persisted selection and explanation',()=>{
     const opening=store.openDetail('a'),late=http.expectOne(r=>r.url.endsWith('/proposals/a/explanation'));session.workspace.set(null);TestBed.tick();late.flush({});await opening;
     expect(store.detail()).toBeNull();expect(store.dependencies()).toBeNull();expect(store.selection()).toBeNull();
   });
+  it('closes antecedents from the rendered control and returns keyboard focus to the proposal trigger',async()=>{
+    const f=await render(),trigger=button(f,'1 antecedente');trigger.focus();trigger.click();
+    http.expectOne(r=>r.url.endsWith('/proposals/b/dependencies')).flush({selectionId,previewId:id,revision:1,state:'ready',proposalId:'b',scope:'all',items:[a],total:1,nextCursor:null,predecessorCount:1,requiredPredecessorCount:0});
+    await settle();f.detectChanges();const close=button(f,'Cerrar antecedentes');close.focus();close.click();f.detectChanges();
+    expect(f.componentInstance.store.dependencies()).toBeNull();expect(document.activeElement).toBe(trigger);
+  });
   it('retains obsolete history without editable checkboxes, discard or confirmation',async()=>{
     const f=await render('obsolete'),store=f.componentInstance.store;expect((f.nativeElement as HTMLElement).textContent).toContain('obsoleta');
     expect((f.nativeElement as HTMLElement).querySelectorAll('.proposal-row input[type=checkbox]')).toHaveLength(0);expect((f.nativeElement as HTMLElement).querySelector('#apply-title')).toBeNull();
     expect(store.canDiscard()).toBe(false);await store.discard();await store.toggle('a',false);http.expectNone(r=>r.method==='POST'||r.method==='DELETE');
   });
+  it('shows only one return from missing dependencies and restores the normal filtered proposals without changing selection',async()=>{
+    const f=await render(),s=summary(2,1,1),items=[{...a,selected:false,required:true},{...b,requiredPredecessorCount:1}],store=f.componentInstance.store;
+    store.selection.set(s as any);store.page.set(rows(s,items) as any);f.detectChanges();button(f,'Revisar dependencias pendientes').click();
+    respond(preview,s,{...rows(s,[items[0]!]),scope:'missing'} as any);await settle();f.detectChanges();
+    const root=f.nativeElement as HTMLElement,back=Array.from(root.querySelectorAll('button')).filter(button=>button.textContent?.trim()==='Volver a las propuestas');expect(back).toHaveLength(1);expect(root.querySelector('#proposal-status')).toBeNull();expect(root.querySelectorAll('.proposal-row')).toHaveLength(1);
+    back[0]!.click();respond(preview,s,rows(s,items));await settle();f.detectChanges();expect(store.scope()).toBe('all');expect(root.querySelector('#proposal-status')).not.toBeNull();expect(root.querySelectorAll('.proposal-row')).toHaveLength(2);expect(store.selection()?.selectedCount).toBe(1);expect(store.selection()?.requiredCount).toBe(1);http.expectNone(r=>r.method==='POST');
+  });
   it('confirms discard with CAS and retains confirmed rows on a stale rejection',async()=>{
-    const f=await render();button(f,'Descartar previsualización').click();f.detectChanges();http.expectNone(r=>r.method==='DELETE');
+    const f=await render();button(f,'Descartar previsualización').click();f.detectChanges();http.expectNone(r=>r.method==='DELETE');button(f,'Volver').click();f.detectChanges();expect(f.componentInstance.store.confirmDiscard()).toBe(false);expect(f.componentInstance.store.preview()?.state).toBe('ready');http.expectNone(r=>r.method==='DELETE');button(f,'Descartar previsualización').click();f.detectChanges();
     const discard=f.componentInstance.store.discard(),request=http.expectOne(r=>r.method==='DELETE');expect(request.request.headers.get('If-Match')).toBe('"v-'+versionId+'"');expect(request.request.params.get('compact')).toBe('true');
     request.flush({error:{message:'La versión ha cambiado.'}},{status:412,statusText:'Precondition Failed'});await discard;
     expect(f.componentInstance.store.page()?.items).toHaveLength(2);expect(f.componentInstance.store.preview()?.state).toBe('ready');
   });
   it('ignores late history after closing and never fabricates a preview from a cancelled job',async()=>{
-    const f=TestBed.createComponent(PreviewPageComponent);f.detectChanges();const history=http.expectOne(r=>r.url.endsWith('/previews'));session.workspace.set(null);TestBed.tick();history.flush({items:[preview],total:1,nextCursor:null});await settle();expect(f.componentInstance.store.history()).toEqual([]);http.expectNone(r=>r.url.endsWith('/previews/'+id));
+    const f=TestBed.createComponent(PreviewPageComponent);f.detectChanges();http.expectOne(r=>r.url.endsWith('/recalculation-state')).flush({workspaceId,currentVersionId:versionId,validationBasisId:versionId,configuration:{configVersion:'config',directionCount:0},counts:null,state:'needs_validation'});const history=http.expectOne(r=>r.url.endsWith('/previews'));session.workspace.set(null);TestBed.tick();history.flush({items:[preview],total:1,nextCursor:null});await settle();expect(f.componentInstance.store.history()).toEqual([]);http.expectNone(r=>r.url.endsWith('/previews/'+id));
     session.workspace.set(workspace);TestBed.tick();http.expectOne(r=>r.url.endsWith('/previews')).flush({items:[],total:0,nextCursor:null});await settle();
-    const starting=f.componentInstance.store.execute(),request=http.expectOne(r=>r.method==='POST'&&r.url.endsWith('/previews'));expect(request.request.body).toEqual({baseVersionId:versionId});
-    request.flush({...job('cancelled'),kind:'preview',baseVersionId:versionId});await starting;TestBed.tick();expect(f.componentInstance.store.preview()).toBeNull();
+    session.job.set({...job('cancelled'),kind:'preview',baseVersionId:versionId} as any);TestBed.tick();expect(f.componentInstance.store.preview()).toBeNull();
   });
   it('pages a compact applied receipt, preserves no-op counts and rejects late comparison replies',async()=>{
     const f=await render(),store=f.componentInstance.store;store.preview.set({...store.preview()!,state:'applied',appliedReceiptId:'receipt'});
@@ -99,8 +117,9 @@ describe('compact preview, persisted selection and explanation',()=>{
     http.expectOne(r=>r.url.endsWith('/comparison')).flush({receipt,beforeSummary:counts,afterSummary:counts,items:Array.from({length:50},(_,i)=>({key:String(i),after:result})),total:51,nextCursor:'next-page'});await loading;f.detectChanges();
     for(const r of http.match(r=>r.url.endsWith('/runs')))r.flush({items:[],total:0,nextCursor:null});
     expect((f.nativeElement as HTMLElement).textContent).toContain('Propuestas sin cambio de valor: 1');expect((f.nativeElement as HTMLElement).querySelector('#apply-title')).toBeNull();
+    const root=f.nativeElement as HTMLElement;expect(root.querySelectorAll('.proposal-row')).toHaveLength(0);const show=button(f,'Ver propuestas aplicadas');expect(show.getAttribute('aria-expanded')).toBe('false');show.click();f.detectChanges();expect(button(f,'Ocultar propuestas aplicadas').getAttribute('aria-expanded')).toBe('true');expect(root.querySelectorAll('.proposal-row')).toHaveLength(2);expect(root.querySelector('ce-comparison')).not.toBeNull();button(f,'Ocultar propuestas aplicadas').click();f.detectChanges();expect(root.querySelectorAll('.proposal-row')).toHaveLength(0);expect(root.querySelector('ce-comparison')).not.toBeNull();
     const primary=Array.from((f.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button.ce-primary-action')).filter(button=>!button.disabled);
-    expect(primary).toHaveLength(1);expect(primary[0]!.textContent).toContain('Descargar esta versión');
+    expect(primary.some(button=>button.textContent?.includes('Descargar'))).toBe(false);
     const more=store.loadApplication(true);http.expectOne(r=>r.url.endsWith('/applications/receipt')).flush(detail);const tail=http.expectOne(r=>r.url.endsWith('/comparison'));expect(tail.request.params.get('cursor')).toBe('next-page');tail.flush({receipt,beforeSummary:counts,afterSummary:counts,items:[{key:'last',after:result}],total:51,nextCursor:null});await more;expect(store.comparison()?.items).toHaveLength(1);
     const late=store.loadApplication();const one=http.expectOne(r=>r.url.endsWith('/applications/receipt')),two=http.expectOne(r=>r.url.endsWith('/comparison'));session.workspace.set(null);TestBed.tick();one.flush({});two.flush({});await late;expect(store.application()).toBeNull();expect(store.comparison()).toBeNull();http.expectNone(r=>r.method==='POST');
   });

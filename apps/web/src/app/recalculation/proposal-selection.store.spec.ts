@@ -6,6 +6,7 @@ import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
 import { PreviewStore } from './preview.store';
 import { ApplyStore } from './apply.store';
+import { DirectionsStore } from './directions.store';
 
 const workspaceId = '60000000-0000-4000-8000-000000000001';
 const baseVersionId = '60000000-0000-4000-8000-000000000002';
@@ -33,11 +34,14 @@ describe('004 persisted proposal selection and explicit consent', () => {
       prepareProposalSelection: vi.fn().mockResolvedValue({ jobId: 'prepare', workspaceId, kind: 'select-proposals', status: 'queued' }), proposal: vi.fn(), previewSelection: vi.fn(),
       proposalExplanation: vi.fn(), selectionDependencies: vi.fn(), job: vi.fn(),
       createPreview: vi.fn().mockResolvedValue({ jobId: 'new-preview', workspaceId, kind: 'preview', status: 'queued' }),
+      recalculate: vi.fn(),
     };
     session = { workspace: signal({ id: workspaceId, contexts: [], versionIds: [baseVersionId] }), versionId: signal(baseVersionId),
       etag: signal('"version"'), pending: signal(false), jobActive: signal(false), job: signal(null), selectedContextId: signal(null),
       trackJob: vi.fn(), refreshWorkspace: vi.fn() };
-    TestBed.configureTestingModule({ providers: [{ provide: ApiClient, useValue: api }, { provide: SessionStore, useValue: session }] });
+    // Selection scenarios assume current destination decisions are already prepared; their preparation is tested separately.
+    const directions={canSimulate:signal(true),hasUnsavedChoice:signal(false),review:signal(null),operationLocked:signal(false),simulationInput:vi.fn(()=>({baseVersionId,validationBasisId:baseVersionId,runId:previewId,reviewId:selectionId,expectedRevision:1}))};
+    TestBed.configureTestingModule({ providers: [{ provide: ApiClient, useValue: api }, { provide: SessionStore, useValue: session },{provide:DirectionsStore,useValue:directions}] });
     store = TestBed.inject(PreviewStore); applying = TestBed.inject(ApplyStore); TestBed.tick();
   });
   afterEach(() => { TestBed.resetTestingModule(); });
@@ -88,7 +92,7 @@ describe('004 persisted proposal selection and explicit consent', () => {
   });
   it('blocks simulation and empty initialization while an application response is uncertain', async () => {
     await load(); applying.uncertain.set(true);
-    await store.execute(); expect(api['createPreview']).not.toHaveBeenCalled();
+    await store.execute(); expect(api['createPreview']).not.toHaveBeenCalled();expect(api['recalculate']).not.toHaveBeenCalled();
     store.selectionMissing.set(true); await store.prepareEmptySelection(); expect(api['prepareProposalSelection']).not.toHaveBeenCalled();
   });
   it('recovers the exact pending worker after a reload without inventing published counters', async () => {

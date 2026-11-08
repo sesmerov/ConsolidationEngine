@@ -34,7 +34,7 @@ async function setup() {
   const base = app.ce.store.publish(workspace.id, initial.versionId, { ...content, profileId: V2 });
   // A stored historical run is seeded deliberately to test the independent API guard,
   // not to claim v2 validation has already run through a worker.
-  const seeded: ValidationBundle = { run: { ...run.run, versionId: base.versionId, profileId: V2 }, results: run.results.map(row => ({ ...row, versionId: base.versionId, profileId: V2 })) };
+  const seeded: ValidationBundle = { run: { ...run.run, versionId: base.versionId, validationBasisId: base.validationBasisId, profileId: V2 }, results: run.results.map(row => ({ ...row, versionId: base.versionId, profileId: V2 })) };
   app.ce.store.putRecords([{ key: validationKey(workspace.id, run.run.id), value: seeded as unknown as JsonValue }]);
   return { app, headers, workspace, initial, base, directions, run: seeded };
 }

@@ -100,3 +100,45 @@ Comprobados:51 decisiones/productores, diez reentradas sin versiones, configurac
 T034/T037: nuevo contrato inicialmente rechaza con400 la query de intención ausente. Tras implementar, download-intent y results-export:12/12 PASS. Resumen, recibo reservado y artefacto incluyen intención/huella canónica; resultados requieren versión exacta, no solo base. Compatibilidad explícita: Accept application/json devuelve resumen del artefacto; descargaZIP completa continúa como ruta legacy local. Hosted deberá ofrecer resumen/partes privadas y no heredar la descarga completa.
 
 Primer build web integrado PASS (bundle inicial723,34kB frente al aviso700kB; baseline707kB). Primer E2E de guía: geometría corregida comprobada a320/390/1440; cuatro fallos de aserción confundían outlineWidth computado3px con outline-style:none que no pinta contorno. El trace confirma headingPointer y summaryPointer sin estilo visible, teclado3px solid. Se corrige esa aserción y se amplía estática/movimiento reducido/colores forzados a las tres anchuras. Repetición pendiente; no registrar aún T016comoPASS.
+
+### Cierre local US1 — T010–T016
+
+Los cinco casos de workflow-guidance pasan con el build integrado: dos pruebas de foco/movimiento reducido/colores forzados PASS y, después de corregir el locator específico de metadatos y comparar innerText con innerText, los tres recorridos320/390/1440 PASS (33,4s). Las repeticiones previas solo descubrieron aserciones de test mal acotadas; las expectativas de producto se conservaron.
+
+Comprobado: caja/radio/posición del halo igual al botón dentro de1px, sin captura de eventos ni desplazamiento,4500ms y retirada antes5s; ratón sin contorno pintado y teclado con3px solid; estado estático distinguible con movimiento reducido/colores forzados a las tres anchuras; carga→Validar, validación completa→Recalcular conservando versión, fallo de inspección sin avance. Capturas de390y1440 abiertas e inspeccionadas; el intento temprano de abrir1440 mientras se generaba no encontró archivo, la lectura posterior sí. Capturas de test no se confunden con las cuatro imágenes finales pendientes de README.
+
+Rerun tras el último ajuste de presentación/recuperación de US3: export.store, exports.component y workspace-shell,26/26 Angular PASS. Prueba conjunta de19E2E interrumpida por el coordinador antes de completar casos: detectado helper antiguo que esperaba /recalculate en vez de /recalculation-operations; corregido también el ETag tomado antes de la nueva versión compuesta. No se cuenta esa ejecución interrumpida como resultado. Los14 recorridos no visuales están en ejecución separada.
+
+### T053/T060 y arnés base T054: PostgreSQL real
+
+Commit204cd82 contiene configuración de modos/orígenes/secretos/cuotas, migración versionada001 y cliente transaccional PG, transportes controlados y script test:hosted. Primeros rojos por módulos/helper ausentes; primer SQL real16/18 por serialización incorrecta de arrayJSON en fixture, corregida sin cambiar restricciones. Gate final repetido tras canonical_block_edges:22/22 PASS en tres suites (hosted-config, database, harness), tsc API PASS.
+
+Pruebas acreditan migración concurrente/checksum, rollback y release, dos pools independientes, poolMaximum1 para composición futura API1+worker1, unicidad hashes, ownership FK, CAS, límite20 snapshots en carrera, reloj/barreras, ACK perdido y fallos de objetos. Script solo crea y elimina su contenedor PostgreSQL17 por UUID+etiqueta propia; imagen fijada por digest, sin tocar recursos ajenos. Cada suite crea esquema ce_* aislado. Ninguna contraseña o configuración de usuario guardada en repositorio.
+
+T054 tiene infraestructura funcional con factoría createApis; sigue pendiente conectar dos API reales a la composición hosted. Dos pools PostgreSQL no se presentan como dos API ni acreditan aún el recorrido completo, proveedores reales o capacidad. El paquete API posterior debe incluir dist/hosted/migrations/001-demo.sql y sucesoras. Cambios de esquema posteriores a204cd82 se versionan como002+.
+
+### Integración UI2/UI3 y rojo US4
+
+Tras adaptar endpoint exacto y ETag efectivo,14 recorridos de decisiones/descarga:13 PASS,1 fallo al cierre por un intento que permanecía en sessionStorage. El caso fallido sí completó aplicación, comparación, ZIP, resultados, histórico y reimportación exacta; no se cuenta como aprobado. Corrección SessionStore: limpiar solo el namespace propio tras cierre confirmado/sesión inválida, preservarlo ante cierre rechazado/origen no permitido. Rojo focal4fallos/7controles, verde Session11+Attempt4=15PASS; E2E de cierre pendiente de repetición.
+
+Los13PASS incluyen selección global51/dependencias, conflictos con candidato51, cambio de elección, diez entradas sin versión nueva, decisión51 y omisión persistida, cero candidatos, versión1 frente a6/respuesta tardía conZIP real, recuperación de aceptación perdida, reintento sin regenerarZIP, COREP110valores y texto/fechas sin artefactos ajenos.
+
+T045 rojo en build anterior:3/3 fallos esperados por instrucciones manuales obsoletas, selector único de ejecución y detalle numérico vacío de texto/fecha. T046 rojo:3 fallos/14 controles; tras cambios de producto,48 pruebas Angular en cinco archivos PASS. Aún pendiente comprobar las pantallas nuevas y completar inventario; no declarar todos los controles verificados a partir de tests escritos.
+
+### Integración local US2–US4 y regresión general
+
+Repetición tras corregir limpieza de cierre: siete E2E de analyst-controls, apply-export y visual-roundtrip PASS (1min30s). Acreditan recorrido completo, cierre sin intento residual, COREP110 valores/typed6 exactos, filtros, historiales cero/uno/varios y retorno de foco de antecedentes. La ampliación posterior de controles tiene73/73 Angular PASS en siete suites y14 E2E compilados estrictamente; candidato tardío y cierre de detalle tuvieron rojo de foco real antes de corregirse. Cancelar editor de conflicto también devolvía el foco al elemento retirado: rojo1/9controles, verde10/10 tras retorno al resumen, sin PATCH.
+
+Ejecución local general (engine+contract+integration, un worker):1428 PASS/2FAIL sobre1430,87 archivos,454,18s. Ambos fallos se corrigieron conservando guardas: profile-guards construía una ejecución con versionId nuevo y validationBasisId antiguo (fixture corregido,6/6PASS); visual-exports exigía lista anterior sin intent/intentFingerprint (ahora verifica identidad y SHA exactos,9/9PASS). No se atribuye una segunda ejecución general que no ocurrió. La prueba local de volumen informa100000posiciones, query145ms/worker945ms/total10450ms, respuesta33018bytes, RSS final1074049024bytes; no sustituye el gate de capacidad hosted.
+
+Global Angular:205PASS/1FAIL en22suites/206casos. El fallo legacy de preparar selección vacía omitía en su mock el estado de destinos requerido por la operación nueva; corregido solo fixture,14/14focalPASS. Todos los otros21archivos pasaron. Exports-visual11/11PASS, incluyendo cero exclusiones sin desplegable vacío. Build web posterior PASS724,94kB inicial (aviso700kB, error1MB sin modificar). Los23 recorridos E2E ampliados se ejecutan por separado; aún no se acredita su cierre aquí.
+
+### Sesiones, transporte y autoridad SQL incremental
+
+T055/T065/T067 base:40/40 en siete suites SQL/HTTP reales. Dos Fastify independientes comparten PostgreSQL y prueban token/nonce, recuperación sin resurrección, owner404, caducidad/revocación, CORS exacto/preflight/errores y medidas de bytes reales. Las variantes nuevas se llaman routes/hosted-sessions.ts, routes/hosted-bootstrap.ts y plugins/hosted-cors.ts; la composición pública completa sigue pendiente. Se conserva autenticación antes del parser; reserva específica antes de partes se integra con T077.
+
+T063 detectó y corrigió subcuenta de SQL: una reserva futura se sumaba al ledger pero podía quedar oculta tras max(ledger,tamañoSQL). Ahora compara también tamaño medido+reservas pendientes no materializadas. Caso rojo con pg_total_relation_size real y dos pools admitía dos reservas incompatibles; verde11/11 junto a aceptación. No hay mock de tamaño. Migrador incremental verifica cada checksum y protege concurrencia;001 permanece inmutable.
+
+Repositorio4/4 SQL: ownership, metadatos sin hidratar, base compatible y revocación revalidada tras I/O. Coordinación4/4: duplicados, permisoCPU global, plazo desde primerclaim y fence antiguo sin liberar permiso nuevo. Aceptación/outbox5/5: ACK perdido recupera mismojob antes del CAS obsoleto, rollback de hook, red fuera de transacción y sesión vigente. Son incrementos de infraestructura, no recorrido alojado completo.
+
+Codec/objetos17/17 (8 SQL,5 codec,4 fronteraSDK controlada): hashes reales, cadenas exactas, orden, bloques256KiB, partes≤3MiB, deduplicación solo intrasesión, reservas antes de red, revocación antes/después de I/O y reconciliación sin liberar objetos inciertos. Migración002 añade claims;003 añade autoridades de inspección/aplicación. No se contactó Blob real ni se acredita todavía cleanup completo.

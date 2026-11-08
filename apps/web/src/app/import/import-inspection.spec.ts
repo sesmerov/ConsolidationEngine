@@ -80,6 +80,14 @@ describe('visual workbook inspection before publication', () => {
     const element = fixture.nativeElement as HTMLElement; expect(element.textContent).toContain('1 hoja incluida: CA1 · 190 hojas excluidas'); expect(element.querySelectorAll('.excluded-sheets li')).toHaveLength(190); expect(element.textContent).toContain('No presentada');
     const checkbox = await TestbedHarnessEnvironment.loader(fixture).getHarness(MatCheckboxHarness.with({ label: 'Acepto importar únicamente las hojas incluidas y excluir las demás' })); expect(await checkbox.isChecked()).toBe(false); expect(store.canCommit()).toBe(false); expect(api.commitImportInspection).not.toHaveBeenCalled();
   });
+  it('requires an explicit scale and filing decision and sends millions and false without treating either as empty',async()=>{
+    const f=await render(),store=f.componentInstance.store;store.catalog.set(new File(['rules'],'rules.xlsx'));store.reports.set([new File(['report'],'corep.xlsx')]);store.contextSource.set('form');store.contextForm.set({...form,scaleExponent:'',presented:''});f.detectChanges();await f.whenStable();f.detectChanges();
+    const root=f.nativeElement as HTMLElement,scale=root.querySelector<HTMLSelectElement>('#context-scale')!,filing=root.querySelector<HTMLSelectElement>('#context-filing')!;
+    expect(store.canInspect()).toBe(false);expect(store.contextError()).toContain('unidades, miles o millones');
+    for(const value of ['0','3','6']){scale.value=value;scale.dispatchEvent(new Event('change'));f.detectChanges();await f.whenStable();expect(store.contextInput()).toMatchObject({declaration:{scaleExponent:Number(value)}});expect(store.canInspect()).toBe(false);}
+    expect(store.contextError()).toContain('expresamente');filing.value='false';filing.dispatchEvent(new Event('change'));f.detectChanges();await f.whenStable();expect(store.canInspect()).toBe(true);
+    await store.inspect();expect(api.inspectImport.mock.calls[0]?.[4]).toMatchObject({source:'form',declaration:{scaleExponent:6,filingIndicators:{'C_01.00':false}}});
+  });
   it('requires explicit partial-coverage acceptance and commits the exact inspection with current CAS', async () => {
     const inspection = ready(); api.activeImportInspection.mockResolvedValue({ active: inspection }); const fixture = await render(), store = fixture.componentInstance.store, loader = TestbedHarnessEnvironment.loader(fixture);
     const confirm = await loader.getHarness(MatButtonHarness.with({ text: 'Confirmar carga' })); expect(await confirm.isDisabled()).toBe(true);

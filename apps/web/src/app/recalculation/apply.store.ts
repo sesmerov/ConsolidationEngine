@@ -10,6 +10,7 @@ interface Attempt { workspaceId: string; etag: string; key: string; body: Applic
 @Injectable({ providedIn: 'root' })
 export class ApplyStore {
   readonly preview = signal<CompactPreviewDTO | null>(null); readonly selection = signal<ProposalSelectionSummaryDTO | null>(null); readonly selectionBusy = signal(false);
+  readonly configurationPending = signal(false);
   readonly session = inject(SessionStore); private readonly api = inject(ApiClient); private readonly view = inject(WorkspaceViewStore);
   private accepted: { jobId: string; previewId: string; baseVersionId: string; closureHash: string; selectionId: string; revision: number } | null = null;
   readonly acknowledged = signal(false); readonly pending = signal(false); readonly error = signal<string | null>(null); readonly uncertain = signal(false); readonly rejected = signal(false);
@@ -17,7 +18,7 @@ export class ApplyStore {
   private contextKey = ''; private attempt: Attempt | undefined; private workspaceId: string | undefined; private reviewGeneration = 0;
   readonly canApply = computed(() => {
     const preview = this.preview(), selection = this.selection(), workspace = this.session.workspace();
-    return !!workspace && preview?.state === 'ready' && preview.baseVersionId === this.session.versionId()
+    return !!workspace && !this.configurationPending() && preview?.state === 'ready' && preview.baseVersionId === this.session.versionId()
       && selection?.workspaceId === workspace.id && selection.previewId === preview.id && selection.baseVersionId === preview.baseVersionId
       && selection.state === 'ready' && selection.revision > 0 && !!selection.selectedCount && selection.complete === true && selection.requiredCount === 0 && !!selection.closureHash
       && !!this.session.etag() && !this.session.pending() && !this.session.jobActive() && !this.pending() && !this.uncertain() && !this.rejected() && !this.selectionBusy()

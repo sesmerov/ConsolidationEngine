@@ -1,3 +1,4 @@
+import { expectSelectedHistory } from './workflow-helpers.js';
 import { expectPublishedVersion } from './workflow-helpers.js';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -59,14 +60,21 @@ async function upload(page: Page, catalog: Buffer, report: Buffer, prefix: strin
 }
 async function validate(page: Page) {
   await navigateStage(page, 'validation'); const job = await action(page, '/validations', 'Validar informes');
-  await expect(page.locator('#validation-run')).toHaveValue(job.resultRef.id); return get(page, `/runs/${job.resultRef.id}/results?limit=200`);
+  await expectSelectedHistory(page, 'validation', job.resultRef.id); return get(page, `/runs/${job.resultRef.id}/results?limit=200`);
 }
-async function download(page: Page, trigger: string | Locator, info: TestInfo, name: string, expected: { versionId: string; kind: 'report' | 'results'; runId?: string }) {
-  const request = page.waitForRequest(value => value.url().endsWith('/exports') && value.method() === 'POST'), downloading = page.waitForEvent('download');
-  const button = typeof trigger === 'string' ? page.getByRole('button', { name: trigger, exact: true }) : trigger;
-  await button.click(); expect((await request).postDataJSON()).toEqual(expected);
+async function download(page: Page, _trigger: string | Locator, info: TestInfo, name: string, expected: { versionId: string; kind: 'report' | 'results'; runId?: string }) {
+  if (expected.kind === 'results' && await page.locator('ce-validation-page').count()) await page.getByRole('button', { name: 'Ir a Descargar resultados', exact: true }).click();
+  else if (!await page.locator('ce-exports').count()) await navigateStage(page, 'download');
+  await expect(page.locator('ce-exports')).toBeVisible();
+  if (await page.locator('#export-version').count()) await page.locator('#export-version').selectOption(expected.versionId);
+  await page.locator('#export-kind').selectOption(expected.kind);
+  if (expected.runId && await page.locator('#export-run').count()) await page.locator('#export-run').selectOption(expected.runId);
+  const submitted: unknown[] = [], listener = (request: import('@playwright/test').Request) => { if (request.url().endsWith('/exports') && request.method() === 'POST') submitted.push(request.postDataJSON()); };
+  page.on('request', listener); const downloading = page.waitForEvent('download'); await page.locator('[data-download-action]').click();
   const artifact = await downloading; expect(artifact.suggestedFilename()).toBe(`${expected.kind}.zip`);
-  const location = info.outputPath(name); await artifact.saveAs(location); return readZipParts(location);
+  page.off('request', listener); if (submitted.length) expect(submitted).toEqual([expected]);
+  const location = info.outputPath(name); await artifact.saveAs(location); const parts = await readZipParts(location), identity = JSON.parse(parts.find(part => part.name === (expected.kind === 'results' ? 'results.json' : 'changes.json'))!.data.toString('utf8'));
+  expect(expected.kind === 'results' ? identity.run.versionId : identity.versionId).toBe(expected.versionId); if (expected.runId) expect(identity.run.id).toBe(expected.runId); return parts;
 }
 function reportBytes(parts: readonly ZipPart[]): Buffer {
   const reports = parts.filter(part => /^reports\/[^/]+\.xlsx$/.test(part.name)); expect(reports).toHaveLength(1); return reports[0]!.data;
@@ -106,14 +114,14 @@ test('COREP exports the receipt and historical version, preserves selection acro
   const initial = await validate(page);
   await configureCorepDemo(page);
   await navigateStage(page, 'recalculation');
-  await action(page, '/previews', 'Simular recálculos');
+  await action(page, '/recalculation-operations', 'Simular recálculos');
   for (const code of ['v0172_m', 'v0173_m', 'v0174_m', 'v0175_m', 'v0176_m']) await page.getByLabel(`Seleccionar ${code}`, { exact: true }).check();
   await navigateStage(page, 'download');
   await page.locator('#export-version').selectOption(originalVersion);
   await navigateStage(page, 'recalculation');
   await page.getByLabel('He revisado cada propuesta y acepto aplicar el conjunto completo mostrado.').check();
   const applied = await action(page, '/applications', 'Aplicar cambios seleccionados'), comparison = await get(page, `/applications/${applied.resultRef.id}/comparison?limit=200`);
-  await expect(page.getByRole('button', { name: 'Descargar esta versión', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Descargar esta versión', exact: true })).toHaveCount(0);
   const next = page.getByRole('button', { name: '4. Descargar', exact: true });
   await expect(next).toHaveClass(/stage-recommended/);
   await next.focus(); await page.keyboard.press('Enter');
@@ -121,13 +129,12 @@ test('COREP exports the receipt and historical version, preserves selection acro
   await expect(page.locator('.stage-recommended')).toHaveCount(0);
   await expect(page.locator('#export-version')).toHaveValue(originalVersion);
   const summary = page.getByRole('region', { name: 'Contenido de la versión elegida', exact: true }); await expect(summary).toContainText('COREP'); await expect(summary).toContainText('histórica');
-  const appliedDownload = page.locator('button[data-applied-download]');
-  await expect(appliedDownload).toHaveAccessibleName(/Descargar informes aplicados.*Versión 3/);
-  const appliedZip = await download(page, appliedDownload, info, 'applied-corep.zip', { versionId: applied.newVersionId, kind: 'report' });
+  await expect(page.locator('button[data-applied-download]')).toHaveCount(0);
+  const appliedZip = await download(page, 'Descargar', info, 'applied-corep.zip', { versionId: applied.newVersionId, kind: 'report' });
   const appliedReport = reportBytes(appliedZip); await assertCorep(appliedReport, true, info, 'applied-corep.xlsx');
   const changeLog = JSON.parse(appliedZip.find(part => part.name === 'changes.json')!.data.toString('utf8')); expect(changeLog.versionId).toBe(applied.newVersionId); expect(changeLog.changes).toHaveLength(5);
-  await expect(page.locator('#export-version')).toHaveValue(originalVersion);
-  const historicalZip = await download(page, 'Preparar descarga', info, 'historical-corep.zip', { versionId: originalVersion, kind: 'report' });
+  await expect(page.locator('#export-version')).toHaveValue(applied.newVersionId);
+  const historicalZip = await download(page, 'Descargar', info, 'historical-corep.zip', { versionId: originalVersion, kind: 'report' });
   await assertCorep(reportBytes(historicalZip), false, info, 'historical-corep.xlsx');
   expect(JSON.parse(historicalZip.find(part => part.name === 'changes.json')!.data.toString('utf8')).changes).toEqual([]);
   // The current version now has a different profile; the historical summary must remain COREP.
@@ -145,13 +152,13 @@ test('COREP exports the receipt and historical version, preserves selection acro
 
 test('typed visual report and results preserve all six values and never repeat an unrelated artifact', async ({ page }, info) => {
   test.setTimeout(120_000); const files = await demo(page, 'types'), version = await upload(page, files.catalog, files.report, 'types'), initial = await validate(page);
-  const resultsZip = await download(page, 'Descargar resultados de esta ejecución', info, 'typed-results.zip', { versionId: version, kind: 'results', runId: initial.run.id });
+  const resultsZip = await download(page, 'Descargar', info, 'typed-results.zip', { versionId: version, kind: 'results', runId: initial.run.id });
   const json = JSON.parse(resultsZip.find(part => part.name === 'results.json')!.data.toString('utf8')); expect(semantics(json.results)).toEqual(semantics(initial.items));
   const resultsSheets = await readXlsxFile(resultsZip.find(part => part.name === 'results.xlsx')!.data, { trim: false, parseNumber: value => value });
   const facts = resultsSheets.find(sheet => sheet.sheet === 'Facts')!; expect(facts.data[0]).toContain('dataType'); expect(facts.data.flat()).toContain('Banco '); expect(facts.data.flat()).toContain('2024-02-29');
-  await navigateStage(page, 'download'); await page.locator('#export-version').selectOption(version);
+  await navigateStage(page, 'download'); if (await page.locator('#export-version').count()) await page.locator('#export-version').selectOption(version);
   const summary = page.getByRole('region', { name: 'Contenido de la versión elegida', exact: true }); await expect(summary).toContainText('Demostración de texto y fechas');
-  const reportZip = await download(page, 'Preparar descarga', info, 'typed-report.zip', { versionId: version, kind: 'report' }), report = reportBytes(reportZip);
+  const reportZip = await download(page, 'Descargar', info, 'typed-report.zip', { versionId: version, kind: 'report' }), report = reportBytes(reportZip);
   const sheets = await assertSafeVisual(report, ['Instrucciones', 'Datos', 'Contexto'], info, 'typed-report.xlsx'), data = sheets.find(sheet => sheet.sheet === 'Datos')!.data;
   expect(data.slice(3, 9).map(row => row[1] ?? '')).toEqual(['Banco', 'banco', 'Banco ', '', '2024-02-29', '2025-12-31']);
   expect(data.slice(3, 9).map(row => row[2])).toEqual(Array(6).fill('Informado'));
@@ -164,7 +171,7 @@ test('typed visual report and results preserve all six values and never repeat a
   await summary.scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath('typed-export-mobile.png') });
   await navigateStage(page, 'validation'); await expect(page.locator('ce-results-export').getByRole('button', { name: /de nuevo/i })).toHaveCount(0);
-  const repeated = await download(page, 'Descargar resultados de esta ejecución', info, 'typed-results-after-report.zip', { versionId: version, kind: 'results', runId: initial.run.id });
+  const repeated = await download(page, 'Descargar', info, 'typed-results-after-report.zip', { versionId: version, kind: 'results', runId: initial.run.id });
   expect(repeated.some(part => part.name === 'results.json')).toBe(true); expect(repeated.some(part => part.name.startsWith('reports/'))).toBe(false);
   await freshWorkspace(page, 'Reimportación tipada SYNTHETIC'); await upload(page, files.catalog, report, 'reimport-types'); const checked = await validate(page);
   expect(semantics(checked.items)).toEqual(semantics(initial.items)); expect(checked.run.summary.byStatus).toMatchObject({ pass: 6, fail: 2, not_evaluable: 0, error: 0 });

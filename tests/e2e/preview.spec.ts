@@ -1,3 +1,4 @@
+import { expectSelectedHistory } from './workflow-helpers.js';
 import { expectPublishedVersion } from './workflow-helpers.js';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
@@ -5,7 +6,7 @@ import type { Page } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 import writeXlsxFile from 'write-excel-file/node';
 import { importLegacyFixture, navigateStage, openCalculation } from './workflow-helpers.js';
-import { prepareDirections, saveDirections } from './direction-review-helpers.js';
+import { prepareDirections, ensureDirectionsReady } from './direction-review-helpers.js';
 const root = path.resolve('tests/fixtures/generated');
 async function session(page: Page) { const bootstrap = await (await page.request.get('/api/v1/bootstrap')).json(); return { id: bootstrap.activeWorkspaceId as string, headers: { 'X-CE-Session': bootstrap.sessionToken as string } }; }
 async function catalog(expressions: readonly (readonly [string, string, string?])[]) {
@@ -17,7 +18,7 @@ async function catalog(expressions: readonly (readonly [string, string, string?]
 async function validate(page: Page) {
   await navigateStage(page, 'validation');
   const response = page.waitForResponse(response => response.url().endsWith('/validations') && response.request().method() === 'POST'); await page.getByRole('button', { name: 'Validar informes', exact: true }).click();
-  const job = await (await response).json(); await expect(page.locator('#validation-run')).toHaveValue(job.resultRef.id, { timeout: 15000 }); const connection = await session(page);
+  const job = await (await response).json(); await expectSelectedHistory(page, 'validation', job.resultRef.id); const connection = await session(page);
   return (await page.request.get(`/api/v1/workspaces/${connection.id}/runs/${job.resultRef.id}/results?limit=200`, { headers: connection.headers })).json();
 }
 async function configure(page: Page, expressions: readonly (readonly [string, string, string?])[], options: { facts?: Readonly<Record<string, string>>; legacyProducerConflict?: boolean } = {}) {
@@ -48,18 +49,30 @@ async function configure(page: Page, expressions: readonly (readonly [string, st
     await expectPublishedVersion(page, (await configured.json()).versionId);
   } else {
     const reviewId = await prepareDirections(page);
-    await saveDirections(page, reviewId, expressions.length);
+    await ensureDirectionsReady(page, reviewId, expressions.length);
   }
   await navigateStage(page, 'recalculation');
-  await expect(page.getByRole('button', { name: 'Simular recálculos', exact: true })).toBeEnabled(); const connection = await session(page);
+  if(options.legacyProducerConflict) await expect(page.getByRole('button', { name: 'Simular recálculos', exact: true })).toBeDisabled();
+  else await expect(page.getByRole('button', { name: 'Simular recálculos', exact: true })).toBeEnabled(); const connection = await session(page);
   const current = await page.request.get(`/api/v1/workspaces/${connection.id}`, { headers: connection.headers }); return { connection, workspace: await current.json(), etag: current.headers()['etag']!, run };
 }
-async function preview(page: Page) {
+async function preview(page: Page, legacyProducerConflict = false) {
   await navigateStage(page, 'recalculation');
-  const response = page.waitForResponse(response => response.url().endsWith('/previews') && response.request().method() === 'POST'); await page.getByRole('button', { name: 'Simular recálculos', exact: true }).click();
-  const accepted = await (await response).json(), connection = await session(page); let id = '';
+  const connection = await session(page); let accepted:any;
+  if(legacyProducerConflict){
+    // Exercise the retained engine guard with a deliberately incompatible legacy configuration.
+    // The new UI must not submit this unresolved review as a recalculation operation.
+    const base=`/api/v1/workspaces/${connection.id}`,current=await page.request.get(base,{headers:connection.headers});
+    const response=await page.request.post(base+'/previews',{headers:{...connection.headers,'If-Match':current.headers()['etag']!,'Idempotency-Key':crypto.randomUUID()},data:{baseVersionId:(await current.json()).currentVersionId}});
+    expect(response.status()).toBe(202);accepted=await response.json();
+  }else{
+    const response = page.waitForResponse(response => response.url().endsWith('/recalculation-operations') && response.request().method() === 'POST'); await page.getByRole('button', { name: 'Simular recálculos', exact: true }).click();
+    accepted=await(await response).json();
+  }
+  let id = '';
   await expect.poll(async () => { const job = await (await page.request.get(`/api/v1/workspaces/${connection.id}/jobs/${accepted.jobId}`, { headers: connection.headers })).json(); id = job.resultRef?.id ?? ''; return job.status; }).toBe('succeeded');
-  await expect(page.locator('#preview-history')).toHaveValue(id); await expect(page.locator('.proposal-row')).not.toHaveCount(0);
+  if(legacyProducerConflict)await page.getByRole('button',{name:'Actualizar historial de previsualizaciones',exact:true}).click();
+  await expectSelectedHistory(page, 'preview', id); await expect(page.locator('.proposal-row')).not.toHaveCount(0);
   return { id, data: await (await page.request.get(`/api/v1/workspaces/${connection.id}/previews/${id}/proposals?limit=200`, { headers: connection.headers })).json() };
 }
 test.beforeEach(async ({ page }) => {
@@ -82,20 +95,22 @@ test('V06-preview/V09: topological simulation re-evaluates a false guard, requir
   await page.getByLabel('Seleccionar synthetic_guard', { exact: true }).check(); await expect(page.getByText(/Faltan 2 antecedentes/)).toBeVisible(); expect(await page.locator('.proposal-row input[type="checkbox"]:checked').count()).toBe(1);
   await page.getByLabel('Seleccionar synthetic_Z_producer', { exact: true }).check(); await page.getByLabel('Seleccionar synthetic_A_consumer', { exact: true }).check();
   await expect(page.getByText('La selección contiene todos sus antecedentes. Los datos del informe siguen sin cambios.')).toBeVisible();
-  const unchanged = await (await page.request.get(`/api/v1/workspaces/${initial.connection.id}`, { headers: initial.connection.headers })).json(); expect(unchanged.currentVersionId).toBe(initial.workspace.currentVersionId); expect(unchanged.counts).toEqual(initial.workspace.counts);
+  const unchanged = await (await page.request.get(`/api/v1/workspaces/${initial.connection.id}`, { headers: initial.connection.headers })).json(); expect(unchanged.currentVersionId).toBe(simulation.data.versionId); expect(unchanged.versionIds).toEqual([...initial.workspace.versionIds,unchanged.currentVersionId]); expect(unchanged.counts).toEqual(initial.workspace.counts);
   await page.locator('ce-preview-page').screenshot({ path: path.resolve('.cache/preview-ui.png') });
-  await page.reload(); await navigateStage(page, 'recalculation'); await expect(page.locator('#preview-history')).toHaveValue(simulation.id); await expect(page.locator('.proposal-row')).toHaveCount(3);
+  await page.reload(); await navigateStage(page, 'recalculation'); await expectSelectedHistory(page, 'preview', simulation.id); await expect(page.locator('.proposal-row')).toHaveCount(3);
   expect(await page.locator('.proposal-row input[type="checkbox"]:checked').count()).toBe(3); // Selection persists; application consent does not.
   await expect(page.getByLabel('He revisado cada propuesta y acepto aplicar el conjunto completo mostrado.')).not.toBeChecked();
-  await navigateStage(page, 'validation'); await expect(page.locator('#validation-run')).toHaveValue(initial.run.run.id);
+  await navigateStage(page, 'validation'); await expectSelectedHistory(page, 'validation', initial.run.run.id);
   const after = await validate(page); expect(after.items.map((row: { code: string; status: string; factReads: unknown }) => [row.code, row.status, row.factReads])).toEqual(initial.run.items.map((row: { code: string; status: string; factReads: unknown }) => [row.code, row.status, row.factReads]));
   await navigateStage(page, 'recalculation');
-  await page.getByRole('button', { name: 'Descartar previsualización', exact: true }).click(); await page.getByRole('button', { name: 'Confirmar descarte', exact: true }).click(); await expect(page.getByText('Previsualización descartada. Sus propuestas se conservan para consulta.')).toBeVisible();
+  const discard=page.getByRole('button', { name: 'Descartar previsualización', exact: true });await discard.focus();await page.keyboard.press('Enter');
+  await page.getByRole('button',{name:'Volver',exact:true}).focus();await page.keyboard.press('Enter');await expect(page.getByRole('button',{name:'Confirmar descarte',exact:true})).toHaveCount(0);await expect(discard).toBeEnabled();await expect(page.locator('.proposal-row')).toHaveCount(3);
+  await discard.focus();await page.keyboard.press('Enter');await page.getByRole('button', { name: 'Confirmar descarte', exact: true }).focus();await page.keyboard.press('Enter'); await expect(page.getByText('Previsualización descartada. Sus propuestas se conservan para consulta.')).toBeVisible();
   await page.reload(); await navigateStage(page, 'recalculation'); await expect(page.getByText('Previsualización descartada. Sus propuestas se conservan para consulta.')).toBeVisible();
 });
 test('V09: equal-valued conflicting producers and their dependent proposal are blocked with explanations', async ({ page }) => {
   const initial = await configure(page, [['synthetic_P', '{tC_01.00,r0230,c0010}=1'], ['synthetic_Q', '{tC_01.00,r0230,c0010}=1'], ['synthetic_D', '{tC_01.00,r0250,c0010}={tC_01.00,r0230,c0010}+1']], { legacyProducerConflict: true });
-  const simulation = await preview(page); expect(simulation.data.items.every((row: { state: string }) => row.state === 'blocked')).toBe(true);
+  const simulation = await preview(page,true); expect(simulation.data.items.every((row: { state: string }) => row.state === 'blocked')).toBe(true);
   await expect(page.getByText('Hay productores incompatibles para un mismo destino. Consulta el detalle de las propuestas bloqueadas.', { exact: true })).toBeVisible(); await expect(page.locator('ce-preview-page input[type="checkbox"]:enabled')).toHaveCount(0);
   expect((await (await page.request.get(`/api/v1/workspaces/${initial.connection.id}`, { headers: initial.connection.headers })).json()).currentVersionId).toBe(initial.workspace.currentVersionId);
 });

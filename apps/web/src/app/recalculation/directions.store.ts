@@ -1,243 +1,101 @@
 import { DestroyRef, Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { isTerminalJob } from '@ce/contracts';
-import type {
-  DirectionReviewCommitDTO, DirectionReviewDecision, DirectionReviewOperationDTO, DirectionReviewPageDTO,
-  DirectionReviewPatchDTO, DirectionReviewPrepareDTO, DirectionReviewReceiptDTO, DirectionReviewRowDTO,
-  DirectionReviewSummaryDTO, JobDTO, TargetSide, ValidationRunDTO,
-  DirectionConflictGroupDTO, DirectionConflictGroupsPageDTO, DirectionConflictCandidatesPageDTO, DirectionConflictCandidateDetailDTO,
-} from '@ce/contracts';
+import type { DirectionReviewDecision, DirectionReviewOperationDTO, DirectionReviewPageDTO, DirectionReviewPatchDTO,
+  RecalculationReviewPrepareDTO, RecalculationOperationRequestDTO, RecalculationStateDTO, DirectionReviewRowDTO, DirectionReviewSummaryDTO, JobDTO, TargetSide,
+  DirectionConflictGroupDTO, DirectionConflictGroupsPageDTO, DirectionConflictCandidatesPageDTO, DirectionConflictCandidateDetailDTO } from '@ce/contracts';
 import { ApiClient } from '../core/api-client';
 import { CursorPage, CursorPageError } from '../core/cursor-page';
 import { SessionStore } from '../core/session.store';
+import { StageFocus } from '../core/stage-title.directive';
 import { WorkspaceViewStore } from '../workspace/workspace-view.store';
-
-type Attempt = { workspaceId: string; etag: string } & (
-  | { kind: 'prepare'; body: DirectionReviewPrepareDTO; key: string }
-  | { kind: 'edit'; id: string; body: DirectionReviewPatchDTO }
-  | { kind: 'commit'; id: string; body: DirectionReviewCommitDTO; key: string }
-);
+type Attempt = {workspaceId:string;etag:string} & ({kind:'prepare';body:RecalculationReviewPrepareDTO;key:string}|{kind:'edit';id:string;body:DirectionReviewPatchDTO});
 interface GroupEditor { group: DirectionConflictGroupDTO; revision: number; value: string | null | undefined; original: string | null | undefined; code?: string }
-const errorMessage = (error: unknown) => error instanceof HttpErrorResponse && typeof error.error?.error?.message === 'string'
-  ? error.error.error.message as string : error instanceof CursorPageError ? error.message : 'No se pudo completar la revisión de destinos.';
-
-@Injectable({ providedIn: 'root' })
+const errorMessage=(e:unknown)=>e instanceof HttpErrorResponse && typeof e.error?.error?.message==='string'?e.error.error.message as string:e instanceof CursorPageError?e.message:'No se pudo completar la revisión de destinos.';
+@Injectable({providedIn:'root'})
 export class DirectionsStore {
-  readonly session = inject(SessionStore);
-  private readonly api = inject(ApiClient);
-  private readonly view = inject(WorkspaceViewStore);
-  private scope = '';
-  private boundWorkspaceId = '';
-  private requiresWorkspaceRefresh = false;
-  private alive = true;
-  private lookupGeneration = 0;
-  private rowGeneration = 0;
-  private groupsGeneration = 0; private candidatesGeneration = 0; private detailGeneration = 0;
-  private confirmingGroupId: string | null = null;
-  private expiryTimer?: ReturnType<typeof setTimeout>;
-  private attempt: Attempt | null = null;
-  private observedJob: { jobId: string; reviewId?: string } | null = null;
-  private commitOrigin: string | null = null;
-  private readonly synchronized = signal(false);
-
-  readonly run = signal<ValidationRunDTO | null>(null);
-  readonly review = signal<DirectionReviewSummaryDTO | null>(null);
-  readonly otherReview = signal<DirectionReviewSummaryDTO | null>(null);
-  readonly rows = signal<DirectionReviewPageDTO | null>(null);
-  readonly groups = signal<DirectionConflictGroupsPageDTO | null>(null);
-  readonly groupsPagination = new CursorPage(); readonly candidatesPagination = new CursorPage();
-  readonly groupsLoading = signal(false); readonly candidatesLoading = signal(false);
-  readonly editor = signal<GroupEditor | null>(null);
-  readonly candidates = signal<DirectionConflictCandidatesPageDTO | null>(null);
-  readonly candidateDetail = signal<DirectionConflictCandidateDetailDTO | null>(null);
-  readonly candidateDetailLoading = signal(false);
-  readonly anchoredGroup = signal<DirectionConflictGroupDTO | null>(null);
-  readonly displayGroups = computed(() => {
-    const items = this.groups()?.items ?? [], anchor = this.anchoredGroup();
-    return anchor && !items.some(group => group.groupId === anchor.groupId) ? [...items, anchor] : items;
-  });
-  readonly hasUnsavedChoice = computed(() => !!this.editor() && this.editor()!.value !== this.editor()!.original);
-  readonly selectedOutsidePage = computed(() => !!this.editor()?.value && !this.candidates()?.items.some(row => row.instanceId === this.editor()?.value));
-  readonly receipt = signal<DirectionReviewReceiptDTO | null>(null);
-  readonly stateFilter = signal<DirectionReviewDecision | ''>('');
-  readonly groupFilter = signal('');
-  readonly pagination = new CursorPage();
-  readonly partialAccepted = signal(false);
-  readonly uncertain = signal(false);
-  readonly pending = signal(false);
-  readonly looking = signal(false);
-  readonly loading = signal(false);
-  readonly expired = signal(false);
-  readonly error = signal('');
-  readonly historical = computed(() => this.run()?.versionId !== this.session.versionId());
-  readonly complete = computed(() => this.run()?.status === 'completed' && this.run()?.summary.complete === true);
-  readonly busy = computed(() => this.pending() || this.looking() || this.loading() || this.groupsLoading() || this.candidatesLoading() || this.session.pending() || this.session.jobActive());
-  readonly needsPartial = computed(() => {
-    const counts = this.review()?.counts;
-    return !!counts && counts.pending + counts.undetermined > 0;
-  });
-  readonly canPrepare = computed(() => this.synchronized() && !!this.run() && this.complete() && !this.historical() && !this.busy() && !this.uncertain()
-    && !this.otherReview() && (!this.review() || this.expired() || ['expired','obsolete','discarded','failed'].includes(this.review()!.state)));
-  readonly editable = computed(() => this.synchronized() && this.complete() && !this.historical() && !this.expired() && !this.uncertain() && !this.busy()
-    && !this.otherReview() && this.review()?.state === 'ready' && !!this.review()?.counts && this.rows()?.revision === this.review()?.revision);
-  readonly canSave = computed(() => this.editable() && !this.hasUnsavedChoice() && this.groups()?.revision === this.review()?.revision
-    && this.review()?.conflictGroupCount === 0 && (!this.needsPartial() || this.partialAccepted()));
-  readonly configurable = computed(() => (this.rows()?.items ?? []).filter(row => ['included','pending','omitted'].includes(row.state)));
-  readonly unavailable = computed(() => (this.rows()?.items ?? []).filter(row => row.state === 'excluded' || row.state === 'undetermined'));
-  readonly resultPresentation = computed(() => {
-    const job = this.session.job(), review = this.review(), receipt = this.receipt();
-    if (!job || job.status !== 'succeeded' || job.workspaceId !== this.session.workspace()?.id || job.resultRef?.type !== 'direction-review') return null;
-    const prepared = job.kind === 'prepare-directions' && review?.id === job.resultRef.id && review.state === 'ready'
-      && !this.expired() && !this.historical() && !!review.counts && this.rows()?.reviewId === review.id && this.rows()?.revision === review.revision
-      && this.groups()?.reviewId === review.id && this.groups()?.revision === review.revision;
-    const committed = job.kind === 'commit-directions' && receipt?.reviewId === job.resultRef.id
-      && receipt.baseVersionId === job.baseVersionId && receipt.newVersionId === job.newVersionId;
-    return prepared || committed ? { jobId: job.jobId, workspaceId: job.workspaceId, versionId: job.newVersionId ?? job.baseVersionId ?? null } : null;
-  });
-
-  constructor() {
-    effect(() => {
-      const version = this.session.versionId(), editor = this.editor(), review = this.review();
-      if (editor && review && version !== review.baseVersionId) untracked(() => this.invalidateEditor('La versión cambió. La elección pendiente se ha cancelado; actualiza la revisión.'));
-    });
-    effect(() => {
-      const job = this.session.job();
-      if (!job || job.workspaceId !== this.session.workspace()?.id || !isTerminalJob(job.status) || job.jobId !== this.observedJob?.jobId) return;
-      const tracked = this.observedJob;
-      this.observedJob = null;
-      untracked(() => { void this.finishJob(job, tracked.reviewId ?? job.resultRef?.id); });
-    });
-    inject(DestroyRef).onDestroy(() => {
-      this.alive = false;
-      clearTimeout(this.expiryTimer);
-      this.lookupGeneration++; this.rowGeneration++; this.groupsGeneration++; this.candidatesGeneration++; this.detailGeneration++;
-    });
-  }
-
-  bind(run: ValidationRunDTO): void {
-    const workspaceId = this.session.workspace()?.id;
-    if (!workspaceId) return;
-    const key = workspaceId + ':' + run.id + ':' + run.versionId;
-    this.run.set(run);
-    if (key === this.scope) return;
-    if (workspaceId !== this.boundWorkspaceId) {
-      this.boundWorkspaceId = workspaceId;
-      this.requiresWorkspaceRefresh = false;
-      this.attempt = null; this.commitOrigin = null; this.observedJob = null;
-      this.uncertain.set(false); this.pending.set(false);
-    }
-    this.scope = key;
-    this.resetGroups();
-    this.lookupGeneration++; this.rowGeneration++;
-    this.review.set(null); this.rows.set(null); this.otherReview.set(null); this.receipt.set(null);
-    this.stateFilter.set(''); this.groupFilter.set(''); this.partialAccepted.set(false);
-    this.expired.set(false); this.loading.set(false); this.error.set(''); clearTimeout(this.expiryTimer);
-    void this.recover();
-  }
-  private owns(workspaceId: string): boolean { return this.alive && this.session.workspace()?.id === workspaceId; }
-  private matches(summary: DirectionReviewSummaryDTO): boolean {
-    return this.owns(summary.workspaceId) && this.run()?.id === summary.runId && this.run()?.versionId === summary.baseVersionId;
-  }
-
-  async recover(): Promise<void> {
-    const workspaceId = this.session.workspace()?.id;
-    if (!workspaceId || !this.run()) return;
-    const generation = ++this.lookupGeneration;
-    this.looking.set(true);
-    this.synchronized.set(false);
-    try {
-      if (this.requiresWorkspaceRefresh) {
-        await this.session.refreshWorkspace(workspaceId);
-        if (!this.owns(workspaceId) || generation !== this.lookupGeneration) return;
-        this.requiresWorkspaceRefresh = false;
-      }
-      const {active, latestCommit} = await this.api.activeDirectionReviews(workspaceId);
-      if (!this.owns(workspaceId) || generation !== this.lookupGeneration) return;
-      this.synchronized.set(true);
-      if (latestCommit && this.commitOrigin === latestCommit.reviewId) {
-        await this.acceptReceipt(workspaceId, latestCommit);
-        if (!this.owns(workspaceId) || generation !== this.lookupGeneration) return;
-      }
-      this.otherReview.set(active && !this.matches(active) ? active : null);
-      if (active && this.matches(active)) {
-        await this.acceptSummary(active);
-        if (['preparing','committing'].includes(active.state) && active.jobId && generation === this.lookupGeneration) {
-          const job = await this.api.job(workspaceId,active.jobId);
-          if (this.owns(workspaceId) && generation === this.lookupGeneration) this.track(job,active.id);
-        }
-      } else if (this.review()?.state === 'ready' || this.review()?.state === 'committing') {
-        const existing = this.review()!;
-        const summary = await this.api.directionReview(workspaceId, existing.id);
-        if (!this.owns(workspaceId) || generation !== this.lookupGeneration) return;
-        await this.acceptSummary(summary);
-      }
-      if (latestCommit && this.owns(workspaceId) && generation === this.lookupGeneration) await this.acceptReceipt(workspaceId, latestCommit);
-    } catch (error) {
-      if (generation === this.lookupGeneration && this.owns(workspaceId)) {
-        this.synchronized.set(false); this.error.set(errorMessage(error));
-      }
-    } finally {
-      if (generation === this.lookupGeneration) this.looking.set(false);
-    }
-  }
-  private async acceptSummary(summary: DirectionReviewSummaryDTO): Promise<void> {
-    if (!this.matches(summary)) return;
-    const previous = this.review();
-    if (previous?.id === summary.id && previous.revision > summary.revision) return;
-    if (previous?.id === summary.id && previous.state === 'committed' && summary.state !== 'committed') return;
-    this.review.set(summary);
-    this.otherReview.set(null);
-    if (previous?.id !== summary.id || previous.revision !== summary.revision) {
-      this.partialAccepted.set(false); this.pagination.reset();
-      this.groupsPagination.reset(); this.candidatesPagination.reset();
-      if (this.editor() && this.editor()!.revision !== summary.revision) {
-        if (this.confirmingGroupId === this.editor()!.group.groupId) { this.editor.set(null); this.candidates.set(null); }
-        else this.invalidateEditor('La revisión cambió. Comprueba la elección publicada antes de continuar.');
-      }
-    }
-    clearTimeout(this.expiryTimer);
-    this.expired.set(summary.state === 'expired');
-    if (summary.state === 'ready') {
-      const remaining = Date.parse(summary.expiresAt ?? '') - Date.now();
-      if (!(remaining > 0)) { this.expired.set(true); this.rows.set(null); this.invalidateEditor('La revisión ha caducado. Prepara una nueva para continuar.'); return; }
-      this.expiryTimer = setTimeout(() => { this.expired.set(true); this.partialAccepted.set(false); this.invalidateEditor('La revisión ha caducado. Prepara una nueva para continuar.'); }, Math.min(remaining,2_147_483_647));
-      await Promise.all([this.loadRows(0), this.loadGroups(0, previous?.id !== summary.id)]);
-    } else {
-      this.rowGeneration++; this.loading.set(false); this.rows.set(null);
-      if (summary.receipt) await this.acceptReceipt(summary.workspaceId,summary.receipt);
-    }
-  }
-  private async acceptReceipt(workspaceId: string, receipt: DirectionReviewReceiptDTO): Promise<void> {
-    const related = this.commitOrigin === receipt.reviewId;
-    if (receipt.runId !== this.run()?.id && !related) return;
-    this.receipt.set(receipt);
-    const review = this.review();
-    if (review?.id === receipt.reviewId) {
-      clearTimeout(this.expiryTimer);
-      this.review.set({ ...review, state:'committed', receipt });
-      this.rowGeneration++; this.rows.set(null); this.loading.set(false); this.partialAccepted.set(false);
-    }
-    if (related) {
-      this.commitOrigin = null;
-      if (this.attempt?.kind === 'commit' && this.attempt.id === receipt.reviewId) {
-        this.attempt = null; this.uncertain.set(false);
-      }
-      this.error.set('');
-      if (receipt.included > 0) this.view.published(workspaceId,receipt.baseVersionId,receipt.newVersionId,receipt.reviewId,'preview');
-    }
-    if (this.session.versionId() === receipt.baseVersionId) await this.session.refreshWorkspace(workspaceId);
-  }
-
+ readonly session=inject(SessionStore); private readonly api=inject(ApiClient); private readonly view=inject(WorkspaceViewStore);
+ private readonly focus=inject(StageFocus,{optional:true});
+ private alive=true; private active=false; private boundWorkspaceId=''; private lookupGeneration=0; private rowGeneration=0;
+ private groupsGeneration=0; private candidatesGeneration=0; private detailGeneration=0; private confirmingGroupId:string|null=null;
+ private expiryTimer?:ReturnType<typeof setTimeout>; private attempt:Attempt|null=null; private observedJob:{jobId:string;reviewId?:string}|null=null;
+ private synchronized=signal(false); private staleEditor=signal(false);
+ readonly state=signal<RecalculationStateDTO|null>(null); readonly run=computed(()=>this.state()?.compatibleRun??null);
+ readonly review=signal<DirectionReviewSummaryDTO|null>(null); readonly rows=signal<DirectionReviewPageDTO|null>(null);
+ readonly groups=signal<DirectionConflictGroupsPageDTO|null>(null); readonly groupsPagination=new CursorPage(); readonly candidatesPagination=new CursorPage();
+ readonly groupsLoading=signal(false); readonly candidatesLoading=signal(false); readonly editor=signal<GroupEditor|null>(null);
+ readonly candidates=signal<DirectionConflictCandidatesPageDTO|null>(null); readonly candidateDetail=signal<DirectionConflictCandidateDetailDTO|null>(null); readonly candidateDetailLoading=signal(false);
+ readonly anchoredGroup=signal<DirectionConflictGroupDTO|null>(null);
+ readonly displayGroups=computed(()=>{const items=this.groups()?.items??[],anchor=this.anchoredGroup();return anchor&&!items.some(g=>g.groupId===anchor.groupId)?[...items,anchor]:items;});
+ readonly hasUnsavedChoice=computed(()=>!!this.editor()&&this.editor()!.value!==this.editor()!.original);
+ readonly selectedOutsidePage=computed(()=>!!this.editor()?.value&&!this.candidates()?.items.some(r=>r.instanceId===this.editor()?.value));
+ readonly rowScope=signal<'pending'|'resolved'|'all'>('pending'); readonly stateFilter=signal<DirectionReviewDecision|''>(''); readonly groupFilter=signal(''); readonly pagination=new CursorPage();
+ readonly uncertain=signal(false); readonly pending=signal(false); readonly looking=signal(false); readonly loading=signal(false); readonly expired=signal(false); readonly error=signal('');
+ readonly operationLocked=signal(false);
+ readonly historical=computed(()=>!!this.state()&&this.state()!.currentVersionId!==this.session.versionId());
+ readonly complete=computed(()=>!!this.state()?.compatibleRun); readonly busy=computed(()=>this.pending()||this.looking()||this.loading()||this.groupsLoading()||this.candidatesLoading()||this.session.pending()||this.session.jobActive());
+ readonly editable=computed(()=>this.synchronized()&&this.complete()&&!this.historical()&&!this.staleEditor()&&!this.expired()&&!this.uncertain()&&!this.operationLocked()&&!this.busy()&&this.review()?.state==='ready'&&this.rows()?.revision===this.review()?.revision);
+ readonly pendingCount=computed(()=>{const c=this.review()?.counts;return c?c.pending+c.conflicted+c.undetermined:null;});
+ readonly allOmitted=computed(()=>{const c=this.review()?.counts;return !!c&&c.omitted>0&&c.included===0&&this.pendingCount()===0;});
+ readonly canSimulate=computed(()=>this.editable()&&!this.hasUnsavedChoice()&&this.pendingCount()===0&&this.review()?.conflictGroupCount===0&&this.state()?.state!=='no_candidates');
+ readonly configurable=computed(()=>(this.rows()?.items??[]).filter(r=>['included','pending','omitted'].includes(r.state)));
+ readonly unavailable=computed(()=>(this.rows()?.items??[]).filter(r=>r.state==='undetermined'));
+ readonly resultPresentation=computed(()=>{const job=this.session.job(),r=this.review();return job?.workspaceId===this.session.workspace()?.id&&job?.status==='succeeded'&&job.kind==='prepare-directions'&&job.resultRef?.id===r?.id&&this.rows()?.revision===r?.revision&&this.groups()?.revision===r?.revision?{jobId:job.jobId,workspaceId:job.workspaceId,versionId:job.baseVersionId??null}:null;});
+ constructor(){
+  effect(()=>{const version=this.session.versionId(),workspace=this.session.workspace()?.id;untracked(()=>{
+   if(!this.active)return;
+   if(this.hasUnsavedChoice()&&(workspace!==this.boundWorkspaceId||version!==this.state()?.currentVersionId)){this.staleEditor.set(true);this.error.set('La base ha cambiado. Confirma o cancela la elección pendiente antes de actualizar.');return;}
+   if(workspace&&this.state()&&version!==this.state()!.currentVersionId&&!this.session.jobActive())void this.recover();
+  });});
+  effect(()=>{const job=this.session.job();if(!job||job.workspaceId!==this.session.workspace()?.id||!isTerminalJob(job.status)||job.jobId!==this.observedJob?.jobId)return;this.observedJob=null;untracked(()=>{void this.finishJob(job);});});
+  inject(DestroyRef).onDestroy(()=>{this.alive=false;clearTimeout(this.expiryTimer);this.lookupGeneration++;this.rowGeneration++;this.groupsGeneration++;this.candidatesGeneration++;this.detailGeneration++;});
+ }
+ activate():void {this.active=true;void this.recover();}
+ deactivate():void {this.active=false;}
+ navigate(stage:'validation'|'exports'):void {if(this.allowLeaveEditor()){this.focus?.request(stage==='validation'?'validation-title':'exports-title');this.view.visit(stage);}}
+ simulationInput():RecalculationOperationRequestDTO|null {const s=this.state(),r=this.review();return s&&r&&s.compatibleRun?{baseVersionId:s.currentVersionId,validationBasisId:s.validationBasisId,runId:r.runId,reviewId:r.id,expectedRevision:r.revision}:null;}
+ private owns(w:string):boolean{return this.alive&&this.session.workspace()?.id===w;}
+ private matches(r:DirectionReviewSummaryDTO):boolean{return this.owns(r.workspaceId)&&!this.historical()&&r.validationBasisId===this.state()?.validationBasisId;}
+ async recover(autoPrepare=true):Promise<void>{
+  const w=this.session.workspace()?.id,version=this.session.versionId();if(!w||!version)return;
+  if(this.hasUnsavedChoice()&&!this.confirmingGroupId){this.allowLeaveEditor();return;}
+  if(w!==this.boundWorkspaceId){this.boundWorkspaceId=w;this.resetGroups();this.review.set(null);this.rows.set(null);this.state.set(null);this.attempt=null;this.uncertain.set(false);this.pending.set(false);this.rowScope.set('pending');}
+  const generation=++this.lookupGeneration;this.looking.set(true);this.synchronized.set(false);
+  let prepare=false;
+  try{const state=await this.api.recalculationState(w);if(!this.owns(w)||generation!==this.lookupGeneration||version!==this.session.versionId()||state.currentVersionId!==version)return;
+   if(this.hasUnsavedChoice()){this.error.set('Confirma o cancela la elección pendiente antes de actualizar.');return;}
+   this.state.set(state);this.synchronized.set(true);this.staleEditor.set(false);
+   if(state.review){await this.acceptSummary(state.review);if(state.review.state==='preparing'&&state.review.jobId){const job=await this.api.job(w,state.review.jobId);if(this.owns(w)&&generation===this.lookupGeneration)this.track(job,state.review.id);}}
+   else {this.review.set(null);this.rows.set(null);this.resetGroups();}
+   prepare=autoPrepare&&state.state==='preparation_required'&&!this.uncertain()&&!this.session.jobActive();
+  }catch(e){if(generation===this.lookupGeneration&&this.owns(w)){this.synchronized.set(false);this.error.set(errorMessage(e));}}
+  finally{if(generation===this.lookupGeneration)this.looking.set(false);}
+  if(prepare&&generation===this.lookupGeneration)await this.prepare();
+ }
+ private async acceptSummary(summary:DirectionReviewSummaryDTO):Promise<void>{
+  if(!this.matches(summary))return;const previous=this.review();if(previous?.id===summary.id&&previous.revision>summary.revision)return;
+  if(this.hasUnsavedChoice()&&this.editor()?.revision!==summary.revision&&!this.confirmingGroupId){this.staleEditor.set(true);this.error.set('La revisión cambió. Cancela la elección local para consultar el estado actual.');return;}
+  this.review.set(summary);this.state.update(s=>s?{...s,review:summary,counts:summary.counts??null,state:!summary.counts?'preparation_required':summary.counts.pending+summary.counts.conflicted+summary.counts.undetermined>0?'pending':summary.counts.included+summary.counts.omitted>0?'ready':'no_candidates'}:s);
+  if(previous?.id!==summary.id||previous.revision!==summary.revision){this.pagination.reset();this.groupsPagination.reset();this.candidatesPagination.reset();if(this.editor()?.revision!==summary.revision)this.invalidateEditor('La revisión cambió.');}
+  clearTimeout(this.expiryTimer);this.expired.set(summary.state==='expired');
+  if(summary.state==='ready'){
+   const remaining=Date.parse(summary.expiresAt??'')-Date.now();if(!(remaining>0)){this.expired.set(true);return;}
+   this.expiryTimer=setTimeout(()=>{this.expired.set(true);this.error.set('La revisión ha caducado. Actualiza las decisiones para continuar.');},Math.min(remaining,2147483647));
+   await Promise.all([this.loadRows(),this.loadGroups(0,previous?.id!==summary.id)]);
+  }else{this.rowGeneration++;this.rows.set(null);this.loading.set(false);}
+ }
+ async showResolved():Promise<void>{if(!this.allowLeaveEditor())return;this.rowScope.set(this.rowScope()==='pending'?'resolved':'pending');this.stateFilter.set('');this.groupFilter.set('');this.resetGroups();this.pagination.reset();await Promise.all([this.loadRows(),this.loadGroups()]);}
   async loadRows(index = 0): Promise<void> {
     const review = this.review();
     if (!review || review.state !== 'ready' || this.expired() || !this.matches(review)) return;
+    if (index !== this.pagination.index() && !this.allowLeaveEditor()) return;
     const generation = ++this.rowGeneration;
-    const state = this.stateFilter(), groupId = this.groupFilter();
+    const state = this.stateFilter(), groupId = this.groupFilter(), scope = this.rowScope();
     this.loading.set(true);
     try {
-      const request = this.pagination.begin(JSON.stringify([review.id,review.revision,state,groupId]),index);
+      const request = this.pagination.begin(JSON.stringify([review.id,review.revision,state,groupId,scope]),index);
       const page = await this.api.directionReviewRows(review.workspaceId,review.id,{
-        ...(state ? {state} : {}), ...(groupId ? {groupId} : {}), ...(request.cursor ? {cursor:request.cursor} : {}),
+        scope, ...(state ? {state} : {}), ...(groupId ? {groupId} : {}), ...(request.cursor ? {cursor:request.cursor} : {}),
       });
       if (generation !== this.rowGeneration || !this.matches(review) || this.review()?.id !== review.id || this.review()?.revision !== review.revision) return;
       if (page.reviewId !== review.id || page.revision !== review.revision) {
@@ -276,8 +134,8 @@ export class DirectionsStore {
     if (index !== this.groupsPagination.index() && !this.allowLeaveEditor()) return;
     const generation = ++this.groupsGeneration; this.groupsLoading.set(true);
     try {
-      const request = this.groupsPagination.begin(JSON.stringify([review.id, review.revision]), index);
-      const page = await this.api.directionConflictGroups(review.workspaceId, review.id, request.cursor ? { cursor: request.cursor } : {});
+      const request = this.groupsPagination.begin(JSON.stringify([review.id, review.revision, this.rowScope()]), index);
+      const page = await this.api.directionConflictGroups(review.workspaceId, review.id, { scope: this.rowScope(), ...(request.cursor ? { cursor: request.cursor } : {}) });
       if (generation !== this.groupsGeneration || !this.matches(review) || this.review()?.revision !== review.revision) return;
       if (page.reviewId !== review.id || page.revision !== review.revision) throw new Error('La revisión cambió. Actualiza los destinos antes de continuar.');
       this.groupsPagination.accept(request.index, page.total, page.nextCursor, page.items.length); this.groups.set(page);
@@ -316,6 +174,7 @@ export class DirectionsStore {
   cancelChoice(): void {
     if (this.pending() || this.uncertain()) return;
     this.editor.set(null); this.candidates.set(null); this.candidateDetail.set(null); this.candidatesGeneration++; this.detailGeneration++; this.error.set('');
+    if (this.staleEditor()) { this.staleEditor.set(false); void this.recover(); }
   }
   async confirmChoice(): Promise<boolean> {
     const editor = this.editor(), review = this.review();
@@ -343,11 +202,6 @@ export class DirectionsStore {
     finally { if (generation === this.detailGeneration) this.candidateDetailLoading.set(false); }
   }
 
-  async prepare(): Promise<void> {
-    const run = this.run(), workspaceId = this.session.workspace()?.id, etag = this.session.etag();
-    if (!run || !workspaceId || !etag || !this.canPrepare()) return;
-    await this.send({kind:'prepare',workspaceId,etag,key:crypto.randomUUID(),body:{baseVersionId:run.versionId,runId:run.id}});
-  }
   async choose(row: DirectionReviewRowDTO, choice: TargetSide | 'omit' | 'suggest'): Promise<void> {
     if (!this.allowLeaveEditor()) return;
     if (!row.instanceId || row.state === 'excluded' || row.state === 'undetermined' || row.state === 'conflicted') return;
@@ -365,78 +219,31 @@ export class DirectionsStore {
     await this.send({kind:'edit',id:review.id,workspaceId:review.workspaceId,etag,
       body:{expectedRevision:review.revision,mutationId:crypto.randomUUID(),operations:[operation]}});
   }
-  async save(): Promise<void> {
-    const review = this.review(), etag = this.session.etag();
-    if (!review || !etag || !this.canSave()) return;
-    this.commitOrigin = review.id;
-    await this.send({kind:'commit',id:review.id,workspaceId:review.workspaceId,etag,key:crypto.randomUUID(),
-      body:{expectedRevision:review.revision,acceptPartial:this.needsPartial() && this.partialAccepted()}});
-  }
-  async retry(): Promise<void> {
-    if (this.attempt && this.uncertain() && !this.pending()) await this.send(this.attempt);
-  }
-  private async send(attempt: Attempt): Promise<void> {
-    if (!this.owns(attempt.workspaceId)) return;
-    this.attempt = attempt; this.pending.set(true); this.error.set('');
-    try {
-      if (attempt.kind === 'edit') {
-        const reply = await this.api.editDirectionReview(attempt.workspaceId,attempt.id,attempt.body,attempt.etag);
-        if (this.attempt !== attempt || !this.owns(attempt.workspaceId)) return;
-        this.attempt = null; this.uncertain.set(false);
-        if (this.groupFilter()) { this.groupFilter.set(''); this.stateFilter.set(''); }
-        await this.acceptSummary(reply.summary);
-      } else {
-        const job = attempt.kind === 'prepare'
-          ? await this.api.prepareDirectionReview(attempt.workspaceId,attempt.body,attempt.etag,attempt.key)
-          : await this.api.commitDirectionReview(attempt.workspaceId,attempt.id,attempt.body,attempt.etag,attempt.key);
-        if (this.attempt !== attempt || !this.owns(attempt.workspaceId)) return;
-        this.attempt = null; this.uncertain.set(false);
-        this.track(job,attempt.kind === 'commit' ? attempt.id : job.resultRef?.id);
-      }
-    } catch (error) {
-      if (this.attempt !== attempt || !this.owns(attempt.workspaceId)) return;
-      this.error.set(errorMessage(error));
-      const uncertain = error instanceof HttpErrorResponse && (error.status === 0 || error.status >= 500);
-      this.uncertain.set(uncertain);
-      if (!uncertain) { this.attempt = null; this.commitOrigin = null; }
-      if (uncertain || error instanceof HttpErrorResponse && [409,410,412].includes(error.status)) {
-        this.rows.set(null);
-        if (error instanceof HttpErrorResponse && error.status === 412) this.requiresWorkspaceRefresh = true;
-        await this.recover();
-      }
-    } finally { if (this.owns(attempt.workspaceId)) this.pending.set(false); }
-  }
-  private track(job: JobDTO, reviewId?: string): void {
-    this.observedJob = { jobId:job.jobId,...(reviewId ? {reviewId} : {}) };
-    if (job.kind === 'commit-directions' && reviewId) this.commitOrigin = reviewId;
-    this.session.trackJob(job);
-  }
-  private async finishJob(job: JobDTO, id?: string): Promise<void> {
-    const generation = this.lookupGeneration;
-    this.looking.set(true);
-    try {
-      if (job.status !== 'succeeded') {
-        this.error.set(job.diagnostics[0]?.message ?? 'La operación de destinos no se completó.');
-        this.commitOrigin = null;
-      }
-      if (id) {
-        const review = await this.api.directionReview(job.workspaceId,id);
-        if (!this.owns(job.workspaceId)) return;
-        if (this.matches(review)) await this.acceptSummary(review);
-        else if (review.receipt) await this.acceptReceipt(job.workspaceId,review.receipt);
-      } else await this.recover();
-    } catch (error) { if (this.owns(job.workspaceId)) this.error.set(errorMessage(error)); }
-    finally { if (generation === this.lookupGeneration) this.looking.set(false); }
-  }
-  async discard(): Promise<void> {
-    if (!this.allowLeaveEditor()) return;
-    const review = this.otherReview() ?? this.review(), etag = this.session.etag();
-    if (!review || review.state !== 'ready' || !etag || this.busy() || this.uncertain()) return;
-    this.pending.set(true);
-    try {
-      await this.api.discardDirectionReview(review.workspaceId,review.id,etag);
-      if (this.owns(review.workspaceId)) { this.resetGroups(); this.review.set(null); this.rows.set(null); this.otherReview.set(null); await this.recover(); }
-    } catch(error) { if (this.owns(review.workspaceId)) this.error.set(errorMessage(error)); }
-    finally { if (this.owns(review.workspaceId)) this.pending.set(false); }
-  }
+
+ private async prepare():Promise<void>{const s=this.state(),etag=this.session.etag();if(!s?.compatibleRun||!etag||this.uncertain()||this.pending())return;
+ await this.send({kind:'prepare',workspaceId:s.workspaceId,etag,key:crypto.randomUUID(),body:{baseVersionId:s.currentVersionId,validationBasisId:s.validationBasisId,runId:s.compatibleRun.id}});}
+ async retry():Promise<void>{
+  const attempt=this.attempt;if(!attempt||!this.uncertain()||this.pending())return;
+  const operation=attempt.kind==='edit'?attempt.body.operations[0]:undefined;
+  const groupId=operation?.op==='resolveGroup'?operation.groupId:undefined;
+  if(groupId&&this.editor()?.group.groupId===groupId)this.confirmingGroupId=groupId;
+  try{await this.send(attempt);const review=this.review();if(groupId&&review&&!this.uncertain()){
+    const page=await this.api.directionConflictCandidates(review.workspaceId,review.id,groupId);
+    if(this.matches(review)&&page.revision===this.review()?.revision)this.anchoredGroup.set(page.group);
+  }}finally{this.confirmingGroupId=null;}
+ }
+ private async send(attempt:Attempt):Promise<void>{
+  if(!this.owns(attempt.workspaceId))return;this.attempt=attempt;this.pending.set(true);this.error.set('');
+  try{if(attempt.kind==='edit'){const reply=await this.api.editDirectionReview(attempt.workspaceId,attempt.id,attempt.body,attempt.etag);if(this.attempt!==attempt||!this.owns(attempt.workspaceId))return;this.attempt=null;this.uncertain.set(false);await this.acceptSummary(reply.summary);}
+   else{const job=await this.api.prepareDirectionReview(attempt.workspaceId,attempt.body,attempt.etag,attempt.key);if(this.attempt!==attempt||!this.owns(attempt.workspaceId))return;this.attempt=null;this.uncertain.set(false);this.track(job,job.resultRef?.id);}
+  }catch(e){if(this.attempt!==attempt||!this.owns(attempt.workspaceId))return;this.error.set(errorMessage(e));const uncertain=e instanceof HttpErrorResponse&&(e.status===0||e.status>=500);this.uncertain.set(uncertain);
+   if(!uncertain)this.attempt=null;if(e instanceof HttpErrorResponse&&e.status===412)await this.session.refreshWorkspace(attempt.workspaceId);
+   if(!this.hasUnsavedChoice())await this.recover(false);
+  }finally{if(this.owns(attempt.workspaceId))this.pending.set(false);}
+ }
+ private track(job:JobDTO,reviewId?:string):void{this.observedJob={jobId:job.jobId,...(reviewId?{reviewId}:{})};this.session.trackJob(job);}
+ private async finishJob(job:JobDTO):Promise<void>{if(job.status!=='succeeded')this.error.set(job.diagnostics[0]?.message??'No se pudieron preparar las decisiones. Vuelve a intentarlo.');await this.recover(false);}
+ async discard():Promise<void>{if(!this.allowLeaveEditor())return;const r=this.review(),etag=this.session.etag();if(!r||!etag||this.busy()||this.uncertain())return;this.pending.set(true);
+ try{await this.api.discardDirectionReview(r.workspaceId,r.id,etag);if(this.owns(r.workspaceId)){this.resetGroups();this.review.set(null);this.rows.set(null);await this.recover(false);}}
+ catch(e){this.error.set(errorMessage(e));}finally{this.pending.set(false);}}
 }

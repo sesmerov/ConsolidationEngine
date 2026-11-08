@@ -1,3 +1,4 @@
+import { expectSelectedHistory } from './workflow-helpers.js';
 import { expectPublishedVersion } from './workflow-helpers.js';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
@@ -81,14 +82,14 @@ test('COREP analyst journey by keyboard: inspect, confirm, validate, apply five 
 
   await stage(/^2\. Validar\b/, '#validation-title');
   const validation = await action('/validations', 'Validar informes');
-  await expect(page.locator('#validation-run')).toHaveValue(validation.resultRef.id);
+  await expectSelectedHistory(page, 'validation', validation.resultRef.id);
   await expect(page.locator('.result-row').filter({ hasText: 'v0174_m' }).getByText('Falla', { exact: true })).toBeVisible();
   await expect(page.locator('.result-row').filter({ hasText: 'DEMO_IF_ELSE' }).getByText('Pasa', { exact: true })).toBeVisible();
   const official = ['v0172_m', 'v0173_m', 'v0174_m', 'v0175_m', 'v0176_m'];
   await configureCorepDemo(page, control => activate(page, control));
   await stage(/^3\. Recalcular\b/, '#preview-title');
-  const preview = await action('/previews', 'Simular recálculos');
-  await expect(page.locator('#preview-history')).toHaveValue(preview.resultRef.id);
+  const preview = await action('/recalculation-operations', 'Simular recálculos');
+  await expectSelectedHistory(page, 'preview', preview.resultRef.id);
   for (const code of official) await expect(page.getByRole('checkbox', { name: 'Seleccionar ' + code, exact: true })).toBeChecked();
   await activate(page, page.getByRole('button', { name: 'Limpiar selección', exact: true }));
   await expect(page.getByRole('heading', { name: 'Confirmar la aplicación' })).toHaveCount(0);
@@ -129,7 +130,7 @@ test('COREP analyst journey by keyboard: inspect, confirm, validate, apply five 
   await expect(page.locator('#export-version')).toHaveValue(application.newVersionId);
   await expect(page.locator('#export-kind')).toHaveValue('report');
   const downloading = page.waitForEvent('download');
-  await activate(page, page.getByRole('button', { name: 'Preparar descarga', exact: true }));
+  await activate(page, page.locator('[data-download-action]'));
   const artifact = await downloading;
   expect(artifact.suggestedFilename()).toBe('report.zip');
   const saved = info.outputPath('corep-recalculado.zip');

@@ -1,46 +1,19 @@
 <section class="directions-panel" aria-labelledby="directions-title">
-  <h3 id="directions-title">Configurar destinos de recálculo</h3>
-  @if (store.receipt(); as receipt) {
-    <p role="status">Configuración guardada · {{ versionLabel(store.session.workspace(), receipt.newVersionId) }} · {{ receipt.included }} destinos.</p>
-  }
-  @if (store.historical()) {
-    <p class="notice">Esta ejecución es histórica. Valida la versión vigente para configurar sus destinos.</p>
-  } @else if (!store.complete()) {
-    <p class="notice">Se necesita una validación completa para revisar sus destinos.</p>
-  }
-  @if (store.otherReview(); as other) {
-    <p class="notice">Hay una revisión abierta para otra ejecución. Puedes volver a esa ejecución o descartar su borrador.</p>
-    @if (other.state === 'ready') { <button mat-button (click)="store.discard()" [disabled]="store.busy() || store.uncertain()">Descartar revisión anterior</button> }
-  }
-  @if (store.error(); as error) { <p role="alert" class="error">{{ error }}</p> }
-  @if (store.uncertain()) {
-    <p class="notice">La respuesta está sin confirmar. El reintento conserva la solicitud original.</p>
-    <button mat-stroked-button [disabled]="store.pending()" (click)="store.retry()">Reintentar la misma operación</button>
-  }
-  @if (store.looking()) { <p role="status">Consultando la revisión…</p> }
-  @if (!store.historical() && store.complete() && !store.otherReview() && (store.canPrepare() || !store.review())) {
-    <button mat-flat-button class="ce-primary-action" [disabled]="!store.canPrepare()" (click)="store.prepare()">Preparar revisión de destinos</button>
-  }
-  @if (store.review(); as review) {
-    @if (store.expired()) { <p class="notice">La revisión ha caducado. Prepara una nueva para continuar.</p> }
-    @if (review.state === 'preparing' || review.state === 'committing') { <p role="status">Trabajo de destinos en curso.</p> }
-    @if (review.state === 'ready' && !store.expired() && !store.historical()) {
-      @if (review.counts; as counts) {
-        <dl class="workspace-meta" aria-label="Resumen de la revisión completa">
-          @for (category of categories; track category.key) {
-            <div><dt>{{ category.label }}</dt><dd>{{ counts[category.key] }}</dd></div>
-          }
-        </dl>
-        <mat-form-field appearance="outline">
-          <mat-label>Decisiones de la revisión</mat-label>
-          <select matNativeControl [value]="store.stateFilter()" (change)="store.filter($any($event.target).value)" [disabled]="store.pending()">
-            <option value="">Todas</option>
-            @for (category of categories; track category.key) { <option [value]="category.key">{{ category.label }}</option> }
-          </select>
-        </mat-form-field>
-        @if (store.groupFilter()) { <button mat-button (click)="store.filter('')">Volver a todas las decisiones</button> }
-        @if (store.loading()) { <p role="status">Consultando destinos…</p> }
-        @if (store.groupsLoading()) { <p role="status">Consultando las decisiones por celda…</p> }
+<h3 id="directions-title">Elegir qué celdas recalcular</h3>
+@if (store.error(); as error) { <p role="alert" class="error">{{ error }}</p> }
+@if (store.uncertain()) { <p class="notice">La respuesta está sin confirmar. El reintento conserva la solicitud original.</p><button mat-stroked-button [disabled]="store.pending()" (click)="store.retry()">Reintentar la misma operación</button> }
+@if (store.looking() || store.pending() || store.review()?.state === 'preparing') { <p role="status">Preparando las decisiones de recálculo…</p> }
+@if (store.state(); as state) {
+ @if (state.state === 'needs_validation') { <p>Valida los informes para conocer las celdas que se pueden recalcular.</p><button mat-stroked-button (click)="store.navigate('validation')">Ir a Validar</button> }
+ @else if (state.state === 'no_candidates') { <p>No hay recálculos disponibles</p><button mat-stroked-button (click)="store.navigate('exports')">Ir a Descargar</button> }
+ @else if (store.review(); as review) {
+  @if (review.state === 'ready' && !store.expired() && !store.historical()) {
+   @if (review.counts; as counts) {
+    @if (store.allOmitted()) { <p role="status">Todas las reglas se han omitido</p><button mat-button (click)="store.navigate('exports')">Ir a Descargar</button> }
+    @else if (store.pendingCount() === 0) { <p role="status">{{ counts.included }} destinos preparados. Ya puedes simular los recálculos.</p> }
+    @else { <p role="status">Quedan {{ store.pendingCount() }} decisiones pendientes. Elige un destino o indica que no se recalcule.</p> }
+    <button mat-button (click)="store.showResolved()" [disabled]="store.busy() || store.uncertain()">{{ store.rowScope() === 'pending' ? 'Revisar decisiones' : 'Ver decisiones pendientes' }}</button>
+    @if (store.loading() || store.groupsLoading()) { <p role="status">Consultando decisiones…</p> }
         @for (group of store.displayGroups(); track group.groupId) {
           <section class="conflict-card" role="group" [attr.data-group-id]="group.groupId" [attr.aria-label]="'Conflicto en ' + group.targetLabel + ' · ' + group.contextLabel">
             <div class="conflict-title"><strong>{{ group.conceptLabel || group.targetLabel }}</strong><span class="conflict-status">{{ groupStates[group.state] }}</span></div>
@@ -56,7 +29,7 @@
                       <mat-radio-button [value]="candidate.instanceId" [disabled]="!store.editable() || candidate.availability !== 'selectable'"><strong>{{ candidate.code }}</strong>@if (candidate.descriptionPreview) { <span class="candidate-description">{{ candidate.descriptionPreview }}{{ candidate.descriptionTruncated ? '…' : '' }}</span> }</mat-radio-button>
                       <p class="candidate-expression">{{ candidate.expressionPreview }}{{ candidate.expressionTruncated ? '…' : '' }}</p>
                       @if (candidate.availability === 'assignedElsewhere') { <p class="muted">Esta regla tiene otro destino elegido: {{ candidate.assignedTargetLabel }}. Revísalo antes de seleccionarla aquí.</p> }
-                      <button mat-button (click)="store.showCandidate(candidate.instanceId)" [disabled]="store.candidateDetailLoading()" [attr.aria-label]="'Ver regla ' + candidate.code">Ver regla</button>
+                      <button mat-button (click)="openCandidate(candidate.instanceId, $event)" [disabled]="store.candidateDetailLoading()" [attr.aria-label]="'Ver regla ' + candidate.code">Ver regla</button>
                     </div>
                   }
                   <mat-radio-button [value]="null">No recalcular esta celda</mat-radio-button>
@@ -64,8 +37,8 @@
                 @if (store.selectedOutsidePage()) { <p role="status">La regla elegida está en otra página: {{ editor.code }}.</p> }
                 @if (store.candidates(); as candidates) { <mat-paginator aria-label="Páginas de reglas candidatas" [length]="candidates.total" [pageSize]="50" [pageIndex]="store.candidatesPagination.index()" [hidePageSize]="true" [disabled]="store.busy() || store.uncertain()" (page)="store.loadCandidates($event.pageIndex)"/> }
                 @if (store.candidateDetailLoading()) { <p role="status">Consultando la regla completa…</p> }
-                @if (store.candidateDetail(); as detail) { <section class="candidate-detail" role="region" [attr.aria-label]="'Regla ' + detail.candidate.code"><h4>{{ detail.candidate.code }}</h4><p class="candidate-expression">{{ detail.expression }}</p>@if (detail.precondition) { <p>Precondición</p><p class="candidate-expression">{{ detail.precondition }}</p> }@for (description of detail.descriptions; track $index) { <p>{{ description.description }}</p><p class="muted">{{ description.sourceLabel }}</p> }<button mat-button (click)="store.candidateDetail.set(null)">Cerrar regla</button></section> }
-                <div class="choice-actions"><button mat-stroked-button (click)="confirmChoice($event)" [disabled]="!store.hasUnsavedChoice() || !store.editable()">Confirmar elección</button><button mat-button (click)="store.cancelChoice()" [disabled]="store.pending() || store.uncertain()">Cancelar</button></div>
+                @if (store.candidateDetail(); as detail) { <section class="candidate-detail" role="region" [attr.aria-label]="'Regla ' + detail.candidate.code"><h4 [id]="candidateHeadingId(detail.candidate.instanceId)" tabindex="-1">{{ detail.candidate.code }}</h4><p class="candidate-expression">{{ detail.expression }}</p>@if (detail.precondition) { <p>Precondición</p><p class="candidate-expression">{{ detail.precondition }}</p> }@for (description of detail.descriptions; track $index) { <p>{{ description.description }}</p><p class="muted">{{ description.sourceLabel }}</p> }<button mat-button (click)="closeCandidate()">Cerrar regla</button></section> }
+                <div class="choice-actions"><button mat-stroked-button (click)="confirmChoice($event)" [disabled]="!store.hasUnsavedChoice() || !store.editable()">Confirmar elección</button><button mat-button (click)="cancelChoice($event)" [disabled]="store.pending() || store.uncertain()">Cancelar</button></div>
               }
             } @else {
               <p data-group-summary tabindex="-1">@if (group.state === 'resolved') { Regla elegida: <strong>{{ group.selectedCandidate?.code }}</strong> } @else if (group.state === 'omitted') { Omitida · se conserva el importe del informe. } @else { Elige entre {{ group.candidateCount }} reglas para continuar. }</p>
@@ -74,7 +47,7 @@
           </section>
         }
         @if (store.groups(); as groups) { @if (groups.total > 50) { <mat-paginator aria-label="Páginas de decisiones por celda" [length]="groups.total" [pageSize]="50" [pageIndex]="store.groupsPagination.index()" [hidePageSize]="true" [disabled]="store.busy() || store.hasUnsavedChoice() || store.uncertain()" (page)="store.loadGroups($event.pageIndex)"/> } }
-        @if (store.hasUnsavedChoice()) { <p class="notice" role="status">Confirma o cancela la elección pendiente antes de guardar o cambiar de etapa.</p> }
+        @if (store.hasUnsavedChoice()) { <p class="notice" role="status">Confirma o cancela la elección pendiente antes de simular o cambiar de etapa.</p> }
         @if (store.rows(); as rows) {
           @if (store.configurable().length) {
             <p id="directions-scroll-help" class="table-scroll-hint">Desplaza la tabla horizontalmente para ver todas las columnas.</p>
@@ -84,7 +57,7 @@
                 <ng-container matColumnDef="target"><th mat-header-cell *matHeaderCellDef>Destino</th><td mat-cell *matCellDef="let row">
                   @if (row.classification === 'both') {
                     <mat-form-field appearance="outline"><mat-label>{{ row.code }} · Destino</mat-label>
-                      <select matNativeControl [value]="row.state === 'omitted' ? 'omit' : row.selectedSide || ''" [disabled]="!store.editable()" (change)="store.choose(row, $any($event.target).value)">
+                      <select matNativeControl [ngModel]="row.state === 'omitted' ? 'omit' : row.selectedSide || ''" [disabled]="!store.editable()" (ngModelChange)="store.choose(row, $event)">
                         <option value="" disabled>Elige un destino</option>
                         @for (option of row.options; track option.side) { <option [value]="option.side">{{ option.label }} · {{ option.side === 'left' ? 'Izquierda' : 'Derecha' }}</option> }
                         <option value="omit">Omitir</option>
@@ -106,27 +79,24 @@
             </div>
           }
           @if (store.unavailable().length) {
-            <details class="trace-details"><summary>Ver motivos de las reglas sin destino en esta página ({{ store.unavailable().length }})</summary>
+            <section class="notice" aria-label="Decisiones sin determinar"><p>No se pudo determinar el destino de estas reglas:</p>
               <ul>@for (row of store.unavailable(); track row.rowId) {
                 <li><strong>{{ row.code }}</strong> · {{ row.location }} · {{ row.contextLabel }}
                   @for (reason of row.reasons; track $index) { <span class="cell-secondary">{{ reason.message }}</span> }
                 </li>
               }</ul>
-            </details>
+            </section>
           }
           @if (!rows.total) { <p>No hay decisiones que coincidan con este filtro.</p> }
           <mat-paginator aria-label="Páginas de destinos" [length]="rows.total" [pageSize]="50" [pageIndex]="store.pagination.index()" [hidePageSize]="true" [disabled]="store.busy()" (page)="store.loadRows($event.pageIndex)"/>
         }
-        @if (review.conflictGroupCount) { <p class="notice">Quedan {{ review.conflictGroupCount }} grupos en conflicto en la revisión completa.</p> }
-        @if (store.needsPartial()) { <mat-checkbox [checked]="store.partialAccepted()" [disabled]="!store.editable()" (change)="store.partialAccepted.set($event.checked)">He revisado los pendientes y acepto guardar el subconjunto incluido</mat-checkbox> }
-        @if (!counts.included) { <p>Sin destinos incluidos. Puedes descargar los resultados de esta ejecución.</p> }
-        <div class="direction-actions">
-          <button mat-flat-button class="ce-primary-action" [disabled]="!store.canSave()" (click)="store.save()">Guardar configuración</button>
-          <button mat-button [disabled]="!store.editable()" (click)="store.omitAll()">Omitir todos los destinos</button>
-          <button mat-button [disabled]="store.busy() || store.uncertain()" (click)="store.discard()">Descartar revisión</button>
-        </div>
-      }
-    }
+
+    @if (store.pendingCount()) { <p class="notice">Resuelve u omite las decisiones pendientes antes de simular.</p> }
+    <button mat-button [disabled]="!store.editable()" (click)="store.omitAll()">Omitir todos los destinos</button>
+   }
   }
-  @if (store.review() || store.otherReview() || store.error()) { <button mat-button [disabled]="store.busy()" (click)="store.recover()">Actualizar revisión de destinos</button> }
+ }
+}
+@if (store.expired()) { <p class="notice">La revisión ha caducado.</p> }
+@if (store.error() || store.expired()) { <button mat-button [disabled]="store.busy()" (click)="store.recover()">Actualizar decisiones</button> }
 </section>
