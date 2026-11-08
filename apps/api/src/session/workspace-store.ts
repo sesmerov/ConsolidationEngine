@@ -103,7 +103,7 @@ export class WorkspaceStore {
   private withRecords(additions: readonly StateRecord[]): Map<string, unknown> {
     const records = new Map(this.records);
     for (const entry of additions) {
-      if (entry.key.startsWith('job:') || entry.key.startsWith('reserve:') || entry.key.startsWith('operation:') || entry.key.startsWith('idempotency:')) throw new ApiError('INTERNAL_ERROR');
+      if (entry.key.startsWith('job:') || entry.key.startsWith('reserve:') || entry.key.startsWith('operation:') || entry.key.startsWith('operation-receipt:') || entry.key.startsWith('idempotency:')) throw new ApiError('INTERNAL_ERROR');
       records.set(entry.key, immutable(entry.value));
     }
     return records;
@@ -146,9 +146,16 @@ export class WorkspaceStore {
     return records;
   }
   putInternalRecord(key: string, value: unknown): void {
-    const records = new Map(this.records).set(key, immutable(value)); const commitSize = this.check(this.workspace, this.snapshots, records); commitSize(); this.records = records;
+    this.putInternalRecords([{ key, value }]);
   }
-  deleteInternalRecord(key: string): void { const records = new Map(this.records); records.delete(key); const commitSize = this.check(this.workspace, this.snapshots, records); commitSize(); this.records = records; }
+  /** Single quota-checked publication for coupled internal indexes; no partial receipt survives a failure. */
+  putInternalRecords(additions: readonly { readonly key: string; readonly value: unknown }[], removals: readonly string[] = []): void {
+    const records = new Map(this.records);
+    for (const key of removals) records.delete(key);
+    for (const { key, value } of additions) records.set(key, immutable(value));
+    const commitSize = this.check(this.workspace, this.snapshots, records); commitSize(); this.records = records;
+  }
+  deleteInternalRecord(key: string): void { this.putInternalRecords([], [key]); }
   job(id: string, jobId: string): JobDTO {
     this.require(id); const job = this.getRecord<JobDTO>('job:' + jobId);
     if (!job || job.workspaceId !== id) throw new ApiError('RESOURCE_NOT_FOUND'); return job;

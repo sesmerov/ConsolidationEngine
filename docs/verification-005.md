@@ -61,3 +61,16 @@ Prueba roja inicial: `node node_modules/vitest/vitest.mjs run --project integrat
 - `git diff --check`: PASS. Ejecución Vitest fuera de sandbox tras EPERM de spawn. Sin nuevas pruebas de navegador ni cobertura alojada atribuida a este incremento.
 
 Preparación local adicional: descargada imagen oficial `postgres:17`, digest `sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f`. Aún no se ha creado base de pruebas ni probado SQL; ningún recurso comercial provisionado.
+
+### T007–T009: adaptadores, recibos y contratos de transporte
+
+Los puertos async de repositorio, objetos y despacho tienen adaptadores locales, sin dependencia de PostgreSQL. La hidratación es explícita. Recibos con fingerprint de método/ruta/cuerpo/base se recuperan por clave u operación dentro de la sesión; la escritura de índices es atómica. Un fallo de respuesta tras aceptar conserva el recibo y no ejecuta otro worker. Repetir el If-Match original recupera la operación aunque ahora sea antiguo; sustituirlo por otro arbitrario produce conflicto.
+
+- Prueba roja de adaptadores/recibos: seis fallos esperados por capacidades ausentes. Tras implementar: 58/58 en seis suites (adaptadores, recibos, sesión local, jobs, recursos y atomicidad).
+- Regresión de ocho suites de rutas: 79/81 inicialmente. Los dos fallos eran expectativas anteriores que permitían cambiar arbitrariamente If-Match. Tras ajustar a la identidad exacta de petición: operaciones, exportación visual y sesión local, 22/22 PASS. No atribuir 81/81 a una repetición que no se realizó.
+- Contratos de intención, sesión, página compacta y partes: 13/13 PASS; esquema cerrado, límites UTF-8, UUID|null para primera carga y manifiestos sin URLs privadas. El primer intento rojo fue módulo ausente (cero pruebas ejecutadas), no trece fallos de comportamiento.
+- Typecheck API, build:packages, tipos estrictos de contratos y git diff --check: PASS. No acreditan todavía autenticación alojada, almacenamiento o navegador.
+
+Precisión de UI acordada al integrar: todas las reglas omitidas explícitamente es un estado listo, distinto de no existir candidatos. Se permite una simulación deliberada vacía para conservar esas decisiones; nunca aplicación vacía. Antes de preparar los contadores son desconocidos, no ceros. Una revisión mantiene su ejecución compatible aunque aparezca otra de la misma base.
+
+Docker aislado confirma PostgreSQL17.11 con postgres:17 y límites de128MiB/1CPU, ejecutando solamente --version; aún no hay evidencia SQL funcional ni de capacidad del motor.

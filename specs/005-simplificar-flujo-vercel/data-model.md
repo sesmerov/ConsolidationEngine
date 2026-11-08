@@ -35,7 +35,7 @@ No guardar una sesión entera en una fila JSON ni abrir transacciones durante c�
 
 | Entidad | Campos y reglas |
 | --- | --- |
-| `UploadBatch` | owner, id, catalogFileId, reportFileIds, declaredTotalBytes, state, reservationId, expiresAt. Un catálogo+ 1–20 informes, total ≤ 50 MiB. |
+| `UploadBatch` | owner, id, baseVersionId (UUID o null para conjunto vacío), catalogFileId, reportFileIds, declaredTotalBytes, state, reservationId, expiresAt. Un catálogo+ 1–20 informes, total ≤ 50 MiB. |
 | `StoredFile` | owner, id, batchId?, name público sanitizado, mime, byteLength, sha256, partCount, state, retainedByRefs. Cada entrada ≤ 10 MiB; nunca ruta del cliente. |
 | `ObjectPart` | owner, file/artifact/block, index, size ≤ 3 MiB, sha256, privateObjectKey, status. Único(owner, recurso, index); mismo hash/tamaño reintenta, distinto 409. |
 | `ObjectManifest` | codecVersion, owner, orderedParts, wholeSize/hash, sealedAt, refs, state. Sellar verifica continuidad, totalidad, hash completo y guardasZIP; nunca publicar un manifiesto parcial. |

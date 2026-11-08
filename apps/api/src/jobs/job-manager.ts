@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { Worker } from 'node:worker_threads';
 import { ERROR_MESSAGES, JOB_DEADLINE_MS, isTerminalJob } from '@ce/contracts';
-import type { JobDTO, JobKind, JsonValue, ResultRef } from '@ce/contracts';
+import type { JobDTO, JobKind, JsonValue, OperationReservationDTO, ResultRef } from '@ce/contracts';
 import { ApiError } from '../errors.js';
 import { WorkLimitError } from '@ce/engine';
 import type { PublicationOutput, WorkspaceStore } from '../session/workspace-store.js';
 import type { StateRecord, WorkerMessage, WorkerOutput, WorkerRequest } from '../workers/protocol.js';
 import { receivedDiagnostic } from '../public-diagnostic.js';
+import type { AcceptedJobReference, JobDispatcher } from '../ports/job-dispatcher.js';
+import { LocalJobDispatcher } from '../local/local-job-dispatcher.js';
 
 export type WorkerHandle = Pick<Worker, 'on' | 'terminate'>;
 export type WorkerFactory = (request: WorkerRequest) => WorkerHandle;
@@ -14,15 +16,18 @@ export interface JobManagerOptions {
   workerFactory?: WorkerFactory; workerModules?: Partial<Record<JobKind, URL>>; deadlineMs?: number; workerEntry?: URL;
 }
 export interface JobAcceptance { input?: JsonValue; initialRecords?: readonly StateRecord[]; resultRef?: ResultRef; includeSnapshot?: boolean;
+  /** Reserved IDs exposed through a receipt, never as an already-published job result. */
+  reservation?: OperationReservationDTO;
   retainedState?: JsonValue;
   /** Final synchronous resource CAS after asynchronous acceptance and before publishing initial records. */
   assertStart?: () => void;
   preparePublication?: (job: JobDTO, output: WorkerOutput) => { output: PublicationOutput; assertCommit?: () => void } | Promise<{ output: PublicationOutput; assertCommit?: () => void }>;
   onTerminal?: (job: JobDTO) => readonly StateRecord[]; finalize?: () => Promise<void> }
 export interface StartJob extends JobAcceptance { workspaceId: string; kind: JobKind; baseVersionId?: string; input: JsonValue; jobId?: string }
-interface Running extends Pick<JobAcceptance, 'onTerminal' | 'includeSnapshot' | 'finalize' | 'preparePublication'> { cancellation: Int32Array; worker?: WorkerHandle; timer?: NodeJS.Timeout; expiresAt: number; stopping: boolean; publishing?: boolean; stopPromise?: Promise<JobDTO> }
+interface Running extends Pick<JobAcceptance, 'onTerminal' | 'includeSnapshot' | 'finalize' | 'preparePublication'> { input: JsonValue; cancellation: Int32Array; worker?: WorkerHandle; timer?: NodeJS.Timeout; expiresAt: number; stopping: boolean; publishing?: boolean; stopPromise?: Promise<JobDTO> }
 class DeadlineElapsed extends Error {}
 export class JobManager {
+  readonly dispatcher: JobDispatcher;
   private readonly running = new Map<string, Running>();
   private readonly terminations = new Set<Promise<unknown>>();
   private readonly settling = new Map<string, Promise<unknown>>();
@@ -31,6 +36,7 @@ export class JobManager {
   private readonly modules: Partial<Record<JobKind, URL>>;
   private disposed = false;
   constructor(readonly store: WorkspaceStore, options: JobManagerOptions = {}) {
+    this.dispatcher = new LocalJobDispatcher(reference => this.deliver(reference));
     this.deadlineMs = options.deadlineMs ?? JOB_DEADLINE_MS;
     if (this.deadlineMs <= 0 || this.deadlineMs > JOB_DEADLINE_MS) throw new Error('Invalid worker deadline.');
     this.modules = options.workerModules ?? {};
@@ -47,12 +53,22 @@ export class JobManager {
       ...(input.baseVersionId ? { baseVersionId: input.baseVersionId } : {}), ...(input.resultRef ? { resultRef: input.resultRef } : {}), progress: { completed: 0, total: 0, complete: false }, diagnostics: [], pollAfterMs: 1000 };
     input.assertStart?.();
     this.store.registerJob(job, input.initialRecords, input.retainedState);
-    const running: Running = { cancellation: new Int32Array(new SharedArrayBuffer(4)), expiresAt: Infinity, stopping: false, ...(input.finalize ? { finalize: input.finalize } : {}),
+    const running: Running = { input: input.input, cancellation: new Int32Array(new SharedArrayBuffer(4)), expiresAt: Infinity, stopping: false, ...(input.finalize ? { finalize: input.finalize } : {}),
       ...(input.onTerminal ? { onTerminal: input.onTerminal } : {}), ...(input.preparePublication ? { preparePublication: input.preparePublication } : {}), ...(input.includeSnapshot !== undefined ? { includeSnapshot: input.includeSnapshot } : {}) };
     this.running.set(job.jobId, running);
-    queueMicrotask(() => this.begin(job, input.input, running)); return this.get(job.workspaceId, job.jobId);
+    void this.dispatcher.dispatch({ sessionId: this.store.sessionId, workspaceId: job.workspaceId, jobId: job.jobId }).catch(error => this.fail(job, error));
+    return this.get(job.workspaceId, job.jobId);
   }
   get(workspaceId: string, jobId: string): JobDTO { return this.store.job(workspaceId, jobId); }
+  private deliver(reference: AcceptedJobReference): void {
+    if (reference.sessionId !== this.store.sessionId) throw new ApiError('RESOURCE_NOT_FOUND');
+    const job = this.get(reference.workspaceId, reference.jobId);
+    // Transport duplicates are harmless; the accepted job is the authority.
+    if (job.status !== 'queued') return;
+    const running = this.running.get(job.jobId);
+    if (!running) throw new ApiError('RESOURCE_NOT_FOUND');
+    this.begin(job, running.input, running);
+  }
   private begin(queued: JobDTO, input: JsonValue, running: Running): void {
     if (running.stopping || this.disposed) return;
     try {

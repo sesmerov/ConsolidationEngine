@@ -14,3 +14,8 @@ export * from './import-inspection.js';
 export * from './export-summary.js';
 export * from './direction-review.js';
 export * from './proposal-selection.js';
+export * from './download.js';
+export * from './compact.js';
+export * from './demo-session.js';
+export * from './transfers.js';
+export * from './operations.js';

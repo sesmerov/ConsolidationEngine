@@ -37,7 +37,10 @@ import type { WorkLimits } from '@ce/engine';
 import { registerExports } from './routes/exports.js';
 import type { ExportLimits } from './export/results-export.js';
 import type { ReportExportLimits } from './export/recalculated-report.js';
-export interface AppServices { readonly store: WorkspaceStore; readonly idempotency: IdempotencyStore; readonly jobs: JobManager; readonly files: SessionFiles; readonly uploads: UploadManager; readonly preparations: PreparationManager; readonly inspections: ImportInspectionService; readonly directionReviews: DirectionReviewService; readonly proposalSelections: ProposalSelectionService }
+import { createLocalAdapters } from './local/local-adapters.js';
+import type { LocalAdapters } from './local/local-adapters.js';
+import { registerOperations } from './routes/operations.js';
+export interface AppServices { readonly store: WorkspaceStore; readonly idempotency: IdempotencyStore; readonly jobs: JobManager; readonly files: SessionFiles; readonly uploads: UploadManager; readonly preparations: PreparationManager; readonly inspections: ImportInspectionService; readonly directionReviews: DirectionReviewService; readonly proposalSelections: ProposalSelectionService; readonly adapters: LocalAdapters }
 declare module 'fastify' { interface FastifyInstance { ce: AppServices } }
 export interface AppOptions extends JobManagerOptions {
   mode?: 'development' | 'production'; apiPort?: number; webPort?: number;
@@ -70,7 +73,7 @@ export async function createApp(options: AppOptions = {}): Promise<FastifyInstan
     ...(options.directionReviewLimits ? { limits: options.directionReviewLimits } : {}),
   });
   const proposalSelections = new ProposalSelectionService(store, options.proposalSelectionLimits);
-  app.decorate('ce', { store, files, jobs, uploads, preparations, inspections, directionReviews, proposalSelections, idempotency: new IdempotencyStore(store) });
+  app.decorate('ce', { store, files, jobs, uploads, preparations, inspections, directionReviews, proposalSelections, idempotency: new IdempotencyStore(store), adapters: createLocalAdapters(store, files, jobs) });
   const token = randomBytes(32).toString('base64url');
   installLocalSession(app, { token, mode: options.mode ?? 'production', apiPort: options.apiPort ?? 3000, webPort: options.webPort ?? 4200 });
   app.setErrorHandler((error, request, reply) => {
@@ -86,7 +89,7 @@ export async function createApp(options: AppOptions = {}): Promise<FastifyInstan
     const error = new ApiError('RESOURCE_NOT_FOUND'); return reply.code(404).send({ error: { code: error.code, message: error.publicMessage, requestId: _request.id, locator: null, details: {} } });
   });
   app.addHook('onSend', async (_request, reply) => { reply.header('Cache-Control', 'no-store'); reply.header('X-Content-Type-Options', 'nosniff'); });
-  registerBootstrap(app, token); registerWorkspaces(app); registerJobs(app);
+  registerBootstrap(app, token); registerWorkspaces(app); registerJobs(app); registerOperations(app);
   registerImports(app, options.uploadLimits); registerImportInspections(app, options.uploadLimits); registerRules(app); registerCapabilities(app);
   registerValidations(app, options.validationLimits); registerResults(app);
   registerDirections(app);

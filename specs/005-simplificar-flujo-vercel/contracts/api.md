@@ -31,7 +31,7 @@ Registrar actividad significativa al aceptar una acción manual de creación de 
 
 | Método y recurso | Contrato |
 | --- | --- |
-| POST `/workspaces/:w/upload-batches` | `{baseVersionId,files:[{clientFileId,role,name,byteLength,sha256}]}`; un catálogo+ 1–20 informes, cada ≤ 10 MiB y total ≤ 50 MiB. Reserva lote/cuotas antes de 201; devuelve IDs servidor, partSize 3 MiB e índices esperados. |
+| POST `/workspaces/:w/upload-batches` | `{baseVersionId,files:[{clientFileId,role,name,byteLength,sha256}]}`; `baseVersionId` es obligatorio UUID o `null` para un conjunto vacío, con If-Match también en ese caso. Un catálogo+ 1–20 informes, cada ≤ 10 MiB y total ≤ 50 MiB. Reserva lote/cuotas antes de 201; devuelve IDs servidor, partSize 3 MiB e índices esperados. |
 | POST `/workspaces/:w/upload-batches/:b/files/:f/parts/:index` | Cuerpo binario y `X-CE-Part-SHA256`; autenticación, owner, reserva, índice y longitud antes de escribir; calcular SHA real. Segunda comprobación de sesión antes de registrar. Repetición misma parte devuelve mismo recibo; hash/tamaño distinto 409. |
 | GET `/workspaces/:w/upload-batches/:b` | Estado y manifiesto compacto de partes registradas, sin rutas/URLs. Permite reanudar un archivo reeleccionado cuyo tamaño/hash coincide. |
 | POST `/workspaces/:w/upload-batches/:b/seal` | Base+idempotencia; job durable comprueba totalidad/orden/hash, reconstruye con presupuesto y ejecuta preflight XLSX/ZIP existente. Ninguna fórmula, macro o enlace se ejecuta. |

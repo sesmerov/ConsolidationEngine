@@ -69,7 +69,9 @@ it.each(['corep', 'types'] as const)('exports historical %s through HTTP and the
   const restored = await reimportVisual(imported.files[0]!, [location]); expect(visualBusiness(restored)).toEqual(visualBusiness(snapshot.content));
   expect(log.reports[0]).toMatchObject({ size: report.data.length, sha256: visualHash(report.data) });
   expect(await readdir(app.ce.files.workspacePath(workspace.id))).toHaveLength(1); expect(app.ce.files.usage(workspace.id)).toMatchObject({ reservedBytes: 0, retainedBytes: download.rawPayload.length });
-  const replay = await start(payload, key, '"stale"'); expect(replay.statusCode).toBe(202); expect(replay.json().jobId).toBe(job.jobId); expect(control.requests).toHaveLength(1);
+  // A retry preserves the original request precondition; another ETag is a different fingerprint.
+  expect((await start(payload, key, '"stale"')).statusCode).toBe(409);
+  const replay = await start(payload, key, etag); expect(replay.statusCode).toBe(202); expect(replay.json().jobId).toBe(job.jobId); expect(control.requests).toHaveLength(1);
   const results = await start({ kind: 'results', versionId: snapshot.versionId, runId: bundle.run.id }, randomUUID()); expect(results.statusCode).toBe(202); await nextTurn(); await control.finish();
   await vi.waitFor(() => expect(app.ce.store.job(workspace.id, results.json().jobId).status).toBe('succeeded'));
   const resultsJob = app.ce.store.job(workspace.id, results.json().jobId), resultsDownload = await app.inject({ url: `${base}/exports/${resultsJob.resultRef!.id}`, headers });
