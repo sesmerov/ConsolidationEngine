@@ -22,7 +22,7 @@ export function installHostedCors(app: FastifyInstance, config: HostedConfig): v
     const method = request.headers['access-control-request-method'];
     const requestedHeaders = request.headers['access-control-request-headers'];
     if (!origin || typeof method !== 'string' || !methods.includes(method) || method === 'OPTIONS'
-      || !app.hasRoute({ method: method as HTTPMethods, url: path })
+      || !app.findRoute({ method: method as HTTPMethods, url: path })
       || (requestedHeaders !== undefined && (typeof requestedHeaders !== 'string'
         || requestedHeaders.split(',').some(value => !headers.includes(value.trim().toLowerCase()))))) throw new ApiError('ORIGIN_NOT_ALLOWED');
     reply.header('Access-Control-Allow-Methods', methods.join(', '));

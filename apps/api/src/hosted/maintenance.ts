@@ -229,7 +229,7 @@ export class HostedMaintenance {
       await tx.query('UPDATE cpu_permits SET session_id=NULL,workspace_id=NULL,job_id=NULL,attempt_id=NULL,claimed_at=NULL,safe_release_at=NULL WHERE session_id=$1 AND workspace_id=$2 AND released_at IS NOT NULL', ids);
       if (!await this.objects.detachWorkspace(tx, owner)) return 'more';
       for (const table of ['projection_value_parts','projection_values','projection_rows','projection_sets','application_receipts',
-        'proposal_selection_mutations','proposal_selections','direction_review_mutations','recalculation_operations','previews','direction_reviews',
+        'proposal_selection_mutations','proposal_selections','direction_review_mutations','review_choice_rows','review_choice_groups','recalculation_operations','previews','direction_reviews',
         'import_inspections','operation_receipts','outbox_entries','mutation_receipts','export_reservations','export_artifacts','snapshot_manifests',
         'upload_part_claims','stored_files','canonical_blocks','object_manifests','object_resources','upload_batch_reservations','upload_batches',
         'validation_runs','jobs','workspace_versions','validation_bases']) {

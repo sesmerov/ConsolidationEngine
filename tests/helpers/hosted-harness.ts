@@ -5,7 +5,9 @@ import { ControlledBarriers, ControlledQueue } from './controlled-queue.js';
 import { ControlledObjects, ControlledObjectTransport } from './controlled-objects.js';
 
 export class ControlledClock {
-  constructor(private current = Date.parse('2026-11-08T12:00:00.000Z')) {}
+  // Freeze the current instant; canonical I/O and real worker deadlines also use wall time.
+  // A hard-coded past date would make every otherwise-live claim expire as the calendar advances.
+  constructor(private current = Date.now()) {}
   readonly now = (): number => this.current;
   date(): Date { return new Date(this.current); }
   advance(milliseconds: number): void {

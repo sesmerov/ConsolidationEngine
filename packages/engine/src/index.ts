@@ -51,5 +51,6 @@ export {
   verifyDirectionCompilation, projectDirectionConfiguration, replacedDirectionDecisionState, DirectionReviewError,
 } from './recalculation/direction-review.js';
 export type { DirectionReviewProjection, ReviewSeed } from './recalculation/direction-review.js';
+export { restoreDirectionProjection } from './recalculation/direction-review-index.js';
 export { assertRecalculationConfiguration, RecalculationConfigurationError } from './recalculation/configuration.js';
 export * from './recalculation/proposal-selection.js';

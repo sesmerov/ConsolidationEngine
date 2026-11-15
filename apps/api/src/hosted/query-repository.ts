@@ -16,7 +16,7 @@ export interface ProjectionFilter {
   readonly table?: string; readonly contextId?: string; readonly groupId?: string; readonly resultId?: string; readonly section?: string; readonly rowKey?: string;
 }
 interface Resolved { ref: ProjectionIndexRef; versionId?: string; basisId?: string; revision: number }
-interface Row extends QueryResultRow { row_key: string; sort_key: string; payload_ref: { chunk: CanonicalRef; offset: number } }
+interface Row extends QueryResultRow { row_key: string; sort_key: string; summary:JsonObject; payload_ref: { chunk: CanonicalRef; offset: number }; overlay?: {set:JsonObject;unset:string[];nested?:string|null;revision?:number}|null }
 const columns = {
   version: ['workspace_versions', 'summary'], run: ['validation_runs', 'result_index_ref'], review: ['direction_reviews', 'choices_ref'],
   preview: ['previews', 'manifest_refs'], selection: ['proposal_selections', 'mask_ref'], application: ['application_receipts', 'detail_ref'],
@@ -57,15 +57,17 @@ export class HostedQueryRepository {
     return { ref, ...(versionId ? { versionId } : {}), ...(basisId ? { basisId } : {}), revision: revisionNumber(index.revision) };
   }
   async page(owner: WorkspaceOwner, resource: ProjectionResource,
-    query: { limit?: number; cursor?: string; filter?: ProjectionFilter }, prefix: JsonObject = {}) {
+    query: { limit?: number; cursor?: string; filter?: ProjectionFilter;byteBudget?:number }, prefix: JsonObject = {}, onRow?:(metadata:{rowKey:string;summary:JsonObject})=>void) {
     const limit = query.limit ?? 50, filter = query.filter ?? {};
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) throw new ApiError('INVALID_REQUEST');
+    const byteBudget=query.byteBudget??1024*1024;if(!Number.isSafeInteger(byteBudget)||byteBudget<32768||byteBudget>1024*1024)throw new ApiError('INTERNAL_ERROR');
     const selected = await this.database.transaction(async tx => {
       const resolved = await this.resolve(tx, owner, resource);
       const fingerprint = canonicalHash({ owner, resource, basisId: resolved.basisId ?? null, ref: resolved.ref, filter });
       const after = query.cursor ? this.cursors.decode(query.cursor, fingerprint) : undefined;
       const values: unknown[] = [owner.sessionId, owner.workspaceId, resolved.ref.kind, resolved.ref.indexId];
       const clauses = ['session_id=$1', 'workspace_id=$2', 'resource_kind=$3', 'resource_id=$4'];
+      if(resource.type==='review'&&resource.view==='groups')clauses.push("status<>'not-observed'");
       const where = (sql: string, value: unknown) => { values.push(value); clauses.push(sql.replace('?', '$' + values.length)); };
       if (filter.code) where("strpos(lower(rule_code),lower(?))>0", filter.code);
       if (filter.status) { values.push(filter.status); clauses.push(`(status=$${values.length} OR coalesce(summary->'statuses','[]'::jsonb) ? $${values.length})`); }
@@ -79,7 +81,7 @@ export class HostedQueryRepository {
       const total = Number((await tx.query<{ total: string }>(`SELECT count(*)::text AS total FROM projection_rows WHERE ${clauses.join(' AND ')}`, values)).rows[0]!.total);
       if (after) { values.push(after.sortKey, after.rowKey); clauses.push(`(sort_key COLLATE "C",row_key COLLATE "C")>($${values.length - 1} COLLATE "C",$${values.length} COLLATE "C")`); }
       values.push(limit + 1);
-      const rows = (await tx.query<Row>(`SELECT row_key,sort_key,payload_ref FROM projection_rows WHERE ${clauses.join(' AND ')} ORDER BY sort_key COLLATE "C",row_key COLLATE "C" LIMIT $${values.length}`, values)).rows;
+      const rows = (await tx.query<Row>(`SELECT row_key,sort_key,payload_ref,summary,overlay FROM projection_rows WHERE ${clauses.join(' AND ')} ORDER BY sort_key COLLATE "C",row_key COLLATE "C" LIMIT $${values.length}`, values)).rows;
       return { resolved, fingerprint, rows, total };
     });
     const { resolved, fingerprint, rows, total } = selected, items: JsonValue[] = [], chunks = new Map<string, JsonValue[]>();
@@ -90,12 +92,21 @@ export class HostedQueryRepository {
       let values = chunks.get(chunk.resourceId);
       if (!values) { const decoded = await this.codec.get(owner, chunk); if (!Array.isArray(decoded)) throw new ApiError('INTERNAL_ERROR'); values = decoded as JsonValue[]; chunks.set(chunk.resourceId, values); }
       if (!Number.isSafeInteger(offset) || offset < 0 || offset >= values.length) throw new ApiError('INTERNAL_ERROR');
+      let item=values[offset]!;
+      if(row.overlay){
+        if(!item||typeof item!=='object'||Array.isArray(item))throw new ApiError('INTERNAL_ERROR');
+        const copy={...item} as Record<string,JsonValue>,patch=row.overlay;
+        const target=(patch.nested?{...(copy[patch.nested] as JsonObject)}:copy);
+        for(const key of patch.unset)delete target[key];Object.assign(target,patch.set);
+        if(patch.nested){copy[patch.nested]=target;if(patch.revision!==undefined)copy['revision']=patch.revision;}
+        item=copy;
+      }
       const candidateCursor = rows.length > items.length + 1 ? this.cursors.encode(fingerprint, { sortKey: row.sort_key, rowKey: row.row_key }) : null;
-      const candidate = { ...base, items: [...items, values[offset]!], total, nextCursor: candidateCursor };
-      if (Buffer.byteLength(JSON.stringify(candidate)) > 1024 * 1024) {
+      const candidate = { ...base, items: [...items, item], total, nextCursor: candidateCursor };
+      if (Buffer.byteLength(JSON.stringify(candidate)) > byteBudget) {
         if (!items.length) throw new ApiError('RESPONSE_LIMIT'); break;
       }
-      items.push(values[offset]!); nextCursor = candidateCursor;
+      items.push(item); nextCursor = candidateCursor;onRow?.({rowKey:row.row_key,summary:row.summary});
     }
     await this.database.transaction(async tx => {
       const current = await this.resolve(tx, owner, resource);
@@ -106,6 +117,13 @@ export class HostedQueryRepository {
   async item(owner: WorkspaceOwner, resource: ProjectionResource, rowKey: string): Promise<JsonValue> {
     const page = await this.page(owner, resource, { limit: 1, filter: { rowKey } });
     if (!page.items.length) throw new ApiError('RESOURCE_NOT_FOUND'); return page.items[0]!;
+  }
+  async metadata(owner:WorkspaceOwner,resource:ProjectionResource,rowKey:string):Promise<JsonObject>{
+    return this.database.transaction(async tx=>{
+      const {ref}=await this.resolve(tx,owner,resource);
+      const row=(await tx.query<{summary:JsonObject}>('SELECT summary FROM projection_rows WHERE session_id=$1 AND workspace_id=$2 AND resource_kind=$3 AND resource_id=$4 AND row_key=$5',[owner.sessionId,owner.workspaceId,ref.kind,ref.indexId,rowKey])).rows[0];
+      if(!row)throw new ApiError('RESOURCE_NOT_FOUND');return row.summary;
+    });
   }
   async valuePart(owner: WorkspaceOwner, valueId: string, partIndex: number): Promise<{ bytes: Uint8Array; sha256: string }> {
     if (!Number.isSafeInteger(partIndex) || partIndex < 0) throw new ApiError('RESOURCE_NOT_FOUND');

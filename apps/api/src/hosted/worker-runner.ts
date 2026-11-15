@@ -17,7 +17,8 @@ export interface HostedRunnerOptions {
   readonly workerFactory?: (request: HostedWorkerRequest) => HostedWorkerHandle;
 }
 type WorkerOutcome = { readonly output: PublicationEnvelope } | { readonly status: 'failed' | 'cancelled' | 'timed_out'; readonly diagnostic: Diagnostic };
-const failure = (code = 'INTERNAL_ERROR'): WorkerOutcome => ({ status: code === 'JOB_TIMEOUT' ? 'timed_out' : code === 'CANCELLED' ? 'cancelled' : 'failed', diagnostic: receivedDiagnostic({ code }) });
+const terminalStatus = (code: string) => ['JOB_TIMED_OUT', 'DEADLINE_EXCEEDED'].includes(code) ? 'timed_out' as const : code === 'CANCELLED' ? 'cancelled' as const : 'failed' as const;
+const failure = (code = 'INTERNAL_ERROR'): WorkerOutcome => ({ status: terminalStatus(code), diagnostic: receivedDiagnostic({ code }) });
 
 /** One awaited callback owns execution. SQL remains the cross-instance authority; this local slot is only an additional bound. */
 export class HostedWorkerRunner {
@@ -64,17 +65,17 @@ export class HostedWorkerRunner {
           if (message.type === 'result') {
             if (!message.output || Buffer.byteLength(JSON.stringify(message.output), 'utf8') > 262_144) finish(failure());
             else finish({ output: message.output });
-          } else if (message.type === 'failure') finish({ status: 'failed', diagnostic: receivedDiagnostic(message.diagnostic) });
+          } else if (message.type === 'failure') { const diagnostic = receivedDiagnostic(message.diagnostic); finish({ status: terminalStatus(diagnostic.code), diagnostic }); }
           else if (message.type !== 'progress' || !Number.isSafeInteger(message.completed) || !Number.isSafeInteger(message.total) || message.completed < 0 || message.total < message.completed) finish(failure());
         });
         worker!.on('error', () => finish(failure())); worker!.on('exit', () => finish(failure()));
-        timer = setTimeout(() => { Atomics.store(cancellation, 0, 1); finish(failure('JOB_TIMEOUT')); }, Math.max(1, Date.parse(claim.deadlineAt) - this.now()));
+        timer = setTimeout(() => { Atomics.store(cancellation, 0, 1); finish(failure('JOB_TIMED_OUT')); }, Math.max(1, Date.parse(claim.deadlineAt) - this.now()));
         interval = setInterval(() => {
           if (polling || settled) return;
           polling = (async () => {
             if (Atomics.load(cancellation, 0)) { finish(failure('CANCELLED')); return; }
             const authority = await this.coordinator.poll(claim);
-            if (authority.cancelled) { Atomics.store(cancellation, 0, 1); finish(failure(authority.reason === 'deadline' ? 'JOB_TIMEOUT' : authority.reason === 'base_changed' ? 'STALE_VERSION' : 'CANCELLED')); }
+            if (authority.cancelled) { Atomics.store(cancellation, 0, 1); finish(failure(authority.reason === 'deadline' ? 'JOB_TIMED_OUT' : authority.reason === 'base_changed' ? 'STALE_VERSION' : 'CANCELLED')); }
           })().catch(() => { Atomics.store(cancellation, 0, 1); finish(failure()); }).finally(() => { polling = undefined; });
         }, 750);
       });
@@ -84,7 +85,7 @@ export class HostedWorkerRunner {
       await worker.terminate(); terminated = true;
       if ('output' in result) {
         const authority = await this.coordinator.poll(claim);
-        if (authority.cancelled) return this.failed(claim, failure(authority.reason === 'deadline' ? 'JOB_TIMEOUT' : authority.reason === 'base_changed' ? 'STALE_VERSION' : 'CANCELLED'));
+        if (authority.cancelled) return this.failed(claim, failure(authority.reason === 'deadline' ? 'JOB_TIMED_OUT' : authority.reason === 'base_changed' ? 'STALE_VERSION' : 'CANCELLED'));
         return { state: 'terminal', job: await this.publication.publish(claim, result.output) };
       }
       return this.failed(claim, result);

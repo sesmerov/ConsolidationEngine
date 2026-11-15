@@ -140,7 +140,7 @@ export class HostedJobCoordinator {
   }
   private async expireLocked(tx: DatabaseTransaction, job: JobRow, now: Date): Promise<JobRow> {
     if (isTerminalJob(publicJob(job).status)) return job;
-    if (job.started_at && job.deadline_at && now >= job.deadline_at) return this.terminal(tx, job, 'timed_out', [{ code: 'JOB_TIMEOUT', message: 'El trabajo superó el plazo de ejecución.' }], now);
+    if (job.started_at && job.deadline_at && now >= job.deadline_at) return this.terminal(tx, job, 'timed_out', [{ code: 'JOB_TIMED_OUT', message: 'El trabajo superó el plazo de ejecución.' }], now);
     if (!job.started_at && now >= job.queue_expires_at) return this.terminal(tx, job, 'timed_out', [{ code: 'JOB_QUEUE_EXPIRED', message: 'El trabajo caducó antes de ejecutarse.' }], now);
     return job;
   }
@@ -157,6 +157,11 @@ export class HostedJobCoordinator {
     await tx.query(`UPDATE direction_reviews SET pending_job_id=NULL,state='failed' WHERE session_id=$1 AND workspace_id=$2 AND preparation_job_id=$3 AND state='preparing'`, identity);
     await tx.query(`UPDATE proposal_selections SET pending_job_id=NULL,state=CASE WHEN revision=0 THEN 'failed' ELSE 'ready' END
       WHERE session_id=$1 AND workspace_id=$2 AND pending_job_id=$3 AND state IN ('preparing','updating','applying')`, identity);
+    await tx.query(`UPDATE import_inspections SET commit_job_id=NULL,state=CASE
+      WHEN expires_at<=$4 THEN 'expired'
+      WHEN base_version_id IS DISTINCT FROM (SELECT current_version_id FROM workspaces WHERE session_id=$1 AND id=$2)
+        OR NOT EXISTS(SELECT 1 FROM demo_sessions WHERE id=$1 AND state='active' AND expires_at>$4 AND absolute_expires_at>$4) THEN 'invalidated'
+      ELSE 'ready' END WHERE session_id=$1 AND workspace_id=$2 AND commit_job_id=$3 AND state='committing'`, [...identity, now]);
     return { ...job, status, terminal_at: now, result_refs: null, diagnostics: { items: diagnostics }, progress: { ...job.progress, complete: false } };
   }
 }

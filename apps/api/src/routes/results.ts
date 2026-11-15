@@ -1,6 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { uuidSchema, validationResultsPageSchema, validationResultsQuerySchema } from '@ce/contracts';
+import { uuidSchema, validationResultsPageSchema, validationResultsQuerySchema, compactResultsQuerySchema, compactResultsPageSchema } from '@ce/contracts';
+import { registerLocalPublicViews } from './public-views.js';
 import type { ValidationResultsQueryDTO } from '@ce/contracts';
 import { getRecalculationPolicy, resultOrderKey, WorkBudget } from '@ce/engine';
 import { ApiError } from '../errors.js';
@@ -10,13 +11,17 @@ import { directionEligibility } from '../recalculation/directions-service.js';
 import { publicResult } from '../presentation/public-values.js';
 import { rulePresentation } from '../presentation/rule-presentation.js';
 export function registerResults(app: FastifyInstance): void {
+  const views=app.ce.adapters.publicViews;registerLocalPublicViews(app,views);
   const secret = randomBytes(32), sign = (payload: string) => createHmac('sha256', secret).update(payload).digest('base64url');
-  app.get<{ Params: { workspaceId: string; runId: string }; Querystring: ValidationResultsQueryDTO }>('/api/v1/workspaces/:workspaceId/runs/:runId/results', {
+  app.get<{ Params: { workspaceId: string; runId: string }; Querystring: ValidationResultsQueryDTO & {compact?:string} }>('/api/v1/workspaces/:workspaceId/runs/:runId/results', {
     schema: { params: { type: 'object', additionalProperties: false, required: ['workspaceId', 'runId'], properties: { workspaceId: uuidSchema, runId: uuidSchema } },
-      querystring: validationResultsQuerySchema,
-      response: { 200: validationResultsPageSchema } },
-  }, async (request) => {
+      querystring: {anyOf:[validationResultsQuerySchema,compactResultsQuerySchema]},
+      response: { 200: {anyOf:[validationResultsPageSchema,compactResultsPageSchema]} } },
+  }, async (request, reply) => {
     const { workspaceId, runId } = request.params, query = request.query, bundle = getValidation(app.ce.store, workspaceId, runId);
+    if(query.compact==='true')return views.results(workspaceId,runId,query);
+    // Select the closed legacy serializer before union matching to strip private fields.
+    reply.serializer(reply.compileSerializationSchema(validationResultsPageSchema));
     const fingerprint = canonicalHash({ resource: 'results', workspaceId, runId, versionId: bundle.run.versionId, status: query.status ?? '', code: query.code ?? '', table: query.table ?? '' });
     let after: string | undefined;
     if (query.cursor) try {

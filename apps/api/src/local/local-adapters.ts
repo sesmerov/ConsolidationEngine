@@ -11,6 +11,10 @@ import type { ObjectStore, PrivateObjectReference } from '../ports/object-store.
 import type { WorkspaceMetadata, WorkspaceOwner, WorkspaceRepository } from '../ports/workspace-repository.js';
 import type { WorkspaceStore } from '../session/workspace-store.js';
 import type { SessionFiles } from '../storage/session-files.js';
+import { LocalExportTransfers } from './local-export-transfers.js';
+import type { ExportTransferService } from '../hosted/export-artifacts.js';
+import { LocalUploadBatches } from './local-upload-batches.js';
+import { LocalPublicViews } from './local-public-views.js';
 
 function authorize(store: WorkspaceStore, owner: WorkspaceOwner): void {
   if (owner.sessionId !== store.sessionId) throw new ApiError('RESOURCE_NOT_FOUND');
@@ -63,7 +67,10 @@ export interface LocalAdapters {
   readonly repository: WorkspaceRepository;
   readonly objects: ObjectStore;
   readonly dispatcher: JobDispatcher;
+  readonly exports: ExportTransferService;
+  readonly uploads: LocalUploadBatches;
+  readonly publicViews: LocalPublicViews;
 }
 export function createLocalAdapters(store: WorkspaceStore, files: SessionFiles, jobs: JobManager): LocalAdapters {
-  return Object.freeze({ repository: new LocalWorkspaceRepository(store), objects: new LocalObjectStore(store, files), dispatcher: jobs.dispatcher });
+  return Object.freeze({ repository: new LocalWorkspaceRepository(store), objects: new LocalObjectStore(store, files), dispatcher: jobs.dispatcher, exports: new LocalExportTransfers(store, files, jobs), uploads: new LocalUploadBatches(store, files), publicViews: new LocalPublicViews(store) });
 }

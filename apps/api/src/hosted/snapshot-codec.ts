@@ -1,4 +1,5 @@
 import type { JsonObject, JsonValue, Snapshot, SnapshotContent, SnapshotPublicationReason } from '@ce/contracts';
+import { isRationalValue } from '@ce/contracts';
 import { ApiError } from '../errors.js';
 import { versionExportSummary } from '../export/report-ownership.js';
 import type { WorkspaceOwner } from '../ports/workspace-repository.js';
@@ -51,13 +52,14 @@ export class HostedSnapshotCodec {
     const basisExists = (await this.database.query('SELECT id FROM validation_bases WHERE session_id=$1 AND workspace_id=$2 AND id=$3', [claim.sessionId, claim.workspaceId, snapshot.validationBasisId])).rowCount === 1;
     const shared = { ...(basisExists ? { basisId: snapshot.validationBasisId } : {}), revision: 1 };
     recordIndex('contexts', await this.indexes.stage(claim, { ...shared, resource: { type: 'version', id: snapshot.versionId, view: 'contexts' }, kind: 'details',
-      rows: content.contexts.map(item => ({ key: item.contextId, sortKey: item.contextId, value: item as unknown as JsonValue })) }));
+      rows: content.contexts.map(item => ({ key: item.contextId, sortKey: item.contextId, selectors: { contextId: item.contextId }, value: item as unknown as JsonValue })) }));
     recordIndex('sources', await this.indexes.stage(claim, { ...shared, resource: { type: 'version', id: snapshot.versionId, view: 'sources' }, kind: 'details',
       rows: content.sources.map(item => ({ key: item.id, sortKey: item.id, value: item as unknown as JsonValue })) }));
+    const fileNames=new Map(content.sources.map(source=>[source.id,source.displayName]));
     recordIndex('catalog', await this.indexes.stage(claim, { ...shared, resource: { type: 'version', id: snapshot.versionId, view: 'catalog' }, kind: 'catalog',
-      rows: catalogRows(snapshot).map(item => ({ key: item.id, sortKey: JSON.stringify([item.code, item.variantId ?? '', item.id]), code: item.code,
+      rows: catalogRows(snapshot).map(item => {const {originalFields:_fields,...publicItem}=item;return ({ key: item.id, sortKey: JSON.stringify([item.code, item.variantId ?? '', item.id]), code: item.code,
         selectors: { tables: item.tables ?? [], statuses: [item.syntaxStatus, item.supportStatus, item.applicability,
-          ...(item.diagnostics.some(diagnostic => diagnostic.severity === 'error') ? ['invalid'] : [])].filter(value => value !== undefined) as string[] }, value: item as unknown as JsonValue })) }));
+          ...(item.diagnostics.some(diagnostic => diagnostic.severity === 'error') ? ['invalid'] : [])].filter(value => value !== undefined) as string[] }, value: {...publicItem,fileName:fileNames.get(item.sourceLocator.fileId??'')??''} as unknown as JsonValue });}) }));
     // Imported versions have authoritative report bindings. Empty synthetic engine fixtures have no downloadable report.
     const exportSummary = content.sources.some(source => source.kind === 'report') ? versionExportSummary(snapshot, () => {}) : undefined;
     const compactExportSummary = exportSummary && Buffer.byteLength(canonicalStringify(exportSummary), 'utf8') <= 32_768 ? exportSummary : undefined;
@@ -70,6 +72,8 @@ export class HostedSnapshotCodec {
     const summary: JsonObject = { contextCount: content.contexts.length, directionCount: content.directions.length,
       counts: { coordinates: content.coordinates.length, facts: content.facts.length, sources: content.sources.length }, views: views as unknown as JsonObject,
       ...(compactExportSummary ? { exportSummary: compactExportSummary as unknown as JsonObject } : {}),
+      dataSummary: {explicitNulls:content.facts.filter(fact=>fact.presence==='null').length,implicitNulls:content.coordinates.length-content.facts.length,
+        zeroValues:content.facts.filter(fact=>isRationalValue(fact.normalizedValue)&&fact.normalizedValue.numerator==='0').length},
       coverage: content.catalog.coverage as unknown as JsonObject };
     const version: PublishedVersion = { id: snapshot.versionId, basisId: snapshot.validationBasisId, ...(snapshot.parentVersionId ? { parentId: snapshot.parentVersionId } : {}), reason,
       contentRef: root, directionsRef: roots.configuration as unknown as JsonObject, contentHash: snapshot.contentHash, configVersion: content.configVersion,

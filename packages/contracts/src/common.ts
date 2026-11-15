@@ -41,7 +41,7 @@ export interface Snapshot {
   readonly validationBasisId?: ValidationBasisId;
   readonly createdAt: string; readonly content: SnapshotContent;
 }
-export const JOB_KINDS = ['import','inspect-import','prepare-directions','commit-directions','recalculation-operation','validate','preview','select-proposals','apply','export'] as const;
+export const JOB_KINDS = ['import','inspect-import','prepare-directions','commit-directions','recalculation-operation','validate','preview','select-proposals','apply','export','seal-upload'] as const;
 export type JobKind = typeof JOB_KINDS[number];
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'timed_out';
 export interface ResultRef { readonly type: string; readonly id: string }

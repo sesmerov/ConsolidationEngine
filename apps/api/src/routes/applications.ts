@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { applicationDetailSchema, applicationRequestSchema, changedOnlyQuerySchema, comparisonPageSchema, emptyQuerySchema, uuidSchema } from '@ce/contracts';
+import { applicationDetailSchema, applicationRequestSchema, changedOnlyQuerySchema, comparisonPageSchema, publicComparisonPageSchema, publicApplicationChangesPageSchema, emptyQuerySchema, uuidSchema } from '@ce/contracts';
 import type { ApplicationRequestDTO, ApplyReceiptDTO, CompactApplyReceiptDTO, ComparisonRowDTO } from '@ce/contracts';
 import { resultOrderKey, WorkBudget, WorkLimitError } from '@ce/engine';
 import type { WorkLimits } from '@ce/engine';
@@ -31,10 +31,12 @@ export function registerApplications(app: FastifyInstance, limits?: Partial<Work
     const { bundle, before, after } = detail(request.params.workspaceId, request.params.receiptId);
     return { receipt: projectReceipt(bundle.receipt, request.query.includeAcceptedIds), changeCount: bundle.changes.filter(change => change.changed).length, beforeSummary: before.run.summary, afterSummary: after.run.summary };
   });
-  app.get<{ Params: Params; Querystring: { limit?: string; cursor?: string; changedOnly?: string; includeAcceptedIds?: string } }>('/api/v1/workspaces/:workspaceId/applications/:receiptId/comparison', { schema: {
-    params, querystring: { type: 'object', additionalProperties: false, properties: { ...paginationProperties, changedOnly: changedOnlyQuerySchema, includeAcceptedIds } }, response: { 200: comparisonPageSchema },
-  } }, async request => {
+  app.get<{ Params: Params; Querystring: { limit?: string; cursor?: string; changedOnly?: string; includeAcceptedIds?: string;compact?:string } }>('/api/v1/workspaces/:workspaceId/applications/:receiptId/comparison', { schema: {
+    params, querystring: { type: 'object', additionalProperties: false, properties: { ...paginationProperties, compact:{const:'true'},changedOnly: changedOnlyQuerySchema, includeAcceptedIds } },response:{200:{anyOf:[publicComparisonPageSchema,comparisonPageSchema]}},
+  } }, async (request, reply) => {
     try {
+    if(request.query.compact==='true')return app.ce.adapters.publicViews.comparison(request.params.workspaceId,request.params.receiptId,request.query);
+    reply.serializer(reply.compileSerializationSchema(comparisonPageSchema));
     const budget = new WorkBudget({ cancelled: () => request.raw.aborted });
     const { workspaceId, receiptId } = request.params, { bundle, before, after } = detail(workspaceId, receiptId), rows = new Map<string, ComparisonRowDTO>();
     for (const result of before.results) { budget.check(); const key = resultOrderKey(result); rows.set(key, { key, before: result }); }
@@ -52,4 +54,5 @@ export function registerApplications(app: FastifyInstance, limits?: Partial<Work
       receipt: projectReceipt(bundle.receipt, request.query.includeAcceptedIds), beforeSummary: before.run.summary, afterSummary: after.run.summary, sourceFiles: app.ce.store.snapshot(workspaceId, bundle.receipt.newVersionId).content.sources };
     } catch (error) { if (error instanceof WorkLimitError) throw new ApiError('EXPANSION_LIMIT', { reason: error.code }); throw error; }
   });
+  app.get<{Params:Params;Querystring:{limit?:string;cursor?:string}}>('/api/v1/workspaces/:workspaceId/applications/:receiptId/changes',{schema:{params,querystring:{type:'object',additionalProperties:false,properties:{limit:{type:'string',pattern:'^(?:[1-9]|[1-4][0-9]|50)$'},cursor:{type:'string',maxLength:8192}}},response:{200:publicApplicationChangesPageSchema}}},req=>app.ce.adapters.publicViews.applicationChanges(req.params.workspaceId,req.params.receiptId,req.query));
 }

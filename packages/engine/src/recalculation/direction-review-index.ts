@@ -269,6 +269,15 @@ export function indexProjection(base: Omit<DirectionReviewProjection, 'decisions
   return { ...draft, blockCounts, counts: totalCounts(blockCounts) };
 }
 
+/** Rebuild the immutable worker projection from persisted one-character choices and observed group identities. */
+export function restoreDirectionProjection(base: DirectionReviewProjection, choices: readonly string[], observed: readonly number[], omitted: readonly number[], budget = new WorkBudget()): DirectionReviewProjection {
+  if (choices.length !== base.rows.length || choices.some(choice => !Object.values(decisionCode).includes(choice as never))) throw new DirectionReviewError('INVALID_DECISION');
+  const projection = indexProjection(base, choices, budget), seen = new Set([...projection.observedGroups, ...observed]), hidden = new Set(omitted);
+  for (const group of [...seen, ...hidden]) if (!Number.isSafeInteger(group) || group < 0 || group >= base.groups.length) throw new DirectionReviewError('UNKNOWN_GROUP');
+  const flags = (set: Set<number>) => Array.from({ length: Math.ceil(base.groups.length / blockSize) }, (_, block) => Array.from({ length: Math.min(blockSize, base.groups.length - block * blockSize) }, (_, offset) => set.has(block * blockSize + offset) ? '1' : '0').join(''));
+  return { ...projection, observedGroups: [...seen].sort((a, b) => ordinal(base.groups[a]!.targetKey, base.groups[b]!.targetKey)), observedFlags: flags(seen), omittedFlags: flags(hidden) };
+}
+
 interface DecisionEdits {
   rows: Map<number, string>;
   // A group resolution retains just its winner, including when the group spans thousands of pages.

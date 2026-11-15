@@ -13,13 +13,19 @@ import { ApiError } from '../errors.js';
 import { requireCurrentVersion } from '../plugins/version-guard.js';
 import { canonicalHash } from '../session/canonical-state.js';
 import { registerJobRoute } from './jobs.js';
+import { compactDetailResponse, compactLimit, compactOnlyQuery, compactPageResponse, compactRecalculationPage, withCompactQuery } from '../local/local-recalculation-views.js';
 
 interface Params { workspaceId: string; reviewId: string }
-interface RowsQuery { limit?: string; cursor?: string; state?: DirectionReviewDecision; groupId?: string; scope?: DirectionReviewScope }
-interface PageQuery { limit?: string; cursor?: string; scope?: DirectionReviewScope }
+interface RowsQuery { limit?: string; cursor?: string; state?: DirectionReviewDecision; groupId?: string; scope?: DirectionReviewScope; compact?: string }
+interface PageQuery { limit?: string; cursor?: string; scope?: DirectionReviewScope; compact?: string }
 export function registerDirectionReviews(app: FastifyInstance, current = false): void {
   const path = '/workspaces/:workspaceId/' + (current ? 'recalculation-reviews' : 'direction-reviews'), collection = '/api/v1' + path, member = collection + '/:reviewId';
   const reviews = app.ce.directionReviews;
+  const values = app.ce.adapters.publicViews;
+  const authority = (workspaceId: string, reviewId: string, revision: number) => () => {
+    const summary = reviews.get(workspaceId, reviewId);
+    if (summary.revision !== revision || summary.state !== 'ready') throw new ApiError('STALE_DIRECTION_REVIEW');
+  };
   const secret = randomBytes(32);
   const signature = (text: string) => createHmac('sha256', secret).update(text).digest('base64url');
   function cursorOffset(cursor: string | undefined, scope: string): number {
@@ -50,16 +56,17 @@ export function registerDirectionReviews(app: FastifyInstance, current = false):
     schema: { params: directionReviewParamsSchema, querystring: emptyQuerySchema, response: { 200: directionReviewSummarySchema } },
   }, request => reviews.get(request.params.workspaceId, request.params.reviewId));
   app.get<{ Params: Params; Querystring: RowsQuery }>(member + '/rows', {
-    schema: { params: directionReviewParamsSchema, querystring: current ? recalculationReviewRowsQuerySchema : directionReviewRowsQuerySchema, response: { 200: directionReviewPageSchema } },
+    schema: { params: directionReviewParamsSchema, querystring: withCompactQuery(current ? recalculationReviewRowsQuerySchema : directionReviewRowsQuerySchema), response: { 200: compactPageResponse(directionReviewPageSchema) } },
   }, request => {
     const { workspaceId, reviewId } = request.params, { cursor, limit, state, groupId, scope: filterScope } = request.query;
     const { revision } = reviews.get(workspaceId, reviewId);
     const scope = canonicalHash({ resource: 'direction-review-rows', workspaceId, reviewId, revision, state: state ?? '', groupId: groupId ?? '', scope: filterScope ?? 'all' });
     const offset = cursorOffset(cursor, scope);
-    const page = reviews.rows(workspaceId, reviewId, { offset, limit: Number(limit ?? 50), ...(state ? { state } : {}), ...(groupId ? { groupId } : {}), ...(filterScope ? { scope: filterScope } : {}) });
+    const page = reviews.rows(workspaceId, reviewId, { offset, limit: request.query.compact === 'true' ? compactLimit(limit) : Number(limit ?? 50), ...(state ? { state } : {}), ...(groupId ? { groupId } : {}), ...(filterScope ? { scope: filterScope } : {}) });
     const nextOffset = offset + page.items.length;
     const payload = Buffer.from(JSON.stringify({ fingerprint: scope, offset: nextOffset })).toString('base64url');
-    return { ...page, nextCursor: nextOffset < page.total ? payload + '.' + signature(payload) : null };
+    return request.query.compact === 'true' ? compactRecalculationPage(values, workspaceId, `${reviewId}:${revision}`, authority(workspaceId, reviewId, revision), page,
+      count => withCursor({ items: Array(count), total: page.total }, offset, scope).nextCursor) : { ...page, nextCursor: nextOffset < page.total ? payload + '.' + signature(payload) : null };
   });
   function withCursor<T extends { items: readonly unknown[]; total: number }>(page: T, offset: number, scope: string) {
     const nextOffset = offset + page.items.length;
@@ -67,28 +74,38 @@ export function registerDirectionReviews(app: FastifyInstance, current = false):
     return { ...page, nextCursor: nextOffset < page.total ? payload + '.' + signature(payload) : null };
   }
   app.get<{ Params: Params; Querystring: PageQuery }>(member + '/groups', {
-    schema: { params: directionReviewParamsSchema, querystring: current ? recalculationReviewGroupsQuerySchema : directionConflictPageQuerySchema, response: { 200: directionConflictGroupsPageSchema } },
+    schema: { params: directionReviewParamsSchema, querystring: withCompactQuery(current ? recalculationReviewGroupsQuerySchema : directionConflictPageQuerySchema), response: { 200: compactPageResponse(directionConflictGroupsPageSchema) } },
   }, request => {
     const { workspaceId, reviewId } = request.params, { cursor, limit, scope: filterScope } = request.query;
     const { revision } = reviews.get(workspaceId, reviewId);
     const scope = canonicalHash({ resource: 'direction-conflict-groups', workspaceId, reviewId, revision, scope: filterScope ?? 'all' });
     const offset = cursorOffset(cursor, scope);
-    return withCursor(reviews.groups(workspaceId, reviewId, { offset, limit: Number(limit ?? 50), ...(filterScope ? { scope: filterScope } : {}) }), offset, scope);
+    const page = reviews.groups(workspaceId, reviewId, { offset, limit: request.query.compact === 'true' ? compactLimit(limit) : Number(limit ?? 50), ...(filterScope ? { scope: filterScope } : {}) });
+    return request.query.compact === 'true' ? compactRecalculationPage(values, workspaceId, `${reviewId}:${revision}`, authority(workspaceId, reviewId, revision), page,
+      count => withCursor({ items: Array(count), total: page.total }, offset, scope).nextCursor) : withCursor(page, offset, scope);
   });
   app.get<{ Params: Params & { groupId: string }; Querystring: PageQuery }>(member + '/groups/:groupId/candidates', {
-    schema: { params: directionConflictGroupParamsSchema, querystring: current ? recalculationReviewCandidatesQuerySchema : directionConflictPageQuerySchema, response: { 200: directionConflictCandidatesPageSchema } },
+    schema: { params: directionConflictGroupParamsSchema, querystring: withCompactQuery(current ? recalculationReviewCandidatesQuerySchema : directionConflictPageQuerySchema), response: { 200: compactPageResponse(directionConflictCandidatesPageSchema) } },
   }, request => {
     const { workspaceId, reviewId, groupId } = request.params, { cursor, limit } = request.query;
     const { revision } = reviews.get(workspaceId, reviewId);
     const scope = canonicalHash({ resource: 'direction-conflict-candidates', workspaceId, reviewId, revision, groupId });
     const offset = cursorOffset(cursor, scope);
-    return withCursor(reviews.candidates(workspaceId, reviewId, groupId, { offset, limit: Number(limit ?? 50) }), offset, scope);
+    const page = reviews.candidates(workspaceId, reviewId, groupId, { offset, limit: request.query.compact === 'true' ? compactLimit(limit) : Number(limit ?? 50) });
+    return request.query.compact === 'true' ? compactRecalculationPage(values, workspaceId, `${reviewId}:${revision}`, authority(workspaceId, reviewId, revision), page,
+      count => withCursor({ items: Array(count), total: page.total }, offset, scope).nextCursor) : withCursor(page, offset, scope);
   });
-  app.get<{ Params: Params & { groupId: string; instanceId: string } }>(member + '/groups/:groupId/candidates/:instanceId', {
-    schema: { params: directionConflictCandidateParamsSchema, querystring: emptyQuerySchema, response: { 200: directionConflictCandidateDetailSchema } },
-  }, request => {
+  app.get<{ Params: Params & { groupId: string; instanceId: string }; Querystring: { compact?: string } }>(member + '/groups/:groupId/candidates/:instanceId', {
+    schema: { params: directionConflictCandidateParamsSchema, querystring: compactOnlyQuery, response: { 200: compactDetailResponse(directionConflictCandidateDetailSchema, ['expression', 'precondition', 'descriptions']) } },
+  }, async request => {
     const { workspaceId, reviewId, groupId, instanceId } = request.params;
-    return reviews.candidate(workspaceId, reviewId, groupId, instanceId);
+    const detail = reviews.candidate(workspaceId, reviewId, groupId, instanceId);
+    if (request.query.compact !== 'true') return detail;
+    const authorize = authority(workspaceId, reviewId, detail.revision), scope = `${reviewId}:${detail.revision}`;
+    const retained = { ...detail, expression: await values.retainValue(workspaceId, scope, authorize, detail.expression),
+      ...(detail.precondition === undefined ? {} : { precondition: await values.retainValue(workspaceId, scope, authorize, detail.precondition) }),
+      descriptions: await values.retainValue(workspaceId, scope, authorize, detail.descriptions) };
+    return values.retainValue(workspaceId, scope, authorize, retained);
   });
   app.patch<{ Params: Params; Body: DirectionReviewPatchDTO }>(member, {
     schema: { params: directionReviewParamsSchema, body: directionReviewPatchSchema, querystring: emptyQuerySchema, response: { 200: directionReviewMutationResponseSchema } },

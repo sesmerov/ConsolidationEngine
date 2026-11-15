@@ -30,6 +30,10 @@ it('publishes configuration, effective preview and preselection together, then r
   expect(preview.baseVersionId).toBe(current.versionId);
   const selection = (await h.getCurrent('/previews/' + accepted.reservedPreviewId + '/selection-state')).json();
   expect(selection).toMatchObject({ baseVersionId: current.versionId, revision: 1, selectedCount: 1, requiredCount: 0 });
+  const countBeforeReads = h.scheduled.length, bytesBeforeReads = h.store.bytes;
+  for (let i = 0; i < 3; i++) expect((await h.getCurrent('/recalculation-state')).json()).toMatchObject({
+    state: 'ready', currentVersionId: current.versionId, review: { id: review.id, state: 'committed' }, counts: { included: 1, pending: 0 } });
+  expect(h.scheduled).toHaveLength(countBeforeReads); expect(h.store.bytes).toBe(bytesBeforeReads);
   const second = await h.readyCurrent(), next = (await h.operate(second)).json();
   expect(next.effectiveVersionId).toBe(current.versionId);
   expect((await h.finish(next.jobId)).status).toBe('succeeded');

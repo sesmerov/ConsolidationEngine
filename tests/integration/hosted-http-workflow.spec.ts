@@ -1,0 +1,71 @@
+import { createHash,randomBytes,randomUUID } from 'node:crypto';
+import { mkdtemp,rm,copyFile,readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { build } from 'esbuild';
+import { afterEach,beforeEach,describe,expect,it } from 'vitest';
+import { createHostedApp } from '../../apps/api/src/hosted-entry.js';
+import { createHostedHarness,type HostedHarness } from '../helpers/hosted-harness.js';
+import { ControlledFileObjectTransport } from '../helpers/controlled-file-objects.js';
+const sha=(value:Uint8Array)=>createHash('sha256').update(value).digest('hex');
+describe('public HTTP workflows across two APIs and real isolated workers',()=>{
+ let h:HostedHarness,transport:ControlledFileObjectTransport,temp:string;
+ beforeEach(async()=>{h=await createHostedHarness({now:Date.now()});transport=await ControlledFileObjectTransport.create();temp=await mkdtemp(path.resolve('.tools/http-worker-'));});
+ afterEach(async()=>{await h?.close();await transport?.close();if(temp&&path.resolve(temp).startsWith(path.resolve('.tools')+path.sep))await rm(temp,{recursive:true,force:true});});
+ it('recovers and reads a FINREP upload, validation and exact export on either instance with owner isolation',async()=>{
+  await build({entryPoints:{worker:'apps/api/src/workers/hosted-operation-worker.ts',commands:'apps/api/src/hosted/domain-commands.ts',provider:'tests/helpers/controlled-file-objects.ts'},outdir:temp,outExtension:{'.js':'.mjs'},bundle:true,packages:'external',platform:'node',format:'esm',logLevel:'silent'});
+  for(const name of ['corep-ca1-mapping.json','finrep-f0101-mapping.json','demo-types-mapping.json'])await copyFile(path.resolve('apps/api/src/import/profiles',name),path.join(temp,name));
+  const apps=await h.createApis(deps=>createHostedApp({config:deps.config,database:deps.database,objectTransport:transport,dispatcher:deps.queue,now:deps.clock.now,instanceId:deps.instanceId,signatureVerifier:{verify:async()=>true},log:()=>{},workerOptions:{workerEntry:pathToFileURL(path.join(temp,'worker.mjs')),commandModule:pathToFileURL(path.join(temp,'commands.mjs')),runtime:{config:deps.config,objectTransport:{moduleUrl:pathToFileURL(path.join(temp,'provider.mjs')).href,descriptor:{...transport.descriptor}}}}}));
+  let index=0;const api=()=>apps[index++%2]!;
+  const visitor=async()=>{const headers={origin:h.config.allowedOrigins[0]!,'x-ce-session':randomBytes(32).toString('base64url')};const created=await api().inject({method:'POST',url:'/api/v1/sessions',headers,payload:{creationNonce:randomBytes(32).toString('base64url')}});expect(created.statusCode,created.body).toBe(201);return headers;};
+  const headers=await visitor(),stranger=await visitor();
+  const created=await api().inject({method:'POST',url:'/api/v1/workspaces',headers:{...headers,'idempotency-key':randomUUID()},payload:{name:'Synthetic FINREP'}});expect(created.statusCode,created.body).toBe(201);
+  const w=created.json().id,base='/api/v1/workspaces/'+w;let etag=String(created.headers.etag);
+  const post=async(url:string,payload:object)=>{const response=await api().inject({method:'POST',url,headers:{...headers,'if-match':etag,'idempotency-key':randomUUID()},payload});expect(response.statusCode,response.body).toBe(202);return response.json();};
+  const terminal=async(job:{jobId:string})=>{const message=h.queue.messages.find(row=>row.reference.jobId===job.jobId)!;expect(message).toBeDefined();const response=await api().inject({method:'POST',url:'/internal/jobs',headers:{'content-type':'application/json','upstash-signature':'controlled-signature'},payload:JSON.stringify(message.reference)});expect(response.statusCode,response.body).toBe(200);const result=await api().inject({url:base+'/jobs/'+job.jobId,headers});expect(result.json(),result.body).toMatchObject({status:'succeeded'});return result.json();};
+  const files=await Promise.all(['catalog','report'].map(async role=>({role,bytes:await readFile(`tests/fixtures/generated/demo-finrep-${role}.xlsx`)})));
+  const declaration={baseVersionId:null,files:files.map(file=>({clientFileId:file.role,role:file.role,name:file.role+'.xlsx',byteLength:file.bytes.length,sha256:sha(file.bytes)}))};
+  const key=randomUUID(),upload=await api().inject({method:'POST',url:base+'/upload-batches',headers:{...headers,'if-match':etag,'idempotency-key':key},payload:declaration});expect(upload.statusCode,upload.body).toBe(201);const batch=upload.json();
+  expect((await api().inject({method:'POST',url:base+'/upload-batches',headers:{...headers,'if-match':etag,'idempotency-key':key},payload:declaration})).json().id).toBe(batch.id);
+  for(const file of files){const id=batch.files.find((row:{role:string})=>row.role===file.role).id;const response=await api().inject({method:'POST',url:base+`/upload-batches/${batch.id}/files/${id}/parts/0`,headers:{...headers,'content-type':'application/octet-stream','x-ce-part-sha256':sha(file.bytes)},payload:file.bytes});expect(response.statusCode,response.body).toBe(200);}
+  await terminal(await post(base+`/upload-batches/${batch.id}/seal`,{baseVersionId:null}));
+  const inspected=await terminal(await post(base+'/import-inspections',{uploadBatchId:batch.id,context:{source:'workbook'}})),inspectionId=inspected.resultRef.id;
+  const inspectionResponse=await api().inject({url:base+'/import-inspections/'+inspectionId+'?compact=true',headers});expect(inspectionResponse.statusCode,inspectionResponse.body).toBe(200);const inspection=inspectionResponse.json();expect(inspection).not.toHaveProperty('reports');expect(inspection.reportCount).toBe(1);
+  const reports=await api().inject({url:base+`/import-inspections/${inspectionId}/items?section=reports`,headers});expect(reports.statusCode,reports.body).toBe(200);expect(reports.json().items[0].profileId).toBe('eba-finrep-4.0-f0101-v1');
+  const imported=await terminal(await post(base+`/import-inspections/${inspectionId}/commit`,{inspectionHash:inspection.inspectionHash,acceptedExcludedSheets:true}));let versionId=imported.newVersionId;
+  const metadata=await api().inject({url:base+'?compact=true',headers});etag=String(metadata.headers.etag);expect(metadata.json()).toMatchObject({currentVersionId:versionId,contextCount:1});
+  const contexts=await api().inject({url:base+'/contexts',headers});expect(contexts.statusCode,contexts.body).toBe(200);expect(contexts.json().total).toBe(1);
+  const run=await terminal(await post(base+'/validations',{baseVersionId:versionId})),runId=run.resultRef.id;
+  const results=await api().inject({url:base+`/runs/${runId}/results?compact=true`,headers});expect(results.statusCode,results.body).toBe(200);expect(results.json().run.summary.byStatus).toMatchObject({pass:2,fail:3});expect(results.json().run).not.toHaveProperty('resultIds');
+  const row=results.json().items[0],explanation=await api().inject({url:base+`/runs/${runId}/results/${row.id}/explanation/items?section=reads`,headers});expect(explanation.statusCode,explanation.body).toBe(200);expect(explanation.json().total).toBe(row.counts.reads);
+  const stateResponse=await api().inject({url:base+'/recalculation-state',headers});expect(stateResponse.statusCode,stateResponse.body).toBe(200);const state=stateResponse.json();expect(state.state).toBe('preparation_required');
+  const prepareBody={baseVersionId:versionId,validationBasisId:state.validationBasisId,runId},prepared=await terminal(await post(base+'/recalculation-reviews',prepareBody));
+  const reviewResponse=await api().inject({url:base+'/recalculation-reviews/'+prepared.resultRef.id,headers});expect(reviewResponse.statusCode,reviewResponse.body).toBe(200);const review=reviewResponse.json();expect(review.counts.pending).toBe(0);expect(review.conflictGroupCount).toBe(0);
+  const operation=await post(base+'/recalculation-operations',{...prepareBody,reviewId:review.id,expectedRevision:review.revision}),calculated=await terminal(operation),previewId=calculated.resultRef.id;
+  const afterConfiguration=await api().inject({url:base+'?compact=true',headers});etag=String(afterConfiguration.headers.etag);versionId=afterConfiguration.json().currentVersionId;expect(afterConfiguration.json().validationBasisId).toBe(state.validationBasisId);
+  for(let i=0;i<3;i++){
+    const recovered=await api().inject({url:base+'/recalculation-state',headers});expect(recovered.statusCode,recovered.body).toBe(200);
+    expect(recovered.json()).toMatchObject({state:'ready',currentVersionId:versionId,review:{id:review.id,state:'committed'},counts:{pending:0}});
+  }
+  const previewResponse=await api().inject({url:base+`/previews/${previewId}?compact=true`,headers});expect(previewResponse.statusCode,previewResponse.body).toBe(200);expect(previewResponse.json()).not.toHaveProperty('proposalIds');expect(previewResponse.json().graphSummary).not.toHaveProperty('order');
+  const proposals=await api().inject({url:base+`/previews/${previewId}/selection-state/rows`,headers});expect(proposals.statusCode,proposals.body).toBe(200);expect(proposals.json().summary.selectedCount).toBeGreaterThan(0);expect(proposals.json().items.every((item:{selected:boolean})=>item.selected)).toBe(true);
+  const selection=proposals.json().summary,proposalId=proposals.json().items[0].id;
+  const proposalExplanation=await api().inject({url:base+`/previews/${previewId}/selection-state/proposals/${proposalId}/explanation`,headers});expect(proposalExplanation.statusCode,proposalExplanation.body).toBe(200);expect(proposalExplanation.json().evidenceState).toBe('recorded');
+  const cleared=await terminal(await post(base+`/previews/${previewId}/selection-state/edits`,{selectionId:selection.id,expectedRevision:selection.revision,operations:[{op:'clear'}]}));expect(cleared.status).toBe('succeeded');
+  const stateAfterClear=(await api().inject({url:base+`/previews/${previewId}/selection-state`,headers})).json();expect(stateAfterClear.selectedCount).toBe(0);
+  await terminal(await post(base+`/previews/${previewId}/selection-state/edits`,{selectionId:selection.id,expectedRevision:stateAfterClear.revision,operations:[{op:'selectMatching',filter:{}}]}));
+  const selected=(await api().inject({url:base+`/previews/${previewId}/selection-state`,headers})).json();
+  const applied=await terminal(await post(base+'/applications',{baseVersionId:versionId,previewId,selectionRef:{id:selected.id,revision:selected.revision},closureHash:selected.closureHash})),receiptId=applied.resultRef.id;
+  const appliedMetadata=await api().inject({url:base+'?compact=true',headers});etag=String(appliedMetadata.headers.etag);versionId=appliedMetadata.json().currentVersionId;
+  expect(appliedMetadata.json().validationBasisId).not.toBe(state.validationBasisId);
+  const detail=await api().inject({url:base+`/applications/${receiptId}?includeAcceptedIds=false`,headers});expect(detail.statusCode,detail.body).toBe(200);expect(detail.json().afterSummary.byStatus).toMatchObject({pass:4,fail:1});expect(detail.json().receipt).not.toHaveProperty('acceptedIds');
+  const comparison=await api().inject({url:base+`/applications/${receiptId}/comparison?compact=true&changedOnly=true&includeAcceptedIds=false`,headers});expect(comparison.statusCode,comparison.body).toBe(200);expect(comparison.json().total).toBeGreaterThan(0);expect(comparison.json().items[0].before).not.toHaveProperty('factReads');
+  const changes=await api().inject({url:base+`/applications/${receiptId}/changes`,headers});expect(changes.statusCode,changes.body).toBe(200);expect(changes.json().items).toEqual(expect.arrayContaining([expect.objectContaining({before:'90',after:'100.00'}),expect.objectContaining({before:'105',after:'120.00'})]));
+  const summary=await api().inject({url:base+`/versions/${versionId}/export-summary?kind=report`,headers});expect(summary.statusCode,summary.body).toBe(200);expect(summary.json().intent.versionId).toBe(versionId);
+  const exported=await terminal(await post(base+'/exports',{versionId,kind:'report'})),artifactId=exported.resultRef.id;
+  const manifestResponse=await api().inject({url:base+`/exports/${artifactId}/manifest`,headers});expect(manifestResponse.statusCode,manifestResponse.body).toBe(200);const manifest=manifestResponse.json(),parts:Buffer[]=[];
+  for(const part of manifest.parts){const response=await api().inject({url:base+`/exports/${artifactId}/parts/${part.index}`,headers});expect(response.statusCode).toBe(200);expect(sha(response.rawPayload)).toBe(part.sha256);expect(response.headers['x-ce-part-sha256']).toBe(part.sha256);parts.push(response.rawPayload);}
+  expect(sha(Buffer.concat(parts))).toBe(manifest.sha256);
+  for(const url of [base,base+'/jobs/'+run.jobId,base+`/runs/${runId}/results?compact=true`,base+`/runs/${runId}/results/${row.id}/explanation/items?section=reads`,base+`/import-inspections/${inspectionId}`,base+`/previews/${previewId}/selection-state`,base+`/previews/${previewId}/selection-state/proposals/${proposalId}/explanation`,base+`/applications/${receiptId}/changes`,base+`/exports/${artifactId}/manifest`,base+`/exports/${artifactId}/parts/0`])expect((await api().inject({url,headers:stranger})).statusCode,url).toBe(404);
+ },120000);
+});

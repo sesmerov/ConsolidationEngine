@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
 import { compactWorkspaceSchema, compactContextsPageSchema, compactRuleResultSchema, compactResultsPageSchema,
-  resultExplanationPageSchema, PUBLIC_VALUE_PART_BYTES } from '../../packages/contracts/src/hosted-views.js';
+  resultExplanationPageSchema, compactRuleRowSchema, compactRulesPageSchema, publicComparisonPageSchema, publicApplicationChangesPageSchema, PUBLIC_VALUE_PART_BYTES } from '../../packages/contracts/src/hosted-views.js';
 
 const id='00000000-0000-4000-8000-000000000005';
 const descriptor={valueRef:id,byteLength:1048577,sha256:'a'.repeat(64),mediaType:'application/json'};
@@ -13,6 +13,16 @@ async function check(schema:object,work:(post:(value:unknown)=>Promise<number>)=
  try{await work(async value=>(await app.inject({method:'POST',url:'/',payload:value as any})).statusCode);}finally{await app.close();}
 }
 describe('hosted public views',()=>{
+ it('compares compact results and pages applied values independently without attributing a shared cell to a rule',async()=>{
+  const receipt={id,previewId:id,closureHash:'a'.repeat(64),baseVersionId:id,newVersionId:id,beforeValidationRunId:id,validationRunId:id,appliedAt:'2026-11-08T12:00:00Z',acceptedCount:1};
+  await check(publicComparisonPageSchema,async post=>{const page={workspaceId:id,versionId:id,items:[{key:'pair',before:row,after:row}],total:1,nextCursor:null,receipt,beforeSummary:run.summary,afterSummary:run.summary};expect(await post(page)).toBe(200);expect(await post({...page,sourceFiles:[]})).toBe(400);expect(await post({...page,items:[{key:'pair',before:{...row,factReads:[]}}]})).toBe(400);});
+  await check(publicApplicationChangesPageSchema,async post=>{const page={workspaceId:id,versionId:id,receiptId:id,items:[{itemId:'change',location:'SYNTHETIC F_01.01 r0010 c0010',before:'1,00',after:'2,00',unit:'EUR'},descriptor],total:2,nextCursor:null};expect(await post(page)).toBe(200);expect(await post({...page,items:Array(51).fill(descriptor)})).toBe(400);expect(await post({...page,storageKey:'private'})).toBe(400);});
+ });
+ it('keeps a catalog row readable without original field maps or a global source list',async()=>{
+  const record={id,code:'RULE',sourceLocator:{fileId:id,sheet:'Rules',row:2},fileName:'catalog.xlsx',diagnostics:[],expression:'1=1'};
+  await check(compactRuleRowSchema,async post=>{expect(await post(record)).toBe(200);expect(await post({...record,originalFields:{secret:'not a public map'}})).toBe(400);});
+  await check(compactRulesPageSchema,async post=>{const page={workspaceId:id,versionId:id,items:[record,descriptor],total:2,nextCursor:null,coverage:{rows:2,variants:1,applicableVariants:1,supportedVariants:1,invalidRows:0,duplicateRows:1,conflictingVariants:0},dataSummary:{explicitNulls:0,implicitNulls:0,zeroValues:0}};expect(await post(page)).toBe(200);expect(await post({...page,sources:[]})).toBe(400);});
+ });
  it('keeps workspace metadata closed and contexts separately paginated',async()=>{
   const workspace={id,name:'Demo',state:'empty',versionIds:[],contextCount:100000,counts:{snapshots:0,coordinates:0,facts:0,sources:0},sessionBytes:0};
   await check(compactWorkspaceSchema,async post=>{expect(await post(workspace)).toBe(200);expect(await post({...workspace,contexts:[]})).toBe(400);expect(await post({...workspace,versionIds:Array(21).fill(id)})).toBe(400);});

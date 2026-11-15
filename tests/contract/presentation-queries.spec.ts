@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WorkBudget, WorkLimitError } from '@ce/engine';
 import type { FactReadDTO, ProposalDTO, RuleResultDTO, SnapshotContent } from '@ce/contracts';
 import { registerResults } from '../../apps/api/src/routes/results.js';
+import { LocalPublicViews } from '../../apps/api/src/local/local-public-views.js';
 import { registerPreviews } from '../../apps/api/src/routes/previews.js';
 import { registerApplications } from '../../apps/api/src/routes/applications.js';
 import { WorkspaceStore } from '../../apps/api/src/session/workspace-store.js';
@@ -23,7 +24,7 @@ const summary = { complete: true, rows: 0, variants: 0, applicableVariants: 0, i
 
 function setup(profileId = 'ce-dpmxl-0.9-closed-v1', extra: Partial<SnapshotContent> = {}) {
   const app = Fastify({ ajv: { customOptions: { removeAdditional: false, coerceTypes: false } } }); apps.push(app);
-  const store = new WorkspaceStore(), workspace = store.create('Presentation tests'); app.decorate('ce', { store });
+  const store = new WorkspaceStore(), workspace = store.create('Presentation tests'); app.decorate('ce', { store,adapters:{publicViews:new LocalPublicViews(store)} });
   registerResults(app); registerPreviews(app); registerApplications(app);
   const recordIds = [randomUUID(), randomUUID()];
   const catalog: SnapshotContent['catalog'] = { ...content().catalog,

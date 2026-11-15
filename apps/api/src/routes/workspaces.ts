@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { createWorkspaceSchema, emptyQuerySchema, workspaceParamsSchema } from '@ce/contracts';
+import { createWorkspaceSchema, emptyQuerySchema, workspaceParamsSchema, compactWorkspaceQuerySchema } from '@ce/contracts';
 import { requireCurrentVersion } from '../plugins/version-guard.js';
 export function registerWorkspaces(app: FastifyInstance): void {
   app.post<{ Body: { name: string } }>('/api/v1/workspaces', { schema: { body: createWorkspaceSchema, querystring: emptyQuerySchema } }, async (request, reply) => {
@@ -7,8 +7,9 @@ export function registerWorkspaces(app: FastifyInstance): void {
     try { await app.ce.files.createWorkspace(workspace.id); } catch (error) { app.ce.store.close(workspace.id); throw error; }
     return reply.code(201).header('ETag', '"empty"').send(workspace);
   });
-  app.get<{ Params: { workspaceId: string } }>('/api/v1/workspaces/:workspaceId', { schema: { params: workspaceParamsSchema, querystring: emptyQuerySchema } }, async (request, reply) => {
-    const id = request.params.workspaceId; return reply.header('ETag', app.ce.store.etag(id)).send(app.ce.store.get(id));
+  app.get<{ Params: { workspaceId: string }; Querystring:{compact?:string} }>('/api/v1/workspaces/:workspaceId', { schema: { params: workspaceParamsSchema, querystring: compactWorkspaceQuerySchema } }, async (request, reply) => {
+    const id = request.params.workspaceId,workspace=app.ce.store.get(id);const {contexts,...metadata}=workspace;
+    return reply.header('ETag', app.ce.store.etag(id)).send(request.query.compact==='true'?{...metadata,contextCount:contexts.length}:workspace);
   });
   app.delete<{ Params: { workspaceId: string } }>('/api/v1/workspaces/:workspaceId', { schema: { params: workspaceParamsSchema, querystring: emptyQuerySchema } }, async (request, reply) => {
     const id = request.params.workspaceId; requireCurrentVersion(request, app.ce.store, id);

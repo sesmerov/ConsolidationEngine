@@ -13,17 +13,22 @@ export interface ChangeLogData {
   readonly versionId: string; readonly contentHash: string; readonly profileId: string; readonly policyId: string; readonly synthetic: boolean;
   readonly sources: readonly SourceFile[]; readonly reports: readonly ReportManifestEntry[]; readonly receipts: readonly ApplyReceiptDTO[]; readonly changes: readonly ApplyChangeDTO[];
 }
-export interface ReportExportHistory { readonly snapshot: (versionId: string) => Snapshot; readonly applications: readonly ApplicationBundle[] }
+/** Lineage verification needs source identities, never ancestor catalogs, coordinates or facts. */
+export interface ReportHistoryVersion {
+  readonly versionId: string; readonly parentVersionId?: string;
+  readonly content: { readonly sources: readonly Pick<SourceFile, 'id' | 'kind'>[] };
+}
+export interface ReportExportHistory { readonly snapshot: (versionId: string) => ReportHistoryVersion; readonly applications: readonly ApplicationBundle[] }
 export const unavailable = (reason: ExportUnavailableReason): never => { throw new ApiError('EXPORT_NOT_AVAILABLE', { reason }); };
 /** Imports allocate new source IDs; configuration and application retain them unchanged. */
-export function sourceSignature(sources: readonly SourceFile[]): string {
+export function sourceSignature(sources: readonly Pick<SourceFile, 'id' | 'kind'>[]): string {
   if (!sources.length || sources.filter(source => source.kind === 'catalog').length !== 1 || sources.filter(source => source.kind === 'report').length < 1
     || sources.filter(source => source.kind === 'report').length > 20 || new Set(sources.map(source => source.id)).size !== sources.length
     || sources.some(source => !UUID_PATTERN.test(source.id) || source.kind !== 'catalog' && source.kind !== 'report')) return unavailable('INVALID_REPORT_SOURCE');
   return canonicalStringify(sources.map(source => [source.kind, source.id]).sort((a, b) => a[0]! < b[0]! ? -1 : a[0]! > b[0]! ? 1 : a[1]! < b[1]! ? -1 : a[1]! > b[1]! ? 1 : 0));
 }
 export function collectApplicationHistory(target: Snapshot, history: ReportExportHistory, check: () => void): Pick<ChangeLogData, 'receipts' | 'changes'> {
-  const signature = sourceSignature(target.content.sources), chain: Snapshot[] = [], visited = new Set<string>(); let current: Snapshot | undefined = target;
+  const signature = sourceSignature(target.content.sources), chain: ReportHistoryVersion[] = [], visited = new Set<string>(); let current: ReportHistoryVersion | undefined = target;
   while (current) {
     check(); if (visited.has(current.versionId) || visited.size >= 20) return unavailable('INCOMPLETE_VERSION_HISTORY'); visited.add(current.versionId);
     if (sourceSignature(current.content.sources) !== signature) break;

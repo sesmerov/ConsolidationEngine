@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import type { FastifyInstance } from 'fastify';
-import { downloadIntentKey, emptyQuerySchema, exportRequestSchema, uuidSchema, versionExportSummarySchema } from '@ce/contracts';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { downloadIntentKey, emptyQuerySchema, exportManifestSchema, exportRequestSchema, uuidSchema, versionExportSummarySchema } from '@ce/contracts';
 import { WorkBudget } from '@ce/engine';
 import type { ApplicationBundle, DownloadIntent, ExportArtifactSummaryDTO, JsonValue } from '@ce/contracts';
 import { ApiError } from '../errors.js';
@@ -14,6 +14,17 @@ import { exportKey } from '../workers/export.worker.js';
 import type { ExportArtifact } from '../workers/export.worker.js';
 import { registerJobRoute } from './jobs.js';
 import { versionExportSummary } from '../export/report-ownership.js';
+import type { ExportTransferService } from '../hosted/export-artifacts.js';
+import type { WorkspaceOwner } from '../ports/workspace-repository.js';
+/** Identical authenticated fragment protocol for local and hosted compositions. */
+export function registerExportTransfers(app: FastifyInstance, service: ExportTransferService, owner: (request: FastifyRequest, workspaceId: string) => WorkspaceOwner): void {
+  const parameters = { type: 'object', additionalProperties: false, required: ['workspaceId','artifactId'], properties: { workspaceId: uuidSchema, artifactId: uuidSchema } } as const;
+  app.get<{ Params: { workspaceId: string; artifactId: string } }>('/api/v1/workspaces/:workspaceId/exports/:artifactId/manifest', { schema: { params: parameters, querystring: emptyQuerySchema, response: { 200: exportManifestSchema } } }, request => service.manifest(owner(request, request.params.workspaceId), request.params.artifactId));
+  app.get<{ Params: { workspaceId: string; artifactId: string; index: string } }>('/api/v1/workspaces/:workspaceId/exports/:artifactId/parts/:index', { schema: { params: { ...parameters, required: [...parameters.required,'index'], properties: { ...parameters.properties, index: { type: 'string', pattern: '^(?:[0-9]|[12][0-9]|3[0-3])$' } } }, querystring: emptyQuerySchema } }, async (request, reply) => {
+    const bytes = await service.part(owner(request, request.params.workspaceId), request.params.artifactId, Number(request.params.index));
+    return reply.type('application/octet-stream').header('Content-Length', bytes.byteLength).header('X-CE-Part-SHA256',createHash('sha256').update(bytes).digest('hex')).header('Cache-Control', 'private, no-store').send(Buffer.from(bytes));
+  });
+}
 export function registerExports(app: FastifyInstance, overrides?: Partial<ExportLimits>, reportOverrides?: Partial<ReportExportLimits>): void {
   const resultsLimits = exportLimits(overrides), reportLimits = reportExportLimits(reportOverrides);
   app.get<{ Params: { workspaceId: string; versionId: string }; Querystring: { kind?: 'report' | 'results'; runId?: string } }>('/api/v1/workspaces/:workspaceId/versions/:versionId/export-summary', { schema: {

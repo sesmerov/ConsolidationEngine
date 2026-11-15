@@ -8,7 +8,7 @@ import type { WorkspaceStore } from '../session/workspace-store.js';
 import { directionConfigurationVersion } from '../session/canonical-state.js';
 import { ApiError } from '../errors.js';
 import type { DirectionReviewService } from './direction-review-service.js';
-import { activeReviewKey, reviewEntry } from './direction-review-record.js';
+import { activeReviewKey, latestDirectionCommitKey, reviewEntry } from './direction-review-record.js';
 import { previewKey } from './preview-store.js';
 import { proposalSelectionKey, selectionSummary } from './proposal-selection-record.js';
 
@@ -42,6 +42,7 @@ export class RecalculationOperationService {
         const receipt = { reviewId: body.reviewId, runId: body.runId, baseVersionId: base.versionId, newVersionId: effectiveVersionId, configVersion, included: candidate.directions.length };
         const records = [
           reviewEntry({ summary: { ...lease.pending.summary, state: 'committed', receipt } }),
+          { key: latestDirectionCommitKey(workspaceId), value: receipt },
           { key: activeReviewKey(workspaceId), value: null },
           { key: previewKey(workspaceId, previewId), value: preview as unknown as JsonValue },
           { key: proposalSelectionKey(workspaceId, previewId), value: { summary: selectionSummary({ id: selectionId, workspaceId, previewId,

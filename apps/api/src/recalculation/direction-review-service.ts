@@ -119,6 +119,13 @@ export class DirectionReviewService {
       finalize: async () => this.schedule(w),
     };
   }
+  /** A committed decision remains valid for its exact configured version, without refreshing a draft. */
+  peekCommitted(w: string): DirectionReviewSummaryDTO | undefined {
+    const snapshot = this.store.current(w), receipt = this.store.getRecord<DirectionReviewReceiptDTO>(latestDirectionCommitKey(w));
+    if (!snapshot || !receipt || receipt.newVersionId !== snapshot.versionId || receipt.configVersion !== snapshot.content.configVersion) return undefined;
+    const summary = this.record(w, receipt.reviewId).summary;
+    return summary.state === 'committed' && summary.validationBasisId === snapshot.validationBasisId ? summary : undefined;
+  }
   active(w: string): DirectionReviewActiveDTO {
     const workspace = this.store.get(w);
     this.expire(w);

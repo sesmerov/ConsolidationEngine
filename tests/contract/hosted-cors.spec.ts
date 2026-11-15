@@ -20,6 +20,9 @@ describe('hosted exact-origin CORS and transport bounds', () => {
     expect(rejected.statusCode).toBe(403); expect(rejected.headers['access-control-allow-origin']).toBeUndefined();
     expect((await apps[0].inject({ ...options, headers: { ...options.headers, 'access-control-request-headers': 'Authorization' } })).statusCode).toBe(403);
     expect((await apps[0].inject({ ...options, url: '/api/v1/no-route' })).statusCode).toBe(403);
+    const parameterized=await apps[1].inject({...options,url:'/api/v1/probe/12345678-1234-4123-8123-123456789012?compact=true',headers:{...options.headers,'access-control-request-method':'GET'}});
+    expect(parameterized.statusCode,parameterized.body).toBe(204);
+    expect((await apps[1].inject({...options,url:'/api/v1/probe/12345678-1234-4123-8123-123456789012'})).statusCode).toBe(403);
   });
   it('preserves allowed CORS on application errors and authenticates before parsing private bytes', async () => {
     const response = await apps[0].inject({ method: 'POST', url: '/api/v1/echo', headers: { origin, 'content-type': 'application/json' }, payload: '{invalid' });

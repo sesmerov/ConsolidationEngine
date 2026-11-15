@@ -9,8 +9,10 @@ export function recalculationState(store: WorkspaceStore, reviews: DirectionRevi
   const snapshot = store.current(workspaceId);
   if (!snapshot) throw new ApiError('RESOURCE_NOT_FOUND');
   const review = reviews.peekCompatible(workspaceId);
-  const validation = review ? getValidation(store, workspaceId, review.summary.runId) : findCompatibleValidation(store, workspaceId, snapshot);
-  const counts = review?.projection?.counts ?? null;
+  const committed = !review ? reviews.peekCommitted(workspaceId) : undefined;
+  const summary = review?.summary ?? committed;
+  const validation = summary ? getValidation(store, workspaceId, summary.runId) : findCompatibleValidation(store, workspaceId, snapshot);
+  const counts = review?.projection?.counts ?? committed?.counts ?? null;
   const state = !validation ? 'needs_validation' : !counts ? 'preparation_required'
     : counts.pending || counts.conflicted || counts.undetermined ? 'pending' : counts.included || counts.omitted ? 'ready' : 'no_candidates';
   return { workspaceId, currentVersionId: snapshot.versionId, validationBasisId: snapshot.validationBasisId ?? snapshot.versionId,
@@ -18,5 +20,5 @@ export function recalculationState(store: WorkspaceStore, reviews: DirectionRevi
     ...(validation ? { compatibleRun: { id: validation.run.id, versionId: validation.run.versionId,
       validationBasisId: validation.run.validationBasisId ?? snapshot.validationBasisId ?? snapshot.versionId,
       ...(validation.run.endedAt ? { endedAt: validation.run.endedAt } : {}) } } : {}),
-    ...(review ? { review: review.summary } : {}), counts, state };
+    ...(summary ? { review: summary } : {}), counts, state };
 }

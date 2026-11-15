@@ -155,9 +155,10 @@ describe('typed values and bindings retain canonical state guarantees', () => {
 describe('result projection uses a server policy and a closed wire shape', () => {
   async function page(profileId: string, expression: string, exhaustBudget = false) {
     const { registerResults } = await import('../../apps/api/src/routes/results.js');
+    const { LocalPublicViews } = await import('../../apps/api/src/local/local-public-views.js');
     const { WorkBudget, WorkLimitError } = await import('@ce/engine');
     const app = Fastify(), store = new WorkspaceStore(), workspace = store.create('Closed results');
-    app.decorate('ce', { store });
+    app.decorate('ce', { store,adapters:{publicViews:new LocalPublicViews(store)} });
     const variant = { variantId: hash, code: 'SYNTHETIC', expression, framework: 'COREP', modules: ['COREP_OF_4.0'], crossModule: false,
       tables: [], active: true, referenceWindow: {}, severityOriginal: 'Error', severity: 'error', sourceRecords: [hash], sourceLocators: [] };
     const snapshot = store.publish(workspace.id, undefined, { ...content(), profileId, facts: [], coordinates: [], catalog: {

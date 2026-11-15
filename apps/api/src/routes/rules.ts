@@ -11,10 +11,11 @@ export function registerRules(app: FastifyInstance): void {
   const sign = (payload: string) => createHmac('sha256', secret).update(payload).digest('base64url');
   app.get<{ Params: { workspaceId: string }; Querystring: Query }>('/api/v1/workspaces/:workspaceId/rules', {
     schema: { params: workspaceParamsSchema, querystring: { type: 'object', additionalProperties: false, required: ['versionId'], properties: {
-      versionId: uuidSchema, limit: { type: 'string', pattern: '^(?:[1-9]|[1-9][0-9]|1[0-9]{2}|200)$' }, cursor: { type: 'string', maxLength: 2048 },
+      versionId: uuidSchema, compact:{const:'true'}, limit: { type: 'string', pattern: '^(?:[1-9]|[1-9][0-9]|1[0-9]{2}|200)$' }, cursor: { type: 'string', maxLength: 8192 },
       status: { enum: ['error', 'unsupported', 'supported', 'applicable', 'not_applicable', 'not_evaluable', 'invalid'] }, code: { type: 'string', maxLength: 128 }, table: { type: 'string', maxLength: 128 },
     } } },
   }, async (request) => {
+    if((request.query as Query&{compact?:string}).compact==='true')return app.ce.adapters.publicViews.rules(request.params.workspaceId,request.query);
     const { workspaceId } = request.params, query = request.query; const snapshot = app.ce.store.snapshot(workspaceId, query.versionId), catalog = snapshot.content.catalog;
     const fingerprint = canonicalHash({ resource: 'rules', workspaceId, versionId: query.versionId, status: query.status ?? '', code: query.code ?? '', table: query.table ?? '' });
     let after: string | undefined;

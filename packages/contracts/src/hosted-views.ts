@@ -6,18 +6,23 @@ import type { RecalculationPolicyDTO } from './profiles.js';
 import { recalculationPolicySchema } from './profiles.js';
 import type { FactReadDTO, MetadataReadDTO, ValidationStatus, ValidationValueDTO } from './validation.js';
 import { validationValueSchema } from './validation.js';
-import type { Severity } from './catalog.js';
-import { diagnosticSchema } from './catalog.js';
+import type { Severity, RuleRowDTO, RulesPageDTO } from './catalog.js';
+import { diagnosticSchema, rawRuleRecordSchema } from './catalog.js';
 import { factReadSchema, metadataReadsSchema } from './recalculation.js';
 import { sourceLocatorSchema } from './common.schemas.js';
 import type { CompactPageDTO, CompactValidationRunDTO, LargeValueDescriptorDTO } from './compact.js';
 import { compactPageSchema, compactValidationRunSchema, largeValueDescriptorSchema } from './compact.js';
+import type { CompactApplyReceiptDTO } from './application.js';
+import { compactApplyReceiptSchema, completedValidationSummarySchema } from './application.js';
+import type { ValidationSummary } from './validation.js';
 
 /** Value parts use a smaller bound than uploads/exports; hashes cover original UTF-8 bytes. */
 export const PUBLIC_VALUE_PART_BYTES = 128 * 1024;
 export type PublicValue<T> = T | LargeValueDescriptorDTO;
 export type CompactWorkspaceDTO = Omit<WorkspaceDTO, 'contexts'> & { readonly contextCount: number };
 export type CompactContextsPageDTO = CompactPageDTO<PublicValue<ReportContext>>;
+export type CompactRuleRowDTO = Omit<RuleRowDTO,'originalFields'> & {readonly fileName:string};
+export interface CompactRulesPageDTO extends CompactPageDTO<PublicValue<CompactRuleRowDTO>> {readonly coverage:RulesPageDTO['coverage'];readonly dataSummary:RulesPageDTO['dataSummary']}
 export interface ResultEvidenceCountsDTO {
  readonly operands:number; readonly reads:number; readonly metadataReads:number;
  readonly origins:number; readonly diagnostics:number; readonly descriptions:number;
@@ -49,6 +54,13 @@ export type ResultExplanationItemDTO =
 export interface ResultExplanationPageDTO extends CompactPageDTO<PublicValue<ResultExplanationItemDTO>> {
  readonly runId:UUID; readonly resultId:string; readonly section:ResultExplanationSection;
 }
+export interface PublicComparisonRowDTO {readonly key:string;readonly before?:CompactRuleResultDTO;readonly after?:CompactRuleResultDTO}
+export interface PublicComparisonPageDTO extends CompactPageDTO<PublicValue<PublicComparisonRowDTO>> {
+ readonly receipt:CompactApplyReceiptDTO;readonly beforeSummary:ValidationSummary;readonly afterSummary:ValidationSummary;
+}
+/** Applied cells are separate from result comparisons: one change may affect several validation rules. */
+export interface PublicApplicationChangeDTO {readonly itemId:string;readonly location:string;readonly before:string;readonly after:string;readonly unit:string}
+export interface PublicApplicationChangesPageDTO extends CompactPageDTO<PublicValue<PublicApplicationChangeDTO>> {readonly receiptId:UUID}
 
 const text={type:'string'} as const;
 const count={type:'integer',minimum:0,maximum:Number.MAX_SAFE_INTEGER} as const;
@@ -59,7 +71,12 @@ const paging={limit:{type:'string',pattern:'^(?:[1-9]|[1-4][0-9]|50)$'},cursor:{
 export const compactWorkspaceQuerySchema=closed({compact:{const:'true'}},[]);
 export const compactContextsQuerySchema=closed({...paging,contextId:{type:'string',minLength:1,maxLength:512}},[]);
 export const compactResultsQuerySchema=closed({...paging,compact:{const:'true'},code:{type:'string',maxLength:128},table:{type:'string',maxLength:128},status:{enum:['pass','fail','not_applicable','not_evaluable','error']}},[]);
+export const compactRulesQuerySchema=closed({...paging,versionId:uuidSchema,compact:{const:'true'},code:{type:'string',maxLength:128},table:{type:'string',maxLength:128},status:{enum:['error','unsupported','supported','applicable','not_applicable','not_evaluable','invalid']}},['versionId']);
 export const resultExplanationItemsQuerySchema=closed({...paging,section:{enum:['operands','reads','metadata','origins','diagnostics','descriptions']}},['section']);
+const {originalFields:_sourceFields,...recordProperties}=rawRuleRecordSchema.properties;
+export const compactRuleRowSchema=closed({...recordProperties,fileName:{type:'string',maxLength:200},expression:text,precondition:text,severity:{enum:['error','warning','unknown']},active:{type:'boolean'},modules:{type:'array',items:text},tables:{type:'array',items:text},syntaxStatus:{enum:['valid','error']},supportStatus:{enum:['supported','unsupported']},applicability:{enum:['applicable','not_applicable','not_evaluable']}},[...rawRuleRecordSchema.required.filter(key=>key!=='originalFields'),'fileName']);
+const catalogPage=compactPageSchema(retained(compactRuleRowSchema));
+export const compactRulesPageSchema={...catalogPage,properties:{...catalogPage.properties,coverage:closed({rows:count,variants:count,applicableVariants:count,supportedVariants:count,invalidRows:count,duplicateRows:count,conflictingVariants:count},['rows','variants','applicableVariants','supportedVariants','invalidRows','duplicateRows','conflictingVariants']),dataSummary:closed({explicitNulls:count,implicitNulls:count,zeroValues:count},['explicitNulls','implicitNulls','zeroValues'])},required:[...catalogPage.required,'coverage','dataSummary']};
 export const compactWorkspaceSchema=closed({id:uuidSchema,name:{...text,minLength:1,maxLength:100},state:{enum:['empty','ready','closed']},currentVersionId:uuidSchema,versionIds:{type:'array',maxItems:20,items:uuidSchema},activeJobId:uuidSchema,validationBasisId:uuidSchema,
  contextCount:count,counts:closed({snapshots:count,coordinates:count,facts:count,sources:count},['snapshots','coordinates','facts','sources']),sessionBytes:count},['id','name','state','versionIds','contextCount','counts','sessionBytes']);
 export const compactContextsPageSchema=compactPageSchema(retained(reportContextSchema));
@@ -69,6 +86,13 @@ export const compactRuleResultSchema=closed({id:text,runId:uuidSchema,versionId:
  ['id','runId','versionId','profileId','coverageOnly','code','status','severity','severityOriginal','location','expression','values','counts']);
 const resultPage=compactPageSchema(retained(compactRuleResultSchema));
 export const compactResultsPageSchema={...resultPage,properties:{...resultPage.properties,run:compactValidationRunSchema},required:[...resultPage.required,'run']};
+export const publicComparisonRowSchema={...closed({key:text,before:compactRuleResultSchema,after:compactRuleResultSchema},['key']),anyOf:[{required:['before']},{required:['after']}]};
+const comparisonPage=compactPageSchema(retained(publicComparisonRowSchema));
+export const publicComparisonPageSchema={...comparisonPage,properties:{...comparisonPage.properties,receipt:compactApplyReceiptSchema,beforeSummary:completedValidationSummarySchema,afterSummary:completedValidationSummarySchema},required:[...comparisonPage.required,'receipt','beforeSummary','afterSummary']};
+export const publicApplicationChangeSchema=closed({itemId:text,location:text,before:text,after:text,unit:text},['itemId','location','before','after','unit']);
+const applicationChangesPage=compactPageSchema(retained(publicApplicationChangeSchema));
+export const publicApplicationChangesPageSchema={...applicationChangesPage,properties:{...applicationChangesPage.properties,receiptId:uuidSchema},required:[...applicationChangesPage.required,'receiptId']};
+export const publicApplicationChangesQuerySchema=closed(paging,[]);
 export const resultExplanationSchema={...compactRuleResultSchema,properties:{...compactRuleResultSchema.properties,workspaceId:uuidSchema},required:[...compactRuleResultSchema.required,'workspaceId']};
 const originSchema=closed({locator:sourceLocatorSchema,fileName:text},['locator','fileName']);
 const descriptionSchema=closed({description:text,expression:text,precondition:text,source:originSchema},['description','source']);
