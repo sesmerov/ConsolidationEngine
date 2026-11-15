@@ -10,7 +10,7 @@ import { PreviewStore } from './preview.store';
 const id=(n:number)=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const body={baseVersionId:id(2),validationBasisId:id(3),runId:id(4),reviewId:id(5),expectedRevision:2};
 const api={previews:vi.fn(),recalculate:vi.fn(),operation:vi.fn(),operationReceipt:vi.fn(),job:vi.fn()};
-const directions={canSimulate:signal(true),simulationInput:()=>body,operationLocked:signal(false),review:signal({id:id(5),revision:2}),hasUnsavedChoice:signal(false),recover:vi.fn().mockResolvedValue(undefined)};
+const directions={busy:signal(false),canSimulate:signal(true),simulationInput:()=>body,operationLocked:signal(false),review:signal({id:id(5),revision:2}),hasUnsavedChoice:signal(false),recover:vi.fn().mockResolvedValue(undefined)};
 describe('durable compound simulation client',()=>{
  let session:SessionStore,store:PreviewStore,attempts:OperationAttemptStore;
  beforeEach(()=>{vi.resetAllMocks();sessionStorage.clear();api.previews.mockResolvedValue({items:[],total:0,nextCursor:null});api.operationReceipt.mockRejectedValue(new HttpErrorResponse({status:404}));

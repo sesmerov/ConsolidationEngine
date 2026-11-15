@@ -80,6 +80,7 @@ for (const width of [320, 390, 1440]) test(`visible guidance and primary action 
   const workspaceMetadata = page.locator('dl.workspace-meta').filter({ has: page.locator('dt').filter({ hasText: /^Versión$/ }) });
   const versionBeforeValidation = await workspaceMetadata.innerText();
   await page.getByRole('button', { name: 'Validar informes', exact: true }).click();
+  await expect(page.getByRole('heading',{name:'Ejecución terminada',exact:true})).toBeVisible({timeout:60_000});
   await expect(page.getByRole('button', { name: '3. Recalcular', exact: true })).toHaveClass(/stage-recommended/);
   await expect(next).toHaveAttribute('aria-current', 'step');
   await expect(workspaceMetadata).toHaveText(versionBeforeValidation, { useInnerText: true });
@@ -119,6 +120,7 @@ test('reduced motion keeps the static signal and a failed inspection never advan
   await page.getByRole('button', { name: 'Inspeccionar archivos', exact: true }).click();
   await expect(page.locator('ce-import-page [role=alert]').filter({ hasText: /./ }).first()).toBeVisible();
   await expect(page.locator('.stage-recommended')).toHaveCount(0);
+  await page.getByRole('button',{name:'Descartar carga pendiente',exact:true}).click();
   await page.getByLabel('Catálogo de reglas (.xlsx)').setInputFiles(path.resolve('assets/demos/demo-corep-catalog.xlsx'));
   await page.getByRole('button', { name: 'Inspeccionar archivos', exact: true }).click();
   await page.getByRole('button', { name: 'Confirmar carga', exact: true }).click();

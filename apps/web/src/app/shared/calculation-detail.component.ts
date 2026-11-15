@@ -1,15 +1,16 @@
 import { afterEveryRender, ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTableModule } from '@angular/material/table';
-import type { FactReadDTO, ProposalDTO, RuleResultDTO, SourceFile, SourceLocator, ValidationValueDTO } from '@ce/contracts';
+import type { CompactRuleResultDTO, FactReadDTO, ProposalDTO, RuleResultDTO, SourceFile, SourceLocator, ValidationValueDTO } from '@ce/contracts';
 import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
 import { calculationHeadingId, StageFocus } from '../core/stage-title.directive';
 import { coordinateText, decimalText, factText, hasInterval, normalizedText, roundedProposal, sourceText, validationText } from '../core/exact-value';
+import { ResultExplanationComponent } from './result-explanation.component';
 
 interface ReadRow { readonly fact: FactReadDTO; readonly fromProposalId?: string }
 interface Alternative { readonly description: string; readonly origins: readonly string[] }
-@Component({ selector: 'ce-calculation-detail', standalone: true, imports: [MatButtonModule, MatTableModule], changeDetection: ChangeDetectionStrategy.OnPush,
+@Component({ selector: 'ce-calculation-detail', standalone: true, imports: [MatButtonModule, MatTableModule, ResultExplanationComponent], changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './calculation-detail.component.html', styles: [`.detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}.detail-grid dt{font-size:13px;color:#526379}.detail-grid dd{margin:5px 0 0}.calculation-detail h3{margin:0}.expression{white-space:pre-wrap}.source-list{padding-left:20px}.source-list li{margin:8px 0}.technical-values{margin:12px 0}.data-table td{max-width:36ch}`] })
 export class CalculationDetailComponent {
   private readonly api = inject(ApiClient);
@@ -18,6 +19,7 @@ export class CalculationDetailComponent {
   private readonly focus = inject(StageFocus, { optional: true });
   private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
   readonly result = input<RuleResultDTO>();
+  readonly compact = input<CompactRuleResultDTO>();
   readonly proposal = input<ProposalDTO>();
   readonly files = input<readonly SourceFile[]>([]);
   readonly closed = output<void>();

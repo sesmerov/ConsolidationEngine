@@ -38,9 +38,9 @@ describe('004 persisted proposal selection and explicit consent', () => {
     };
     session = { workspace: signal({ id: workspaceId, contexts: [], versionIds: [baseVersionId] }), versionId: signal(baseVersionId),
       etag: signal('"version"'), pending: signal(false), jobActive: signal(false), job: signal(null), selectedContextId: signal(null),
-      trackJob: vi.fn(), refreshWorkspace: vi.fn() };
+      trackJob: vi.fn(), refreshWorkspace: vi.fn(),recoveryView:vi.fn().mockReturnValue(null),rememberView:vi.fn() };
     // Selection scenarios assume current destination decisions are already prepared; their preparation is tested separately.
-    const directions={canSimulate:signal(true),hasUnsavedChoice:signal(false),review:signal(null),operationLocked:signal(false),simulationInput:vi.fn(()=>({baseVersionId,validationBasisId:baseVersionId,runId:previewId,reviewId:selectionId,expectedRevision:1}))};
+    const directions={busy:signal(false),canSimulate:signal(true),hasUnsavedChoice:signal(false),review:signal(null),operationLocked:signal(false),simulationInput:vi.fn(()=>({baseVersionId,validationBasisId:baseVersionId,runId:previewId,reviewId:selectionId,expectedRevision:1}))};
     TestBed.configureTestingModule({ providers: [{ provide: ApiClient, useValue: api }, { provide: SessionStore, useValue: session },{provide:DirectionsStore,useValue:directions}] });
     store = TestBed.inject(PreviewStore); applying = TestBed.inject(ApplyStore); TestBed.tick();
   });
@@ -53,6 +53,16 @@ describe('004 persisted proposal selection and explicit consent', () => {
     await load(); expect(selectionOf(store)?.selectedCount).toBe(5); expect(applying.acknowledged()).toBe(false);
     expect(api['proposalSelectionState']).toHaveBeenCalled(); expect(api['prepareProposalSelection']).not.toHaveBeenCalled();
     expect(api['proposals']).not.toHaveBeenCalled(); expect(api['proposal']).not.toHaveBeenCalled();
+  });
+  it('restores the selected preview identity without retaining its business response',async()=>{
+    session['recoveryView'].mockReturnValue({previewId});api['previews']!.mockResolvedValue({items:[{id:'newest'}],total:2,nextCursor:null});await store.loadHistory();
+    await vi.waitFor(()=>expect(store.selectedPreviewId()).toBe(previewId));await vi.waitFor(()=>expect(session['rememberView']).toHaveBeenCalledWith({previewId}));
+    expect(session['rememberView'].mock.calls.every((call:unknown[])=>Object.keys(call[0] as object).join(',')==='previewId')).toBe(true);
+  });
+  it('waits for destination recovery before accepting application and keeps consent on an equivalent read',async()=>{
+    await load();const busy=TestBed.inject(DirectionsStore).busy as unknown as {set(value:boolean):void};applying.acknowledged.set(true);expect(applying.canApply()).toBe(true);
+    busy.set(true);TestBed.tick();expect(applying.canApply()).toBe(false);expect(applying.acknowledged()).toBe(true);
+    busy.set(false);TestBed.tick();expect(applying.canApply()).toBe(true);expect(applying.acknowledged()).toBe(true);
   });
   it('keeps deselections when a filter has no matches and does not fetch off-page DTOs', async () => {
     await load(); api['selectionRows']!.mockResolvedValue({ ...page(2, 4, []), total: 0, filterCounts: { matched: 0, available: 0, selected: 0, selectedOutsideFilter: 4, selectedOutsidePage: 4 } });

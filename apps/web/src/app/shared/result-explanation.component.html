@@ -1,0 +1,21 @@
+<section class="calculation-detail" role="region" [attr.aria-label]="title()">
+  <div class="section-heading"><h3 #heading [id]="headingId()" tabindex="-1">{{title()}}</h3><button mat-button type="button" (click)="close()">Cerrar detalle</button></div>
+  @if(loading()){<p role="status">Consultando el cálculo conservado…</p>}
+  @if(error(); as message){<p class="error" role="alert">{{message}}</p>@if(!detail()){<button mat-button (click)="retry()">Reintentar detalle</button>}}
+  @if(detail(); as entry){
+    @if(entry.presentation?.description;as value){<ce-result-value [value]="value" label="la descripción"/>}
+    @if(entry.presentation?.conceptLabel;as value){<ce-result-value [value]="value" label="el concepto"/>}
+    <h4>Expresión</h4><ce-result-value [value]="entry.expression" label="la expresión"/>
+    @if(entry.precondition;as value){<h4>Precondición</h4><ce-result-value [value]="value" label="la precondición"/>}
+    @if(entry.preconditionResult;as value){<p>Resultado de la precondición</p><ce-result-value [value]="value" mode="validation" label="el resultado de la precondición"/>}
+    <dl class="detail-grid">@for(operand of operands();track operand.label){<div><dt>{{operand.label}}</dt><dd><ce-result-value [value]="operand.value" mode="validation" [label]="operand.label"/></dd></div>}</dl>
+    @if(sections().length){<div class="detail-actions" role="group" aria-label="Consultar la explicación">
+      @for(item of sections();track item.id){<button mat-stroked-button type="button" [attr.aria-pressed]="section()===item.id" [disabled]="pageLoading()" (click)="loadSection(item.id)">{{item.label}} ({{item.count}})</button>}
+    </div>}
+    @if(pageLoading()){<p role="status">Consultando explicación…</p>}
+    @if(page();as current){<div class="table-region" role="region" [attr.aria-label]="sectionLabel()" tabindex="0"><table mat-table class="data-table" [dataSource]="current.items" [attr.aria-label]="sectionLabel()">
+      <ng-container matColumnDef="value"><th mat-header-cell *matHeaderCellDef>Detalle consultado</th><td mat-cell *matCellDef="let item"><ce-result-value [value]="item" mode="evidence" label="esta entrada"/></td></ng-container>
+      <tr mat-header-row *matHeaderRowDef="['value']"></tr><tr mat-row *matRowDef="let row;columns:['value']"></tr>
+    </table></div><ce-cursor-paginator [cursor]="pagination" [disabled]="pageLoading()" label="Páginas de la explicación" (pageChange)="loadSection(current.section,$event)"/>}
+  }
+</section>

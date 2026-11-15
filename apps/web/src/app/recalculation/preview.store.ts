@@ -1,11 +1,12 @@
 import { DestroyRef, Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { isTerminalJob } from '@ce/contracts';
-import type { CompactPreviewDTO, CompactApplicationDetailDTO, CompactComparisonPageDTO, PreviewSummaryDTO,
+import type { CompactPreviewDTO, CompactApplicationDetailDTO, PublicComparisonPageDTO, PreviewSummaryDTO,
   ProposalSelectionSummaryDTO, ProposalSelectionPageDTO, ProposalSelectionRowDTO, ProposalSelectionFilterDTO,
   ProposalSelectionEditDTO, ProposalSelectionOperationDTO, ProposalDependencyPageDTO, ProposalExplanationDTO, OperationReceiptDTO, JobDTO } from '@ce/contracts';
 import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
+import type { ResolvedItemsPage } from '../core/public-value';
 import { CursorPage, CursorPageError } from '../core/cursor-page';
 import { ApplyStore } from './apply.store';
 import { DirectionsStore } from './directions.store';
@@ -27,7 +28,8 @@ export class PreviewStore {
   readonly selectedPreviewId = signal<string | null>(null); readonly preview = signal<CompactPreviewDTO | null>(null);
   readonly page = signal<ProposalSelectionPageDTO | null>(null); readonly selection = signal<ProposalSelectionSummaryDTO | null>(null);
   readonly selecting = signal(false); readonly selectionUncertain = signal(false); readonly selectionMissing = signal(false);
-  readonly application = signal<CompactApplicationDetailDTO | null>(null); readonly comparison = signal<CompactComparisonPageDTO | null>(null); readonly applicationLoading = signal(false);
+  readonly applicationSelectionBusy=computed(()=>this.selecting()||this.selectionUncertain()||this.directions.busy());
+  readonly application = signal<CompactApplicationDetailDTO | null>(null); readonly comparison = signal<ResolvedItemsPage<PublicComparisonPageDTO> | null>(null); readonly applicationLoading = signal(false);
   readonly loading = signal(false); readonly pending = signal(false); readonly error = signal<string | null>(null); readonly confirmDiscard = signal(false);
   readonly status = signal(''); readonly code = signal(''); readonly table = signal(''); readonly scope = signal<'all' | 'missing'>('all');
   readonly pagination = new CursorPage(); readonly comparisonPagination = new CursorPage(); readonly changedOnly = signal(true);
@@ -68,7 +70,7 @@ export class PreviewStore {
       }
       if (job.kind === 'apply' && job.status === 'succeeded' && job.resultRef?.type === 'application' && job.jobId !== this.observedApplication) { this.observedApplication = job.jobId; void this.loadHistory(); if (this.selectedPreviewId()) void this.load(); }
     }); });
-    effect(() => { this.applying.preview.set(this.preview()); this.applying.selection.set(this.selection()); this.applying.selectionBusy.set(this.selecting() || this.selectionUncertain()); });
+    effect(() => { this.applying.preview.set(this.preview()); this.applying.selection.set(this.selection()); this.applying.selectionBusy.set(this.applicationSelectionBusy()); });
     effect(() => { this.directions.operationLocked.set(this.pending() || this.operationUncertain() || !!this.operationAttempt && this.session.jobActive()); });
     effect(() => { const review = this.directions.review(); const local = this.directions.hasUnsavedChoice(); untracked(() => {
       const key = review ? review.id + ':' + review.revision : '';
@@ -92,7 +94,7 @@ export class PreviewStore {
     try { const history = await this.api.previews(w, cursor ?? undefined); if (generation !== this.historyGeneration || w !== this.session.workspace()?.id) return;
       const retained = this.history().find(row => row.id === this.selectedPreviewId());
       this.history.set(append ? [...this.history(), ...history.items.filter(row => !this.history().some(existing => existing.id === row.id))] : retained && !history.items.some(row => row.id === retained.id) ? [retained, ...history.items] : history.items);
-      this.historyCursor.set(history.nextCursor); if (!this.selectedPreviewId() && history.items[0]) this.choose(history.items[0].id);
+      this.historyCursor.set(history.nextCursor); if (!this.selectedPreviewId()) { const restored=this.session.recoveryView()?.previewId; if(restored)this.choose(restored);else if(history.items[0])this.choose(history.items[0].id); }
     } catch (error) { if (generation === this.historyGeneration) this.report(error); } finally { if (generation === this.historyGeneration) this.historyLoading.set(false); }
   }
   choose(id: string): void {
@@ -113,7 +115,8 @@ export class PreviewStore {
         this.api.proposalSelectionState(w, id).then(value => ({ value }), error => ({ error })),
         this.api.selectionRows(w, id, { ...filter, scope, ...(request.cursor ? { cursor: request.cursor } : {}) }).then(value => ({ value }), error => ({ error }))]);
       if (generation !== this.generation || w !== this.session.workspace()?.id || id !== this.selectedPreviewId()) return;
-      this.preview.set(preview); this.history.update(rows => rows.some(row => row.id === id) ? rows.map(row => row.id === id ? preview : row) : [preview, ...rows]);
+      if(preview.id!==id)throw new CursorPageError('La simulación recibida no corresponde a la elegida.');
+      this.preview.set(preview); this.session.rememberView({previewId:preview.id}); this.history.update(rows => rows.some(row => row.id === id) ? rows.map(row => row.id === id ? preview : row) : [preview, ...rows]);
       if ('error' in summaryResult) {
         if (summaryResult.error instanceof HttpErrorResponse && summaryResult.error.status === 404) { this.selectionMissing.set(true); this.selection.set(null); this.page.set(null); this.selecting.set(false); } else throw summaryResult.error;
       } else {
@@ -261,6 +264,7 @@ export class PreviewStore {
     const request = this.comparisonPagination.begin(JSON.stringify([w, receiptId, this.changedOnly()]), typeof append === 'number' ? append : append ? this.comparisonPagination.index() + 1 : 0), generation = ++this.applicationGeneration; this.applicationLoading.set(true);
     try { const [application, page] = await Promise.all([this.api.applicationCompact(w, receiptId), this.api.comparisonCompact(w, receiptId, { ...(request.cursor ? { cursor: request.cursor } : {}), changedOnly: this.changedOnly() })]);
       if (generation !== this.applicationGeneration || w !== this.session.workspace()?.id || receiptId !== this.preview()?.appliedReceiptId) return;
+      if(page.workspaceId!==w || page.receipt.id!==receiptId || application.receipt.id!==receiptId || page.versionId!==application.receipt.newVersionId) throw new CursorPageError('La comparación no corresponde a esta aplicación.');
       this.application.set(application); this.applying.confirmReceipt(application.receipt); this.comparisonPagination.accept(request.index, page.total, page.nextCursor, page.items.length); this.comparison.set(page);
     } catch (error) { if (generation === this.applicationGeneration) this.report(error); } finally { if (generation === this.applicationGeneration) this.applicationLoading.set(false); }
   }

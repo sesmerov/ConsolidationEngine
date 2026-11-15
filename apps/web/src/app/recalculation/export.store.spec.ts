@@ -41,6 +41,11 @@ describe('one download intent and recoverable lifecycle', () => {
     session.trackJob({ ...job, status: 'succeeded', resultRef: { type: 'export', id: artifactId }, progress: { completed: 1, total: 1, complete: true } }); await tick(); expect(store.state()).toBe('failed');
     await store.activate(); expect(api['exportReport']).toHaveBeenCalledTimes(1); expect(api['downloadExport']).toHaveBeenCalledTimes(2); expect(store.state()).toBe('ready');
   });
+  it('forgets an expired artifact and prepares a new download only after an explicit next click',async()=>{
+    store.selectVersion(original);await store.activate();const key=api['exportReport']!.mock.calls[0]![3];api['downloadExport']!.mockRejectedValueOnce(new HttpErrorResponse({status:410,error:{error:{code:'ARTIFACT_EXPIRED',message:'Archivo caducado.'}}}));
+    session.trackJob({...job,status:'succeeded',resultRef:{type:'export',id:artifactId},progress:{completed:1,total:1,complete:true}});await tick();expect(store.state()).toBe('expired');expect(store.ready()).toBeNull();expect(api['exportReport']).toHaveBeenCalledOnce();
+    await store.activate();expect(api['exportReport']).toHaveBeenCalledTimes(2);expect(api['exportReport']!.mock.calls[1]![3]).not.toBe(key);
+  });
   it('aborts an in-flight transfer when intent changes and never clicks a stale response', async () => {
     store.selectVersion(original); await store.activate(); const transfer = deferred<Blob>(); api['downloadExport']!.mockReturnValueOnce(transfer.promise);
     session.trackJob({ ...job, status: 'succeeded', resultRef: { type: 'export', id: artifactId }, progress: { completed: 1, total: 1, complete: true } }); await tick();

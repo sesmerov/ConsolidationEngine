@@ -7,6 +7,7 @@ import { ApiClient } from '../core/api-client';
 import { OperationAttemptStore } from '../core/operation-attempt.store';
 import type { ExportOperationAttempt } from '../core/operation-attempt.store';
 import { SessionStore } from '../core/session.store';
+import { ArtifactExpiredError } from '../core/verified-transfer';
 
 @Injectable({ providedIn: 'root' })
 export class ExportStore {
@@ -140,15 +141,15 @@ export class ExportStore {
       this.artifacts.update(items => new Map([...items, [downloadIntentKey(attempt.intent), artifact]]));
       this.state.set(this.ready() ? 'ready' : 'idle');
       if (this.autoTransfer && sameDownloadIntent(this.intent(), attempt.intent)) { this.autoTransfer = false; await this.download(artifact); }
-    } catch (error) { if (this.current(attempt.intent.workspaceId)) { if (sameDownloadIntent(attempt.intent, this.intent())) { this.state.set('failed'); this.report(error); } else this.state.set(this.ready() ? 'ready' : 'idle'); } }
+    } catch (error) { if (this.current(attempt.intent.workspaceId)) { if (sameDownloadIntent(attempt.intent, this.intent())) { if(this.artifactExpired(error))this.forgetArtifact(attempt.intent);else this.state.set('failed'); this.report(error); } else this.state.set(this.ready() ? 'ready' : 'idle'); } }
   }
   async download(artifact = this.ready()): Promise<void> {
     if (!artifact || !this.current(artifact.intent.workspaceId) || !sameDownloadIntent(artifact.intent, this.intent())) return;
     this.transfer?.abort(); const controller = new AbortController(); this.transfer = controller; this.state.set('transferring'); this.error.set(null);
-    try { const blob = await this.api.downloadExport(artifact.intent.workspaceId, artifact.id, controller.signal);
+    try { const blob = await this.api.downloadExport(artifact.intent.workspaceId, artifact.id, controller.signal,artifact);
       if (controller.signal.aborted || !this.current(artifact.intent.workspaceId) || !sameDownloadIntent(artifact.intent, this.intent())) return;
       const url = URL.createObjectURL(blob), anchor = document.createElement('a'); anchor.href = url; anchor.download = artifact.filename; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 0); this.state.set('ready');
-    } catch (error) { if (!controller.signal.aborted && this.current(artifact.intent.workspaceId) && sameDownloadIntent(artifact.intent, this.intent())) { this.state.set('failed'); this.report(error); } }
+    } catch (error) { if (!controller.signal.aborted && this.current(artifact.intent.workspaceId) && sameDownloadIntent(artifact.intent, this.intent())) { if(this.artifactExpired(error))this.forgetArtifact(artifact.intent);else this.state.set('failed');this.report(error); } }
     finally { if (this.transfer === controller) { this.transfer = null; if (controller.signal.aborted && this.state() === 'transferring') this.state.set(this.ready() ? 'ready' : 'idle'); } }
   }
   async cancel(): Promise<void> {
@@ -156,6 +157,8 @@ export class ExportStore {
     if (this.attempt?.jobId === this.session.job()?.jobId && this.session.jobActive()) await this.session.cancelJob();
   }
   private current(workspaceId: string): boolean { return this.alive && workspaceId === this.session.workspace()?.id; }
+  private artifactExpired(error:unknown):boolean{return error instanceof ArtifactExpiredError||error instanceof HttpErrorResponse&&error.status===410&&error.error?.error?.code==='ARTIFACT_EXPIRED';}
+  private forgetArtifact(intent:DownloadIntent):void{this.artifacts.update(items=>{const next=new Map(items);next.delete(downloadIntentKey(intent));return next;});this.completedJob=null;this.attempt=null;this.autoTransfer=false;this.attempts.clear('export',intent.workspaceId);this.state.set('expired');}
   private reset(): void {
     this.generation++; this.summaryGeneration++; this.summaryKey = ''; this.lastIntent = ''; this.desiredRunId = ''; this.transfer?.abort(); this.transfer = null;
     this.summary.set(null); this.summaryLoading.set(false); this.summaryError.set(null); this.attempt = null; this.handledJob = ''; this.autoTransfer = false; this.completedJob = null;

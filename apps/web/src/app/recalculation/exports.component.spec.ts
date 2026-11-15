@@ -26,7 +26,7 @@ describe('visible download intent and one primary action', () => {
     const fixture = TestBed.createComponent(ExportsComponent); fixture.detectChanges(); http.expectOne(request => request.url.endsWith('/runs')).flush({ items, total: items.length, nextCursor: null, revision: 'r' });
     await settle(fixture); return fixture;
   }
-  async function settle(fixture: { detectChanges(): void }) { for (let i = 0; i < 3; i++) { await Promise.resolve(); TestBed.tick(); flushSummaries(); fixture.detectChanges(); } }
+  async function settle(fixture: { detectChanges(): void }) { for (let i = 0; i < 6; i++) { await Promise.resolve(); TestBed.tick(); flushSummaries(); fixture.detectChanges(); } }
   it('reproduces the old value binding mismatch when options arrive after the selected value', () => {
     const probe = TestBed.createComponent(LegacySelectProbe); probe.detectChanges(); probe.componentInstance.versions.set([original, current]); probe.detectChanges();
     expect(probe.componentInstance.selected()).toBe(current); expect((probe.nativeElement.querySelector('select') as HTMLSelectElement).value).toBe(original);

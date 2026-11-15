@@ -52,7 +52,7 @@ test('SC-004: lost acceptance survives reload, recovers receipt and keeps one bu
 test('SC-003: transfer failure retries the same artifact and no extra preparation', async ({ page }, info) => {
   test.setTimeout(90_000); const workspace = await fresh(page); let preparations = 0, failed = false;
   page.on('request', request => { if (request.method() === 'POST' && request.url().endsWith('/exports')) preparations++; });
-  await page.route('**/exports/*', async route => { if (!failed && route.request().headers()['accept'] === 'application/zip') { failed = true; await route.abort('failed'); } else await route.continue(); });
+  await page.route('**/exports/*/parts/*', async route => { if (!failed) { failed = true; await route.abort('failed'); } else await route.continue(); });
   await page.locator('[data-download-action]').click(); await expect(page.locator('[data-download-action]')).toHaveText('Reintentar descarga'); await expect(page.locator('#export-version')).toBeEnabled(); expect(preparations).toBe(1);
   expect((await unzip(page, info.outputPath('retried.zip'))).versionId).toBe(workspace.currentVersionId); expect(preparations).toBe(1); await expect(page.locator('[data-download-action]')).toHaveText('Descargar');
 });

@@ -46,7 +46,7 @@ describe('separate guided visual demonstrations', () => {
       context: [{ sourceFileId: 'typed', origin: 'workbook', declaration: { contextId: 'demo_types', entityId: 'SYNTHETIC', referenceDate: '2025-12-31', framework: 'DEMO', moduleVersion: 'DEMO_TYPES_1', filingIndicators: { DEMO_TYPES: true } } }] } });
     const fixture = await render(), review = (fixture.nativeElement as HTMLElement).querySelector('[aria-label="Revisión de la carga"]')!;
     expect(review.textContent).toContain('DEMO_TYPES'); expect(review.textContent).not.toContain('Tabla C_01.00'); expect(review.textContent).toContain('Presentada');
-    const store = fixture.componentInstance.store, candidate = store.inspection(); expect(store.canCommit()).toBe(true);
+    const store = fixture.componentInstance.store, candidate = store.inspection(); await vi.waitFor(()=>{fixture.detectChanges();expect(store.canCommit(),JSON.stringify({dirty:store.reviewDirty(),stale:store.staleInspection(),pending:store.inspectionPending(),expired:store.locallyExpired(),evidence:store.inspectionEvidenceReady(),error:store.error()})).toBe(true);});
     store.selectDemo('types'); fixture.detectChanges(); await fixture.whenStable();
     expect(store.inspection()).toBe(candidate); expect(store.reviewDirty()).toBe(false); expect(store.canCommit()).toBe(true);
   });

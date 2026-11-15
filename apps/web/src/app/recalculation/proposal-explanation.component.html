@@ -35,6 +35,6 @@
   @for (item of descriptionRows(); track item.itemId) { <p>{{ item.description }}</p><p class="expression">{{ item.expression }}</p><p class="muted">{{ item.fileName }} · {{ item.sheet }}@if (item.row) { · fila {{ item.row }} }</p> }
   @if (page(); as current) {
     @if (!current.items.length && !loading()) { <p>No hay datos conservados en esta sección.</p> }
-    @if (current.total > current.items.length) { <div class="detail-nav"><button mat-button type="button" [disabled]="loading() || !canPrevious()" (click)="previous()">Anterior</button><span>{{ current.items.length }} de {{ current.total }} registros</span><button mat-button type="button" [disabled]="loading() || !current.nextCursor" (click)="next()">Siguiente</button></div> }
+    <ce-cursor-paginator label="Páginas del detalle del cálculo" [cursor]="pagination" [disabled]="loading()" (pageChange)="load($event)"/>
   }
 </section>

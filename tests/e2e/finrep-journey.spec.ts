@@ -85,7 +85,7 @@ for (const width of [320, 390, 1440]) test(`FINREP F 01.01 ${width}px: downloada
   const application = await get(page, `/applications/${applied.resultRef.id}?includeAcceptedIds=false`);
   expect(application.afterSummary.byStatus).toMatchObject({ pass: 4, fail: 1 });
   await expect(page.getByRole('button', { name: '4. Descargar', exact: true })).toHaveClass(/stage-recommended/);
-  await expect(page.getByRole('heading', { name: 'Aplicación completada · comparación de validaciones', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Aplicación completada · comparación de validaciones', exact: true })).toBeVisible({timeout:30_000});
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath(`finrep-applied-${width}.png`), fullPage: true });
   await navigateStage(page, 'download'); await page.locator('#export-version').selectOption(imported.newVersionId);

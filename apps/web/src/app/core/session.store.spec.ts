@@ -36,7 +36,7 @@ describe('SessionStore HTTP lifecycle', () => {
     const secondContext = { ...firstContext, contextId: 'segundo', canonicalContextKey: 'scope-b' };
     async function refresh(contexts: readonly ReportContext[]): Promise<void> {
       const pending = store.refreshWorkspace(workspaceId);
-      http.expectOne('/api/v1/workspaces/' + workspaceId).flush({ ...workspace, contexts }, { headers: { ETag: '"refreshed"' } });
+      http.expectOne('/api/v1/workspaces/' + workspaceId + '?compact=true').flush({ ...workspace, contexts }, { headers: { ETag: '"refreshed"' } });
       await pending;
     }
 
@@ -56,7 +56,7 @@ describe('SessionStore HTTP lifecycle', () => {
     const bootstrap = http.expectOne('/api/v1/bootstrap'); expect(bootstrap.request.headers.has('X-CE-Session')).toBe(false);
     bootstrap.flush({ sessionToken: 'ephemeral-token', apiVersion: 'v1', sessionPersistence: 'ephemeral', activeWorkspaceId: workspaceId });
     await Promise.resolve();
-    const restore = http.expectOne('/api/v1/workspaces/' + workspaceId);
+    const restore = http.expectOne('/api/v1/workspaces/' + workspaceId + '?compact=true');
     expect(restore.request.headers.get('X-CE-Session')).toBe('ephemeral-token');
     restore.flush(workspace, { headers: { ETag: '"empty"' } }); await connect;
     expect(store.workspace()?.id).toBe(workspaceId); expect(store.etag()).toBe('"empty"'); expect(store.connected()).toBe(true);
@@ -79,7 +79,7 @@ describe('SessionStore HTTP lifecycle', () => {
     store.trackJob({ jobId: 'apply-job', workspaceId, kind: 'apply', status: 'running', progress: { completed: 1, total: 2, complete: false }, diagnostics: [], pollAfterMs: 60000 });
     const cancel = store.cancelJob(); http.expectOne('/api/v1/workspaces/' + workspaceId + '/jobs/apply-job').flush({ jobId: 'apply-job', workspaceId, kind: 'apply', status: 'succeeded', newVersionId: 'published', resultRef: { type: 'application', id: 'receipt' }, progress: { completed: 2, total: 2, complete: true }, diagnostics: [] });
     await Promise.resolve();
-    http.expectOne('/api/v1/workspaces/' + workspaceId).flush({ ...workspace, state: 'ready', currentVersionId: 'published', versionIds: ['base', 'published'] }, { headers: { ETag: '"v-published"' } }); await cancel;
+    http.expectOne('/api/v1/workspaces/' + workspaceId + '?compact=true').flush({ ...workspace, state: 'ready', currentVersionId: 'published', versionIds: ['base', 'published'] }, { headers: { ETag: '"v-published"' } }); await cancel;
     expect(store.job()?.status).toBe('succeeded'); expect(store.job()?.resultRef?.id).toBe('receipt'); expect(store.versionId()).toBe('published'); expect(store.jobActive()).toBe(false);
   });
 });

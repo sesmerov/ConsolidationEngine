@@ -20,25 +20,42 @@ describe('bounded server pages', () => {
     expect(cursor.begin('bounded', 19999).cursor).toBe('c19998'); cursor.accept(19999, 1_000_000, null, 50);
     expect(() => cursor.accept(20000, 1_000_000, null)).toThrow(); expect(() => cursor.accept(19999, 1_000_000, 'overflow')).toThrow();
   });
-  it('rejects missing/extra cursors, partial pages and indices outside the reported total', () => {
+  it('rejects missing/extra cursors, empty intermediate pages and indices outside the reported total', () => {
     const cursor = new CursorPage(); cursor.begin('inconsistent');
     expect(() => cursor.accept(0, 51, null, 50)).toThrow(); expect(() => cursor.accept(0, 50, 'extra', 50)).toThrow();
-    expect(() => cursor.accept(1, 50, null, 0)).toThrow(); expect(() => cursor.accept(0, 51, 'next', 49)).toThrow();
+    expect(() => cursor.accept(1, 50, null, 0)).toThrow(); expect(() => cursor.accept(0, 51, 'next', 0)).toThrow();
     cursor.accept(0, 0, null, 0); expect(() => cursor.accept(1, 0, null, 0)).toThrow();
+  });
+  it('tracks actual offsets for byte-limited pages and rejects loops or changed totals', () => {
+    const cursor = new CursorPage(); cursor.begin('large'); cursor.accept(0, 80, 'second', 7);
+    expect(cursor.offset()).toBe(0); expect(cursor.rangeLabel()).toBe('1–7 de 80');
+    cursor.accept(cursor.begin('large', 1).index, 80, 'third', 11);
+    expect(cursor.offset()).toBe(7); expect(cursor.rangeLabel()).toBe('8–18 de 80'); expect(cursor.hasNext()).toBe(true);
+    expect(() => cursor.accept(2, 80, 'second', 2)).toThrow(); expect(() => cursor.accept(2, 81, 'fourth', 2)).toThrow();
+    cursor.accept(cursor.begin('large', 0).index, 80, 'second', 7);
+    expect(cursor.offset()).toBe(0); expect(() => cursor.begin('large', 2)).toThrow();
+  });
+  it('keeps advancing after256 short pages and returns to the first page without inventing cursors', () => {
+    const cursor = new CursorPage(); cursor.begin('short');
+    for (let index = 0; index < 300; index++) { cursor.begin('short', index); cursor.accept(index, 301, 'next-' + index, 1); }
+    expect(cursor.rangeLabel()).toBe('300–300 de 301'); expect(cursor.hasNext()).toBe(true); expect(cursor.firstAvailableIndex()).toBeGreaterThan(0);
+    expect(() => cursor.begin('short', 1)).toThrow(); cursor.accept(cursor.begin('short', 300).index, 301, null, 1);
+    expect(cursor.rangeLabel()).toBe('301–301 de 301'); expect(cursor.hasNext()).toBe(false);
+    cursor.accept(cursor.begin('short', 0).index, 301, 'next-0', 1); expect(cursor.rangeLabel()).toBe('1–1 de 301'); expect(cursor.firstAvailableIndex()).toBe(0);
   });
   it('names the available navigation in Spanish with a fixed fifty-row range', () => {
     const labels = spanishPaginator(); expect(labels.nextPageLabel).toBe('Siguiente'); expect(labels.previousPageLabel).toBe('Anterior'); expect(labels.getRangeLabel(1, 50, 51)).toBe('51–51 de 51');
   });
   it('replaces the current page instead of retaining all previously visited result payloads', async () => {
-    const run = { id: 'run', versionId: 'v1', startedAt: '2026-11-04', summary: { byStatus: {} } };
+    const run = { id: 'run', workspaceId:'w', versionId: 'v1', startedAt: '2026-11-04', summary: { byStatus: {} } };
     const first = Array.from({ length: 50 }, (_, n) => ({ id: String(n) }));
-    const results = vi.fn().mockResolvedValueOnce({ items: first, total: 51, nextCursor: 'cursor-page-2', versionId: 'v1', run })
-      .mockResolvedValueOnce({ items: [{ id: '50' }], total: 51, nextCursor: null, versionId: 'v1', run });
-    TestBed.configureTestingModule({ providers: [ResultsStore, { provide: ApiClient, useValue: { results, runs: vi.fn().mockResolvedValue({ items: [], total: 0, nextCursor: null }) } }] });
+    const results = vi.fn().mockResolvedValueOnce({ workspaceId:'w',items: first, total: 51, nextCursor: 'cursor-page-2', versionId: 'v1', run })
+      .mockResolvedValueOnce({ workspaceId:'w',items: [{ id: '50' }], total: 51, nextCursor: null, versionId: 'v1', run });
+    TestBed.configureTestingModule({ providers: [ResultsStore, { provide: ApiClient, useValue: { compactResults:results, runs: vi.fn().mockResolvedValue({ items: [], total: 0, nextCursor: null }) } }] });
     const session = TestBed.inject(SessionStore); session.workspace.set({ id: 'w', name: 'SYNTHETIC', state: 'ready', currentVersionId: 'v1', versionIds: ['v1'], contexts: [], counts: { snapshots: 1, coordinates: 0, facts: 0, sources: 0 }, sessionBytes: 0 });
     const store = TestBed.inject(ResultsStore); TestBed.tick(); await Promise.resolve(); store.selectedRunId.set('run');
     await store.load(); await store.load(true);
-    expect(store.page()?.items.map(row => row.id)).toEqual(['50']);
+    expect(store.page()?.items.map(row => 'id' in row ? row.id : row.valueRef)).toEqual(['50']);
     expect(results.mock.calls[1]?.[2]).toMatchObject({ cursor: 'cursor-page-2' });
   });
 });

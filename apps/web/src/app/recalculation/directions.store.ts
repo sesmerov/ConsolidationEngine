@@ -39,6 +39,7 @@ export class DirectionsStore {
  readonly pendingCount=computed(()=>{const c=this.review()?.counts;return c?c.pending+c.conflicted+c.undetermined:null;});
  readonly allOmitted=computed(()=>{const c=this.review()?.counts;return !!c&&c.omitted>0&&c.included===0&&this.pendingCount()===0;});
  readonly canSimulate=computed(()=>this.editable()&&!this.hasUnsavedChoice()&&this.pendingCount()===0&&this.review()?.conflictGroupCount===0&&this.state()?.state!=='no_candidates');
+ readonly canReviewDestinations=computed(()=>this.review()?.state==='committed'&&this.complete()&&!this.historical()&&!this.busy()&&!this.uncertain()&&!this.operationLocked());
  readonly configurable=computed(()=>(this.rows()?.items??[]).filter(r=>['included','pending','omitted'].includes(r.state)));
  readonly unavailable=computed(()=>(this.rows()?.items??[]).filter(r=>r.state==='undetermined'));
  readonly resultPresentation=computed(()=>{const job=this.session.job(),r=this.review();return job?.workspaceId===this.session.workspace()?.id&&job?.status==='succeeded'&&job.kind==='prepare-directions'&&job.resultRef?.id===r?.id&&this.rows()?.revision===r?.revision&&this.groups()?.revision===r?.revision?{jobId:job.jobId,workspaceId:job.workspaceId,versionId:job.baseVersionId??null}:null;});
@@ -59,6 +60,7 @@ export class DirectionsStore {
  deactivate():void {this.active=false;}
  navigate(stage:'validation'|'exports'):void {if(this.allowLeaveEditor()){this.focus?.request(stage==='validation'?'validation-title':'exports-title');this.view.visit(stage);}}
  simulationInput():RecalculationOperationRequestDTO|null {const s=this.state(),r=this.review();return s&&r&&s.compatibleRun?{baseVersionId:s.currentVersionId,validationBasisId:s.validationBasisId,runId:r.runId,reviewId:r.id,expectedRevision:r.revision}:null;}
+ async reviewDestinations():Promise<void>{if(this.canReviewDestinations())await this.prepare();}
  private owns(w:string):boolean{return this.alive&&this.session.workspace()?.id===w;}
  private matches(r:DirectionReviewSummaryDTO):boolean{return this.owns(r.workspaceId)&&!this.historical()&&r.validationBasisId===this.state()?.validationBasisId;}
  async recover(autoPrepare=true):Promise<void>{

@@ -1,18 +1,17 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ValidationPageComponent } from './validation-page.component';
 import { SessionStore } from '../core/session.store';
 import { ApiClient } from '../core/api-client';
 const workspaceId = 'a4a99ec0-bb65-41f5-90d1-b857f4ebefb2', versionId = 'bfda41bd-2a55-4a80-9f22-2fc1aa89894c', runId = '5976e981-9b8d-4e80-af2a-b1ffeced4b55';
 const workspace = { id: workspaceId, name: 'Cierre', state: 'ready' as const, currentVersionId: versionId, versionIds: [versionId], contexts: [], counts: { snapshots: 1, coordinates: 6, facts: 5, sources: 2 }, sessionBytes: 100 };
 const summary = { complete: true, rows: 3, variants: 3, applicableVariants: 1, instances: 1, duplicateRows: 0, byStatus: { pass: 1, fail: 0, not_applicable: 0, not_evaluable: 0, error: 0 } };
-const result = { id: 'result-1', runId, instanceId: 'a'.repeat(64), code: 'v0190_m', variantIds: ['b'.repeat(64)], sourceRecordIds: [], coverageOnly: false, tables: ['C_01.00'], readKeys: [], versionId, profileId: 'ce-dpmxl-0.9-closed-v1', status: 'pass', severity: 'warning', severityOriginal: 'Warning',
+const result = { id: 'result-1', runId, instanceId: 'a'.repeat(64), code: 'v0190_m', coverageOnly: false, location:'C_01.00', versionId, profileId: 'ce-dpmxl-0.9-closed-v1', status: 'pass', severity: 'warning', severityOriginal: 'Warning',
   expression: '1/3 = 1/3', precondition: '{v_C_01.00}', values: { left: { kind: 'number', nominal: { numerator: '1', denominator: '3' }, interval: { lo: { numerator: '1', denominator: '3' }, hi: { numerator: '1', denominator: '3' } }, unit: 'pure' } },
-  recalculation: { policy: { profileId: 'ce-dpmxl-0.9-closed-v1', mode: 'standard', reasons: [] }, left: { eligible: false, diagnostics: [] }, right: { eligible: false, diagnostics: [] } },
-  factReads: [], sources: [{ sheet: 'Facts', row: 2, column: 'G' }], diagnostics: [], metadataReads: [{ contextId: 'demo', code: 'C_01.00', presence: 'declared', value: true }] };
-const page = { items: [result], total: 1, nextCursor: null, versionId, configuredDirections: [], run: { id: runId, versionId, profileId: 'ce-dpmxl-0.9-closed-v1', status: 'completed', startedAt: '2026-10-31T00:00:00.000Z', endedAt: '2026-10-31T00:00:01.000Z', summary, resultIds: ['result-1'], diagnostics: [] } };
+  recalculationPolicy: { profileId: 'ce-dpmxl-0.9-closed-v1', mode: 'standard', reasons: [] },counts:{operands:1,reads:0,origins:1,metadataReads:1,diagnostics:0,descriptions:0} };
+const page = { workspaceId,items: [result], total: 1, nextCursor: null, versionId, run: { id: runId,workspaceId,validationBasisId:'basis',versionId, profileId: 'ce-dpmxl-0.9-closed-v1', status: 'completed', startedAt: '2026-10-31T00:00:00.000Z', endedAt: '2026-10-31T00:00:01.000Z', summary, diagnosticsCount:0 } };
 const terminalJob = { jobId: '0cfafc23-142c-48f1-8cdf-c346df5ec02b', workspaceId, kind: 'validate' as const, status: 'succeeded' as const, baseVersionId: versionId, progress: { completed: 1, total: 1, complete: true }, resultRef: { type: 'validation', id: runId }, diagnostics: [], pollAfterMs: 1000 };
 describe('validation page HTTP workflow', () => {
   let http: HttpTestingController, session: SessionStore;
@@ -42,9 +41,13 @@ describe('validation page HTTP workflow', () => {
     const element = fixture.nativeElement as HTMLElement; expect(element.textContent).toContain('Pasa'); expect(element.textContent).toContain('Advertencia');
     expect(element.querySelector('ce-results-export details')).toBeNull();expect(element.textContent).not.toContain('Formato de resultados');expect(element.querySelector('ce-results-export')?.textContent).toContain('Ir a Descargar resultados');
     expect(element.querySelector('ce-calculation-detail')).toBeNull();
-    element.querySelector<HTMLButtonElement>('button[aria-label="Ver cálculo y origen de v0190_m"]')!.click(); fixture.detectChanges();
+    element.querySelector<HTMLButtonElement>('button[aria-label="Ver cálculo y origen de v0190_m"]')!.click(); await Promise.resolve();fixture.detectChanges();
+    http.expectOne(item=>item.url.endsWith('/results/result-1/explanation')).flush({...result,workspaceId});await fixture.whenStable();fixture.detectChanges();
     const detail = element.querySelector('[role="region"][aria-label="Cálculo y origen de v0190_m"]')!;
-    expect(detail.textContent).toContain('1/3'); expect(detail.textContent).toContain('Facts'); expect(detail.textContent).toContain('G2'); expect(detail.textContent).not.toContain('0.333333');
+    await vi.waitFor(()=>{fixture.detectChanges();expect(detail.textContent).toContain('1/3');});expect(detail.textContent).not.toContain('0.333333');
+    Array.from(detail.querySelectorAll('button')).find(button=>button.textContent?.includes('Archivos y celdas de origen'))!.click();
+    http.expectOne(item=>item.url.endsWith('/explanation/items')).flush({workspaceId,versionId,runId,resultId:result.id,section:'origins',items:[{itemId:'origin',section:'origins',value:{fileName:'informe.xlsx',locator:{sheet:'Facts',row:2,column:'G'}}}],total:1,nextCursor:null});await Promise.resolve();fixture.detectChanges();
+    expect(detail.textContent).toContain('Facts');expect(detail.textContent).toContain('G2');
   });
   it('keeps the historical run visible but labels it after the current snapshot changes', async () => {
     session.job.set(terminalJob); const fixture = TestBed.createComponent(ValidationPageComponent); fixture.detectChanges(); flushHistory(); TestBed.tick();

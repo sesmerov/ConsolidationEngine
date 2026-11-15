@@ -26,7 +26,7 @@ describe('visual workbook inspection before publication', () => {
   };
   beforeEach(() => { vi.clearAllMocks(); api.activeImportInspection.mockResolvedValue({ active: null }); api.importInspection.mockResolvedValue(ready()); api.inspectImport.mockResolvedValue(job('inspect-import')); api.commitImportInspection.mockResolvedValue(job('import', 'commit-job')); api.discardImportInspection.mockResolvedValue(ready({ state: 'discarded', profiles: [], context: [], reports: [] })); api.job.mockResolvedValue(job('import', 'commit-job')); TestBed.configureTestingModule({ imports: [ImportPageComponent], providers: [{ provide: ApiClient, useValue: api }] }); const session = TestBed.inject(SessionStore); session.workspace.set(workspace); session.etag.set('"v-v1"'); });
   afterEach(() => TestBed.resetTestingModule());
-  async function render() { const fixture = TestBed.createComponent(ImportPageComponent); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges(); return fixture; }
+  async function render() { const fixture = TestBed.createComponent(ImportPageComponent); fixture.detectChanges(); await fixture.whenStable(); await vi.waitFor(() => expect(fixture.componentInstance.store.inspectionPending()).toBe(false)); fixture.detectChanges(); return fixture; }
   it('offers inspection as the main operation and never publishes simply by selecting files', async () => {
     const fixture = await render(); fixture.componentInstance.catalog.set(new File(['rules'], 'rules.xlsx')); fixture.componentInstance.reports.set([new File(['corep'], 'corep.xlsx')]); fixture.detectChanges();
     const loader = TestbedHarnessEnvironment.loader(fixture); expect(await loader.hasHarness(MatButtonHarness.with({ text: 'Inspeccionar archivos' }))).toBe(true);

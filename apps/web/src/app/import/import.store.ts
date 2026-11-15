@@ -1,13 +1,18 @@
 import { DestroyRef, computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import { isCivilDate, isTerminalJob } from '@ce/contracts';
+import { compactImportInspection, isCivilDate, isTerminalJob } from '@ce/contracts';
 import type { CapabilitiesDTO, Diagnostic, ImportContextInputDTO, ImportInspectionCommitDTO, ImportInspectionDTO, ReportProfileChoiceDTO, RulesPageDTO } from '@ce/contracts';
+import type { CompactImportInspectionDTO, ImportInspectionContextDTO, ImportInspectionReportDTO, ImportInspectionItemDTO, ImportInspectionSection } from '@ce/contracts';
+import type { CompactRuleRowDTO, SourceFile, RuleRowDTO } from '@ce/contracts';
+import { CursorPage } from '../core/cursor-page';
 import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
 import { WorkspaceViewStore } from '../workspace/workspace-view.store';
 export interface ContextForm { entityId: string; referenceDate: string; submissionDate: string; currency: string; scaleExponent: string; displayDecimals: string; presented: string }
 const emptyContext = (): ContextForm => ({ entityId: '', referenceDate: '', submissionDate: '', currency: '', scaleExponent: '', displayDecimals: '', presented: '' });
 interface CommitAttempt { workspaceId: string; id: string; body: ImportInspectionCommitDTO; etag: string; key: string }
+type RuleView=Omit<RuleRowDTO,'originalFields'>&{readonly fileName?:string};
+type RulesView=Omit<RulesPageDTO,'items'|'sources'>&{readonly items:readonly RuleView[];readonly sources?:readonly SourceFile[]};
 @Injectable({ providedIn: 'root' })
 export class ImportStore {
   readonly catalog = signal<File | null>(null); readonly reports = signal<readonly File[]>([]);
@@ -15,7 +20,11 @@ export class ImportStore {
   private readonly view = inject(WorkspaceViewStore);
   private controller: AbortController | undefined; private pageGeneration = 0;
   readonly uploading = signal(false); readonly error = signal<string | null>(null);
-  readonly page = signal<RulesPageDTO | null>(null); readonly capabilities = signal<CapabilitiesDTO | null>(null);
+  readonly uploadProgress=computed(()=>this.api.uploadProgress?.()??null);
+  readonly uploadPercent=computed(()=>{const progress=this.uploadProgress();return progress?.total?Math.floor(100*progress.completed/progress.total):0;});
+  readonly pendingUpload=computed(()=>{const id=this.session.workspace()?.id,attempt=id?this.api.pendingUpload?.(id):null;return attempt?.baseVersionId===this.session.versionId()?attempt:null;});
+  async discardPendingUpload():Promise<void>{const id=this.session.workspace()?.id;if(!id||this.uploading()||this.session.jobActive())return;try{await this.api.discardUpload(id);}catch(error){this.report(error);}}
+  readonly page = signal<RulesView | null>(null); readonly capabilities = signal<CapabilitiesDTO | null>(null);
   readonly published = signal<Pick<RulesPageDTO, 'versionId' | 'coverage' | 'dataSummary'> | null>(null);
   readonly resultPresentation = computed(() => {
     const job = this.session.job();
@@ -28,6 +37,7 @@ export class ImportStore {
   readonly queryState = signal<'idle' | 'waiting' | 'loading'>('idle');
   readonly queryError = signal<string | null>(null);
   private queryTimer?: ReturnType<typeof setTimeout>;
+  private rulesController:AbortController|undefined;
   private rulesWorkspaceId: string | undefined;
   private rulesVersionId: string | null = null;
   readonly selectedDemo = signal<'corep' | 'types' | 'finrep'>('corep'); readonly demoDownloading = signal(false); readonly demoError = signal<string | null>(null);
@@ -38,13 +48,22 @@ export class ImportStore {
   readonly profileChoices = signal<readonly NonNullable<Diagnostic['profileChoice']>[]>([]);
   readonly reportProfiles = signal<readonly ReportProfileChoiceDTO[]>([]);
   private inspectionAttempt: { jobId: string | undefined; revision: number; reports: readonly File[] } | undefined;
-  readonly inspection = signal<ImportInspectionDTO | null>(null); readonly inspectionPending = signal(false); readonly acceptedExcludedSheets = signal(false);
+  readonly inspection = signal<CompactImportInspectionDTO | null>(null); readonly inspectionPending = signal(false); readonly acceptedExcludedSheets = signal(false);
+  readonly inspectionReports=signal<readonly ImportInspectionReportDTO[]>([]);
+  readonly inspectionContexts=signal<readonly ImportInspectionContextDTO[]>([]);
+  readonly inspectionDiagnostics=signal<readonly Diagnostic[]>([]);
+  readonly inspectionPagination={reports:new CursorPage(),context:new CursorPage(),diagnostics:new CursorPage()};
+  readonly inspectionNext=signal<Record<ImportInspectionSection,boolean>>({reports:false,context:false,diagnostics:false});
+  readonly inspectionSectionLoading=signal<Record<ImportInspectionSection,boolean>>({reports:false,context:false,diagnostics:false});
+  readonly inspectionSectionErrors=signal<Record<ImportInspectionSection,string|null>>({reports:null,context:null,diagnostics:null});
+  private readonly sectionControllers:Partial<Record<ImportInspectionSection,AbortController>>={};
+  readonly inspectionEvidenceReady=computed(()=>!Object.values(this.inspectionSectionLoading()).some(Boolean)&&!Object.values(this.inspectionSectionErrors()).some(Boolean));
   readonly reviewDirty = signal(false); readonly locallyExpired = signal(false); readonly uncertainCommit = signal(false);
   readonly contextError = computed(() => this.contextSource() === 'workbook' ? null : this.validateContext());
   readonly liveInspection = computed(() => this.inspection()?.state === 'ready' && !this.locallyExpired() || this.inspection()?.state === 'committing');
   readonly staleInspection = computed(() => !!this.inspection() && this.inspection()!.baseVersionId !== (this.session.versionId() ?? undefined));
   readonly canInspect = computed(() => !!this.catalog() && this.reports().length > 0 && !this.contextError() && !this.liveInspection() && !this.uploading() && !this.inspectionPending() && !this.uncertainCommit() && !this.session.jobActive() && !this.session.pending() && this.profileChoices().every(choice => this.reportProfiles().some(selected => selected.reportIndex === choice.reportIndex && selected.sha256 === choice.sha256)));
-  readonly canCommit = computed(() => this.inspection()?.state === 'ready' && !this.reviewDirty() && !this.locallyExpired() && !this.staleInspection() && !this.inspectionPending() && !this.uploading() && !this.session.jobActive() && !this.session.pending() && !this.uncertainCommit() && (!this.inspection()!.requiresPartialCoverageAcceptance || this.acceptedExcludedSheets()));
+  readonly canCommit = computed(() => this.inspection()?.state === 'ready' && this.inspectionEvidenceReady() && !this.reviewDirty() && !this.locallyExpired() && !this.staleInspection() && !this.inspectionPending() && !this.uploading() && !this.session.jobActive() && !this.session.pending() && !this.uncertainCommit() && (!this.inspection()!.requiresPartialCoverageAcceptance || this.acceptedExcludedSheets()));
   private workspaceId: string | undefined; private inspectionGeneration = 0; private observedJob = ''; private alive = true; private commitAttempt: CommitAttempt | undefined;
   private commitJobId: string | undefined; private expiryTimer: ReturnType<typeof setTimeout> | undefined; private inputRevision = 0; private preparingRevision: number | undefined;
   private lastInput: { catalog: File | null; reports: readonly File[]; context: string } | undefined;
@@ -61,7 +80,7 @@ export class ImportStore {
         this.refreshRules();
       });
     });
-    effect(() => { const id = this.session.workspace()?.id; if (id !== this.workspaceId) { const previous = this.workspaceId; this.workspaceId = id; untracked(() => { this.inspectionGeneration++; this.inspection.set(null); this.acceptedExcludedSheets.set(false); this.reviewDirty.set(false); this.locallyExpired.set(false); this.commitAttempt = undefined; this.commitJobId = undefined; this.uncertainCommit.set(false); this.observedJob = ''; this.preparingRevision = undefined; this.inspectionAttempt = undefined; this.profileChoices.set([]); this.reportProfiles.set([]); this.contextProfile.set('corep'); if (this.expiryTimer) clearTimeout(this.expiryTimer); if (previous) { this.controller?.abort(); this.catalog.set(null); this.reports.set([]); this.contextSource.set('workbook'); this.contextForm.set(emptyContext()); this.inspectionPending.set(false); this.uploading.set(false); this.inputRevision++; this.lastInput = this.captureInput(); } if (id) void this.recoverInspection(); }); } });
+    effect(() => { const id = this.session.workspace()?.id; if (id !== this.workspaceId) { const previous = this.workspaceId; this.workspaceId = id; untracked(() => { this.inspectionGeneration++; this.clearInspectionSections(); this.inspection.set(null); this.acceptedExcludedSheets.set(false); this.reviewDirty.set(false); this.locallyExpired.set(false); this.commitAttempt = undefined; this.commitJobId = undefined; this.uncertainCommit.set(false); this.observedJob = ''; this.preparingRevision = undefined; this.inspectionAttempt = undefined; this.profileChoices.set([]); this.reportProfiles.set([]); this.contextProfile.set('corep'); if (this.expiryTimer) clearTimeout(this.expiryTimer); if (previous) { this.controller?.abort(); this.catalog.set(null); this.reports.set([]); this.contextSource.set('workbook'); this.contextForm.set(emptyContext()); this.inspectionPending.set(false); this.uploading.set(false); this.inputRevision++; this.lastInput = this.captureInput(); } if (id) void this.recoverInspection(); }); } });
     effect(() => { const input = this.captureInput(); untracked(() => { const previous = this.lastInput; this.lastInput = input; if (previous && (previous.catalog !== input.catalog || previous.reports !== input.reports || previous.context !== input.context)) { this.inputRevision++; this.acceptedExcludedSheets.set(false); if (this.liveInspection()) this.reviewDirty.set(true); if (previous.reports !== input.reports) { this.profileChoices.set([]); this.reportProfiles.set([]); } } }); });
     effect(() => {
       const job = this.session.job();
@@ -100,7 +119,7 @@ export class ImportStore {
       });
     });
     effect(() => { const stale = this.staleInspection(); if (stale) untracked(() => this.acceptedExcludedSheets.set(false)); });
-    inject(DestroyRef).onDestroy(() => { this.alive = false; this.controller?.abort(); this.pageGeneration++; this.inspectionGeneration++; if (this.expiryTimer) clearTimeout(this.expiryTimer); this.catalog.set(null); this.reports.set([]); this.contextForm.set(emptyContext()); this.inspection.set(null); this.commitAttempt = undefined; });
+    inject(DestroyRef).onDestroy(() => { this.alive = false; this.rulesController?.abort(); this.clearInspectionSections(); this.controller?.abort(); this.pageGeneration++; this.inspectionGeneration++; if (this.expiryTimer) clearTimeout(this.expiryTimer); this.catalog.set(null); this.reports.set([]); this.contextForm.set(emptyContext()); this.inspection.set(null); this.commitAttempt = undefined; });
     void this.api.capabilities().then((value) => this.capabilities.set(value)).catch((error: unknown) => this.report(error));
     inject(DestroyRef).onDestroy(() => clearTimeout(this.queryTimer));
   }
@@ -143,7 +162,7 @@ export class ImportStore {
     const workspace = this.session.workspace(), etag = this.session.etag(), catalog = this.catalog(); if (!workspace || !etag || !catalog || !this.canInspect()) return;
     const controller = new AbortController(); this.controller = controller; this.preparingRevision = this.inputRevision; this.uploading.set(true); this.error.set(null); this.acceptedExcludedSheets.set(false); this.reviewDirty.set(false); this.inspection.set(null); this.locallyExpired.set(false); if (this.expiryTimer) clearTimeout(this.expiryTimer);
     const attempt = { revision: this.inputRevision, reports: this.reports(), jobId: undefined as string | undefined }; this.inspectionAttempt = attempt;
-    try { const job = await this.api.inspectImport(workspace.id, etag, catalog, attempt.reports, this.contextInput(), crypto.randomUUID(), controller.signal); if (!this.alive || workspace.id !== this.session.workspace()?.id || this.inspectionAttempt !== attempt) return; attempt.jobId = job.jobId; this.session.trackJob(job); }
+    try { const job = await this.api.inspectImport(workspace.id, etag, catalog, attempt.reports, this.contextInput(), crypto.randomUUID(), controller.signal,this.session.versionId()); if (!this.alive || workspace.id !== this.session.workspace()?.id || this.inspectionAttempt !== attempt) return; attempt.jobId = job.jobId; this.session.trackJob(job); }
     catch (error) { if (this.alive && workspace.id === this.session.workspace()?.id) {
       if (controller.signal.aborted) this.error.set('Carga cancelada. El conjunto vigente se conserva.'); else this.report(error);
       if (error instanceof HttpErrorResponse && (error.status === 0 || error.status === 409 || error.status >= 500)) {
@@ -154,25 +173,45 @@ export class ImportStore {
   }
   async recoverInspection(hydrate = true): Promise<void> {
     const workspaceId = this.session.workspace()?.id; if (!workspaceId) return; const generation = ++this.inspectionGeneration, revision = this.inputRevision; this.inspectionPending.set(true);
-    try { const response = await this.api.activeImportInspection(workspaceId); if (!this.alive || generation !== this.inspectionGeneration || workspaceId !== this.session.workspace()?.id) return; if (response.active) { this.acceptInspection(response.active, revision, hydrate); if (!hydrate && response.active.state === 'ready') this.reviewDirty.set(true); await this.recoverCommit(response.active); } else this.inspection.set(null); }
+    try { const response = await this.api.activeImportInspection(workspaceId); if (!this.alive || generation !== this.inspectionGeneration || workspaceId !== this.session.workspace()?.id) return; if (response.active) { await this.acceptInspection(response.active, revision, hydrate); if (!hydrate && response.active.state === 'ready') this.reviewDirty.set(true); await this.recoverCommit(response.active); } else {this.clearInspectionSections();this.inspection.set(null);} }
     catch (error) { if (this.alive && generation === this.inspectionGeneration) this.report(error); } finally { if (this.alive && generation === this.inspectionGeneration) this.inspectionPending.set(false); }
   }
   async loadInspection(id = this.inspection()?.id, hydrate = false): Promise<void> {
     const workspaceId = this.session.workspace()?.id; if (!workspaceId || !id) return; const generation = ++this.inspectionGeneration, revision = this.preparingRevision ?? this.inputRevision; this.inspectionPending.set(true);
-    try { const value = await this.api.importInspection(workspaceId, id); if (!this.alive || generation !== this.inspectionGeneration || workspaceId !== this.session.workspace()?.id) return; this.acceptInspection(value, revision, hydrate || this.preparingRevision !== undefined && this.inspection()?.id !== value.id); }
+    try { const value = await this.api.importInspection(workspaceId, id); if (!this.alive || generation !== this.inspectionGeneration || workspaceId !== this.session.workspace()?.id) return; await this.acceptInspection(value, revision, hydrate || this.preparingRevision !== undefined && this.inspection()?.id !== value.id); }
     catch (error) { if (this.alive && generation === this.inspectionGeneration) this.report(error); } finally { if (this.alive && generation === this.inspectionGeneration) this.inspectionPending.set(false); }
   }
-  private acceptInspection(value: ImportInspectionDTO, revision: number, hydrate: boolean): void {
-    const changed = this.inspection()?.id !== value.id; this.inspection.set(value); if (changed) this.acceptedExcludedSheets.set(false);
+  private async acceptInspection(value: ImportInspectionDTO|CompactImportInspectionDTO, revision: number, hydrate: boolean): Promise<void> {
+    const changed = this.inspection()?.id !== value.id||this.inspection()?.inspectionHash!==value.inspectionHash;this.clearInspectionSections();this.inspection.set('reports' in value?compactImportInspection(value):value); if (changed) this.acceptedExcludedSheets.set(false);
     this.reviewDirty.set(this.reviewDirty() || revision !== this.inputRevision); this.locallyExpired.set(value.state === 'ready' && Date.parse(value.expiresAt) <= Date.now());
-    if (hydrate && revision === this.inputRevision && value.context[0]) { const context = value.context[0], form = context.declaration;
+    if('reports' in value){this.inspectionReports.set(value.reports);this.inspectionContexts.set(value.context);this.inspectionDiagnostics.set(value.diagnostics);}
+    else if(value.state==='ready'||value.state==='committing')await Promise.all((['reports','context','diagnostics'] as const).filter(section=>this.inspectionCount(section)>0).map(section=>this.loadInspectionSection(section,0)));
+    if(!this.alive||this.inspection()?.id!==value.id||this.session.workspace()?.id!==value.workspaceId)return;
+    if (hydrate && revision === this.inputRevision && this.inspectionContexts()[0]) { const context = this.inspectionContexts()[0]!, form = context.declaration;
       this.contextProfile.set(form.framework === 'FINREP' ? 'finrep' : 'corep');
       this.contextSource.set(context.origin); this.contextForm.set({ entityId: form.entityId, referenceDate: form.referenceDate, submissionDate: form.submissionDate ?? '', currency: form.currency ?? '', scaleExponent: form.scaleExponent === undefined ? '' : String(form.scaleExponent), displayDecimals: form.displayDecimals === undefined ? '' : String(form.displayDecimals), presented: form.filingIndicators[this.contextTable()] === undefined ? '' : String(form.filingIndicators[this.contextTable()]) }); this.lastInput = this.captureInput();
     }
     if (this.expiryTimer) clearTimeout(this.expiryTimer); if (value.state === 'ready' && !this.locallyExpired()) this.expiryTimer = setTimeout(() => { this.locallyExpired.set(true); this.acceptedExcludedSheets.set(false); void this.loadInspection(value.id); }, Math.max(1, Date.parse(value.expiresAt) - Date.now()));
     if (value.commitJobId) this.commitJobId = value.commitJobId;
   }
-  private async recoverCommit(value: ImportInspectionDTO): Promise<void> {
+  inspectionCount(section:ImportInspectionSection):number{const summary=this.inspection();return summary?section==='reports'?summary.reportCount:section==='context'?summary.contextCount:summary.diagnosticsCount:0;}
+  async loadInspectionSection(section:ImportInspectionSection,index=0):Promise<void>{
+    const inspection=this.inspection();if(!inspection)return;this.sectionControllers[section]?.abort();const controller=new AbortController();this.sectionControllers[section]=controller;
+    const current=()=>this.alive&&!controller.signal.aborted&&this.inspection()===inspection&&this.session.workspace()?.id===inspection.workspaceId;
+    this.inspectionSectionLoading.update(value=>({...value,[section]:true}));this.inspectionSectionErrors.update(value=>({...value,[section]:null}));
+    const pagination=this.inspectionPagination[section];
+    try{const request=pagination.begin(inspection.id+':'+inspection.inspectionHash,index),page=await this.api.importInspectionItems(inspection.workspaceId,inspection.id,section,request.cursor?{cursor:request.cursor}:{});if(!current())return;
+      if(page.inspectionId!==inspection.id||page.workspaceId!==inspection.workspaceId||page.section!==section||page.versionId!==inspection.baseVersionId||page.revision!==1||page.items.length>50||page.total!==this.inspectionCount(section))throw new Error('La revisión cambió. Actualiza la inspección.');
+      const items=await Promise.all(page.items.map(item=>'valueRef' in item?this.api.largeValue<ImportInspectionItemDTO>(inspection.workspaceId,item,controller.signal):Promise.resolve(item)));if(!current())return;
+      if(items.some(item=>section==='reports'?!('displayName' in item):section==='context'?!('declaration' in item):!('code' in item&&'message' in item)))throw new Error('La sección recibida no corresponde a la revisión.');
+      pagination.accept(request.index,page.total,page.nextCursor,items.length);
+      this.inspectionNext.update(value=>({...value,[section]:page.nextCursor!==null}));
+      if(section==='reports')this.inspectionReports.set(items as ImportInspectionReportDTO[]);else if(section==='context')this.inspectionContexts.set(items as ImportInspectionContextDTO[]);else this.inspectionDiagnostics.set(items as Diagnostic[]);
+    }catch(error){if(current())this.inspectionSectionErrors.update(value=>({...value,[section]:error instanceof HttpErrorResponse?(error.error?.error?.message??'No se pudo consultar esta parte de la revisión.'):error instanceof Error?error.message:'No se pudo consultar esta parte de la revisión.'}));}
+    finally{if(this.sectionControllers[section]===controller)this.inspectionSectionLoading.update(value=>({...value,[section]:false}));}
+  }
+  private clearInspectionSections():void{for(const section of ['reports','context','diagnostics'] as const){this.sectionControllers[section]?.abort();delete this.sectionControllers[section];this.inspectionPagination[section].reset();}this.inspectionNext.set({reports:false,context:false,diagnostics:false});this.inspectionReports.set([]);this.inspectionContexts.set([]);this.inspectionDiagnostics.set([]);this.inspectionSectionLoading.set({reports:false,context:false,diagnostics:false});this.inspectionSectionErrors.set({reports:null,context:null,diagnostics:null});}
+  private async recoverCommit(value: CompactImportInspectionDTO|ImportInspectionDTO): Promise<void> {
     if (!value.commitJobId || value.state !== 'committing') return; const job = await this.api.job(value.workspaceId, value.commitJobId);
     if (!this.alive || value.workspaceId !== this.session.workspace()?.id || this.inspection()?.id !== value.id) return; this.session.trackJob(job); if (isTerminalJob(job.status)) await this.session.refreshWorkspace(value.workspaceId);
   }
@@ -192,7 +231,7 @@ export class ImportStore {
   async discardInspection(): Promise<void> {
     const value = this.inspection(), workspaceId = this.session.workspace()?.id, etag = this.session.etag(); if (!value || !workspaceId || !etag || this.inspectionPending() || this.session.pending() || this.session.jobActive() || this.uncertainCommit()) return;
     this.inspectionPending.set(true); this.error.set(null); const generation = ++this.inspectionGeneration;
-    try { const discarded = await this.api.discardImportInspection(workspaceId, value.id, etag); if (!this.alive || generation !== this.inspectionGeneration || workspaceId !== this.session.workspace()?.id) return; this.acceptInspection(discarded, this.inputRevision, false); this.reviewDirty.set(false); this.acceptedExcludedSheets.set(false); this.preparingRevision = undefined; }
+    try { const discarded = await this.api.discardImportInspection(workspaceId, value.id, etag); if (!this.alive || generation !== this.inspectionGeneration || workspaceId !== this.session.workspace()?.id) return; await this.acceptInspection(discarded, this.inputRevision, false); this.reviewDirty.set(false); this.acceptedExcludedSheets.set(false); this.preparingRevision = undefined; }
     catch (error) { if (this.alive && generation === this.inspectionGeneration) this.report(error); } finally { if (this.alive && generation === this.inspectionGeneration) this.inspectionPending.set(false); }
   }
   async downloadCorepTemplate(): Promise<void> { try { const blob = await this.api.corepTemplate(); const url = URL.createObjectURL(blob), anchor = document.createElement('a'); anchor.href = url; anchor.download = 'COREP-CA1.xlsx'; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 0); } catch (error) { this.report(error); } }
@@ -204,6 +243,7 @@ export class ImportStore {
   }
   refreshRules(debounce = false): void {
     clearTimeout(this.queryTimer);
+    this.rulesController?.abort();this.rulesController=new AbortController();
     const generation = ++this.pageGeneration;
     this.page.set(null);
     this.queryError.set(null);
@@ -221,7 +261,7 @@ export class ImportStore {
     if (this.queryState() !== 'idle' || !previous?.nextCursor) return;
     void this.fetchRules(this.pageGeneration, previous);
   }
-  private async fetchRules(generation: number, previous?: RulesPageDTO): Promise<void> {
+  private async fetchRules(generation: number, previous?: RulesView): Promise<void> {
     const workspaceId = this.rulesWorkspaceId, versionId = this.rulesVersionId;
     const current = () => this.alive && generation === this.pageGeneration
       && workspaceId === this.session.workspace()?.id && versionId === this.session.versionId();
@@ -229,15 +269,19 @@ export class ImportStore {
     this.queryState.set('loading');
     this.queryError.set(null);
     try {
-      const result = await this.api.rules(workspaceId, versionId, {
+      const result = await (this.api.compactRules?this.api.compactRules.bind(this.api):this.api.rules.bind(this.api))(workspaceId, versionId, {
         ...(this.code() && { code: this.code() }),
         ...(this.status() && { status: this.status() }),
         ...(this.table() && { table: this.table() }),
         ...(previous?.nextCursor && { cursor: previous.nextCursor }),
       });
       if (!current() || result.versionId !== versionId) return;
+      const items=result.items.some(row=>'valueRef' in row)
+        ?await Promise.all(result.items.map(row=>'valueRef' in row?this.api.largeValue<CompactRuleRowDTO>(workspaceId,row,this.rulesController?.signal):Promise.resolve(row)))
+        :result.items as RuleView[];
+      if(!current())return;
       this.published.set({ versionId, coverage: result.coverage, dataSummary: result.dataSummary });
-      this.page.set(previous ? { ...result, items: [...previous.items, ...result.items] } : result);
+      this.page.set({...result,items:previous?[...previous.items,...items]:items});
     } catch (error) {
       if (current()) this.queryError.set(error instanceof HttpErrorResponse && typeof error.error?.error?.message === 'string'
         ? error.error.error.message : 'No se pudo consultar el catálogo de reglas.');
@@ -245,8 +289,8 @@ export class ImportStore {
       if (current()) this.queryState.set('idle');
     }
   }
-  fileName(id: string | undefined): string { return this.page()?.sources.find((source) => source.id === id)?.displayName ?? 'Archivo de origen'; }
+  fileName(id: string | undefined): string { return this.page()?.sources?.find((source) => source.id === id)?.displayName ?? 'Archivo de origen'; }
   private report(error: unknown): void {
-    this.error.set(error instanceof HttpErrorResponse && typeof error.error?.error?.message === 'string' ? error.error.error.message as string : 'No se pudo completar la petición. Se conserva la versión cargada.');
+    this.error.set(error instanceof HttpErrorResponse && typeof error.error?.error?.message === 'string' ? error.error.error.message as string : error instanceof Error&&!(error instanceof HttpErrorResponse)?error.message:'No se pudo completar la petición. Se conserva la versión cargada.');
   }
 }

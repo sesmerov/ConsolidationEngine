@@ -6,9 +6,11 @@ import type { ProposalExplanationDTO, ProposalExplanationPageDTO, ProposalExplan
 import { ApiClient } from '../core/api-client';
 import { SessionStore } from '../core/session.store';
 import { StageFocus, calculationHeadingId } from '../core/stage-title.directive';
+import { CursorPage, CursorPageError } from '../core/cursor-page';
+import { CursorPaginatorComponent } from '../shared/cursor-paginator.component';
 import { decimalText, normalizedText, validationText } from '../core/exact-value';
 
-@Component({ selector: 'ce-proposal-explanation', standalone: true, imports: [MatButtonModule, MatTableModule],
+@Component({ selector: 'ce-proposal-explanation', standalone: true, imports: [MatButtonModule, MatTableModule, CursorPaginatorComponent],
   changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './proposal-explanation.component.html',
   styles: [`.expression{white-space:pre-wrap;overflow-wrap:anywhere}.detail-sections{display:flex;gap:8px;flex-wrap:wrap}.detail-sections [aria-pressed=true]{background:#e5efff}.detail-nav{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.data-table td{max-width:36ch}`] })
 export class ProposalExplanationComponent {
@@ -17,7 +19,7 @@ export class ProposalExplanationComponent {
   private readonly focus = inject(StageFocus, { optional: true }); private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
   readonly section = signal<ProposalExplanationSection>('operands'); readonly page = signal<ProposalExplanationPageDTO | null>(null);
   readonly loading = signal(false); readonly error = signal<string | null>(null); readonly canPrevious = signal(false);
-  private generation = 0; private cursors: (string | undefined)[] = [undefined]; private pageIndex = 0;
+  private generation = 0; readonly pagination=new CursorPage();
   readonly title = computed(() => 'Cálculo y origen de ' + this.explanation().code);
   readonly headingId = computed(() => calculationHeadingId(this.explanation().proposalId));
   readonly operandRows = computed(() => this.page()?.section === 'operands' ? this.page()!.items as readonly ProposalOperandDTO[] : []);
@@ -31,25 +33,22 @@ export class ProposalExplanationComponent {
     afterEveryRender(() => { const heading = this.heading(); if (heading) this.focus?.fulfill(heading.nativeElement); });
     inject(DestroyRef).onDestroy(() => { this.generation++; });
   }
-  private reset(): void { this.generation++; this.page.set(null); this.error.set(null); this.cursors = [undefined]; this.pageIndex = 0; this.canPrevious.set(false); }
+  private reset(): void { this.generation++; this.page.set(null); this.error.set(null); this.pagination.reset(); this.canPrevious.set(false); }
   selectSection(section: ProposalExplanationSection): void { this.section.set(section); this.reset(); void this.load(); }
-  async load(index = this.pageIndex): Promise<void> {
-    const workspace = this.session.workspace()?.id, detail = this.explanation(); if (!workspace || index < 0 || index >= this.cursors.length) return;
-    const generation = ++this.generation, section = this.section(), cursor = this.cursors[index]; this.loading.set(true); this.error.set(null);
+  async load(index = this.pagination.index()): Promise<void> {
+    const workspace = this.session.workspace()?.id, detail = this.explanation(); if (!workspace) return;
+    const generation = ++this.generation, section = this.section(); this.loading.set(true); this.error.set(null);
     try {
+      const request=this.pagination.begin(JSON.stringify([workspace,detail.previewId,detail.proposalId,detail.revision,section]),index),cursor=request.cursor;
       const page = await this.api.proposalExplanationItems(workspace, detail.previewId, detail.proposalId, { section, ...(cursor ? { cursor } : {}) });
       if (generation !== this.generation || workspace !== this.session.workspace()?.id) return;
       if (page.revision !== detail.revision || page.state !== detail.state) { this.error.set('La selección ha cambiado. Cierra el detalle y vuelve a abrirlo para consultar la revisión actual.'); return; }
-      this.page.set(page); this.pageIndex = index;
-      if (page.nextCursor) this.cursors[index + 1] = page.nextCursor; else this.cursors.length = index + 1;
-      // Only cursor history is kept, never accumulated operands or provenance lists.
-      if (this.cursors.length > 50) { this.cursors.shift(); this.pageIndex--; }
-      this.canPrevious.set(this.pageIndex > 0);
-    } catch (error) { if (generation === this.generation) this.error.set(error instanceof HttpErrorResponse && typeof error.error?.error?.message === 'string' ? error.error.error.message : 'No se pudo consultar el detalle. Vuelve a intentarlo.'); }
+      this.pagination.accept(request.index,page.total,page.nextCursor,page.items.length);this.page.set(page);this.canPrevious.set(this.pagination.index()>0);
+    } catch (error) { if (generation === this.generation) this.error.set(error instanceof CursorPageError?error.message:error instanceof HttpErrorResponse && typeof error.error?.error?.message === 'string' ? error.error.error.message : 'No se pudo consultar el detalle. Vuelve a intentarlo.'); }
     finally { if (generation === this.generation) this.loading.set(false); }
   }
-  previous(): void { void this.load(this.pageIndex - 1); }
-  next(): void { if (this.page()?.nextCursor) void this.load(this.pageIndex + 1); }
+  previous(): void { void this.load(this.pagination.index() - 1); }
+  next(): void { if (this.page()?.nextCursor) void this.load(this.pagination.index() + 1); }
   close(): void { this.generation++; this.closed.emit(); }
   coordinate(row: { tableCode: string; sheetCode: string; rowCode: string; columnCode: string }): string { return [row.tableCode, row.sheetCode ? 's' + row.sheetCode : '', 'r' + row.rowCode, 'c' + row.columnCode].filter(Boolean).join(' · '); }
   origin(row: ProposalOperandDTO): string { return row.originKind === 'proposal' ? 'Valor recalculado por ' + (row.fromProposalCode ?? 'una propuesta antecesora') : row.originKind === 'application' ? 'Valor de una aplicación anterior' : 'Valor del informe'; }

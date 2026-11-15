@@ -73,6 +73,24 @@ Las rutas de las tablas son relativas a `apps/web/src/app/`. Para cada control c
 
 Al completar T052/T100 sustituir cada estado pendiente por resultado, nombre de caso ejecutado y enlace a evidencia. Para una eliminación, verificar además que sigue accesible toda información que cambia una decisión. Registrar por separado controles nuevos de aviso de sesión, recuperación y valores paginados; no declararlos incluidos en el conteo inicial hasta inventariarlos. No confundir este inventario con aceptación humana de004 ni005.
 
+## Controles incorporados a la proyección compacta (2026-11-16)
+
+Los 17 selectores y 11 desplegables anteriores son el inventario inicial. Los controles siguientes se registran por separado. Las páginas conservan solo la respuesta visible y las referencias de navegación; abrir un detalle grande verifica sus partes y su contenido completo en memoria. La selección global y sus dependencias siguen siendo decisiones del servidor.
+
+| ID | Control y ubicación | Comportamiento y evidencia actual |
+| --- | --- | --- |
+| N01 | Iniciar o recuperar demo — `app.component.ts` | Acción explícita después de cierre/caducidad; aviso de datos sintéticos antes de empezar. `hosted-session.store`, `session-persistence` y `session.store` verifican recuperación, pérdida de respuesta y ausencia de recreación silenciosa. No es un selector nuevo. |
+| N02 | Aviso de caducidad — `app.component.ts` | Mensaje contextual diez minutos antes de vencer. Lectura/GET/foco/partes no renuevan actividad; `hosted-session.store` comprueba el reloj. No es un desplegable. |
+| N03 | Paginadores de contextos, inspección, catálogo, resultados, decisiones, selección, antecedentes, explicación, comparación y cambios — `shared/cursor-paginator.component.ts` | Anterior/Siguiente con nombre de región, cantidad real recibida y estado ocupado; retorno a primera página si se supera la ventana de historial. `cursor-page` y `cursor-paginator` cubren páginas de menos de 50 filas por límite de bytes, navegación y rechazo de cursores inconsistentes. `public-pages` verifica filas retenidas íntegras sin recorrer la siguiente página. |
+| N04 | Secciones de cálculo conservado — `shared/result-explanation.component.html` | Botones Entradas/Indicadores/Origen/Avisos/Descripciones solo si hay contenido; nombre accesible de tabla según sección. `result-explanation` comprueba consulta explícita, valores exactos, respuesta tardía y descripción/expresión/precondición completas. `analyst-controls` se adapta a abrir origen y entradas por teclado. |
+| N05 | Ver contenido completo — `shared/result-value.component.ts` | Acción explícita para un valor individual por partes; error verificable sin mostrar bytes parciales. `result-explanation` y `binary-api-client` verifican texto literal, integridad, cancelación y destrucción del componente. |
+| N06 | Avisos de la ejecución — `validation/validation-page.component.html` | Botón con cantidad y paginación independiente. `results.store` comprueba carga bajo demanda, conservación del descriptor grande y rechazo de otra versión. |
+| N07 | Valores modificados en el informe — `recalculation/comparison.component.html` | Tabla separada de los resultados de reglas: celda, anterior, después y unidad. Paginación independiente ligada al recibo y a su nueva versión. `preview-page` conserva cantidades de propuestas sin cambio, historial y rechazo de respuestas tardías; `apply.component` distingue fallos restantes y errores aritméticos. |
+| N08 | Intervalo del valor — `shared/result-value.component.ts` | Nuevo desplegable opcional para valores numéricos con intervalo; texto/fecha no muestran este control. Se suma al inventario de desplegables, sin sustituir el acceso a origen. |
+| N09 | Revisar destinos después de simular — `recalculation/directions.component.html` | La revisión ya usada permanece de solo lectura. Una nueva revisión requiere este botón explícito; una actualización de página no inicia otro trabajo ni borra la aceptación. `directions.component` comprueba ausencia de POST al consultar y guarda de operación activa; `proposal-selection.store` bloquea la aceptación mientras se recuperan decisiones y conserva consentimiento en una lectura equivalente. |
+
+Revalidación Angular actual: **34 archivos / 279 pruebas PASS**. La evidencia anterior permanece identificada como histórica; el recorrido de navegador local y la integración alojada se registran aparte en la verificación de 005. Ninguna de estas pruebas equivale a aceptación humana.
+
 
 ## Alcance de la evidencia local
 

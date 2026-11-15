@@ -1,3 +1,4 @@
+import { CursorPaginatorComponent } from '../shared/cursor-paginator.component';
 import { afterEveryRender, ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import type { DoCheck } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -24,13 +25,14 @@ import { ExportsComponent } from '../recalculation/exports.component';
 import { WorkspaceViewStore } from './workspace-view.store';
 import type { WorkspaceStage } from './workspace-view.store';
 @Component({ selector: 'ce-workspace-shell', standalone: true, changeDetection: ChangeDetectionStrategy.OnPush,
-imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatProgressBarModule, ImportPageComponent, ValidationPageComponent, PreviewPageComponent, ExportsComponent],
+imports: [CursorPaginatorComponent, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatProgressBarModule, ImportPageComponent, ValidationPageComponent, PreviewPageComponent, ExportsComponent],
 providers: [WorkspaceViewStore, StageFocus, ImportStore, ResultsStore, PreviewStore, DirectionsStore, ApplyStore, ExportStore, { provide: MatPaginatorIntl, useFactory: spanishPaginator }], templateUrl: './workspace-shell.component.html', styleUrl: './workspace-shell.component.scss' })
 export class WorkspaceShellComponent implements DoCheck {
 readonly session = inject(SessionStore); readonly view = inject(WorkspaceViewStore); readonly confirmClose = signal(false);
 private readonly imports = inject(ImportStore); private readonly results = inject(ResultsStore); private readonly proposals = inject(PreviewStore);
 private readonly directions = inject(DirectionsStore);
 private readonly exports = inject(ExportStore);
+private restoredWorkspace:string|undefined;
 readonly visibleJob = computed(() => { const job = this.session.job(); return job && !this.view.resultWasPresented(job) ? job : null; });
 readonly stages = [
   { id: 'import', label: '1. Cargar' }, { id: 'validation', label: '2. Validar' },
@@ -83,6 +85,7 @@ constructor() {
     const workspace = this.session.workspace(), completed = this.results.completedValidation(), basis = this.session.validationBasisId();
     untracked(() => {
       this.view.reconcile(workspace?.id ?? null, workspace?.currentVersionId ?? null, basis);
+      if(workspace&&this.restoredWorkspace!==workspace.id){this.restoredWorkspace=workspace.id;const stage=this.session.recoveryView()?.stage;if(stage&&workspace.currentVersionId)this.view.visit(stage);}
       if (workspace && completed) this.view.validated(workspace.id, completed);
     });
   });
@@ -91,12 +94,12 @@ constructor() {
 }
 ngDoCheck(): void {
   const workspace = this.session.workspace();
-  if (!workspace || workspace.contexts.length > 1) return;
+  if (!workspace || this.session.contextCount() > 1) return;
   // Return focus before Angular removes a context selector the analyst was using.
   const select = this.contextSelector()?.nativeElement;
   if (select && select.ownerDocument.activeElement === select) this.workspaceName()?.nativeElement.focus();
 }
-navigate(stage: WorkspaceStage): void { if (stage !== this.view.stage() && !this.directions.allowLeaveEditor()) return; this.stageFocus.request({ import: 'import-title', validation: 'validation-title', preview: 'preview-title', exports: 'exports-title' }[stage]); this.view.visit(stage); }
+navigate(stage: WorkspaceStage): void { if (stage !== this.view.stage() && !this.directions.allowLeaveEditor()) return; this.stageFocus.request({ import: 'import-title', validation: 'validation-title', preview: 'preview-title', exports: 'exports-title' }[stage]); this.view.visit(stage);this.session.rememberView({stage}); }
 selectContext(id: string): void {
   if (this.directions.allowLeaveEditor()) this.session.selectContext(id);
   else { const select = this.contextSelector()?.nativeElement; if (select) select.value = this.session.selectedContextId() ?? ''; }

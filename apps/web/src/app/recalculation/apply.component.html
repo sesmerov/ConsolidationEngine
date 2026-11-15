@@ -6,7 +6,7 @@
 @if (store.reviewLoading()) { <p role="status">Cargando cambios seleccionados…</p> }
 @if (store.reviewPage(); as page) {
 <ul class="selected-changes">@for (row of page.items; track row.id) { <li><strong>{{ row.code }}</strong> · {{ target(row) }} <span class="value-change"><ce-exact-value [value]="row.before?.normalizedValue" [decimals]="row.before?.decimals || ''"/><span aria-hidden="true">→</span><ce-exact-value [value]="row.after?.normalizedValue" [decimals]="row.before?.decimals || ''"/></span> <span>{{ row.before?.unit }}</span>@if (noChange(row)) { <span class="muted">Sin cambio de valor</span> }</li> }</ul>
-<mat-paginator aria-label="Páginas de cambios seleccionados" [length]="page.total" [pageSize]="50" [pageIndex]="store.reviewPagination.index()" [hidePageSize]="true" [showFirstLastButtons]="false" [disabled]="store.reviewLoading()" (page)="store.loadReview($event.pageIndex)"/>
+<ce-cursor-paginator label="Páginas de cambios seleccionados" [cursor]="store.reviewPagination" [disabled]="store.reviewLoading()" (pageChange)="store.loadReview($event)"/>
 } @else if (!store.reviewLoading()) { <button mat-button (click)="store.loadReview()">Consultar cambios seleccionados</button> }
 </details>
 @if (selectionBusy() || selection()?.state !== 'ready') { <p class="notice">La selección se está actualizando. Espera a que termine antes de aceptar los cambios.</p> }

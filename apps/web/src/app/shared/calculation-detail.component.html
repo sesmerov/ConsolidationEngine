@@ -1,4 +1,5 @@
-@if (row(); as entry) {
+@if(compact();as current){<ce-result-explanation [result]="current" (closed)="close()"/>}
+@else if (row(); as entry) {
   <section class="calculation-detail" role="region" [attr.aria-label]="title()">
     <div class="section-heading">
       <h3 #heading [id]="headingId()" tabindex="-1">{{ title() }}</h3>

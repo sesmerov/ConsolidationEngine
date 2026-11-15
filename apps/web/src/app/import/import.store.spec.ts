@@ -4,6 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionStore } from '../core/session.store';
 import { ApiClient } from '../core/api-client';
+import { UploadAttemptStore } from '../core/upload-attempt.store';
 import { ImportStore } from './import.store';
 import { ImportPageComponent } from './import-page.component';
 const workspaceId = 'a4a99ec0-bb65-41f5-90d1-b857f4ebefb2', version = 'bfda41bd-2a55-4a80-9f22-2fc1aa89894c';
@@ -17,14 +18,16 @@ describe('ImportStore preserves the accepted version', () => {
     session.etag.set('"v-' + version + '"'); store = TestBed.inject(ImportStore);
     http.expectOne('/api/v1/capabilities').flush({ profileId: 'local', grammarVersion: '0.9', support: [], knownDifferences: [], limits: {} }); TestBed.tick(); http.expectOne(request => request.url.endsWith('/import-inspections')).flush({ active: null });
   });
-  afterEach(() => { vi.useRealTimers(); http.verify(); TestBed.resetTestingModule(); });
-  it('keeps coverage and context after a rejected multipart upload, with auth and version headers', async () => {
+  afterEach(() => { vi.useRealTimers(); TestBed.inject(UploadAttemptStore).clearAll(); http.verify(); TestBed.resetTestingModule(); });
+  it('keeps coverage and context after a rejected upload batch, with auth and version headers', async () => {
     http.expectOne((request) => request.url.endsWith('/rules')).flush(page); await Promise.resolve();
     store.catalog.set(new File(['catalog'], 'catalog.xlsx'));
     store.reports.set([new File(['report'], 'report.xlsx')]);
     const upload = store.inspect();
-    const request = http.expectOne((item) => item.method === 'POST' && item.url.endsWith('/import-inspections'));
-    expect(request.request.body).toBeInstanceOf(FormData); expect(request.request.headers.get('X-CE-Session')).toBe('memory-only');
+    let requests:ReturnType<HttpTestingController['match']>=[];
+    await vi.waitFor(()=>{requests=http.match(item=>item.method==='POST'&&item.url.endsWith('/upload-batches'));expect(requests).toHaveLength(1);});
+    const request=requests[0]!;
+    expect(request.request.body).not.toBeInstanceOf(FormData); expect(request.request.body.baseVersionId).toBe(version); expect(request.request.body.files).toHaveLength(2); expect(request.request.headers.get('X-CE-Session')).toBe('memory-only');
     expect(request.request.headers.get('If-Match')).toBe('"v-' + version + '"'); expect(request.request.headers.get('Idempotency-Key')).toMatch(/^[0-9a-f-]{36}$/);
     request.flush({ error: { message: 'La carga supera los límites admitidos.' } }, { status: 413, statusText: 'Too Large' }); await upload;
     expect(store.page()?.coverage.rows).toBe(3); expect(session.versionId()).toBe(version); expect(store.error()).toContain('límites'); expect(store.uploading()).toBe(false);

@@ -3,14 +3,14 @@
 <div class="context-row">
   <dl class="workspace-meta">
     <div><dt>Versión</dt><dd>{{ versionLabel(workspace, session.versionId()) }}</dd></div>
-    @if (workspace.contexts.length === 1 && session.selectedContext(); as context) {
+    @if (session.contextCount() === 1 && session.selectedContext(); as context) {
       <div><dt>Entidad</dt><dd>{{ context.entityId }}</dd></div>
       <div><dt>Periodo de referencia</dt><dd>{{ civilDate(context.referenceDate) }}</dd></div>
       <div><dt>Módulo</dt><dd>{{ context.moduleVersion }}</dd></div>
     }
     <div><dt>Archivos</dt><dd>{{ workspace.counts.sources }}</dd></div>
   </dl>
-  @if (workspace.contexts.length > 1) {
+  @if (session.contextCount() > 1) {
     <mat-form-field appearance="outline">
       <mat-label>Contexto</mat-label>
       <select #contextSelector matNativeControl id="context-selector" [ngModel]="session.selectedContextId()" (ngModelChange)="selectContext($event)">
@@ -19,6 +19,7 @@
         }
       </select>
     </mat-form-field>
+    @if(session.contextPagination.hasNext() || session.contextPagination.index()>0){<ce-cursor-paginator label="Páginas de contextos" [cursor]="session.contextPagination" [disabled]="session.contextsLoading()" (pageChange)="session.loadContexts($event)"/>}
   }
 </div>
 

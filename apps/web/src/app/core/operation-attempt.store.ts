@@ -1,9 +1,10 @@
 import { inject, Injectable, InjectionToken } from '@angular/core';
 import type { DownloadIntent } from '@ce/contracts';
+import { CONNECTION_CONFIG } from './connection-config';
 
 /** The hosted connection supplies frontend/API/profile identity; no bearer belongs in this key. */
 export const OPERATION_ATTEMPT_NAMESPACE = new InjectionToken<string>('CE operation attempt namespace', {
-  providedIn: 'root', factory: () => `${globalThis.location?.origin ?? 'local'}|local`,
+  providedIn: 'root', factory: () => inject(CONNECTION_CONFIG).namespace,
 });
 interface AttemptIdentity { readonly key: string; readonly etag: string; readonly operationId?: string; readonly jobId?: string }
 export interface ExportOperationAttempt extends AttemptIdentity { readonly operation: 'export'; readonly intent: DownloadIntent }

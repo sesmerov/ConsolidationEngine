@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatPaginatorModule } from '@angular/material/paginator';
+import { CursorPaginatorComponent } from '../shared/cursor-paginator.component';
 import type { CompactPreviewDTO, ProposalSelectionSummaryDTO } from '@ce/contracts';
 import { ApplyStore } from './apply.store';
 import { ExactValueComponent } from '../core/exact-value.component';
-@Component({ selector: 'ce-apply', standalone: true, imports: [MatButtonModule, MatCheckboxModule, MatPaginatorModule, ExactValueComponent], changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './apply.component.html' })
+@Component({ selector: 'ce-apply', standalone: true, imports: [MatButtonModule, MatCheckboxModule, CursorPaginatorComponent, ExactValueComponent], changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './apply.component.html' })
 export class ApplyComponent {
 readonly preview = input.required<CompactPreviewDTO | null>();
 readonly selection = input<ProposalSelectionSummaryDTO | null>(null); readonly selectionBusy = input(false);

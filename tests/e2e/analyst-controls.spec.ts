@@ -48,6 +48,7 @@ test('S01/S09/S13: single context/run/preview are readable and a second actual c
   await expect(page.getByRole('heading',{name:'Antecedentes de la propuesta',exact:true})).toBeVisible();
   await expect(page.getByLabel('Seleccionar antecedente FIN_TOTAL_CASH',{exact:true})).toBeChecked();
   await page.getByRole('button',{name:'Cerrar antecedentes',exact:true}).focus();await page.keyboard.press('Enter');await expect(antecedents).toBeFocused();
+  await page.getByRole('button',{name:'Revisar destinos',exact:true}).click();await expect(page.getByRole('button',{name:'Simular recálculos',exact:true})).toBeEnabled({timeout:60_000});
   await runAnalystAction(page,'/recalculation-operations','Simular recálculos');const previewSelector=page.getByLabel('Previsualización conservada',{exact:true});await expect(previewSelector.locator('option')).toHaveCount(2);
   await previewSelector.selectOption(simulated.resultRef.id);await expect(previewSelector).toHaveValue(simulated.resultRef.id);await expectNoTechnicalText(page);
 });
@@ -60,7 +61,8 @@ test('D05/C13: text and dates retain their evidence without a numeric disclosure
   for(const index of [0,4]){
     const trigger=triggers.nth(index);await trigger.focus();await page.keyboard.press('Enter');const detail=page.locator('ce-calculation-detail');
     await expect(detail.getByRole('heading',{name:/Cálculo y origen/})).toBeFocused();await expect(detail.locator('.calculation-explanation')).toHaveCount(0);
-    await expect(detail).toContainText('demo-types-report.xlsx');await expect(detail.getByRole('table',{name:'Entradas utilizadas',exact:true})).toBeVisible();
+    const origins=detail.getByRole('button',{name:/^Archivos y celdas de origen/});await origins.focus();await page.keyboard.press('Enter');await expect(detail).toContainText('demo-types-report.xlsx');
+    const reads=detail.getByRole('button',{name:/^Entradas utilizadas/});await reads.focus();await page.keyboard.press('Enter');await expect(detail.getByRole('table',{name:'Entradas utilizadas',exact:true})).toBeVisible();
     await detail.getByRole('button',{name:'Cerrar detalle',exact:true}).focus();await page.keyboard.press('Enter');await expect(trigger).toBeFocused();
   }
   await expectNoTechnicalText(page);

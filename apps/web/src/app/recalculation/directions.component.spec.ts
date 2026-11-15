@@ -92,4 +92,11 @@ describe('current-base destination decisions',()=>{
  });
  it('distinguishes missing validation and genuinely zero eligible candidates',async()=>{api.recalculationState.mockResolvedValue({...state,state:'needs_validation',compatibleRun:undefined,review:undefined,counts:null}); let f=await render(); expect(f.nativeElement.textContent).toContain('Ir a Validar'); expect(api.prepareDirectionReview).not.toHaveBeenCalled(); f.destroy();
  api.recalculationState.mockResolvedValue({...state,state:'no_candidates',review:{...ready,counts:{...counts,included:0,pending:0,conflicted:0,excluded:4},conflictGroupCount:0}}); f=await render(); expect(f.nativeElement.textContent).toContain('No hay recálculos disponibles'); expect(f.componentInstance.store.canSimulate()).toBe(false); });
+ it('keeps committed destinations on reads and prepares a new review only from its explicit action',async()=>{
+   api.recalculationState.mockResolvedValue({...state,state:'ready',review:{...ready,state:'committed',counts:{...counts,included:4,pending:0,conflicted:0},conflictGroupCount:0}});
+   api.prepareDirectionReview.mockResolvedValue({jobId:'explicit-review',kind:'prepare-directions',workspaceId:'workspace',baseVersionId:'base',status:'queued',progress:{completed:0,total:1,complete:false},diagnostics:[],pollAfterMs:60000});
+   const f=await render(),store=f.componentInstance.store;await store.recover();f.detectChanges();expect(api.prepareDirectionReview).not.toHaveBeenCalled();expect(api.directionReviewRows).not.toHaveBeenCalled();expect(f.nativeElement.textContent).toContain('Destinos usados en esta simulación.');
+   const button=Array.from((f.nativeElement as HTMLElement).querySelectorAll('button')).find(button=>button.textContent?.trim()==='Revisar destinos')!;store.operationLocked.set(true);f.detectChanges();expect(button.disabled).toBe(true);await store.reviewDestinations();expect(api.prepareDirectionReview).not.toHaveBeenCalled();
+   store.operationLocked.set(false);f.detectChanges();button.click();await f.whenStable();expect(api.prepareDirectionReview).toHaveBeenCalledOnce();expect(api.prepareDirectionReview.mock.calls[0]?.[1]).toEqual({baseVersionId:'base',validationBasisId:'basis',runId:'newer-run'});
+ });
 });

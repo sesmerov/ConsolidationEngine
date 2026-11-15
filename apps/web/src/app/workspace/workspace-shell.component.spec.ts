@@ -16,7 +16,7 @@ import { DirectionsStore } from '../recalculation/directions.store';
 import { ApplyStore } from '../recalculation/apply.store';
 import { ExportStore } from '../recalculation/export.store';
 import { OperationAttemptStore } from '../core/operation-attempt.store';
-import type { CompactPreviewDTO, JobDTO, ProposalSelectionSummaryDTO, ReportContext, ValidationResultsPageDTO } from '@ce/contracts';
+import type { CompactPreviewDTO, JobDTO, ProposalSelectionSummaryDTO, ReportContext, CompactResultsPageDTO } from '@ce/contracts';
 
 const workspace = { id: 'workspace', name: 'Cierre de prueba', state: 'ready' as const, currentVersionId: 'v1', versionIds: ['v0', 'v1'], contexts: [], counts: { snapshots: 1, coordinates: 2, facts: 2, sources: 2 }, sessionBytes: 1 };
 const domesticContext: ReportContext = {
@@ -25,7 +25,7 @@ const domesticContext: ReportContext = {
 };
 const consolidatedContext: ReportContext = { ...domesticContext, contextId: 'consolidado', canonicalContextKey: 'scope-2' };
 const summary = { complete: true, rows: 0, variants: 0, instances: 0, duplicateRows: 0, applicableVariants: 0, byStatus: { pass: 0, fail: 0, error: 0, not_applicable: 0, not_evaluable: 0 } };
-const page = { items: [], total: 0, nextCursor: null, versionId: 'v1', configuredDirections: [], run: { id: 'run', versionId: 'v1', profileId: 'profile', status: 'completed', startedAt: '2026-11-04', diagnostics: [], summary, resultIds: [] } } as ValidationResultsPageDTO;
+const page:CompactResultsPageDTO = { workspaceId:workspace.id,items: [], total: 0, nextCursor: null, versionId: 'v1', run: { workspaceId:workspace.id,id: 'run', versionId: 'v1',validationBasisId:'basis', profileId: 'profile', status: 'completed', startedAt: '2026-11-04', diagnosticsCount:0, summary } };
 const preview = { id: 'preview', baseVersionId: 'v1', state: 'ready', createdAt: '2026-11-04', diagnosticCount: 0, graphSummary: { nodes: 0, edges: 0, blocked: 0, cycleCount: 0, conflictCount: 0 } } as CompactPreviewDTO;
 const selection: ProposalSelectionSummaryDTO = { id: 'selection', workspaceId: workspace.id, previewId: preview.id, baseVersionId: 'v1', revision: 1, state: 'ready', availableCount: 1, selectedCount: 1, requiredCount: 0, complete: true, closureHash: 'one' };
 describe('workspace navigation keeps one active stage', () => {

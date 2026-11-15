@@ -5,6 +5,7 @@
 @if (store.looking() || store.pending() || store.review()?.state === 'preparing') { <p role="status">Preparando las decisiones de recálculo…</p> }
 @if (store.state(); as state) {
  @if (state.state === 'needs_validation') { <p>Valida los informes para conocer las celdas que se pueden recalcular.</p><button mat-stroked-button (click)="store.navigate('validation')">Ir a Validar</button> }
+ @else if (store.review()?.state === 'committed') { <p>Destinos usados en esta simulación.</p><button mat-stroked-button (click)="store.reviewDestinations()" [disabled]="!store.canReviewDestinations()">Revisar destinos</button> }
  @else if (state.state === 'no_candidates') { <p>No hay recálculos disponibles</p><button mat-stroked-button (click)="store.navigate('exports')">Ir a Descargar</button> }
  @else if (store.review(); as review) {
   @if (review.state === 'ready' && !store.expired() && !store.historical()) {
@@ -35,7 +36,7 @@
                   <mat-radio-button [value]="null">No recalcular esta celda</mat-radio-button>
                 </mat-radio-group>
                 @if (store.selectedOutsidePage()) { <p role="status">La regla elegida está en otra página: {{ editor.code }}.</p> }
-                @if (store.candidates(); as candidates) { <mat-paginator aria-label="Páginas de reglas candidatas" [length]="candidates.total" [pageSize]="50" [pageIndex]="store.candidatesPagination.index()" [hidePageSize]="true" [disabled]="store.busy() || store.uncertain()" (page)="store.loadCandidates($event.pageIndex)"/> }
+                @if (store.candidates(); as candidates) { <ce-cursor-paginator label="Páginas de reglas candidatas" [cursor]="store.candidatesPagination" [disabled]="store.busy() || store.uncertain()" (pageChange)="store.loadCandidates($event)"/> }
                 @if (store.candidateDetailLoading()) { <p role="status">Consultando la regla completa…</p> }
                 @if (store.candidateDetail(); as detail) { <section class="candidate-detail" role="region" [attr.aria-label]="'Regla ' + detail.candidate.code"><h4 [id]="candidateHeadingId(detail.candidate.instanceId)" tabindex="-1" ceStageTitle>{{ detail.candidate.code }}</h4><p class="candidate-expression">{{ detail.expression }}</p>@if (detail.precondition) { <p>Precondición</p><p class="candidate-expression">{{ detail.precondition }}</p> }@for (description of detail.descriptions; track $index) { <p>{{ description.description }}</p><p class="muted">{{ description.sourceLabel }}</p> }<button mat-button (click)="closeCandidate()">Cerrar regla</button></section> }
                 <div class="choice-actions"><button mat-stroked-button (click)="confirmChoice($event)" [disabled]="!store.hasUnsavedChoice() || !store.editable()">Confirmar elección</button><button mat-button (click)="cancelChoice($event)" [disabled]="store.pending() || store.uncertain()">Cancelar</button></div>
@@ -46,7 +47,7 @@
             }
           </section>
         }
-        @if (store.groups(); as groups) { @if (groups.total > 50) { <mat-paginator aria-label="Páginas de decisiones por celda" [length]="groups.total" [pageSize]="50" [pageIndex]="store.groupsPagination.index()" [hidePageSize]="true" [disabled]="store.busy() || store.hasUnsavedChoice() || store.uncertain()" (page)="store.loadGroups($event.pageIndex)"/> } }
+        @if (store.groups(); as groups) { @if (store.groupsPagination.hasNext() || store.groupsPagination.index() > 0) { <ce-cursor-paginator label="Páginas de decisiones por celda" [cursor]="store.groupsPagination" [disabled]="store.busy() || store.hasUnsavedChoice() || store.uncertain()" (pageChange)="store.loadGroups($event)"/> } }
         @if (store.hasUnsavedChoice()) { <p class="notice" role="status">Confirma o cancela la elección pendiente antes de simular o cambiar de etapa.</p> }
         @if (store.rows(); as rows) {
           @if (store.configurable().length) {
@@ -88,7 +89,7 @@
             </section>
           }
           @if (!rows.total) { <p>No hay decisiones que coincidan con este filtro.</p> }
-          <mat-paginator aria-label="Páginas de destinos" [length]="rows.total" [pageSize]="50" [pageIndex]="store.pagination.index()" [hidePageSize]="true" [disabled]="store.busy()" (page)="store.loadRows($event.pageIndex)"/>
+          <ce-cursor-paginator label="Páginas de destinos" [cursor]="store.pagination" [disabled]="store.busy()" (pageChange)="store.loadRows($event)"/>
         }
 
     @if (store.pendingCount()) { <p class="notice">Resuelve u omite las decisiones pendientes antes de simular.</p> }

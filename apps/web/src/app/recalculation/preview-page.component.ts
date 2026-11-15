@@ -7,7 +7,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatTableModule } from '@angular/material/table';
-import { MatPaginatorModule } from '@angular/material/paginator';
+import { CursorPaginatorComponent } from '../shared/cursor-paginator.component';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { versionLabel } from '../core/display';
 import { ExactValueComponent } from '../core/exact-value.component';
@@ -17,7 +17,7 @@ import { DirectionsComponent } from './directions.component';
 import { ApplyComponent } from './apply.component';
 import { ComparisonComponent } from './comparison.component';
 import type { ProposalSelectionRowDTO } from '@ce/contracts';
-@Component({ selector: 'ce-preview-page', standalone: true, imports: [DirectionsComponent, StageTitleDirective, FormsModule, DatePipe, MatButtonModule, MatFormFieldModule, MatInputModule, MatTableModule, MatPaginatorModule, MatCheckboxModule, ExactValueComponent, ProposalExplanationComponent, ApplyComponent, ComparisonComponent], changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './preview-page.component.html' })
+@Component({ selector: 'ce-preview-page', standalone: true, imports: [DirectionsComponent, StageTitleDirective, FormsModule, DatePipe, MatButtonModule, MatFormFieldModule, MatInputModule, MatTableModule, CursorPaginatorComponent, MatCheckboxModule, ExactValueComponent, ProposalExplanationComponent, ApplyComponent, ComparisonComponent], changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './preview-page.component.html' })
 export class PreviewPageComponent implements DoCheck {
 readonly store = inject(PreviewStore); readonly session = this.store.session; readonly versionLabel = versionLabel;
 readonly showApplied = signal(false); readonly invert = (value: boolean) => !value;
