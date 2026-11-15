@@ -46,11 +46,11 @@ y [su JSON](../specs/002-ui-eba-demo/contracts/demo-corpus.json).
 Sin editar el ejemplo, se esperan **7 reglas que pasan, 8 que fallan y 1 que no aplica**.
 Los fallos son casos de demostración, no una señal de que los archivos estén dañados.
 
-En **Validar**, pulsa **Preparar revisión de destinos**. Revisa los dos grupos en conflicto:
+Ve a **Recalcular**. Al inicio, **Elegir qué celdas recalcular** prepara los destinos y muestra las decisiones pendientes. Revisa los dos grupos en conflicto:
 
 1. En r0070, elige **v0174_m** en las opciones y pulsa **Confirmar elección**. Puedes revisar la decisión con **Cambiar elección**. `DEMO_RANGE` y `DEMO_PRECONDITION` también podrían escribir en esa celda y quedan omitidas.
 2. En r0200, elige **No recalcular esta celda** y pulsa **Confirmar elección** para excluir de la configuración tanto `DEMO_ZERO` como `DEMO_INTERVAL`.
-3. Comprueba **5 incluidas, 4 omitidas y 7 excluidas** de 16 reglas. Pulsa **Guardar configuración**. Se publica la configuración que se usará para simular. El cambio en los importes es posterior, cuando selecciones propuestas y confirmes su aplicación.
+3. Quedan **5 incluidas, 4 omitidas y 7 excluidas** de16 reglas. Cuando no haya decisiones pendientes, pulsa **Simular recálculos**: guarda la configuración y prepara las propuestas en una operación. Los importes solo cambian después de seleccionar propuestas y confirmar su aplicación.
 
 | Regla | Destino C_01.00, columna 0010 | Anterior → propuesto (EUR) |
 |---|---|---|
@@ -60,7 +60,7 @@ En **Validar**, pulsa **Preparar revisión de destinos**. Revisa los dos grupos 
 | v0175_m | Fila 0130 | 20,00 → 100,00 |
 | v0172_m | Fila 0020 | 1.000,00 → 285,00 |
 
-En **Recalcular**, pulsa **Simular recálculos**. El ordenamiento de Kahn respeta dos
+La simulación utiliza el ordenamiento de Kahn y respeta dos
 ramas con tres niveles:
 
 ```text
@@ -125,9 +125,8 @@ el módulo es un alias local, no una denominación oficial de remisión XBRL.
 
 1. Carga el catálogo y el informe FINREP en un conjunto propio, conservando el contexto
    del libro. Confirma la carga y sigue el realce de **Validar**.
-2. Valida: aparecen **2 reglas que pasan y 3 que fallan**. Las dos igualdades tienen
-   un único destino disponible; guarda su configuración.
-3. Sigue el realce de **Recalcular** y simula. Ambas propuestas comienzan seleccionadas.
+2. Valida: aparecen **2 reglas que pasan y 3 que fallan**.
+3. Sigue el realce de **Recalcular**. Las dos igualdades tienen un único destino disponible, elegido automáticamente; simula sin guardar una configuración por separado. Ambas propuestas comienzan seleccionadas.
    Revisa **90 → 100** para efectivo y **105 → 120** para el total de activos del ejemplo.
    La segunda lee el efectivo ya propuesto: **100 + 20 = 120**.
 4. Confirma la selección y aplica. La validación pasa a **4 reglas que pasan y 1 que falla**.
@@ -189,7 +188,7 @@ oficiales de remisión.
 
 **Resultados de validación** permite elegir una ejecución de esa versión. Una ejecución
 incompleta conserva su aviso y estado. Desde Validar, **Descargar resultados de esta
-ejecución** usa la ejecución visible y su propia versión. Repetir esa descarga sólo
+ejecución** lleva a Descargar con la ejecución visible y su propia versión. Repetir esa descarga sólo
 reutiliza un paquete que coincide en versión y ejecución.
 
-Tras aplicar cambios, sigue el realce de la etapa **Descargar**. **Descargar informes aplicados** identifica la versión nueva del recibo y conserva la elección histórica del selector. También puedes usar **Descargar esta versión** desde la comparación. El último paquete disponible muestra la versión que contiene.
+Tras aplicar cambios, sigue el realce de **Descargar**. Elige versión y contenido y utiliza el único botón de descarga. Ese botón prepara el paquete, descarga sus bytes o reintenta la misma transferencia según su estado; conserva la versión que hayas elegido. La comparación de Recalcular no ofrece descargas. Para cambiar los destinos de una simulación, utiliza **Revisar destinos** de forma explícita.

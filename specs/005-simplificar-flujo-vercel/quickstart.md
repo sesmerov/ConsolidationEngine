@@ -1,15 +1,15 @@
-# Guía de validación prevista — 005
+# Guía de validación — 005
 
-Esta guía describe la comprobación **después de implementar** el plan. No acredita ejecución, despliegue o capacidad actuales. Los comandos nuevos indicados abajo deberán crearse durante la implementación; no se han instalado dependencias ni iniciado servicios en esta fase. README se actualizará al terminar el recorrido y sus comprobaciones.
+Esta guía permite repetir la comprobación de la implementación. Los comandos están disponibles; sus resultados y límites se registran en [verification-005.md](../../docs/verification-005.md). Las pruebas locales con adaptadores controlados no acreditan un despliegue real en Vercel.
 
 ## Preparación local
 
 1. Checkout del proyecto, Node 24.22.2/npm 11.19.1 y Java ≥ 11 según herramientas fijadas. Conservar originales EBA, manifiestos y hashes. Para comprobar empaquetado Vercel, disponer también de entorno Linux aislado.
 2. PostgreSQL 17 real de pruebas, separado de datos de usuario: Docker autorizado o `TEST_DATABASE_URL` proporcionada. Que `docker.exe` exista no demuestra que funcione su daemon; comprobarlo antes. No se necesita contratar Neon para integración local.
 3. Claves de prueba independientes, incluida `CE_CURSOR_SIGNING_KEY` compartida por ambas instancias; fixtures de firma QStash y almacén privado controlado. Nunca usar secretos de producción ni guardarlos en Git, capturas o logs.
-4. Puertos de prueba propuestos:3350 frontend, 3351/3352 instancias API, 3353 cola controlada, 3354 objetos privados. Verificar que los procesos y carpetas temporales pertenecen al arnés; no reutilizar ni cerrar el servidor del usuario en 3340.
+4. El arnés hosted usa3350 frontend,3351 origen API balanceado,3352/3353 instancias API y3354 control de prueba. El navegador local usa3318; el benchmark3317. Cada arnés comprueba propiedad y cierra sus recursos; no reutilizar ni cerrar el servidor del usuario en3340.
 
-Comandos existentes de referencia, a ejecutar cuando estén implementados los cambios:
+Comandos de construcción y comprobación local (con la herramienta aislada instalada):
 
 ```powershell
 & scripts/run-with-toolchain.ps1 -NpmArguments @('ci')
@@ -18,9 +18,9 @@ Comandos existentes de referencia, a ejecutar cuando estén implementados los ca
 & scripts/run-with-toolchain.ps1 -NpmArguments @('test')
 ```
 
-Contratos de scripts **nuevos previstos**, todavía no disponibles por este plan:
+Comandos de integración y empaquetado disponibles:
 
-| Comando futuro | Qué debe hacer |
+| Comando | Qué comprueba |
 | --- | --- |
 | `npm run test:hosted` | Crear esquema SQL aislado, cola/objetos controlados y dos instancias; ejecutar integración y contratos, cerrar únicamente recursos propios. Sin servicios comerciales. |
 | `npm run test:e2e:hosted` | Frontend/API en orígenes distintos; Chromium con dos visitantes y escenarios del flujo. |
@@ -28,7 +28,9 @@ Contratos de scripts **nuevos previstos**, todavía no disponibles por este plan
 | `npm run test:package:linux` | Verificar Node/Java efectivos, ocho generados, workers/ANTLR/assets y ejecución sin archivos del checkout original. |
 | `npm run test:capacity:hosted` | Medir casos máximos, RSS agregado, temporales, cuotas, cancelación y deadline; guardar entradas, hashes, entorno y resultados sin ocultar fallos. |
 
-Las suites locales existentes continúan probando memoria/archivos; las nuevas deben usar PostgreSQL real para acreditar transacciones. Adaptadores controlados de QStash/Blob reproducen pérdidas, duplicados y carreras, pero no se presentarán como pruebas reales de los proveedores.
+Las suites locales prueban memoria/archivos; `test:hosted` utiliza PostgreSQL real para acreditar transacciones. Los adaptadores controlados de QStash/Blob reproducen pérdidas, duplicados y carreras sin contactar con proveedores. Docker Desktop debe estar operativo; las imágenes fijadas por digest deben estar presentes (el arnés SQL usa `--pull=never`).
+
+Para la búsqueda: `npm run test:e2e -- tests/e2e/catalog-search.spec.ts`. Para el benchmark local: `npm run bench -- --prepare .cache/benchmark/005-reference`, después `--pilot` y `--cohort` con ese directorio; usar uno nuevo si la referencia ya existe. El criterio exige diez ejecuciones auditadas, nueve≤30s y todas≤60s. No ejecutar otros arneses pesados a la vez. La medida de capacidad alojada se realiza aparte mediante `test:capacity:hosted`.
 
 ## A. Foco y guía visual
 
@@ -39,7 +41,7 @@ En 320/390/1440 px: navegar con ratón y luego Tab/Enter; abrir «Ver informes y
 1. Completar carga/validación COREP; entrar directamente en Recalcular y comprobar título exacto, destinos inequívocos automáticos y solo decisiones pendientes.
 2. En el recorrido guiado COREP elegir `v0174_m` para fila 0070 y omitir fila 0200; comprobar que no quedan pendientes. En un caso `A=B` elegir lado u omitir; en grupos de 2, 3 y 51 productores comprobar páginas, editor y omisiones.
 3. Entrar/recargar diez veces: mismos datos y versión, elecciones conservadas. Cambiar solo configuración mantiene base de validación y no exige validar otra vez.
-4. Simular una vez publica configuración cambiada, preview y selección inicial juntos. Interrumpir antes del commit: versión/importes intactos y borrador conservado. Perder respuesta tras commit y repetir clave: mismo recibo/IDs, sin otra versión.
+4. Simular una vez publica configuración cambiada, preview y selección inicial juntos. Consultar de nuevo conserva la revisión confirmada; «Revisar destinos» inicia otra revisión de forma explícita. Interrumpir antes del commit: versión/importes intactos y borrador conservado. Perder respuesta tras commit y repetir clave: mismo recibo/IDs, sin otra versión.
 5. Cambiar datos invalida ejecución/revisión; un histórico seleccionado en Validar no sirve para otra base. Sin ejecución compatible, ir a Validar; sin candidatos, ir a Descargar sin configuración vacía.
 6. Selección y aplicación mantienen dependencias fuera de página, reintento idéntico y consentimiento invalidado al editar; condicionales/texto/fecha/desigualdades no ofrecen recálculo.
 
@@ -55,7 +57,7 @@ Fallos de transferencia reintentan el artefacto existente; una respuesta tardía
 
 Abrir contextos de navegador A/B sin compartir sessionStorage. Crear tokens/nonce antes del POST; perder su respuesta y repetir: misma sesión. Reusar nonce con otro token o token con otro nonce: conflicto; repetir una sesión cerrada no la revive. Los secretos no aparecen en URLs/logs.
 
-Alternar peticiones autenticadas de la misma sesión entre 3351/3352 manteniendo el mismo perfil público; ambas comparten PostgreSQL, objetos y clave de cursor. No cambiar baseURL de la aplicación para simular una instancia, pues eso deliberadamente cambia su namespace de sesión. Probar conjunto, trabajo, parte, histórico, explicación, contexto, cursor y descarga ajenos: sin acceso ni filtración de existencia. Recargar la pestaña conserva trabajo vigente.
+Alternar peticiones autenticadas de la misma sesión entre3352/3353 a través del origen3351 manteniendo el mismo perfil público; ambas comparten PostgreSQL, objetos y clave de cursor. No cambiar baseURL de la aplicación para simular una instancia, pues eso deliberadamente cambia su namespace de sesión. Probar conjunto, trabajo, parte, histórico, explicación, contexto, cursor y descarga ajenos: sin acceso ni filtración de existencia. Recargar la pestaña conserva trabajo vigente.
 
 Con dos orígenes autorizados comprobar preflight y petición real de lectura, POST/PATCH, fragmento, polling, error y descarga; rechazar un tercer origen. No usar cookies de terceros ni bypass secreto en frontend. Abrir/recargar directamente rutas del frontend sin404 y sin ocultar404 de assets inexistentes.
 
@@ -78,4 +80,4 @@ Regresiones guiadas: COREP 7/8/1→14/1/1 con sus cinco recálculos previstos; F
 
 Solo tras autorización y provisión, contrastar configuración contra cuotas vigentes de Hobby/Neon/QStash/Blob, variables y costes compartidos; publicar y probar dos proyectos, versiones efectivas Node/Java, rutas, firmas, instancias, CORS/previews, archivos grandes y limpieza. Registrar permisos/servicios que falten como **alojamiento real pendiente**, nunca como prueba aprobada ni como servicio a contratar automáticamente.
 
-Después del producto estable y sus verificaciones, capturar las cuatro etapas con datos sintéticos, versionar imágenes portables y actualizar README como último trabajo funcional: introducción < 10 líneas, SDD mediante Spec Kit enlazado a `specs/`, tecnologías/setup, dos diagramas Mermaid, alcance y evidencia local/real pendiente. La aceptación humana SC-010 de 004 sigue independiente. Esta guía de 005 no declara pruebas ejecutadas ni aceptación del usuario.
+Después del producto estable y sus verificaciones, capturar las cuatro etapas con datos sintéticos, versionar imágenes portables y actualizar README como último trabajo funcional: introducción < 10 líneas, SDD mediante Spec Kit enlazado a `specs/`, tecnologías/setup, dos diagramas Mermaid, alcance y evidencia local/real pendiente. La aceptación humana SC-010 de 004 sigue independiente. Las pruebas ejecutadas están en verification-005.md; esta guía no declara aceptación humana.

@@ -1,6 +1,6 @@
 # Inventario de controles — iteración 005
 
-Fecha: 2026-11-08. Base: [contrato UI](../specs/005-simplificar-flujo-vercel/contracts/ui.md) y cambios locales US1–US4. **Comprobación funcional local completada; integración alojada y revisión final T100 pendientes.**
+Actualizado:2026-11-16. Base: [contrato UI](../specs/005-simplificar-flujo-vercel/contracts/ui.md), US1–US4 y proyecciones compactas/sesión pública. **Revisión T100 local completada**, con282pruebas Angular, analyst-controls y workflow-guidance. Los recorridos alojados y sus límites se registran aparte en [verification-005.md](verification-005.md).
 
 Un tipo repetido por cada regla, fila o informe se cuenta una vez. Hay **17 tipos de selectores y 11 tipos de desplegables**; casillas, radios y acciones de apertura se inventarían aparte. T052 completa resultados locales y T100 reconcilia controles nuevos de la demo pública. No eliminar una fila del inventario para ocultar un caso pendiente: registrar su eliminación y la prueba correspondiente.
 
@@ -69,9 +69,9 @@ Las rutas de las tablas son relativas a `apps/web/src/app/`. Para cada control c
 | C17 | Preparar revisión / Guardar configuración — `recalculation/directions.component.html` | Retirar pasos manuales inequívocos; preparación automática al entrar, una acción Simular y resumen de decisiones. | RETIRADO preparar/guardar manual: preview-operation y recalculation-decisions diez entradas sin versiones; un comando Simular recuperable. |
 | C18 | Descargas del conjunto — `validation/results-export.component.ts`, `recalculation/comparison.component.html`, `recalculation/exports.component.html` | Centralizar en Descargar con único botón por estado y Cancelar distinto; ninguna descarga rápida o repetir paquete secundaria. Demos/plantillas de Cargar se conservan. | PASS: exports.component botón único/FSM, download-intent/roundtrip/FINREP; comparación ya no descarga. |
 
-## Registro final pendiente
+## Criterio del registro
 
-Al completar T052/T100 sustituir cada estado pendiente por resultado, nombre de caso ejecutado y enlace a evidencia. Para una eliminación, verificar además que sigue accesible toda información que cambia una decisión. Registrar por separado controles nuevos de aviso de sesión, recuperación y valores paginados; no declararlos incluidos en el conteo inicial hasta inventariarlos. No confundir este inventario con aceptación humana de004 ni005.
+Cada control conserva el resultado y el caso que lo acredita. Las eliminaciones mantienen accesible la información que cambia una decisión. Los controles de sesión, recuperación y valores paginados se añaden como N01–N09, separados del conteo inicial. Este inventario acredita comprobación automática, no aceptación humana de004 ni005.
 
 ## Controles incorporados a la proyección compacta (2026-11-16)
 
@@ -89,9 +89,9 @@ Los 17 selectores y 11 desplegables anteriores son el inventario inicial. Los co
 | N08 | Intervalo del valor — `shared/result-value.component.ts` | Nuevo desplegable opcional para valores numéricos con intervalo; texto/fecha no muestran este control. Se suma al inventario de desplegables, sin sustituir el acceso a origen. |
 | N09 | Revisar destinos después de simular — `recalculation/directions.component.html` | La revisión ya usada permanece de solo lectura. Una nueva revisión requiere este botón explícito; una actualización de página no inicia otro trabajo ni borra la aceptación. `directions.component` comprueba ausencia de POST al consultar y guarda de operación activa; `proposal-selection.store` bloquea la aceptación mientras se recuperan decisiones y conserva consentimiento en una lectura equivalente. |
 
-Revalidación Angular actual: **34 archivos / 279 pruebas PASS**. La evidencia anterior permanece identificada como histórica; el recorrido de navegador local y la integración alojada se registran aparte en la verificación de 005. Ninguna de estas pruebas equivale a aceptación humana.
+Revalidación Angular actual: **34 archivos / 282 pruebas PASS**. La evidencia anterior permanece identificada como histórica; el recorrido de navegador local y la integración alojada se registran aparte en la verificación de 005. Ninguna de estas pruebas equivale a aceptación humana.
 
 
 ## Alcance de la evidencia local
 
-Las referencias de cada fila se resuelven en apps/web/src/app/ o tests/e2e/. Resultados y repeticiones están en [verification-005.md](verification-005.md). La ejecución global Angular tuvo205PASS y un fixture corregido después (14/14focal); las ampliaciones directions finalizaron13/13. De23E2E ampliados,17pasaron inicialmente y los seis afectados pasaron tras corregir producto/helpers. COREP, tipos y FINREP completaron el flujo a320/390/1440. Esto no se extiende automáticamente a cada combinación de control/anchura/modalidad; T100 revalida la matriz completa tras los nuevos controles de sesión y paginación alojada.
+Las referencias de cada fila se resuelven en apps/web/src/app/ o tests/e2e/. Resultados y repeticiones están en [verification-005.md](verification-005.md). La ejecución global Angular tuvo205PASS y un fixture corregido después (14/14focal); las ampliaciones directions finalizaron13/13. De23E2E ampliados,17pasaron inicialmente y los seis afectados pasaron tras corregir producto/helpers. COREP, tipos y FINREP completaron el flujo a320/390/1440. Esto no se extiende automáticamente a cada combinación de control/anchura/modalidad; La revalidación T100 actual consta de282pruebas Angular, analyst-controls3/3, workflow-guidance5/5 y los recorridos COREP/tipos7/7 y FINREP3/3; la evidencia alojada permanece separada.
