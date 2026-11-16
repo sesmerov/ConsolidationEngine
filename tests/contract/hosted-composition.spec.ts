@@ -15,6 +15,12 @@ it('composes two actual APIs with shared SQL and request-local owners, without g
     expect(app.hasDecorator('ce')).toBe(false);
     const bootstrap = await app.inject('/api/v1/bootstrap'); expect(bootstrap.statusCode).toBe(200);
     expect(bootstrap.json()).toMatchObject({ mode: 'hosted' }); expect(bootstrap.json()).not.toHaveProperty('sessionToken');
+    // Vercel routing must not inject a named capture as query; public schemas stay strict.
+    for (const query of ['?path=bootstrap', '?unexpected=sentinel']) {
+      const rejected = await app.inject('/api/v1/bootstrap' + query);
+      expect(rejected.statusCode).toBe(400);
+      expect(rejected.json().error.code).toBe('INVALID_REQUEST');
+    }
   }
   const visitor = async (app: typeof first) => {
     const token = randomBytes(32).toString('base64url'), headers = { origin, 'x-ce-session': token };

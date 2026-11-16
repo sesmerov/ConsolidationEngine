@@ -59,7 +59,7 @@ describe('Vercel API packaging', () => {
     expect(config.functions['api/index.ts']).toEqual({ maxDuration: 120,
       includeFiles: '{dist/**,../../packages/contracts/dist/**,../../packages/contracts/package.json,../../packages/engine/dist/**,../../packages/engine/package.json}' });
     expect(config.rewrites).toEqual([
-      { source: '/api/v1/:path*', destination: '/api/index' }, { source: '/internal/:path*', destination: '/api/index' },
+      { source: '/api/v1/(.*)', destination: '/api/index' }, { source: '/internal/(.*)', destination: '/api/index' },
     ]);
     expect(config.functions['api/index.ts']).not.toHaveProperty('memory');
     expect(config.installCommand).toContain('npm@11.19.1 ci --engine-strict=false');
