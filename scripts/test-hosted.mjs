@@ -7,21 +7,26 @@ import { fileURLToPath } from 'node:url';
 const execute = promisify(execFile);
 const root = fileURLToPath(new URL('../', import.meta.url));
 const ownership = randomUUID();
-const image = 'postgres@sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f';
+const postgresMajor = process.env.TEST_POSTGRES_MAJOR ?? '17';
+const postgresImages = Object.freeze({
+  '17': 'postgres@sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f',
+  '18': 'postgres@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336',
+});
 let containerId, child, creationAttempted = false, interrupted = false;
 async function docker(args, options = {}) {
   return execute('docker', args, { cwd: root, windowsHide: true, timeout: 30_000, maxBuffer: 1024 * 1024, ...options });
 }
 async function provision() {
+  if (!Object.hasOwn(postgresImages, postgresMajor)) throw new Error('TEST_POSTGRES_MAJOR must be 17 or 18.');
   if (process.env.TEST_DATABASE_URL) return process.env.TEST_DATABASE_URL;
   try { await docker(['info', '--format', '{{.ServerVersion}}']); }
-  catch { throw new Error('Hosted tests require a reachable PostgreSQL 17 TEST_DATABASE_URL or Docker Desktop. No SQL mock or skipped PASS is available.'); }
+  catch { throw new Error('Hosted tests require a reachable PostgreSQL 17/18 TEST_DATABASE_URL or Docker Desktop. No SQL mock or skipped PASS is available.'); }
   const password = randomBytes(32).toString('base64url');
   try {
     creationAttempted = true;
     const result = await docker(['run', '--detach', '--rm', '--pull=never', '--name', `ce-hosted-${ownership}`,
       '--label', `ce.hosted-test-owner=${ownership}`, '--publish', '127.0.0.1::5432',
-      '--env', 'POSTGRES_PASSWORD', '--env', 'POSTGRES_USER=ce_test', '--env', 'POSTGRES_DB=ce_test', image],
+      '--env', 'POSTGRES_PASSWORD', '--env', 'POSTGRES_USER=ce_test', '--env', 'POSTGRES_DB=ce_test', postgresImages[postgresMajor]],
     { env: { ...process.env, POSTGRES_PASSWORD: password } });
     containerId = result.stdout.trim();
     if (!/^[a-f0-9]{64}$/.test(containerId)) throw new Error();
@@ -29,12 +34,13 @@ async function provision() {
     if (!/^127\.0\.0\.1:\d+$/.test(endpoint)) throw new Error();
     for (let attempts = 0; attempts < 60; attempts++) {
       try { await docker(['exec', containerId, 'pg_isready', '--host=127.0.0.1', '--username=ce_test', '--dbname=ce_test']);
-        console.log('Hosted tests: owned PostgreSQL 17 container ready; each suite uses an isolated schema.');
+        const actualVersion = (await docker(['exec', containerId, 'postgres', '--version'])).stdout.trim();
+        console.log(`Hosted tests: owned ${actualVersion} container ready; each suite uses an isolated schema.`);
         return `postgresql://ce_test:${password}@${endpoint}/ce_test`;
       } catch { await delay(250); }
     }
-  } catch { throw new Error('Could not prepare the owned PostgreSQL 17 test container. Install/pull the pinned image or provide TEST_DATABASE_URL.'); }
-  throw new Error('Owned PostgreSQL 17 did not become ready within the test startup deadline.');
+  } catch { throw new Error(`Could not prepare the owned PostgreSQL ${postgresMajor} test container. Install/pull the pinned image or provide TEST_DATABASE_URL.`); }
+  throw new Error(`Owned PostgreSQL ${postgresMajor} did not become ready within the test startup deadline.`);
 }
 async function cleanup() {
   if (!containerId && creationAttempted) {

@@ -100,6 +100,10 @@ describe('Vercel web packaging', () => {
     expect(config.outputDirectory).toBe('.vercel-dist/browser');
     expect(config.installCommand).toBe('cd ../.. && npx --yes npm@11.19.1 ci --engine-strict=false');
     expect(config.buildCommand).toBe('cd ../.. && npx --yes npm@11.19.1 run package:vercel:web');
+    const manifest = JSON.parse(await readFile(new URL('../../apps/web/package.json', import.meta.url), 'utf8'));
+    const lock = JSON.parse(await readFile(new URL('../../package-lock.json', import.meta.url), 'utf8'));
+    expect(manifest.engines).toEqual({ node: '24.x' });
+    expect(lock.packages['apps/web'].engines).toEqual(manifest.engines);
     // The app changes stages in memory; it does not implement URL routes for them.
     expect(config.rewrites).toEqual([{ source: '/', destination: '/index.html' }]);
     for (const url of ['/missing.js', '/assets/missing.svg', '/api/v1/session', '/validar', '/does-not-exist']) {

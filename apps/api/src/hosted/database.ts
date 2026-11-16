@@ -16,6 +16,12 @@ export function validatedSchemaName(schema: string): string {
   return schema;
 }
 
+export function assertSupportedPostgresVersion(version: string): void {
+  if (!/^\d{6}$/.test(version) || ![17, 18].includes(Math.floor(Number(version) / 10_000))) {
+    throw new Error('PostgreSQL 17 or 18 is required for the authority schema');
+  }
+}
+
 /** Small authority transactions only. Release the client before network I/O or worker execution. */
 export class HostedDatabase implements DatabaseTransaction {
   readonly schema: string;
@@ -67,7 +73,7 @@ export class HostedDatabase implements DatabaseTransaction {
     await this.transaction(async tx => {
       await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`ce-migrate:${this.schema}`]);
       const version = (await tx.query<{ server_version_num: string }>('SHOW server_version_num')).rows[0]!.server_version_num;
-      if (Number(version) < 170000 || Number(version) >= 180000) throw new Error('PostgreSQL 17 is required for the verified authority schema');
+      assertSupportedPostgresVersion(version);
       await tx.query(`CREATE SCHEMA IF NOT EXISTS "${this.schema}"`);
       await tx.query(`CREATE TABLE IF NOT EXISTS schema_migrations (version integer PRIMARY KEY CHECK(version>0), checksum text NOT NULL CHECK(length(checksum)=64), applied_at timestamptz NOT NULL DEFAULT now())`);
       const previous = await tx.query<{ version: number; checksum: string }>('SELECT version,checksum FROM schema_migrations ORDER BY version');

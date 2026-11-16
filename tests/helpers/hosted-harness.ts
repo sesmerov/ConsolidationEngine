@@ -31,7 +31,7 @@ export interface HostedHarness {
   createApis<T extends Closeable>(factory: (dependencies: HostedInstanceDependencies) => Promise<T>): Promise<readonly [T, T]>;
   close(): Promise<void>;
 }
-/** TEST_DATABASE_URL is supplied by scripts/test-hosted.mjs or an explicitly provisioned PostgreSQL 17. */
+/** TEST_DATABASE_URL is supplied by scripts/test-hosted.mjs or an explicitly provisioned PostgreSQL 17/18. */
 export async function createHostedHarness(options: { readonly databaseUrl?: string; readonly now?: number } = {}): Promise<HostedHarness> {
   const databaseUrl = options.databaseUrl ?? process.env['TEST_DATABASE_URL'];
   if (!databaseUrl) throw new Error('TEST_DATABASE_URL is required. Run npm run test:hosted; SQL cannot be replaced with a mock or skipped PASS.');

@@ -70,7 +70,7 @@ Capturas reales de la demo COREP con datos sintéticos, tomadas tras las comprob
 | API | Node.js 24 y Fastify 5: contratos, sesiones, archivos y coordinación de trabajos. |
 | Motor | ANTLR 4.13.2 genera el parser JavaScript; evaluación con racionales exactos y dependencias ordenadas mediante Kahn. |
 | Modo local | Memoria y archivos temporales; web y API servidas por un mismo proceso. |
-| Modo alojado | PostgreSQL 17, objetos privados Vercel Blob y entregas firmadas QStash; frontend y backend en proyectos Vercel separados. |
+| Modo alojado | PostgreSQL 17 o 18, objetos privados Vercel Blob y entregas firmadas QStash; frontend y backend en proyectos Vercel separados. |
 | Verificación | Vitest, pruebas de Angular, Playwright y entornos Linux/PostgreSQL aislados con Docker. |
 
 ```mermaid

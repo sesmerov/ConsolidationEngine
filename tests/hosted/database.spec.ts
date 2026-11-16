@@ -3,15 +3,16 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { HostedDatabase, validatedSchemaName } from '../../apps/api/src/hosted/database.js';
 import { createHostedHarness, type HostedHarness } from '../helpers/hosted-harness.js';
 
-describe('PostgreSQL 17 authority foundation (real SQL)', () => {
+describe('PostgreSQL 17/18 authority foundation (real SQL)', () => {
   let harness: HostedHarness;
   beforeAll(async () => { harness = await createHostedHarness(); });
   afterAll(async () => { await harness?.close(); });
 
-  it('migrates idempotently across independent pools and uses PostgreSQL 17', async () => {
+  it('migrates idempotently across independent pools on a supported PostgreSQL major', async () => {
     const [one, two] = harness.databases;
     await Promise.all([one.migrate(), two.migrate()]);
-    expect(Number((await one.query<{ server_version_num: string }>('SHOW server_version_num')).rows[0]!.server_version_num)).toBeGreaterThanOrEqual(170000);
+    const version = Number((await one.query<{ server_version_num: string }>('SHOW server_version_num')).rows[0]!.server_version_num);
+    expect([17, 18]).toContain(Math.floor(version / 10_000));
     const versions = (await one.query<{ version: number }>('SELECT version FROM schema_migrations ORDER BY version')).rows;
     expect(versions.length).toBeGreaterThanOrEqual(1);
     expect(versions.map(item => item.version)).toEqual(versions.map((_, index) => index + 1));

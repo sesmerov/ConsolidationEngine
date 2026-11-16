@@ -35,7 +35,7 @@ Usar [apps/api/.env.example](../apps/api/.env.example) y [apps/web/.env.example]
 | `API_BASE_URL` | Pública, origen HTTPS de la API sin `/api/v1`, paths, query ni fragmento. Vacía en local con mismo origen. |
 | `DEPLOYMENT_PROFILE` | Público, identifica el entorno y separa la persistencia de sesión. |
 | `CE_MODE` | `hosted` en el backend público; `local` por defecto. `hosted-test` se limita a pruebas controladas. |
-| `DATABASE_URL_UNPOOLED` | Conexión directa de PostgreSQL 17 creada por la integración Neon/Vercel. Tiene prioridad cuando está definida; TLS con certificado verificado. |
+| `DATABASE_URL_UNPOOLED` | Conexión directa de PostgreSQL 17 o 18 creada por la integración Neon/Vercel. Tiene prioridad cuando está definida; TLS con certificado verificado. |
 | `DATABASE_URL` | Alternativa si no existe `DATABASE_URL_UNPOOLED`: configurar una conexión directa con «Connection pooling» desactivado (host sin `-pooler`). |
 | `BLOB_READ_WRITE_TOKEN` | Acceso backend a un almacén Blob **privado**. |
 | `QSTASH_TOKEN` | Publicar referencias de trabajos. |
@@ -54,7 +54,9 @@ La integración gestionada añade `DATABASE_URL` (agrupada) y `DATABASE_URL_UNPO
 
 En **Connect** de Neon, desactivar **Connection pooling** y copiar la URL completa. Esta versión envía `search_path`, `statement_timeout` e `idle_in_transaction_session_timeout` como parámetros de inicio; las consultas dependen de ellos. Neon documenta que su conexión agrupada puede rechazar parámetros de inicio no admitidos y propone la conexión directa como alternativa. No eliminar esos parámetros del código para hacer pasar la conexión. Conservar los parámetros TLS de la URL: la aplicación normaliza `sslmode` y configura explícitamente la verificación del certificado. [Parámetros de inicio y conexión directa](https://neon.com/docs/connect/connection-errors#unsupported-startup-parameter).
 
-Al iniciar, las migraciones `apps/api/src/hosted/migrations/*.sql` se ejecutan en una transacción con bloqueo asesor y checksums; se rechaza una migración ya aplicada cuyo contenido cambie. PostgreSQL debe ser versión 17. Usar una base dedicada o un rol con permiso sobre el esquema `ce_demo`; verificar primero sobre una copia de prueba. Las futuras modificaciones requieren una migración nueva, no editar una aplicada.
+Al iniciar, las migraciones `apps/api/src/hosted/migrations/*.sql` se ejecutan en una transacción con bloqueo asesor y checksums; se rechaza una migración ya aplicada cuyo contenido cambie. Se admiten exclusivamente PostgreSQL 17 y 18. Usar una base dedicada o un rol con permiso sobre el esquema `ce_demo`; verificar primero sobre una copia de prueba. Las futuras modificaciones requieren una migración nueva, no editar una aplicada.
+
+La [comprobación de compatibilidad 17/18](verification-postgres-18.md) recoge las pruebas SQL reales en contenedores y distingue esa evidencia de los servicios alojados.
 
 El navegador genera un secreto y un nonce antes de crear la sesión. Guarda únicamente credenciales anónimas e identificadores mínimos de recuperación en `sessionStorage`, separados por orígenes y perfil; no conserva Excel, reglas, respuestas de negocio ni blobs. Recargar la misma pestaña recupera la sesión. Cerrar o caducar borra esas credenciales y exige una acción explícita para iniciar otra.
 
@@ -108,7 +110,7 @@ Estas cifras no garantizan coste cero ni disponibilidad. Las unidades no son int
 
 ## Comprobaciones antes de publicar
 
-1. Ejecutar `npm run test:hosted`: PostgreSQL 17 real con esquemas aislados; cola y objetos controlados. No equivale a probar los proveedores reales.
+1. Ejecutar `npm run test:hosted`: PostgreSQL real con esquemas aislados; cola y objetos controlados. El contenedor predeterminado sigue siendo 17; `TEST_POSTGRES_MAJOR=18` selecciona la imagen 18 fijada por huella. `TEST_DATABASE_URL` permite usar una base de pruebas propia 17/18. No equivale a probar los proveedores reales.
 2. Ejecutar `npm run test:e2e:hosted`: dos visitantes, frontend 3350, API pública 3351 y dos procesos 3352/3353; control protegido 3354. Verifica propiedad antes de ocupar puertos y no usa el servidor del usuario en 3340.
 3. Ejecutar `npm run test:package:linux` y `npm run test:capacity:hosted`; consultar las medidas y fallos en `outputs/` y el resumen de verificación. No convertir un fallo de capacidad en una reducción silenciosa de los límites.
 4. Con autorización posterior, configurar los dos proyectos y servicios. Verificar versión efectiva de Node/Java, paquete desplegado, orígenes reales, callbacks firmados, descarga reconstruida, aislamiento, caducidad y limpieza sin navegador.
