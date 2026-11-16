@@ -170,8 +170,13 @@ export class ApiClient {
   directionConflictGroups(workspaceId: string, id: string, query: { cursor?: string; scope?: 'pending'|'resolved'|'all' } = {}): Promise<DirectionConflictGroupsPageDTO> {
     return this.publicPage<DirectionConflictGroupsPageDTO>(workspaceId,this.send(this.http.get<PublicItemsPage<DirectionConflictGroupsPageDTO>>(this.reviewsUrl(workspaceId, id) + '/groups', { headers: this.headers(), params: { compact: 'true', limit: '50', ...query } })));
   }
-  directionConflictCandidates(workspaceId: string, id: string, groupId: string, query: { cursor?: string } = {}): Promise<DirectionConflictCandidatesPageDTO> {
-    return this.publicPage<DirectionConflictCandidatesPageDTO>(workspaceId,this.send(this.http.get<PublicItemsPage<DirectionConflictCandidatesPageDTO>>(this.reviewsUrl(workspaceId, id) + '/groups/' + encodeURIComponent(groupId) + '/candidates', { headers: this.headers(), params: { compact: 'true', limit: '50', ...query } })));
+  async directionConflictCandidates(workspaceId: string, id: string, groupId: string, query: { cursor?: string } = {}): Promise<DirectionConflictCandidatesPageDTO> {
+    type CandidatePage = Omit<DirectionConflictCandidatesPageDTO, 'group'> & { readonly group: PublicValue<DirectionConflictCandidatesPageDTO['group']> };
+    const epoch = this.tokenEpoch;
+    const page = await this.publicPage<CandidatePage>(workspaceId,this.send(this.http.get<PublicItemsPage<CandidatePage>>(this.reviewsUrl(workspaceId, id) + '/groups/' + encodeURIComponent(groupId) + '/candidates', { headers: this.headers(), params: { compact: 'true', limit: '50', ...query } })));
+    if (epoch !== this.tokenEpoch) throw new Error('La consulta pertenece a una sesión anterior.');
+    const group = isLargeValue(page.group) ? await this.largeValue<DirectionConflictCandidatesPageDTO['group']>(workspaceId, page.group) : page.group;
+    return { ...page, group };
   }
   directionConflictCandidate(workspaceId: string, id: string, groupId: string, instanceId: string): Promise<DirectionConflictCandidateDetailDTO> {
     return this.publicDetail<DirectionConflictCandidateDetailDTO>(workspaceId,this.send(this.http.get<PublicValue<DirectionConflictCandidateDetailDTO>>(this.reviewsUrl(workspaceId, id) + '/groups/' + encodeURIComponent(groupId) + '/candidates/' + encodeURIComponent(instanceId), { headers: this.headers(),params:{compact:'true'} }))).then(async detail=>{

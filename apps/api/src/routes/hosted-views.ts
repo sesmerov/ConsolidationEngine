@@ -54,7 +54,13 @@ export function registerHostedViews(app:FastifyInstance,d:HostedCommandDependenc
  app.get<{Params:Params}>(root+'/recalculation-reviews/:reviewId',{schema:{params:params('reviewId'),querystring:emptyQuerySchema}},req=>d.repository.review(owner(req,req.params['workspaceId']!),req.params['reviewId']!));
  const reviewQuery={type:'object',additionalProperties:false,properties:{...paging,compact:{const:'true'},scope:{enum:['pending','resolved','all']},state:{type:'string',maxLength:100},groupId:{type:'string',maxLength:500}}};
  for(const view of ['rows','groups'] as const)app.get<{Params:Params;Querystring:Query&{state?:string;groupId?:string}}>(root+'/recalculation-reviews/:reviewId/'+view,{schema:{params:params('reviewId'),querystring:reviewQuery}},req=>d.queries.page(owner(req,req.params['workspaceId']!),{type:'review',id:req.params['reviewId']!,view},{limit:Number(req.query.limit??50),...(req.query.cursor?{cursor:req.query.cursor}:{}),filter:{...(req.query.scope?{scope:req.query.scope}:{}),...(req.query.state?{status:req.query.state}:{}),...(req.query.groupId?{groupId:req.query.groupId}:{})}},{reviewId:req.params['reviewId']!}));
- app.get<{Params:Params;Querystring:Query}>(root+'/recalculation-reviews/:reviewId/groups/:groupId/candidates',{schema:{params:params('reviewId','groupId'),querystring:reviewQuery}},req=>d.queries.page(owner(req,req.params['workspaceId']!),{type:'review',id:req.params['reviewId']!,view:'candidates'},{limit:Number(req.query.limit??50),...(req.query.cursor?{cursor:req.query.cursor}:{}),filter:{groupId:req.params['groupId']!}},{reviewId:req.params['reviewId']!,groupId:req.params['groupId']!}));
+ app.get<{Params:Params;Querystring:Query}>(root+'/recalculation-reviews/:reviewId/groups/:groupId/candidates',{schema:{params:params('reviewId','groupId'),querystring:reviewQuery}},async req=>{
+   const scope=owner(req,req.params['workspaceId']!),resource={type:'review' as const,id:req.params['reviewId']!};
+   const group=await d.queries.page(scope,{...resource,view:'groups'},{limit:1,filter:{rowKey:req.params['groupId']!}});
+   if(!group.items[0])throw new ApiError('RESOURCE_NOT_FOUND');
+   const page=await d.queries.page(scope,{...resource,view:'candidates'},{limit:Number(req.query.limit??50),...(req.query.cursor?{cursor:req.query.cursor}:{}),filter:{groupId:req.params['groupId']!}},{reviewId:resource.id,group:group.items[0]});
+   if(page.revision!==group.revision)throw new ApiError('STALE_DIRECTION_REVIEW');return page;
+ });
  app.get<{Params:Params}>(root+'/recalculation-reviews/:reviewId/groups/:groupId/candidates/:instanceId',{schema:{params:params('reviewId','groupId','instanceId'),querystring:{type:'object',additionalProperties:false,properties:{compact:{const:'true'}}}}},async req=>{
    return d.queries.item(owner(req,req.params['workspaceId']!),{type:'review',id:req.params['reviewId']!,view:'candidateDetails'},req.params['groupId']!+':'+req.params['instanceId']!);
  });

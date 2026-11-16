@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import Fastify from 'fastify';
 import type { JsonValue, Snapshot } from '@ce/contracts';
 import { compileDirectionConfiguration, WorkBudget } from '@ce/engine';
 import { afterEach,beforeEach,describe,expect,it } from 'vitest';
@@ -16,6 +17,8 @@ import { seedHostedWorkspace } from '../helpers/hosted-seed.js';
 import { collidingTargetsSnapshot,iteration005Snapshot,validate005 } from '../helpers/iteration005-fixtures.js';
 import type { CanonicalRef } from '../../apps/api/src/hosted/canonical-codec.js';
 import type { DirectionReviewProjection } from '@ce/engine';
+import { registerHostedViews } from '../../apps/api/src/routes/hosted-views.js';
+import type { AuthorizedSession } from '../../apps/api/src/hosted/session-service.js';
 
 describe('hosted indexed review mutations with real SQL',()=>{
   let h:HostedHarness;
@@ -46,6 +49,13 @@ describe('hosted indexed review mutations with real SQL',()=>{
     const p=await prepared(collidingTargetsSnapshot(51)),resource={type:'review' as const,id:p.reviewId,view:'groups'};
     const group=(await p.domain.queries.page(p.owner,resource,{})).items[0] as {groupId:string;activeCount:number};expect(group.activeCount).toBe(51);
     const first=await p.domain.queries.page(p.owner,{...resource,view:'candidates'},{filter:{groupId:group.groupId}});expect(first.items).toHaveLength(50);
+    const app=Fastify();app.decorateRequest('hostedSession',null);
+    app.addHook('onRequest',async req=>{req.hostedSession={id:p.owner.sessionId} as AuthorizedSession;});registerHostedViews(app,p.domain);
+    try {
+      const response=await app.inject({url:`/api/v1/workspaces/${p.owner.workspaceId}/recalculation-reviews/${p.reviewId}/groups/${group.groupId}/candidates?compact=true`});
+      expect(response.statusCode,response.body).toBe(200);expect(response.json()).toMatchObject({reviewId:p.reviewId,revision:1,group:{groupId:group.groupId,candidateCount:51}});
+      expect(response.json().items).toHaveLength(50);
+    } finally {await app.close();}
     const last=await p.domain.queries.page(p.owner,{...resource,view:'candidates'},{filter:{groupId:group.groupId},cursor:first.nextCursor!});
     const winner=last.items[0] as {instanceId:string},other=first.items[0] as {instanceId:string};
     const body={expectedRevision:1,mutationId:randomUUID(),operations:[{op:'resolveGroup' as const,groupId:group.groupId,winnerInstanceId:winner.instanceId}]};

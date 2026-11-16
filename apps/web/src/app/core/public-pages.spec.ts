@@ -25,6 +25,13 @@ describe('retained public pages',()=>{
     const pending=api.directionConflictCandidate(workspace,'review','group','instance');http.expectOne(base+'/recalculation-reviews/review/groups/group/candidates/instance?compact=true').flush({expression:expression.descriptor,descriptions:descriptions.descriptor,candidate:{instanceId:'instance'}});
     await resolve(expression);await resolve(descriptions);expect(await pending).toMatchObject({expression:'x'.repeat(20000),descriptions:[{description:'Origen íntegro'}]});
   });
+  it('hydrates the complete conflict group attached to the requested candidates page',async()=>{
+    const group={groupId:'group',targetLabel:'Celda íntegra '.repeat(1000),contextLabel:'SYNTHETIC',candidateCount:51,activeCount:2,state:'conflicted'},large=await value(group,'group-detail');
+    const pending=api.directionConflictCandidates(workspace,'review','group');
+    http.expectOne(req=>req.url.endsWith('/groups/group/candidates')).flush({reviewId:'review',revision:3,group:large.descriptor,items:[{instanceId:'visible-candidate'}],total:51,nextCursor:'next'});
+    await resolve(large);expect(await pending).toEqual({reviewId:'review',revision:3,group,items:[{instanceId:'visible-candidate'}],total:51,nextCursor:'next'});
+    http.expectNone(req=>req.params.get('cursor')==='next');
+  });
   it('retains the download identity when its large summary is stored separately',async()=>{
     const intent={workspaceId:workspace,versionId:'version',kind:'report'},large=await value({files:[{name:'report.xlsx',sheets:Array(500).fill('Datos')}]}),pending=api.exportSummary(workspace,'version');
     http.expectOne(req=>req.url.endsWith('/export-summary')).flush({...large.descriptor,intent,intentFingerprint:'fingerprint'});await resolve(large);expect(await pending).toMatchObject({intent,intentFingerprint:'fingerprint',files:[{name:'report.xlsx',sheets:Array(500).fill('Datos')}]});
