@@ -31,7 +31,7 @@ Usar [apps/api/.env.example](../apps/api/.env.example) y [apps/web/.env.example]
 | `API_BASE_URL` | Pública, origen HTTPS de la API sin `/api/v1`, paths, query ni fragmento. Vacía en local con mismo origen. |
 | `DEPLOYMENT_PROFILE` | Público, identifica el entorno y separa la persistencia de sesión. |
 | `CE_MODE` | `hosted` en el backend público; `local` por defecto. `hosted-test` se limita a pruebas controladas. |
-| `DATABASE_URL` | PostgreSQL 17, preferiblemente conexión agrupada de Neon; TLS con certificado verificado. |
+| `DATABASE_URL` | PostgreSQL 17, conexión directa de Neon con «Connection pooling» desactivado (host sin `-pooler`); TLS con certificado verificado. |
 | `BLOB_READ_WRITE_TOKEN` | Acceso backend a un almacén Blob **privado**. |
 | `QSTASH_TOKEN` | Publicar referencias de trabajos. |
 | `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY` | Verificar la firma del cuerpo original y la URL exacta del callback. |
@@ -44,6 +44,8 @@ Generar la clave de cursores en una terminal privada con `node -e "console.log(r
 ## Autoridad, sesiones y migraciones
 
 Neon conserva sesiones, versiones, recibos, índices paginados, trabajos y cuotas. Los datos voluminosos se escriben en bloques privados inmutables; se comparten referencias entre versiones de la misma sesión. La API usa un pool de una conexión y cada worker otra conexión: como máximo dos por instancia de ejecución. No se mantiene un usuario global ni se reconstruye toda la sesión en cada lectura.
+
+En **Connect** de Neon, desactivar **Connection pooling** y copiar la URL completa. Esta versión envía `search_path`, `statement_timeout` e `idle_in_transaction_session_timeout` como parámetros de inicio; las consultas dependen de ellos. Neon documenta que su conexión agrupada puede rechazar parámetros de inicio no admitidos y propone la conexión directa como alternativa. No eliminar esos parámetros del código para hacer pasar la conexión. Conservar los parámetros TLS de la URL: la aplicación normaliza `sslmode` y configura explícitamente la verificación del certificado. [Parámetros de inicio y conexión directa](https://neon.com/docs/connect/connection-errors#unsupported-startup-parameter).
 
 Al iniciar, las migraciones `apps/api/src/hosted/migrations/*.sql` se ejecutan en una transacción con bloqueo asesor y checksums; se rechaza una migración ya aplicada cuyo contenido cambie. PostgreSQL debe ser versión 17. Usar una base dedicada o un rol con permiso sobre el esquema `ce_demo`; verificar primero sobre una copia de prueba. Las futuras modificaciones requieren una migración nueva, no editar una aplicada.
 
