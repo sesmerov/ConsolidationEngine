@@ -83,7 +83,9 @@ export class DirectionsStore {
   if(!this.matches(summary))return;const previous=this.review();if(previous?.id===summary.id&&previous.revision>summary.revision)return;
   if(this.hasUnsavedChoice()&&this.editor()?.revision!==summary.revision&&!this.confirmingGroupId){this.staleEditor.set(true);this.error.set('La revisión cambió. Cancela la elección local para consultar el estado actual.');return;}
   this.review.set(summary);this.state.update(s=>s?{...s,review:summary,counts:summary.counts??null,state:!summary.counts?'preparation_required':summary.counts.pending+summary.counts.conflicted+summary.counts.undetermined>0?'pending':summary.counts.included+summary.counts.omitted>0?'ready':'no_candidates'}:s);
-  if(previous?.id!==summary.id||previous.revision!==summary.revision){this.pagination.reset();this.groupsPagination.reset();this.candidatesPagination.reset();if(this.editor()?.revision!==summary.revision)this.invalidateEditor('La revisión cambió.');}
+  if(previous?.id!==summary.id||previous.revision!==summary.revision){this.pagination.reset();this.groupsPagination.reset();this.candidatesPagination.reset();
+   // Acknowledging this editor's own choice advances the revision normally; it is not an external conflict.
+   if(this.editor()?.revision!==summary.revision)this.invalidateEditor(this.confirmingGroupId===this.editor()?.group.groupId?undefined:'La revisión cambió.');}
   clearTimeout(this.expiryTimer);this.expired.set(summary.state==='expired');
   if(summary.state==='ready'){
    const remaining=Date.parse(summary.expiresAt??'')-Date.now();if(!(remaining>0)){this.expired.set(true);return;}
@@ -124,8 +126,8 @@ export class DirectionsStore {
     if (!this.hasUnsavedChoice()) return true;
     this.error.set('Confirma o cancela la elección pendiente antes de continuar.'); return false;
   }
-  private invalidateEditor(message: string): void {
-    if (this.hasUnsavedChoice()) this.error.set(message);
+  private invalidateEditor(message?: string): void {
+    if (message && this.hasUnsavedChoice()) this.error.set(message);
     this.editor.set(null); this.candidates.set(null); this.candidateDetail.set(null);
     this.candidatesGeneration++; this.detailGeneration++;
     this.candidatesLoading.set(false); this.candidateDetailLoading.set(false);
