@@ -30,6 +30,38 @@ flowchart LR
 
 Los destinos inequívocos se eligen automáticamente. Si hay alternativas o varias reglas proponen escribir en la misma celda, decide el analista. Las reglas con condicionales, texto, fechas o desigualdades **solo se validan**. Validar y simular no cambian los valores del informe.
 
+## Capturas del flujo
+
+Capturas reales de la demo COREP con datos sintéticos, tomadas tras las comprobaciones de esta iteración.
+
+<details>
+<summary>1. Cargar: inspección y confirmación</summary>
+
+![Carga COREP con contexto y botón Confirmar carga](docs/images/flow-005-load.png)
+
+</details>
+
+<details>
+<summary>2. Validar: resultados y explicación</summary>
+
+![Validación COREP con siete reglas correctas, ocho incorrectas y una no aplicable](docs/images/flow-005-validate.png)
+
+</details>
+
+<details>
+<summary>3. Recalcular: comparación antes y después</summary>
+
+![Cinco cambios aplicados y comparación de validaciones](docs/images/flow-005-recalculate.png)
+
+</details>
+
+<details>
+<summary>4. Descargar: versión y una única acción</summary>
+
+![Descarga de la versión tres con un único botón](docs/images/flow-005-download.png)
+
+</details>
+
 ## Tecnologías y arquitectura
 
 | Capa | Tecnologías y responsabilidad |
@@ -120,60 +152,6 @@ La demo pública está diseñada para **datos sintéticos y sesiones anónimas i
 | Backend | `apps/api` | `npm run package:vercel:api` |
 
 Los archivos `vercel.json` fijan los comandos de instalación/build y las rutas. Configurar los valores públicos del frontend según [apps/web/.env.example](apps/web/.env.example), y los secretos solo en el backend según [apps/api/.env.example](apps/api/.env.example). La [guía de despliegue](docs/deployment-vercel.md) detalla PostgreSQL/Neon, Blob privado, QStash, CORS, mantenimiento, cuotas de planes gratuitos y comprobaciones previas. No se han creado cuentas, contratado ni desplegado servicios.
-
-**Capacidad máxima pendiente:** con 2 GB y una CPU, validar 500 reglas sobre 100.000 hechos supera el plazo de 60 segundos. La exportación máxima, memoria y temporales pasan sus comprobaciones, pero la viabilidad alojada de ese volumen aún no está acreditada. No se han reducido límites ni activado planes de pago para ocultarlo.
-
-Los límites de entrada son 10 MiB por archivo, 50 MiB por lote, 100 MiB expandidos y hasta 20 informes. La demo alojada limita además sesiones, trabajos, almacenamiento y consumo de proveedores. Las [medidas y su alcance](docs/verification-005.md) separan los recorridos funcionales, el rendimiento local, la capacidad alojada y el despliegue real pendiente.
-
-## Pruebas
-
-Después de preparar y construir el proyecto:
-
-```sh
-npm run typecheck
-npm test
-npm run test:e2e
-npm run test:hosted
-npm run test:e2e:hosted
-npm run test:package:linux
-npm run test:capacity:hosted
-```
-
-En Windows se pueden ejecutar mediante `run-with-toolchain.ps1`. Las pruebas de navegador requieren Chromium de Playwright; las alojadas, de empaquetado Linux y capacidad requieren Docker Desktop con contenedores Linux. El [quickstart de 005](specs/005-simplificar-flujo-vercel/quickstart.md) recoge preparación, comandos, puertos y escenarios reproducibles.
-
-Los recorridos COREP, FINREP y texto/fechas se verificaron en local y con dos instancias de API sobre PostgreSQL. El paquete Linux pasa desde una instalación limpia. La referencia local de 500 reglas y 100.000 lecturas pasa 10/10 ejecuciones entre 16,4 y 22,8 s; no equivale a la capacidad del alojamiento con una CPU. `test:capacity:hosted` conserva el fallo de plazo indicado arriba. Consultar el [registro de verificación](docs/verification-005.md) para resultados, repeticiones y límites; las pruebas automáticas no se presentan como aceptación humana.
-
-## Capturas del flujo
-
-Capturas reales de la demo COREP con datos sintéticos, tomadas tras las comprobaciones de esta iteración.
-
-<details>
-<summary>1. Cargar: inspección y confirmación</summary>
-
-![Carga COREP con contexto y botón Confirmar carga](docs/images/flow-005-load.png)
-
-</details>
-
-<details>
-<summary>2. Validar: resultados y explicación</summary>
-
-![Validación COREP con siete reglas correctas, ocho incorrectas y una no aplicable](docs/images/flow-005-validate.png)
-
-</details>
-
-<details>
-<summary>3. Recalcular: comparación antes y después</summary>
-
-![Cinco cambios aplicados y comparación de validaciones](docs/images/flow-005-recalculate.png)
-
-</details>
-
-<details>
-<summary>4. Descargar: versión y una única acción</summary>
-
-![Descarga de la versión tres con un único botón](docs/images/flow-005-download.png)
-
-</details>
 
 ## Desarrollo con Spec Kit
 
