@@ -2,7 +2,7 @@ import { Transform, type TransformCallback } from 'node:stream';
 import type { FastifyInstance } from 'fastify';
 import { PUBLIC_JSON_MAX_BYTES, TRANSFER_PART_MAX_BYTES } from '@ce/contracts';
 import { ApiError } from '../errors.js';
-import type { OperationalLogger } from '../hosted/operational-log.js';
+import { requestFailureKind, type OperationalLogger } from '../hosted/operational-log.js';
 
 class CountedBody extends Transform {
   receivedEncodedLength = 0;
@@ -52,7 +52,8 @@ export function installHostedErrorHandler(app: FastifyInstance, log?: Operationa
     const known = error instanceof ApiError ? error : new ApiError(metadata.validation || metadata.statusCode === 400 ? 'INVALID_REQUEST'
       : metadata.statusCode === 413 ? 'UPLOAD_LIMIT' : metadata.statusCode === 415 ? 'INVALID_REQUEST' : 'INTERNAL_ERROR');
     const retryAfter = known.details['retryAfterSeconds'];
-    log?.('request_failed', { requestId: request.id, code: known.code, statusCode: known.statusCode });
+    log?.('request_failed', { requestId: request.id, code: known.code, statusCode: known.statusCode,
+      ...(known.code === 'INTERNAL_ERROR' ? { failureKind: requestFailureKind(error) } : {}) });
     if (typeof retryAfter === 'number' && Number.isSafeInteger(retryAfter) && retryAfter > 0) reply.header('Retry-After', String(retryAfter));
     reply.header('Cache-Control', 'private, no-store');
     if (known.code === 'UPLOAD_LIMIT' && !request.raw.complete) {

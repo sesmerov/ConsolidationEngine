@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { BlobAccessError } from '@vercel/blob';
 import { BlobObjectTransport } from '../../apps/api/src/hosted/blob-object-store.js';
 
 const privateKey = 'ce/v1/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000002/00000000-0000-4000-8000-000000000003';
 function fixture() {
   const calls = { put: vi.fn().mockResolvedValue({ url: 'https://provider.invalid/private' }), get: vi.fn(), del: vi.fn().mockResolvedValue(undefined) };
-  const transport = new BlobObjectTransport('synthetic-test-token', calls as unknown as NonNullable<ConstructorParameters<typeof BlobObjectTransport>[1]>);
-  return { calls, transport };
+  const log = vi.fn(), transport = new BlobObjectTransport('synthetic-test-token', calls as unknown as NonNullable<ConstructorParameters<typeof BlobObjectTransport>[1]>, log);
+  return { calls, transport, log };
 }
 const body = (chunks: Uint8Array[], size = chunks.reduce((sum, bytes) => sum + bytes.length, 0)) => ({ statusCode: 200, blob: { size }, stream: new ReadableStream<Uint8Array>({ start(controller) { for (const chunk of chunks) controller.enqueue(chunk); controller.close(); } }) });
 describe('private Blob provider adapter with controlled SDK boundary', () => {
@@ -35,6 +36,28 @@ describe('private Blob provider adapter with controlled SDK boundary', () => {
   it('does not retry a rejected provider call implicitly', async () => {
     vi.stubEnv('VERCEL_BLOB_RETRIES', '0'); const { transport, calls } = fixture(); calls.put.mockRejectedValueOnce(new Error('lost acknowledgement'));
     await expect(transport.put(privateKey, Buffer.from('x'))).rejects.toThrow('lost acknowledgement'); expect(calls.put).toHaveBeenCalledTimes(1);
+  });
+  it('diagnoses provider failures without copying private keys, credentials or exception messages', async () => {
+    vi.stubEnv('VERCEL_BLOB_RETRIES', '0'); const { transport, calls, log } = fixture();
+    const denied = new BlobAccessError(), unknown = new Error('private provider response and secret token');
+    calls.get.mockRejectedValueOnce(denied);
+    await expect(transport.get(privateKey)).rejects.toBe(denied);
+    expect(log).toHaveBeenLastCalledWith('provider_failed', { providerOperation: 'blob-get', providerReason: 'access' });
+    calls.put.mockRejectedValueOnce(unknown);
+    await expect(transport.put(privateKey, Buffer.from('x'))).rejects.toBe(unknown);
+    expect(log).toHaveBeenLastCalledWith('provider_failed', { providerOperation: 'blob-put', providerReason: 'other' });
+    expect(JSON.stringify(log.mock.calls)).not.toMatch(/secret|private provider|synthetic-test-token|ce\/v1/);
+    log.mockImplementation(() => { throw new Error('sink failure'); }); calls.del.mockRejectedValueOnce(unknown);
+    await expect(transport.remove(privateKey)).rejects.toBe(unknown);
+  });
+  it('distinguishes missing length from incomplete streams without changing fail-closed reads', async () => {
+    vi.stubEnv('VERCEL_BLOB_RETRIES', '0'); const { transport, calls, log } = fixture();
+    calls.get.mockResolvedValueOnce({ ...body([Buffer.from('x')], 0), headers: new Headers() });
+    await expect(transport.get(privateKey)).rejects.toThrow(/length/);
+    expect(log).toHaveBeenLastCalledWith('provider_failed', { providerOperation: 'blob-read', providerReason: 'missing-length' });
+    calls.get.mockResolvedValueOnce(body([Buffer.from('x')], 2));
+    await expect(transport.get(privateKey)).rejects.toThrow(/Incomplete/);
+    expect(log).toHaveBeenLastCalledWith('provider_failed', { providerOperation: 'blob-read', providerReason: 'incomplete-read' });
   });
   it('deletes a bounded batch with one provider request and rejects unbounded lists before I/O', async () => {
     vi.stubEnv('VERCEL_BLOB_RETRIES', '0'); const { transport, calls } = fixture(), controller = new AbortController();
