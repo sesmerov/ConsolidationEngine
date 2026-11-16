@@ -15,7 +15,7 @@ afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, {
 describe('Vercel API packaging', () => {
   it('does not pass provider secrets or public runtime configuration to compiler processes', () => {
     expect(packageBuildEnvironment({ PATH: 'path', JAVA_HOME: 'jdk', npm_execpath: 'npm.js',
-      DATABASE_URL: 'private', QSTASH_TOKEN: 'private', BLOB_READ_WRITE_TOKEN: 'private',
+      DATABASE_URL: 'private', DATABASE_URL_UNPOOLED: 'private-direct', QSTASH_TOKEN: 'private', BLOB_READ_WRITE_TOKEN: 'private',
       API_BASE_URL: 'https://public.test', DEPLOYMENT_PROFILE: 'demo-public' }))
       .toEqual({ PATH: 'path', JAVA_HOME: 'jdk', npm_execpath: 'npm.js' });
   });

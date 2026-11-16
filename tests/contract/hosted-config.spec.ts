@@ -24,6 +24,27 @@ describe('hosted configuration', () => {
     expect(config.quotas.blobMaintenanceTransferBytes).toBe(1024 ** 3);
     expect(config.quotas.cpuGlobal).toBe(1);
     expect(config.quotas.safeLeaseMs).toBe(120_000);
+    expect(config.databaseUrl).toBe('postgresql://demo:secret@db.example/demo');
+    expect(config.databaseTls).toBe('verify-full');
+  });
+  it.each([undefined, 'postgresql://demo:secret@db-pooler.example/demo?sslmode=require'])('prefers the managed direct connection with fallback setting %s', fallback => {
+    const config = readRuntimeConfig({ ...hosted(), DATABASE_URL: fallback,
+      DATABASE_URL_UNPOOLED: 'postgresql://demo:direct-secret@db.example/demo?sslmode=require&channel_binding=require' });
+    if (config.mode === 'local') throw new Error('Expected hosted config');
+    expect(config.databaseUrl).toBe('postgresql://demo:direct-secret@db.example/demo?channel_binding=require');
+    expect(config.databaseTls).toBe('verify-full');
+  });
+  it.each(['', ' ', 'not-a-url-super-secret', 'postgres://a:b@db.example/db?sslmode=disable',
+    'postgres://a:b@db.example/db?options=unsafe'])('does not fall back when a defined direct connection is invalid (%s)', direct => {
+    expect(() => readRuntimeConfig({ ...hosted(), DATABASE_URL_UNPOOLED: direct })).toThrow(/^Invalid DATABASE_URL_UNPOOLED(?:: verified TLS is required)?$/);
+  });
+  it('keeps loopback-only SQL testing for the selected direct connection', () => {
+    const config = readRuntimeConfig({ ...hosted(), CE_MODE: 'hosted-test',
+      DATABASE_URL_UNPOOLED: 'postgres://demo:test@127.0.0.1:5432/demo?sslmode=disable' });
+    if (config.mode === 'local') throw new Error('Expected hosted-test config');
+    expect(config.databaseTls).toBe('loopback-test');
+    expect(config.databaseUrl).toBe('postgres://demo:test@127.0.0.1:5432/demo');
+    expect(() => readRuntimeConfig({ ...hosted(), DATABASE_URL_UNPOOLED: 'postgres://demo:test@127.0.0.1:5432/demo?sslmode=disable' })).toThrow(/DATABASE_URL_UNPOOLED/);
   });
   it.each(['https://user:pass@api.example', 'https://api.example/path', 'https://api.example/?q=x',
     'https://api.example/#x', 'http://api.example', 'http://localhost:3351', '*'])('rejects production origin %s', origin => {

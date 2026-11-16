@@ -24,6 +24,8 @@ El frontend tiene una ruta de documento `/`; las cuatro etapas pertenecen a la m
 
 El backend declara `public` como salida estática y conserva allí únicamente `robots.txt`. Vercel necesita una carpeta de salida no vacía al ejecutar este build personalizado; la función continúa en `api/index.ts`. No usar `.` ni `dist` como salida pública: expondrían fuentes o recursos internos. El manifiesto de empaquetado permanece fuera de `public`. [Directorio de salida](https://vercel.com/docs/builds/configure-a-build#output-directory).
 
+El builder de funciones Node puede instalar dependencias de nuevo después del comando de instalación del proyecto. Configurar `NPM_CONFIG_ENGINE_STRICT=false` en el entorno **Production del backend en Vercel** para que esa instalación admita el patch 24.x gestionado por el proveedor; `--engine-strict=false` en el primer comando no se hereda automáticamente. Mantener Node 24.x en el proyecto y los requisitos estrictos locales sin cambios. Este ajuste no se copia a `.env` local.
+
 ## Configuración privada y pública
 
 Usar [apps/api/.env.example](../apps/api/.env.example) y [apps/web/.env.example](../apps/web/.env.example) como inventario; el programa no carga automáticamente esos ejemplos. En local, las variables deben estar en el entorno del proceso. En Vercel se configuran por proyecto y entorno.
@@ -33,7 +35,8 @@ Usar [apps/api/.env.example](../apps/api/.env.example) y [apps/web/.env.example]
 | `API_BASE_URL` | Pública, origen HTTPS de la API sin `/api/v1`, paths, query ni fragmento. Vacía en local con mismo origen. |
 | `DEPLOYMENT_PROFILE` | Público, identifica el entorno y separa la persistencia de sesión. |
 | `CE_MODE` | `hosted` en el backend público; `local` por defecto. `hosted-test` se limita a pruebas controladas. |
-| `DATABASE_URL` | PostgreSQL 17, conexión directa de Neon con «Connection pooling» desactivado (host sin `-pooler`); TLS con certificado verificado. |
+| `DATABASE_URL_UNPOOLED` | Conexión directa de PostgreSQL 17 creada por la integración Neon/Vercel. Tiene prioridad cuando está definida; TLS con certificado verificado. |
+| `DATABASE_URL` | Alternativa si no existe `DATABASE_URL_UNPOOLED`: configurar una conexión directa con «Connection pooling» desactivado (host sin `-pooler`). |
 | `BLOB_READ_WRITE_TOKEN` | Acceso backend a un almacén Blob **privado**. |
 | `QSTASH_TOKEN` | Publicar referencias de trabajos. |
 | `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY` | Verificar la firma del cuerpo original y la URL exacta del callback. |
@@ -46,6 +49,8 @@ Generar la clave de cursores en una terminal privada con `node -e "console.log(r
 ## Autoridad, sesiones y migraciones
 
 Neon conserva sesiones, versiones, recibos, índices paginados, trabajos y cuotas. Los datos voluminosos se escriben en bloques privados inmutables; se comparten referencias entre versiones de la misma sesión. La API usa un pool de una conexión y cada worker otra conexión: como máximo dos por instancia de ejecución. No se mantiene un usuario global ni se reconstruye toda la sesión en cada lectura.
+
+La integración gestionada añade `DATABASE_URL` (agrupada) y `DATABASE_URL_UNPOOLED` (directa). La API y sus workers utilizan la directa automáticamente cuando está definida; no sobrescribir las variables gestionadas. Si su valor está vacío o es inválido, el arranque falla indicando el nombre de la variable, sin revelar credenciales ni volver a la conexión agrupada. Sin integración, basta configurar la URL directa en `DATABASE_URL` y dejar `DATABASE_URL_UNPOOLED` sin definir. [Variables de la integración Neon/Vercel](https://neon.com/docs/guides/vercel-managed-integration).
 
 En **Connect** de Neon, desactivar **Connection pooling** y copiar la URL completa. Esta versión envía `search_path`, `statement_timeout` e `idle_in_transaction_session_timeout` como parámetros de inicio; las consultas dependen de ellos. Neon documenta que su conexión agrupada puede rechazar parámetros de inicio no admitidos y propone la conexión directa como alternativa. No eliminar esos parámetros del código para hacer pasar la conexión. Conservar los parámetros TLS de la URL: la aplicación normaliza `sslmode` y configura explícitamente la verificación del certificado. [Parámetros de inicio y conexión directa](https://neon.com/docs/connect/connection-errors#unsupported-startup-parameter).
 

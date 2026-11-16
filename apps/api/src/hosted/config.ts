@@ -46,7 +46,7 @@ export function normalizeOrigin(value: string, allowLoopbackHttp: boolean, setti
   } catch { throw new ConfigurationError(setting); }
 }
 /** URL SSL options cannot replace our verified TLS configuration in node-postgres. */
-export function normalizeDatabaseUrl(value: string, tls: DatabaseTls): string {
+export function normalizeDatabaseUrl(value: string, tls: DatabaseTls, setting = 'DATABASE_URL'): string {
   try {
     const parsed = new URL(value);
     if (!['postgres:', 'postgresql:'].includes(parsed.protocol) || !parsed.hostname || parsed.pathname.length < 2
@@ -58,7 +58,7 @@ export function normalizeDatabaseUrl(value: string, tls: DatabaseTls): string {
     }
     parsed.searchParams.delete('sslmode');
     return parsed.toString();
-  } catch { throw new ConfigurationError('DATABASE_URL', tls === 'loopback-test' ? 'plaintext requires loopback' : 'verified TLS is required'); }
+  } catch { throw new ConfigurationError(setting, tls === 'loopback-test' ? 'plaintext requires loopback' : 'verified TLS is required'); }
 }
 function integer(env: Environment, name: string, fallback: number): number {
   if (env[name] === undefined) return fallback;
@@ -74,11 +74,14 @@ export function readRuntimeConfig(env: Environment = process.env): RuntimeConfig
   const mode = env['CE_MODE'] ?? 'local';
   if (mode === 'local') return Object.freeze({ mode });
   if (mode !== 'hosted' && mode !== 'hosted-test') throw new ConfigurationError('CE_MODE');
-  const rawDatabase = required(env, 'DATABASE_URL');
+  // Neon's managed integration supplies a pooled DATABASE_URL and a direct URL separately.
+  // A configured but invalid direct URL must fail instead of silently selecting the pooler.
+  const databaseSetting = env['DATABASE_URL_UNPOOLED'] === undefined ? 'DATABASE_URL' : 'DATABASE_URL_UNPOOLED';
+  const rawDatabase = required(env, databaseSetting);
   let databaseTls: DatabaseTls = 'verify-full';
   try { if (mode === 'hosted-test' && isLoopbackHost(new URL(rawDatabase).hostname)) databaseTls = 'loopback-test'; }
-  catch { throw new ConfigurationError('DATABASE_URL'); }
-  const databaseUrl = normalizeDatabaseUrl(rawDatabase, databaseTls);
+  catch { throw new ConfigurationError(databaseSetting); }
+  const databaseUrl = normalizeDatabaseUrl(rawDatabase, databaseTls, databaseSetting);
   const publicApiOrigin = normalizeOrigin(required(env, 'PUBLIC_API_URL'), mode === 'hosted-test', 'PUBLIC_API_URL');
   const origins = required(env, 'ALLOWED_ORIGINS').split(',').map(value => normalizeOrigin(value.trim(), mode === 'hosted-test', 'ALLOWED_ORIGINS'));
   const allowedOrigins = Object.freeze([...new Set(origins)]);
