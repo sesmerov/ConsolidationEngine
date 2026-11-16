@@ -35,6 +35,7 @@ it('publishes only accepted references, bounds deliveries and suppresses hidden 
   expect(headers.get('upstash-flow-control-key')).toMatch(/^ce-cpu-/);
   expect(headers.get('upstash-flow-control-value')).toBe('parallelism=1');
   expect(headers.get('upstash-retry-delay')).toBe('1000 * pow(2, retried)');
+  expect(headers.get('upstash-redact-fields')).toBe('body,header');
   expect(init.signal).toBeInstanceOf(AbortSignal);expect(init.redirect).toBe('error');
   fetch.mockRejectedValue(new Error('lost provider acknowledgement'));
   await expect(dispatcher.dispatch(input)).rejects.toThrow(); expect(fetch).toHaveBeenCalledTimes(2);

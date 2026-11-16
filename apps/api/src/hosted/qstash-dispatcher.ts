@@ -53,7 +53,8 @@ export class QstashDispatcher implements JobDispatcher {
         Authorization:'Bearer '+this.token, 'Content-Type':'application/json', 'Upstash-Method':'POST',
         'Upstash-Retries':'3','Upstash-Retry-Delay':'1000 * pow(2, retried)','Upstash-Timeout':'120s',
         'Upstash-Flow-Control-Key':this.flowKey,'Upstash-Flow-Control-Value':'parallelism=1',
-        'Upstash-Deduplication-Id':reference.jobId,'Upstash-Redact-Fields':'body,headers',
+        // The SDK emits singular "header"; live QStash rejects the REST docs' plural "headers".
+        'Upstash-Deduplication-Id':reference.jobId,'Upstash-Redact-Fields':'body,header',
       } }); } catch (error) {
       this.failed(reference.jobId, error instanceof Error && ['AbortError', 'TimeoutError'].includes(error.name) ? 'timeout' : 'network-error'); throw error;
     }
