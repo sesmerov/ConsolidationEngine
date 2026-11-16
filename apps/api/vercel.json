@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "cd ../.. && npx --yes npm@11.19.1 ci --engine-strict=false",
+  "buildCommand": "cd ../.. && npx --yes npm@11.19.1 run package:vercel:api",
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 120,
+      "includeFiles": "{dist/**,../../packages/contracts/dist/**,../../packages/contracts/package.json,../../packages/engine/dist/**,../../packages/engine/package.json}"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/v1/:path*", "destination": "/api/index" },
+    { "source": "/internal/:path*", "destination": "/api/index" }
+  ]
+}

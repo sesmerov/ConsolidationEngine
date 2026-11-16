@@ -4,6 +4,8 @@ dist/
 build/
 coverage/
 .angular/
+.vercel/
+.vercel-dist/
 .cache/
 *.tsbuildinfo
 .tools/

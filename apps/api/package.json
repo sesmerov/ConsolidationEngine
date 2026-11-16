@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": { "node": "24.x" },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node ../../scripts/prepare-visual-templates.mjs --package && node ../../scripts/create-visual-demos.mjs --package",
+    "build": "tsc -p tsconfig.json && node ../../scripts/prepare-api-assets.mjs && node ../../scripts/prepare-visual-templates.mjs --package && node ../../scripts/create-visual-demos.mjs --package",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

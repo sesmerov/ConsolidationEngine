@@ -90,7 +90,9 @@ for (let trial = 1; trial <= count; trial++) test(`004 API-seeded validation tri
     await page.getByRole('button', { name: 'Validar informes', exact: true }).click({ timeout: 65000 }); stages['clickedMs'] = performance.now() - t0!;
     const accepted = await (await acceptedValidation).json(); stages['acceptedMs'] = performance.now() - t0!;
     await expect(page.getByRole('heading', { name: 'Ejecución terminada', exact: true })).toBeVisible({ timeout: 65000 });
-    await expect(page.locator('#validation-run')).toHaveValue(accepted.resultRef.id);
+    // One run is read-only in the simplified UI; its identity is audited through the authenticated API below.
+    await expect(page.locator('.history-controls')).toContainText('Terminada');
+    await expect(page.locator('#validation-run')).toHaveCount(0);
     const summary = page.locator('.validation-summary');
     for (const label of ['Pasa', 'Falla']) await expect(summary.locator('div').filter({ has: page.getByText(label, { exact: true }) }).locator('dd')).toHaveText('250');
     for (const label of ['No aplica', 'No evaluable', 'Error']) await expect(summary.locator('div').filter({ has: page.getByText(label, { exact: true }) }).locator('dd')).toHaveText('0');

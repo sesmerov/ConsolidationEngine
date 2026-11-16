@@ -7,6 +7,7 @@ const testOrigin = `http://127.0.0.1:${testPort}`;
 
 export default defineConfig({
   testDir: './tests/e2e',
+  testIgnore: 'hosted-*.spec.ts',
   fullyParallel: false,
   forbidOnly: Boolean(process.env['CI']),
   retries: 0,

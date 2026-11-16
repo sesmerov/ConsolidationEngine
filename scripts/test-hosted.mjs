@@ -28,7 +28,7 @@ async function provision() {
     const endpoint = (await docker(['port', containerId, '5432/tcp'])).stdout.trim();
     if (!/^127\.0\.0\.1:\d+$/.test(endpoint)) throw new Error();
     for (let attempts = 0; attempts < 60; attempts++) {
-      try { await docker(['exec', containerId, 'pg_isready', '--username=ce_test', '--dbname=ce_test']);
+      try { await docker(['exec', containerId, 'pg_isready', '--host=127.0.0.1', '--username=ce_test', '--dbname=ce_test']);
         console.log('Hosted tests: owned PostgreSQL 17 container ready; each suite uses an isolated schema.');
         return `postgresql://ce_test:${password}@${endpoint}/ce_test`;
       } catch { await delay(250); }

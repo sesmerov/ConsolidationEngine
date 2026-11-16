@@ -39,6 +39,10 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "vercel": {
+              "outputPath": "../../dist/vercel-web",
+              "sourceMap": false
             }
           },
           "defaultConfiguration": "production"

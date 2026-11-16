@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "cd ../.. && npx --yes npm@11.19.1 ci --engine-strict=false",
+  "buildCommand": "cd ../.. && npx --yes npm@11.19.1 run package:vercel:web",
+  "outputDirectory": ".vercel-dist/browser",
+  "trailingSlash": false,
+  "rewrites": [
+    { "source": "/", "destination": "/index.html" }
+  ]
+}
