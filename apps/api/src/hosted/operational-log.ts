@@ -2,8 +2,9 @@ import { ERROR_STATUS, type ErrorCode } from '@ce/contracts';
 
 const events = ['request_failed', 'job_accepted', 'dispatch_uncertain', 'job_claimed', 'job_terminal',
   'quota_rejected', 'cleanup_delayed', 'cleanup_completed', 'provider_failed'] as const;
-const providerOperations = ['blob-put', 'blob-get', 'blob-read', 'blob-delete'] as const;
-const providerReasons = ['access', 'store-missing', 'store-suspended', 'rate-limit', 'timeout', 'provider-error', 'missing-length', 'invalid-length', 'read-limit', 'incomplete-read', 'other'] as const;
+const providerOperations = ['blob-put', 'blob-get', 'blob-read', 'blob-delete', 'qstash-publish'] as const;
+const providerReasons = ['access', 'store-missing', 'store-suspended', 'rate-limit', 'timeout', 'provider-error', 'missing-length', 'invalid-length', 'read-limit', 'incomplete-read', 'other',
+  'request-rejected', 'redaction-invalid', 'timeout-invalid', 'flow-control-invalid', 'retry-invalid', 'invalid-response', 'network-error'] as const;
 const requestFailureKinds = ['database-permission', 'database-constraint', 'database-timeout', 'database-error', 'body-parser', 'type-error', 'range-error', 'timeout', 'unknown'] as const;
 export type ProviderOperation = typeof providerOperations[number];
 export type ProviderFailureReason = typeof providerReasons[number];

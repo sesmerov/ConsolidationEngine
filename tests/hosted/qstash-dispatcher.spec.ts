@@ -4,6 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { QstashDispatcher, QstashSignatureVerifier } from '../../apps/api/src/hosted/qstash-dispatcher.js';
 import { registerInternalJobs } from '../../apps/api/src/routes/internal-jobs.js';
 import type { JobDTO } from '@ce/contracts';
+import { createOperationalLogger } from '../../apps/api/src/hosted/operational-log.js';
 
 const origin = 'https://api.example.test', currentKey = 'synthetic-current-signing-key', nextKey = 'synthetic-next-signing-key';
 const reference = () => ({ sessionId: randomUUID(), workspaceId: randomUUID(), jobId: randomUUID() });
@@ -43,6 +44,30 @@ it('aborts a hung publication at the client boundary and does not start a hidden
  const fetch=vi.fn((_url:string,init:RequestInit)=>new Promise<Response>((_resolve,reject)=>{init.signal!.addEventListener('abort',()=>reject(init.signal!.reason),{once:true});}));vi.stubGlobal('fetch',fetch);
  await expect(new QstashDispatcher({publicApiOrigin:origin,token:'synthetic-token'}).dispatch(reference())).rejects.toThrow();
  expect(spy).toHaveBeenCalledWith(10000);expect(fetch).toHaveBeenCalledTimes(1);
+});
+it.each([
+  [400, 'invalid redact fields containing private data', 'redaction-invalid'],
+  [400, 'timeout exceeds private plan detail', 'timeout-invalid'],
+  [400, 'invalid parallelism for private key', 'flow-control-invalid'],
+  [400, 'invalid retries containing private data', 'retry-invalid'],
+  [401, 'private token', 'access'], [429, 'private quota', 'rate-limit'], [503, 'private provider detail', 'provider-error'],
+] as const)('reports QStash HTTP %s through fixed diagnostic labels only', async (status, message, reason) => {
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: message }), { status })); vi.stubGlobal('fetch', fetch);
+  const sink = vi.fn(), input = reference(), dispatcher = new QstashDispatcher({ publicApiOrigin: origin, token: 'synthetic-secret-token' }, createOperationalLogger(sink));
+  await expect(dispatcher.dispatch(input)).rejects.toThrow('Queue acknowledgement was not confirmed');
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(sink.mock.calls[0]![0])).toEqual({ event: 'provider_failed', jobId: input.jobId, providerOperation: 'qstash-publish', providerReason: reason, statusCode: status });
+  expect(JSON.stringify(sink.mock.calls)).not.toMatch(/private|synthetic-secret|api.example|sessionId|workspaceId/);
+});
+it('bounds rejected response parsing and preserves uncertain acknowledgement for malformed success bodies', async () => {
+  const sink = vi.fn(), cancel = vi.fn(), stream = new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(Buffer.alloc(4097, 65)); }, cancel });
+  const fetch = vi.fn().mockResolvedValueOnce(new Response(stream, { status: 400 })).mockResolvedValueOnce(new Response('not json', { status: 200 }))
+    .mockResolvedValueOnce(new Response('{}', { status: 200 })); vi.stubGlobal('fetch', fetch);
+  const dispatcher = new QstashDispatcher({ publicApiOrigin: origin, token: 'synthetic-token' }, createOperationalLogger(sink));
+  await expect(dispatcher.dispatch(reference())).rejects.toThrow(/acknowledgement/); expect(cancel).toHaveBeenCalledTimes(1); expect(stream.locked).toBe(false);
+  expect(JSON.parse(sink.mock.calls[0]![0])).toMatchObject({ providerReason: 'request-rejected', statusCode: 400 });
+  for (let index = 0; index < 2; index++) { await expect(dispatcher.dispatch(reference())).rejects.toThrow(/acknowledgement/); expect(JSON.parse(sink.mock.calls.at(-1)![0])).toMatchObject({ providerReason: 'invalid-response', statusCode: 200 }); }
+  expect(fetch).toHaveBeenCalledTimes(3);
 });
 it('uses actual current and next signature keys over exact raw body and public URL', async () => {
   const { app, run } = await setup(), input = reference(), body = `\n ${JSON.stringify(input, null, 2)} \n`;
