@@ -1,5 +1,22 @@
 # Verificación de la iteración 005
 
+## Estado de gates — 16-11-2026
+
+| Criterio | Requisitos | Estado actual y evidencia |
+| --- | --- | --- |
+| SC-001 | FR-001–004 | PASS automático: foco/modalidades, halo y tres hitos; workflow-guidance 5/5. |
+| SC-002 | FR-005–009 | PASS local y SQL/worker: revisión automática, pendientes, reentrada, simulación/publicación atómicas y rollback. |
+| SC-003 | FR-010–011 | PASS: descarga centralizada y único CTA; componentes y recorridos locales. |
+| SC-004 | FR-012–013 | PASS local y HTTP: intención exacta, hash/partes, respuestas tardías, históricos y recuperación sin nueva exportación. |
+| SC-005 | FR-014–017 | PASS automático: inventario inicial más N01–N09, 282 pruebas Angular y pruebas de controles/explicaciones paginadas. |
+| SC-006 | FR-019–022 | PASS SQL/HTTP y cuatro casos browser alojados: sesiones independientes, continuidad, publicación durable y cierre aislado. |
+| SC-007 | FR-023–024 | Revocación/limpieza/transporte PASS con proveedores controlados. Capacidad máxima **NO APTA por plazo**; sin rebajar límites. |
+| SC-008 | FR-018, FR-025–026 | Packaging/Linux/orígenes PASS local. Vercel/Neon/Blob/QStash reales **pendientes**, sin cuentas/provisión/despliegue. |
+| SC-009 | FR-030 | PASS motor/local/HTTP/browser alojado: originales, perfiles acotados, COREP/FINREP/tipos y roundtrip. |
+| SC-010 | FR-027–029 | PASS automático: README escrito al final, introducción de siete líneas, mención SDD/Spec Kit, 17 enlaces relativos, cuatro capturas, dos Mermaid y arranque limpio verificados. Sin observación humana atribuida. |
+
+Los detalles siguientes conservan el orden de ejecución, incluidos fallos y repeticiones. «PASS» siempre se refiere al escenario descrito; no convierte un adaptador controlado en proveedor real ni una tarea ejecutada en viabilidad alojada aprobada. La observación humana SC-010 de 004 permanece independiente.
+
 ## Punto de partida — 2026-11-08
 
 Rama `codex/005-simplificar-flujo-vercel`, commit inicial `33bc0b8` (tareas). Árbol limpio al iniciar implementación. Esta evidencia pertenece a 005; no importa resultados ni aceptación humana de 004. Receipt-driven development: `disabled/unmanaged`.
@@ -206,3 +223,48 @@ Angular final completo:34archivos/282PASS. Navegador local final: analyst-contro
 Guía y modalidades:5/5PASS a320/390/1440, ratón/teclado, halo4,5s, movimiento reducido y colores forzados. Búsqueda:2/2PASS, incluidas las cuatro medidas cercanas300ms y respuesta tardía. El inventario se amplió con N01–N09 (sesión, avisos, páginas, contenido completo, cambios e inicio explícito de otra revisión); conserva la evidencia anterior como histórica y distingue pruebas de aceptación humana.
 
 Linux aislado, primera pasada: `outputs/package-linux-aa153f5a-7ec3-4f8e-8602-18d381fd15e8/verification.json`, Node24.22.2/npm11.19.1/Java17.0.21; ocho archivos ANTLR reproducibles y originales por hash, once clases de trabajo, tres demos, imports hosted y frontend sin secretos. Runtime2GB/1CPU/tmp400MiB, sin red ni checkout vecino. Esta pasada precede la optimización del historial; el empaquetado final se revalida después y no se le atribuyen cambios posteriores.
+
+### Capacidad medida: plazo máximo incumplido
+
+El arnés aplica realmente2GiB/1CPU, heap viejo del worker256MiB y `/tmp`400MiB. PostgreSQL17.11 y el almacenamiento privado controlado representan servicios externos y quedan fuera del RSS de la aplicación. Se suman los procesos del espacio PID de la aplicación cada50ms, contando cada hilo una sola vez. Node24.22.2; imágenes fijadas por digest, hashes de entradas/código y logs conservados en `outputs/capacity-hosted-*` (ignorados por Git).
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| Archivo10MiB, lote50MiB y expansión100MiB; cada máximo+1 | Fronteras y rechazosPASS. Sellado9,386s,392 consultas simultáneas. Fixture de transporte con24.000filas físicas, expresamente fuera del límite de500reglas; no acredita cálculo admitido. |
+| Cancelación de carga máxima |134ms, terminal sin publicación. |
+| ZIP100MiB final |104857600bytes,142bytes de overhead,34partes, hashes completos, máximo+1 rechazado; staging/lecturas12,375s. No sustituye generación del informe máximo. |
+|20snapshots de500reglas/100.000hechos |Publicados dentro60s cada uno, compartiendo el mismo bloque de datos; primer snapshot38,95s, siguientes aproximadamente13–15s. |
+|RSS agregado y temporales |1239216128bytes (~1,154GiB) y209715201bytes (~200MiB); dentro de1,6GiB/400MiB, sinOOM. |
+|Validación máxima |TIMED_OUT a60051ms, sin resultado publicado;2822consultas concurrentes, máximo115,96ms. **Gate no apto por plazo**. |
+
+Evidencia principal: `capacity-hosted-d010af31-4d49-4f8c-b5cc-4e16a9dcae3f` (fronteras) y `capacity-hosted-1c01c86b-0c75-4e33-974d-e2494e6d523b` (20snapshots, ZIP, memoria/plazo). El diagnóstico posterior `capacity-hosted-7cb3d878-1104-4e15-89cb-93d3c4624482` usa una semilla máxima, no repite ni sustituye el gate de20snapshots: inicialización0,502s, hidratación21,679s, evaluación desde22,181s hasta timeout60,005s. No alcanza serialización, proyecciones ni publicación. No se aplicó una optimización especulativa de chunks ajena al cuello medido ni se redujeron límites o activó un plan de pago. La viabilidad alojada del caso máximo queda pendiente.
+
+### Capturas del producto final
+
+T103: `docs/images/flow-005-load.png`, `flow-005-validate.png`, `flow-005-recalculate.png` y `flow-005-download.png`,1440×1000. Las cuatro se abrieron y comprobaron visualmente: COREP sintético,110celdas/15valores en carga;7/8/1 al validar; cinco cambios y14/1/1 después de aplicar; versión3 con único botón en Descargar. No contienen credenciales. Son capturas reales de esta interfaz, no mockups ni aceptación humana.
+
+### Paquete final y arranque limpio
+
+`outputs/package-linux-d90689bb-0ea2-48e9-8703-a00e0a22bb1f/verification.json`: **PASS final Linux** con694archivos de runtime, ocho generados ANTLR reproducibles, seis entradas originales verificadas y once clases de trabajo sin imports/workers/assets ausentes. Node24.22.2/npm11.19.1/Java17.0.21. Runtime2GB/1CPU/tmp400MiB, sin red ni fuentes del checkout. El entrypoint exacto de `npm start` arranca en producción y responde HTML200, bootstrap200, ruta directa200 y asset inexistente404. Los paquetes frontend local/Vercel no contienen ninguno de los seis secretos sentinela. Es una comprobación automática desde instalación/build aislados; no acredita lectura o aceptación humana del README ni despliegue en Vercel.
+
+El selector alojado de candidatos requería un grupo completo, no solo su ID. Se restituyó el contrato a la misma revisión, comprobado mediante HTTP/SQL2/2PASS y27pruebas Angular focales, incluida hidratación íntegra de un grupo grande. Los casos locales/hosted de Playwright quedan separados:62pruebas locales en19archivos y cuatro alojadas en su propio arnés; `test:e2e` ya no intenta ejecutarlas sin servicios.
+
+### Recorridos alojados y rendimiento final
+
+Los cuatro casos de navegador alojado quedan cubiertos: orígenes/rutas/aislamiento; FINREP con dos visitantes; COREP; texto/fechas. FINREP completa2/3→4/1 y descarga100/120, con SHA/tamaño verificados, cambio real de instancia, respuesta de exportación perdida, una sola clave/job SQL y recuperación tras recarga sin otroPOST. Texto/fechas conserva6/2, seis valores y ausencia de recálculos. COREP completa7/8/1→14/1/1, cinco cambios y una sola aplicación, con valores del XLSX comprobados.
+
+Evidencia browser: `outputs/hosted-e2e-finrep-types-20261116T0006Z` y `outputs/hosted-e2e-7fa0a44f-ec77-4f1c-828a-925a275b6286`; contienen resultados, ZIPs y `downloads.json` con hashes. El primero conserva también el fallo previo de helperCOREP. Los helpers se corrigieron para esperar grupo visible/radio habilitado, tolerar un único contexto/versión sin selector y mantener el corte durante los reintentos transparentes de Chromium; no se cambiaron resultados esperados. Las cuatro pruebas se aprobaron en ejecuciones separadas, no en una ejecución global inventada. Puertos3350–3354 y contenedores/procesos propios cerrados al terminar.
+
+Benchmark local T099: referencia congelada en `.cache/benchmark/005-reference`, protocolo heredado `004-api-seeded-validation` sin cambiar carga, T0/T1, auditoría ni umbrales. Solo se adaptó la comprobación del selector de ejecución a lectura cuando existe una sola. Piloto22,888s, auditoríaPASS. Cohorte final `cohort-2026-11-16T00-01-38-800Z`: **10/10PASS**, todas≤30s y≤60s:16,435 /22,751 /21,498 /19,483 /16,983 /17,359 /16,790 /22,643 /20,002 /17,455s. Cada ejecución auditó500reglas,250pasan/250fallan y100.000lecturas distintas con valores/procedencia exactos. Duración total10,8min incluye importación/auditoría fuera de T0/T1. Windows y toolchain locales; hubo otros arneses Docker aislados concurrentes, registrado como entorno real de medición. No se equipara con la capacidad alojada de1CPU.
+
+Exportador real máximo, caso separado: `outputs/capacity-hosted-1ee67425-28e2-4de2-9186-7018ef933023`. Desde XLSX reales con500reglas/100.000coordenadas/100.000hechos e identidad verificada, fuentes retenidas mediante SQL/ledger y un snapshot: **PASS23,916s** desde claim a terminal. Hidratación19,748s; preparación/escritura3,626s. Setup de importación y publicación71,9s fuera del claim de exportación; no se presenta como un job de importación de esa duración ni como admisión visual hosted de ce-report-1. RSS agregado1262755840bytes (~1,176GiB), tmp9643004bytes (~9,20MiB), sinOOM con2GiB/1CPU.1048consultas concurrentes, máximo309,29ms. ZIP4821648bytes en dos partes, SHA256 `38d20059043a6de09da3fb7220b53558486ff032ce645d9c6afb4da966f20f08`, descargado y verificado íntegro. El historial de20ancestros se acredita por la prueba SQL separada, no fingiendo veinte versiones en esta medición.
+
+T091/T095 registran ejecución completa de los casos y sus resultados; **la capacidad global sigue NO APTA por el timeout de validación**, aunque exportación, memoria y temporales pasen. T096 contrasta estos gates con la guía operacional y quickstart: local/packaging comprobados, viabilidad máxima pendiente y alojamiento real pendiente por ausencia de un entorno autorizado/provisionado. No se han creado cuentas, contratado ni desplegado servicios.
+
+### README final y cierre documental
+
+T105 / SC-010: `README.md` se reescribió después de los cambios de producto, las pruebas, las capturas y los diagramas. La comprobación automática confirma siete líneas no vacías de introducción (menos de diez), la frase explícita de desarrollo mediante SDD/Spec Kit, el enlace portable a `specs/`, 17 enlaces relativos existentes y dos bloques Mermaid idénticos a `docs/architecture-005.md`. Las cuatro imágenes referenciadas existen, tienen 1440×1000 píxeles y ya se habían abierto y revisado visualmente en T103.
+
+Los comandos documentados de instalación, preparación, build y `npm start` corresponden a la comprobación Linux limpia registrada arriba; no se repite una instalación sin cambios de código. La vista local final en `http://127.0.0.1:3360` responde 200, incluye la raíz Angular y el título de la aplicación. No se tocó la sesión del usuario en 3340. No se solicitó ni se atribuye una prueba humana del README: asistencia, tiempos de lectura y aceptación humana de esta iteración no observados. La revisión por recibos sigue `disabled/unmanaged`.
+
+Las 105 tareas tienen su ejecución documentada. Esto no modifica los gates pendientes: la validación máxima alojada sigue incumpliendo el plazo y los servicios reales no se han desplegado. No existe `.specify/extensions.yml`, por lo que no hay hooks posteriores de implementación que ejecutar.

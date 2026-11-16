@@ -1,17 +1,77 @@
 # ConsolidationEngine
 
-Aplicación local para validar informes Excel con reglas EBA, explicar los resultados y proponer
-recálculos con dependencias. Angular Material presenta los datos; Node.js ejecuta el motor con
-ANTLR JavaScript, aritmética exacta y ordenamiento topológico de Kahn. El analista revisa los
-destinos, selecciona los cambios y confirma su aplicación. El sistema conserva versiones
-anteriores y vuelve a validar después de aplicar.
+Demo para validar informes regulatorios Excel y proponer recálculos explicables.
+El analista carga un catálogo de reglas y sus informes, revisa los resultados y decide qué cambios aplicar.
+El motor interpreta las reglas EBA con ANTLR y ordena sus dependencias mediante el algoritmo de Kahn.
+Cada aplicación crea una versión y vuelve a validar; la descarga conserva los informes y el registro de cambios.
+Incluye ejemplos sintéticos COREP, FINREP F 01.01 y reglas con texto y fechas.
+Esta demo se ha desarrollado mediante Spec Driven Development (SDD), utilizando Spec Kit.
+Las decisiones y su implementación se documentan en las [especificaciones, planes y tareas](specs/).
 
-La iteración 004 incorpora guía visual de etapas, acciones principales verdes, decisiones de conflictos editables, selección múltiple persistente y FINREP F 01.01. Su [registro de verificación](docs/verification-004.md) distingue pruebas ejecutadas, medidas y observación humana SC-010. Los resultados de [002](docs/verification-002.md), [003](docs/verification-003.md) y la [aceptación global de 001](docs/verification.md) se conservan como evidencia histórica; no acreditan por sí solos la interfaz ni los perfiles nuevos.
+## Flujo de trabajo
 
-## Instalación y arranque
+```mermaid
+flowchart LR
+  C["Cargar catálogo e informes"] --> I["Inspeccionar y confirmar"]
+  I --> V["Validar y explicar"]
+  V --> D{"¿Hay recálculos?"}
+  D -->|Sí| E["Resolver decisiones pendientes"]
+  E --> S["Simular y seleccionar propuestas"]
+  S --> A["Confirmar aplicación"]
+  A --> R["Nueva versión y revalidación"]
+  R --> X["Descargar versión elegida"]
+  D -->|No| X
+```
 
-Desde la raíz del repositorio, en PowerShell de Windows x64, con Java 11 o superior disponible
-mediante `java` (la generación registrada usa Java 17):
+1. **Cargar:** seleccionar catálogo e informes, revisar las hojas y confirmar la carga.
+2. **Validar:** consultar qué reglas pasan, fallan o no aplican y abrir sus explicaciones.
+3. **Recalcular:** resolver únicamente las decisiones pendientes en **Elegir qué celdas recalcular**, simular y revisar **Anterior → Propuesto**. Las propuestas disponibles comienzan seleccionadas; aplicar requiere confirmación explícita y dependencias completas.
+4. **Descargar:** elegir versión y contenido, y utilizar un único botón para obtener el paquete.
+
+Los destinos inequívocos se eligen automáticamente. Si hay alternativas o varias reglas proponen escribir en la misma celda, decide el analista. Las reglas con condicionales, texto, fechas o desigualdades **solo se validan**. Validar y simular no cambian los valores del informe.
+
+## Tecnologías y arquitectura
+
+| Capa | Tecnologías y responsabilidad |
+| --- | --- |
+| Interfaz | Angular 22, Angular Material y TypeScript: cuatro etapas, tablas, selección múltiple y accesibilidad. |
+| API | Node.js 24 y Fastify 5: contratos, sesiones, archivos y coordinación de trabajos. |
+| Motor | ANTLR 4.13.2 genera el parser JavaScript; evaluación con racionales exactos y dependencias ordenadas mediante Kahn. |
+| Modo local | Memoria y archivos temporales; web y API servidas por un mismo proceso. |
+| Modo alojado | PostgreSQL 17, objetos privados Vercel Blob y entregas firmadas QStash; frontend y backend en proyectos Vercel separados. |
+| Verificación | Vitest, pruebas de Angular, Playwright y entornos Linux/PostgreSQL aislados con Docker. |
+
+```mermaid
+flowchart TB
+  UI["Angular + Angular Material"] --> API["API Node.js / Fastify"]
+  API --> LOCAL["Modo local: memoria y archivos temporales"]
+  API --> SQL[("Modo hosted: PostgreSQL")]
+  SQL --> OUT["Outbox durable"]
+  OUT --> QUEUE["QStash: entrega firmada"]
+  QUEUE --> CALLBACK["Callback API con permiso y plazo"]
+  LOCAL --> WORKER["Worker aislado"]
+  CALLBACK --> WORKER
+  WORKER --> ENGINE["Motor puro: ANTLR · racionales · Kahn"]
+  WORKER --> OBJECTS[("Blob privado: originales y bloques")]
+  WORKER --> PUB["Publicación atómica en SQL"]
+  PUB --> SQL
+  SQL --> API
+```
+
+El diagrama representa la composición implementada. Los proveedores alojados aún no se han desplegado: las pruebas utilizan PostgreSQL real y adaptadores controlados de cola y objetos. En modo local no hacen falta servicios externos. La [arquitectura detallada](docs/architecture-005.md) explica los componentes y sus límites.
+
+| Ubicación | Contenido |
+| --- | --- |
+| `apps/web` | Interfaz y recuperación del estado de navegación. |
+| `apps/api` | API, workers, adaptadores locales y persistencia alojada. |
+| `packages/engine` | Interpretación, validaciones, recálculos y dependencias. |
+| `packages/contracts` | Tipos, esquemas y límites compartidos. |
+| `grammar` | Gramáticas originales EBA, verificadas por hash. |
+| `specs` | Especificaciones, planes, contratos y tareas de Spec Kit. |
+
+## Instalación y arranque local
+
+Requisitos: **Node 24.22.2, npm 11.19.1 y Java 11 o superior**. La comprobación Linux utiliza Java 17. En PowerShell de Windows x64, desde la raíz:
 
 ```powershell
 .\scripts\bootstrap-toolchain.ps1
@@ -22,95 +82,99 @@ mediante `java` (la generación registrada usa Java 17):
 .\scripts\run-with-toolchain.ps1 -NpmArguments @('start')
 ```
 
-El bootstrap prepara Node **24.22.2** y npm **11.19.1** en `.tools/`, sin cambiar instalaciones
-globales. Material/CDK **22.2.4** están fijados en los manifests y el lockfile. La primera preparación
-requiere descargar dependencias y el JAR ANTLR verificado. `prepare:templates` reproduce las
-plantillas saneadas a partir de las fuentes versionadas; debe preceder a `fixtures`, que genera
-los ejemplos. Build genera el parser, compila API y Angular y empaqueta plantillas, demos y mappings.
-Las descargas del producto no consultan la web ni necesitan los libros originales en runtime.
+El bootstrap instala Node/npm en `.tools`, sin modificar las instalaciones globales. La primera preparación descarga dependencias y el JAR ANTLR verificado. Con las mismas versiones ya disponibles, en Linux o Windows:
 
-Abrir `http://127.0.0.1:3000`; ese proceso sirve web y API. Para detenerlo, usar Ctrl+C en su terminal.
-Para desarrollo, una vez detenido el servidor propio anterior, ejecutar:
-
-```powershell
-.\scripts\run-with-toolchain.ps1 -NpmArguments @('run','dev')
+```sh
+npm ci
+npm run prepare:templates
+npm run fixtures
+npm run build
+npm start
 ```
 
-Abrir `http://127.0.0.1:4200`. Angular recarga el frontend; los cambios del backend requieren
-reiniciar el comando. No detener un proceso con datos de otra sesión para ejecutar pruebas.
+Abrir [http://127.0.0.1:3000](http://127.0.0.1:3000). `build` genera el parser y empaqueta plantillas, demos y recursos; las peticiones no descargan fuentes regulatorias. Para desarrollo, detener ese servidor y ejecutar `npm run dev` —o el equivalente con `run-with-toolchain.ps1`— y abrir [http://127.0.0.1:4200](http://127.0.0.1:4200). Angular recarga la interfaz; los cambios del backend requieren reiniciar el comando.
 
-## Cuatro etapas de trabajo
+El modo local recupera el conjunto al refrescar el navegador, pero pierde sus datos al cerrarlo o reiniciar el servidor. Descargar los informes que se deseen conservar.
 
-1. En **Cargar**, seleccionar catálogo e informes, revisar su contexto y confirmar las hojas que se importarán. La cabecera muestra el contexto único como texto y permite elegir cuando hay varios. La búsqueda por código alcanza todo el catálogo.
-2. En **Validar**, consultar el resultado y abrir **Ver cálculo y origen** para revisar las entradas. **Preparar revisión de destinos** sugiere la celda cuando solo hay un lado elegible. El analista puede omitirla. Cuando hay dos lados posibles, elige el lado o la omisión. Si varias reglas apuntan a la misma celda, decide cuál conservar o si omitir el grupo. **Guardar configuración** publica esas decisiones.
-3. En **Recalcular**, simular y comparar **Anterior → Propuesto**. Las propuestas disponibles comienzan seleccionadas; se pueden desmarcar, seleccionar todas las disponibles del filtro o limpiar la selección completa. La selección se conserva al navegar y recargar. Si faltan antecedentes, se muestran para que el analista decida. La aceptación comienza desmarcada y se invalida al editar la selección. Aplicar publica una versión y vuelve a validar el conjunto.
-4. En **Descargar**, guardar resultados o informes de una versión. El realce de la etapa completa indica dónde continuar tras confirmar la carga, guardar destinos utilizables o aplicar cambios: tres pulsos suaves de 1,5 segundos, o realce estático con movimiento reducido. Las acciones principales son verdes. La descarga de informes aplicados toma la versión del recibo y respeta la elección del selector histórico.
+## Demostraciones y cobertura
 
-La cobertura regulatoria visual fijada es **COREP de fondos propios 4.0, C_01.00 / CA1** (110 posiciones) y **FINREP 4.0, F_01.01 / hoja 1.1** (38 posiciones). Se admiten los extractos empaquetados y el libro oficial reconocido. Si contiene varias plantillas compatibles, se pide elegir una por archivo. Las hojas excluidas requieren aceptación explícita; no se importan ni validan sus datos. Las demás tablas, tablas abiertas y cobertura general COREP/FINREP/DPM-XL quedan fuera del alcance. `FINREP_F0101_4.0` es un alias local de este layout, no un módulo XBRL oficial.
+En **Cargar → Demostraciones guiadas**, descargar catálogo e informe del mismo ejemplo. Todos los datos son sintéticos; descargar los archivos no los importa automáticamente.
 
-## Demostraciones
+| Ejemplo | Reglas | Resultado inicial | Después de aplicar |
+| --- | ---: | --- | --- |
+| COREP CA1 | 16: cinco procedentes del catálogo EBA y once sintéticas | 7 pasan, 8 fallan y 1 no aplica | Cinco cambios: 14 pasan, 1 falla y 1 no aplica. |
+| FINREP F 01.01 | 5 sintéticas | 2 pasan y 3 fallan | 90 → 100 y 105 → 120; 4 pasan y 1 falla deliberadamente. |
+| Texto y fechas | 8 sintéticas | 6 pasan y 2 fallan | Solo validación; no ofrece recálculos. |
 
-En **Cargar → Demostraciones guiadas**, descargar catálogo e informe del mismo ejemplo. Todos los
-datos son sintéticos. Descargar una guía o cambiar de ejemplo no importa datos ni configura reglas.
+La [guía de demostraciones](docs/visual-demos.md) explica las decisiones, los cambios y los fallos deliberados. La cobertura visual está acotada a **COREP fondos propios 4.0, C_01.00 / CA1** (110 posiciones), **FINREP 4.0, F_01.01 / hoja 1.1** (38 posiciones) y el ejemplo tipado. No se afirma cobertura general de COREP, FINREP ni DPM-XL. La API mantiene compatibilidad con `ce-report-1`; ese formato anterior no se ofrece en la interfaz.
 
-| Ejemplo | Reglas | Resultado inicial | Recálculo |
-|---|---:|---|---|
-| COREP CA1 | Cinco procedentes del catálogo EBA y once sintéticas | 7 pasan, 8 fallan y 1 no aplica | Conservar `v0174_m` en r0070 y omitir el grupo r0200 deja cinco productores oficiales. Después pasan 14 reglas, falla 1 y 1 no aplica. |
-| FINREP F 01.01 | 5 sintéticas | 2 pasan y 3 fallan | Dos cambios encadenados: 90 → 100 y 105 → 120. Después pasan 4 y falla 1 deliberadamente. |
-| Texto y fechas | 8 sintéticas | 6 pasan y 2 fallan | Sólo validación, sin destinos ni propuestas. |
+El paquete de informes incluye los Excel de la versión elegida y su registro de cambios. FINREP conserva el libro original y las hojas excluidas, sin considerarlas validadas. Los importes mantienen su valor exacto y escala; texto, fecha, vacío informado y ausencia de dato se distinguen. Los archivos son extractos de trabajo reimportables, **no ficheros oficiales de remisión**.
 
-Son **29 reglas: cinco de origen EBA y veinticuatro sintéticas**. El ejemplo COREP muestra dos ramas
-de dependencias con tres niveles. Los fallos deliberados se explican en la
-[guía de demos](docs/visual-demos.md), que contiene los pasos, cinco cambios y resultados por regla.
+## Preparación de Vercel
 
-En el perfil nuevo, las reglas que contienen condicionales, texto o fechas son **sólo de validación**,
-incluso si su resultado es numérico o el tipo aparece en una rama no ejecutada. Las desigualdades
-tampoco ofrecen destino porque no son igualdades. Las comprobaciones se repiten en API y motor.
+La demo pública está diseñada para **datos sintéticos y sesiones anónimas independientes**. El navegador conserva credenciales e identificadores mínimos, sin guardar informes ni resultados. La API comprueba el propietario en cada acceso, aplica cuotas y autoriza orígenes CORS exactos.
 
-La interfaz ofrece COREP, FINREP F 01.01 y el ejemplo tipado. Los conflictos se resuelven con opciones excluyentes y confirmación local; las decisiones pueden reabrirse y cambiarse. La API de compatibilidad conserva `ce-report-1` para pruebas y consumidores existentes. El rechazo FINREP registrado en 003 es evidencia histórica del punto de partida; el soporte y las comprobaciones actuales se documentan en [verificación de 004](docs/verification-004.md).
+| Proyecto | Root Directory | Comando de empaquetado desde la raíz |
+| --- | --- | --- |
+| Frontend | `apps/web` | `npm run package:vercel:web` |
+| Backend | `apps/api` | `npm run package:vercel:api` |
 
-## Exportación, límites y sesión
+Los archivos `vercel.json` fijan los comandos de instalación/build y las rutas. Configurar los valores públicos del frontend según [apps/web/.env.example](apps/web/.env.example), y los secretos solo en el backend según [apps/api/.env.example](apps/api/.env.example). La [guía de despliegue](docs/deployment-vercel.md) detalla PostgreSQL/Neon, Blob privado, QStash, CORS, mantenimiento, cuotas de planes gratuitos y comprobaciones previas. No se han creado cuentas, contratado ni desplegado servicios.
 
-`report.zip` contiene un libro por informe de la versión elegida y `changes.json`/`changes.xlsx`.
-COREP y el ejemplo tipado usan plantillas saneadas: CA1 y Datos respectivamente. FINREP conserva el libro original, modifica solo los importes seleccionados y su contexto, y verifica la salida antes de publicarla. Sus hojas excluidas se conservan sin considerarlas validadas; si falta el original o ha cambiado, la exportación falla sin sustituirlo por una reconstrucción.
-Los importes conservan su valor exacto y escala; una cifra que no pueda representarse con seguridad
-como número Excel se escribe como texto decimal exacto. Texto, fechas civiles, vacío informado y
-sin dato permanecen diferenciados. La salida anterior sigue usando `ce-report-1`.
+**Capacidad máxima pendiente:** con 2 GB y una CPU, validar 500 reglas sobre 100.000 hechos supera el plazo de 60 segundos. La exportación máxima, memoria y temporales pasan sus comprobaciones, pero la viabilidad alojada de ese volumen aún no está acreditada. No se han reducido límites ni activado planes de pago para ocultarlo.
 
-En COREP las hojas excluidas no se reconstruyen. Son archivos de trabajo local reimportables, no ficheros
-oficiales de remisión. Para reimportarlos, extraer los informes y cargarlos con su catálogo;
-se crean nuevas fuentes y localizadores, sin restaurar recibos históricos. `results.zip` contiene
-los resultados de la ejecución elegida en JSON y XLSX, incluido su estado si quedó incompleta.
+Los límites de entrada son 10 MiB por archivo, 50 MiB por lote, 100 MiB expandidos y hasta 20 informes. La demo alojada limita además sesiones, trabajos, almacenamiento y consumo de proveedores. Las [medidas y su alcance](docs/verification-005.md) separan los recorridos funcionales, el rendimiento local, la capacidad alojada y el despliegue real pendiente.
 
-- Una entidad/fecha y un conjunto activo; hasta 500 filas de catálogo, 20 informes y
-  100.000 coordenadas/hechos. Máximo 10 MiB por archivo, 50 MiB comprimidos por lote y
-  100 MiB descomprimidos. Los perfiles visuales tienen además su estructura cerrada.
-- Una inspección viva por conjunto, con 15 minutos desde que queda lista. Confirmarla exige
-  la misma base y aceptar sus exclusiones. Una tarea activa, hasta 60 segundos de trabajo y
-  120 segundos para recibir archivos. Los límites completos están en capacidades y contratos.
-- La sesión local se recupera al refrescar el navegador, pero termina al cerrar el conjunto o
-  reiniciar el servidor. Hasta 20 snapshots y cuotas separadas de 512 MiB de estado y de archivos.
-  Las descargas guardadas por el usuario sobreviven al cierre.
-- Un fallo o cancelación anterior a publicar conserva la versión vigente. Cancelar después no
-  deshace una aplicación publicada. Una aceptación sin cambio se audita con `changed:false`.
+## Pruebas
 
-La medición de **004** con 500 reglas y 100.000 lecturas pasa **10/10 auditorías y ejecuciones ≤30 s**: rango **14,28–15,80 s**, mediana **15,05 s**, desde fin de carga hasta resultados visibles y cobertura comprobada. La carga se mide aparte: **28,50–30,54 s**. Es una referencia sintética `ce-report-1`, distinta de los recorridos visuales FINREP. La búsqueda automática de 500 reglas tarda **304–313 ms** en las cuatro comprobaciones. [Verificación y límites de 004](docs/verification-004.md) describe el protocolo, equipo, memoria, aviso de bundle y pendiente humano SC-010. Las mediciones de [002](docs/verification-002.md) y [001](docs/performance.md) se conservan como evidencia histórica.
+Después de preparar y construir el proyecto:
 
-## Documentos y desarrollo
+```sh
+npm run typecheck
+npm test
+npm run test:e2e
+npm run test:hosted
+npm run test:e2e:hosted
+npm run test:package:linux
+npm run test:capacity:hosted
+```
 
-- [Especificación 004](specs/004-flujo-claro-finrep/spec.md), [plan](specs/004-flujo-claro-finrep/plan.md), [tareas](specs/004-flujo-claro-finrep/tasks.md), [recorrido de comprobación](specs/004-flujo-claro-finrep/quickstart.md) y [verificación](docs/verification-004.md).
-- [Recorrido y comprobaciones de la iteración 003](specs/003-simplificar-flujo/quickstart.md), [revisión de destinos](specs/003-simplificar-flujo/contracts/direction-review.md) y [registro de verificación 003](docs/verification-003.md).
-- [Inicio y comprobaciones 002](specs/002-ui-eba-demo/quickstart.md), [demos](docs/visual-demos.md)
-  y [evidencia ejecutada](docs/verification-002.md).
-- [Especificación 002](specs/002-ui-eba-demo/spec.md), [plan](specs/002-ui-eba-demo/plan.md),
-  [tareas](specs/002-ui-eba-demo/tasks.md) y [modelo](specs/002-ui-eba-demo/data-model.md).
-- Contratos de [HTTP](specs/002-ui-eba-demo/contracts/http-api.md),
-  [libros y perfiles](specs/002-ui-eba-demo/contracts/workbook-profiles.md) y
-  [lenguaje](specs/002-ui-eba-demo/contracts/language-profile.md).
-- [Toolchain y scripts](scripts/README.md), [constitución](.specify/memory/constitution.md)
-  y [guía histórica 001](specs/001-regulatory-validation/quickstart.md).
+En Windows se pueden ejecutar mediante `run-with-toolchain.ps1`. Las pruebas de navegador requieren Chromium de Playwright; las alojadas, de empaquetado Linux y capacidad requieren Docker Desktop con contenedores Linux. El [quickstart de 005](specs/005-simplificar-flujo-vercel/quickstart.md) recoge preparación, comandos, puertos y escenarios reproducibles.
 
-Spec Kit organiza el trabajo y Git conserva commits por funcionalidades verificadas. Los
-originales EBA y las gramáticas permanecen intactos; la generación comprueba sus hashes.
-Cargas, temporales, descargas y credenciales locales no se incorporan al repositorio.
-La revisión por recibos permanece `disabled/unmanaged`; los checklists de Spec Kit son documentales.
+Los recorridos COREP, FINREP y texto/fechas se verificaron en local y con dos instancias de API sobre PostgreSQL. El paquete Linux pasa desde una instalación limpia. La referencia local de 500 reglas y 100.000 lecturas pasa 10/10 ejecuciones entre 16,4 y 22,8 s; no equivale a la capacidad del alojamiento con una CPU. `test:capacity:hosted` conserva el fallo de plazo indicado arriba. Consultar el [registro de verificación](docs/verification-005.md) para resultados, repeticiones y límites; las pruebas automáticas no se presentan como aceptación humana.
+
+## Capturas del flujo
+
+Capturas reales de la demo COREP con datos sintéticos, tomadas tras las comprobaciones de esta iteración.
+
+<details>
+<summary>1. Cargar: inspección y confirmación</summary>
+
+![Carga COREP con contexto y botón Confirmar carga](docs/images/flow-005-load.png)
+
+</details>
+
+<details>
+<summary>2. Validar: resultados y explicación</summary>
+
+![Validación COREP con siete reglas correctas, ocho incorrectas y una no aplicable](docs/images/flow-005-validate.png)
+
+</details>
+
+<details>
+<summary>3. Recalcular: comparación antes y después</summary>
+
+![Cinco cambios aplicados y comparación de validaciones](docs/images/flow-005-recalculate.png)
+
+</details>
+
+<details>
+<summary>4. Descargar: versión y una única acción</summary>
+
+![Descarga de la versión tres con un único botón](docs/images/flow-005-download.png)
+
+</details>
+
+## Desarrollo con Spec Kit
+
+El trabajo sigue **especificación → plan → tareas → implementación → verificación**, con commits por funcionalidades. La [constitución](.specify/memory/constitution.md) fija las garantías del motor; la iteración actual conserva su [especificación](specs/005-simplificar-flujo-vercel/spec.md), [plan](specs/005-simplificar-flujo-vercel/plan.md) y [tareas](specs/005-simplificar-flujo-vercel/tasks.md). Las gramáticas y fuentes originales EBA se mantienen intactas y verificadas por hash. La revisión por recibos permanece `disabled/unmanaged`; los checklists de Spec Kit son documentales.

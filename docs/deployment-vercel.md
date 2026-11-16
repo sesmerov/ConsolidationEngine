@@ -2,6 +2,8 @@
 
 La configuración separa Angular y la API en dos proyectos. La demo admite exclusivamente uso con datos sintéticos y sesiones anónimas independientes. Esta guía prepara un despliegue posterior: no acredita recursos contratados ni un despliegue real. Los resultados de cada comprobación están en [verification-005.md](verification-005.md).
 
+**Capacidad pendiente:** la prueba de 500 reglas y 100.000 hechos con 2 GB/1 CPU alcanza el plazo de 60 s durante la evaluación. Memoria y temporales cumplen sus límites, pero ese caso máximo aún no está habilitado como capacidad demostrada del alojamiento gratuito. No abrir la demo anunciando ese volumen como garantizado; consultar las medidas y el estado de gates antes de publicar.
+
 ## Proyectos y comandos
 
 Crear posteriormente dos proyectos del mismo repositorio, habilitando en ambos el acceso a archivos fuera de su Root Directory. Los archivos `vercel.json` ya contienen los comandos y las reglas de enrutado.
