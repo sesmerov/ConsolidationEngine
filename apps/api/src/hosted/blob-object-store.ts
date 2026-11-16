@@ -31,20 +31,27 @@ export class BlobObjectTransport implements PrivateObjectTransport {
     try { result = await this.sdk.get(privateKey, { access: 'private', token: this.token, useCache: false, ...(signal ? { abortSignal: signal } : {}) }); }
     catch (error) { this.failed('blob-get', error); throw error; }
     if (!result) return null;
-    if (result.statusCode !== 200 || !result.stream || result.blob.size < 1 || result.blob.size > MAX_PRIVATE_OBJECT_PART_BYTES) {
+    // Private uncached responses can omit Content-Length; the SDK then reports size 0.
+    // Count the stream in that case. ObjectLedger still verifies its authoritative size and SHA-256.
+    const expectedSize = result.blob.size === 0 && result.headers?.get('content-length') === null ? undefined : result.blob.size;
+    if (result.statusCode !== 200 || !result.stream || expectedSize !== undefined && (typeof expectedSize !== 'number' || !Number.isSafeInteger(expectedSize) || expectedSize < 1 || expectedSize > MAX_PRIVATE_OBJECT_PART_BYTES)) {
       const error = new RangeError('Invalid private object length.');
-      this.failed('blob-read', error, result.blob.size === 0 && result.headers?.get('content-length') === null ? 'missing-length' : 'invalid-length');
+      await result.stream?.cancel().catch(() => undefined);
+      this.failed('blob-read', error, 'invalid-length');
       throw error;
     }
     const reader = result.stream.getReader(), chunks: Uint8Array[] = []; let size = 0;
     let readReason: ProviderFailureReason | undefined;
+    const onAbort = () => { void reader.cancel().catch(() => undefined); };
+    signal?.addEventListener('abort', onAbort, { once: true });
     try {
-      for (;;) { const read = await reader.read(); if (read.done) break; size += read.value.byteLength;
-        if (size > MAX_PRIVATE_OBJECT_PART_BYTES || size > result.blob.size || signal?.aborted) { readReason = signal?.aborted ? 'timeout' : 'read-limit'; throw new Error('Private object transfer interrupted.'); } chunks.push(read.value);
+      signal?.throwIfAborted();
+      for (;;) { const read = await reader.read(); signal?.throwIfAborted(); if (read.done) break; size += read.value.byteLength;
+        if (size > MAX_PRIVATE_OBJECT_PART_BYTES || expectedSize !== undefined && size > expectedSize) { readReason = 'read-limit'; throw new Error('Private object transfer interrupted.'); } chunks.push(read.value);
       }
-      if (size !== result.blob.size) { readReason = 'incomplete-read'; throw new Error('Incomplete private object transfer.'); } return Buffer.concat(chunks, size);
+      if (!size || expectedSize !== undefined && size !== expectedSize) { readReason = 'incomplete-read'; throw new Error('Incomplete private object transfer.'); } return Buffer.concat(chunks, size);
     } catch (error) { this.failed('blob-read', error, readReason); throw error;
-    } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
+    } finally { signal?.removeEventListener('abort', onAbort); await reader.cancel().catch(() => undefined); reader.releaseLock(); }
   }
   async remove(privateKey: string, signal?: AbortSignal): Promise<void> {
     key(privateKey); try { await this.sdk.del(privateKey, { token: this.token, ...(signal ? { abortSignal: signal } : {}) }); }

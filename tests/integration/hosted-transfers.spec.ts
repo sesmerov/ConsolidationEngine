@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ObjectLedger } from '../../apps/api/src/hosted/object-ledger.js';
+import { BlobObjectTransport } from '../../apps/api/src/hosted/blob-object-store.js';
 import { CanonicalCodec } from '../../apps/api/src/hosted/canonical-codec.js';
 import { QuotaLedger } from '../../apps/api/src/hosted/quota-ledger.js';
 import { createHostedHarness, type HostedHarness } from '../helpers/hosted-harness.js';
@@ -25,6 +26,16 @@ describe('private immutable storage, real PostgreSQL and controlled provider byt
     const ref = await one.putObject(owner, Buffer.from('private'), context(), 'files'), other = await seedOwner(harness), before = harness.objectTransport.calls.length;
     await expect(two.getObject(other, ref)).rejects.toMatchObject({ code: 'RESOURCE_NOT_FOUND' }); expect(harness.objectTransport.calls).toHaveLength(before);
     harness.objectTransport.corrupt(harness.objectTransport.entries()[0]!.privateKey, Buffer.from('changed')); await expect(two.getObject(owner, ref)).rejects.toThrow(/integrity/i);
+  });
+  it('verifies authoritative SQL length and hash even when private Blob omits Content-Length', async () => {
+    let bytes = Buffer.from('private');
+    const sdk = { put: async () => ({}), del: async () => {}, get: async () => ({ statusCode: 200, blob: { size: 0 }, headers: new Headers(),
+      stream: new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(bytes); controller.close(); } }) }) };
+    const transport = new BlobObjectTransport('synthetic-test-token', sdk as unknown as NonNullable<ConstructorParameters<typeof BlobObjectTransport>[1]>, () => {});
+    const ledger = new ObjectLedger(harness.databases[0], transport, new QuotaLedger(harness.databases[0], harness.config), () => harness.clock.date());
+    const ref = await ledger.putObject(owner, bytes, context(), 'files'); expect(await ledger.getObject(owner, ref)).toEqual(bytes);
+    bytes = Buffer.from('privat'); await expect(ledger.getObject(owner, ref)).rejects.toThrow(/integrity/i);
+    bytes = Buffer.from('changed'); await expect(ledger.getObject(owner, ref)).rejects.toThrow(/integrity/i);
   });
   it('keeps an acknowledged-lost write charged and reconciles its same private key before reuse', async () => {
     const bytes = Buffer.from('uncertain'), request = context(); harness.objectTransport.failNext('put', 'after'); await expect(one.putObject(owner, bytes, request, 'files')).rejects.toThrow();

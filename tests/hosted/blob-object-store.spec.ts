@@ -50,14 +50,34 @@ describe('private Blob provider adapter with controlled SDK boundary', () => {
     log.mockImplementation(() => { throw new Error('sink failure'); }); calls.del.mockRejectedValueOnce(unknown);
     await expect(transport.remove(privateKey)).rejects.toBe(unknown);
   });
-  it('distinguishes missing length from incomplete streams without changing fail-closed reads', async () => {
+  it('reads missing Content-Length with a bounded counter, but rejects empty, oversized and explicitly invalid lengths', async () => {
     vi.stubEnv('VERCEL_BLOB_RETRIES', '0'); const { transport, calls, log } = fixture();
-    calls.get.mockResolvedValueOnce({ ...body([Buffer.from('x')], 0), headers: new Headers() });
+    const missingLength = (chunks: Uint8Array[]) => ({ ...body(chunks, 0), headers: new Headers() });
+    calls.get.mockResolvedValueOnce(missingLength([Buffer.from('valid')]));
+    expect(await transport.get(privateKey)).toEqual(Buffer.from('valid')); expect(log).not.toHaveBeenCalled();
+    const max = Buffer.alloc(3 * 1024 * 1024, 7);
+    calls.get.mockResolvedValueOnce(missingLength([max])); expect((await transport.get(privateKey))?.length).toBe(max.length);
+    calls.get.mockResolvedValueOnce(missingLength([max, Buffer.from('x')])); await expect(transport.get(privateKey)).rejects.toThrow(/interrupted/);
+    expect(log).toHaveBeenLastCalledWith('provider_failed', { providerOperation: 'blob-read', providerReason: 'read-limit' });
+    calls.get.mockResolvedValueOnce(missingLength([])); await expect(transport.get(privateKey)).rejects.toThrow(/Incomplete/);
+    calls.get.mockResolvedValueOnce({ ...body([Buffer.from('x')], 0), headers: new Headers({ 'content-length': '0' }) });
     await expect(transport.get(privateKey)).rejects.toThrow(/length/);
-    expect(log).toHaveBeenLastCalledWith('provider_failed', { providerOperation: 'blob-read', providerReason: 'missing-length' });
+    expect(log).toHaveBeenLastCalledWith('provider_failed', { providerOperation: 'blob-read', providerReason: 'invalid-length' });
     calls.get.mockResolvedValueOnce(body([Buffer.from('x')], 2));
     await expect(transport.get(privateKey)).rejects.toThrow(/Incomplete/);
     expect(log).toHaveBeenLastCalledWith('provider_failed', { providerOperation: 'blob-read', providerReason: 'incomplete-read' });
+  });
+  it('cancels rejected responses and aborts a pending stream read without retaining its reader lock', async () => {
+    vi.stubEnv('VERCEL_BLOB_RETRIES', '0'); const { transport, calls, log } = fixture(), cancel = vi.fn();
+    const invalid = new ReadableStream<Uint8Array>({ cancel });
+    calls.get.mockResolvedValueOnce({ statusCode: 304, blob: { size: 0 }, headers: new Headers(), stream: invalid });
+    await expect(transport.get(privateKey)).rejects.toThrow(/length/); expect(cancel).toHaveBeenCalledTimes(1); expect(invalid.locked).toBe(false);
+    const controller = new AbortController(), aborted = new ReadableStream<Uint8Array>({ cancel });
+    calls.get.mockResolvedValueOnce({ statusCode: 200, blob: { size: 0 }, headers: new Headers(), stream: aborted });
+    const reading = transport.get(privateKey, controller.signal), rejection = expect(reading).rejects.toMatchObject({ name: 'AbortError' });
+    await Promise.resolve(); controller.abort(); await rejection;
+    expect(cancel).toHaveBeenCalledTimes(2); expect(aborted.locked).toBe(false);
+    expect(log).toHaveBeenLastCalledWith('provider_failed', { providerOperation: 'blob-read', providerReason: 'timeout' });
   });
   it('deletes a bounded batch with one provider request and rejects unbounded lists before I/O', async () => {
     vi.stubEnv('VERCEL_BLOB_RETRIES', '0'); const { transport, calls } = fixture(), controller = new AbortController();
