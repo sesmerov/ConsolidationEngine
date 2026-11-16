@@ -14,13 +14,15 @@ Crear posteriormente dos proyectos del mismo repositorio, habilitando en ambos e
 | Framework preset | Other | Other |
 | Install Command | `cd ../.. && npx --yes npm@11.19.1 ci --engine-strict=false` | Igual |
 | Build Command | `cd ../.. && npx --yes npm@11.19.1 run package:vercel:web` | `cd ../.. && npx --yes npm@11.19.1 run package:vercel:api` |
-| Output Directory | `.vercel-dist/browser` | Función `api/index.ts`, sin salida estática |
+| Output Directory | `.vercel-dist/browser` | `public`; solo `robots.txt`. API en la función `api/index.ts` |
 | Node | 24.x | 24.x, Fluid Compute |
 | Recursos | Archivos estáticos | Hobby: 2 GB / 1 vCPU; `maxDuration: 120` |
 
 La instalación permite el patch de Node gestionado por Vercel; los scripts comprueban Node 24 y npm 11.19.1. Localmente se mantienen Node 24.22.2 y `engine-strict`. Registrar la versión efectiva del proveedor, sin asumir que coincidirá exactamente. La generación ANTLR necesita Java ≥11 durante el build y verifica el JAR y las gramáticas; no genera el parser durante peticiones. El paquete incluye los workers, migraciones SQL, perfiles, demos y paquetes compartidos.
 
 El frontend tiene una ruta de documento `/`; las cuatro etapas pertenecen a la misma aplicación. La regla de fallback no transforma un asset inexistente en HTML. La API conserva la URL original al redirigir `/api/v1/*` y `/internal/*` a su función. Espera a `Fastify.ready()` y al final de la respuesta, sin abrir otro listener. [Configuración de funciones](https://vercel.com/docs/project-configuration/vercel-json), [límites y memoria](https://vercel.com/docs/functions/limitations).
+
+El backend declara `public` como salida estática y conserva allí únicamente `robots.txt`. Vercel necesita una carpeta de salida no vacía al ejecutar este build personalizado; la función continúa en `api/index.ts`. No usar `.` ni `dist` como salida pública: expondrían fuentes o recursos internos. El manifiesto de empaquetado permanece fuera de `public`. [Directorio de salida](https://vercel.com/docs/builds/configure-a-build#output-directory).
 
 ## Configuración privada y pública
 

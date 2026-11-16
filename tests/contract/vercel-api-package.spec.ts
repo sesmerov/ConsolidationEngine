@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -50,6 +50,12 @@ describe('Vercel API packaging', () => {
   it('uses explicit function routing and traces the dynamically loaded runtime trees', async () => {
     const config = JSON.parse(await readFile(new URL('../../apps/api/vercel.json', import.meta.url), 'utf8'));
     expect(config.framework).toBeNull();
+    // Vercel's static builder requires a non-empty directory, even for this API-only project.
+    // Serving the project root instead would expose source files and runtime assets.
+    expect(config.outputDirectory).toBe('public');
+    const staticDirectory = new URL(`../../apps/api/${config.outputDirectory}/`, import.meta.url);
+    expect(await readdir(staticDirectory)).toEqual(['robots.txt']);
+    expect((await readFile(new URL('robots.txt', staticDirectory), 'utf8')).replaceAll('\r\n', '\n')).toBe('User-agent: *\nDisallow: /\n');
     expect(config.functions['api/index.ts']).toEqual({ maxDuration: 120,
       includeFiles: '{dist/**,../../packages/contracts/dist/**,../../packages/contracts/package.json,../../packages/engine/dist/**,../../packages/engine/package.json}' });
     expect(config.rewrites).toEqual([
